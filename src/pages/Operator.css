@@ -1,0 +1,36 @@
+.operator-page {
+    padding: var(--spacing-4);
+}
+
+.operator-dashboard .status-update-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-2);
+}
+
+.operator-dashboard .status-update-panel h3 {
+    margin: 0;
+    font-size: 1.125rem;
+    color: var(--text-color);
+}
+
+.operator-dashboard .btn-group {
+    display: flex;
+    gap: var(--spacing-2);
+    flex-wrap: wrap;
+}
+
+.operator-dashboard .task-list {
+    margin-top: var(--spacing-4);
+}
+
+.operator-dashboard .task-list h3 {
+    margin: 0 0 var(--spacing-3) 0;
+    font-size: 1.125rem;
+    color: var(--text-color);
+}
+
+.operator-dashboard .progress-container {
+    width: 100%;
+    margin-top: 4px;
+}
