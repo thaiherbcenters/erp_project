@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
   --primary: #4f46e5;
@@ -6,7 +6,7 @@
   --primary-light: #818cf8;
   --primary-bg: #eef2f6;
   --accent: #4338ca;
-  --bg: #f8f9fa;
+  --bg: #f8fafc;
   --bg-white: #ffffff;
   --border: #e2e8f0;
   --border-light: #f1f5f9;
@@ -14,13 +14,13 @@
   --text-secondary: #475569;
   --text-muted: #94a3b8;
   --success: #10b981;
-  --warning: #ff9800;
-  --danger: #f44336;
-  --info: #2196f3;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --info: #3b82f6;
 
-  font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif;
-  line-height: 1.6;
-  font-weight: 500;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
   color: var(--text);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -56,7 +56,7 @@ a {
   padding: 48px;
   background: var(--bg-white);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: 8px;
 }
 
 .no-access-icon {
@@ -67,15 +67,15 @@ a {
 }
 
 .no-access-card h2 {
-  font-size: 20px;
+  font-size: 18px;
   color: var(--text);
   margin-bottom: 8px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .no-access-card p {
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 /* Scrollbar */

@@ -50,6 +50,7 @@ import Planning from './pages/Planning';
 import Operator from './pages/Operator';
 import RnD from './pages/RnD';
 import Packaging from './pages/Packaging';
+import DocumentControl from './pages/DocumentControl';
 
 function App() {
   return (
@@ -98,6 +99,9 @@ function App() {
             } />
             <Route path="/packaging" element={
               <ProtectedRoute pageId="packaging"><Packaging /></ProtectedRoute>
+            } />
+            <Route path="/document" element={
+              <ProtectedRoute pageId="document"><DocumentControl /></ProtectedRoute>
             } />
 
             {/* บุคลากร */}

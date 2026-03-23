@@ -36,6 +36,7 @@ import {
     LogOut,
     ChevronLeft,
     ChevronRight,
+    ChevronDown,
     ClipboardCheck,
     Calculator,
     ShoppingBag,
@@ -47,6 +48,8 @@ import {
     Wrench,
     FlaskConical,
     PackageOpen,
+    FileText,
+    Menu,
 } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoSmallUrl from '../assets/logo-small.png';
@@ -70,6 +73,7 @@ const PAGE_ICONS = {
     operator: <Wrench size={20} />,
     rnd: <FlaskConical size={20} />,
     packaging: <PackageOpen size={20} />,
+    document: <FileText size={20} />,
 };
 
 const getPageIcon = (pageId) => {
@@ -92,6 +96,7 @@ const ROLE_LABELS = {
     operator: 'พนักงานฝ่ายผลิต',
     rnd: 'นักวิจัยและพัฒนา',
     packaging: 'พนักงานบรรจุภัณฑ์',
+    document_control: 'เจ้าหน้าที่ควบคุมเอกสาร',
 };
 
 /** แปลง role code เป็นชื่อภาษาไทย (default: ผู้ใช้งาน) */
@@ -102,6 +107,7 @@ const getRoleLabel = (role) => ROLE_LABELS[role] || 'ผู้ใช้งาน
 // =============================================================================
 const CORE_MENU_IDS = ['home', 'stock', 'sales', 'accounts', 'procurement', 'reports', 'qc'];
 const PRODUCT_MENU_IDS = ['planning', 'operator', 'rnd', 'packaging'];
+const DOC_MENU_IDS = ['document'];
 const HR_MENU_IDS = ['hr'];
 const SYSTEM_MENU_IDS = ['settings', 'permissions'];
 
@@ -116,9 +122,18 @@ export default function Layout() {
     // ── Sidebar state ──
     const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [expandedGroups, setExpandedGroups] = useState({});
 
     // ── Pages ที่ user มีสิทธิ์เห็น ──
     const visiblePages = getVisiblePages();
+
+    // ── Auto-expand group ที่ตรงกับ URL ปัจจุบัน ──
+    useEffect(() => {
+        const matchedPage = visiblePages.find((p) => location.pathname.startsWith(p.path));
+        if (matchedPage) {
+            setExpandedGroups((prev) => ({ ...prev, [matchedPage.id]: true }));
+        }
+    }, [location.pathname]);
 
     // ── ปรับ sidebar ตามขนาดหน้าจอ ──
     useEffect(() => {
@@ -143,39 +158,72 @@ export default function Layout() {
     };
 
     // =================================================================
+    // Sub-component: toggle เปิด/ปิด sub-menu ของแต่ละกลุ่ม
+    // =================================================================
+    const toggleGroup = (pageId) => {
+        setExpandedGroups((prev) => ({ ...prev, [pageId]: !prev[pageId] }));
+    };
+
+    // =================================================================
     // Sub-component: แสดงเมนูและ sub-navigation
     // =================================================================
-    const renderNavGroup = (page) => (
-        <div key={page.id} className="nav-group">
-            {/* เมนูหลัก */}
-            <NavLink
-                to={page.path}
-                end
-                className={() => `nav-item ${location.pathname.startsWith(page.path) ? 'active' : ''}`}
-                title={!sidebarOpen ? page.name : ''}
-            >
-                <span className="nav-icon-wrapper">{getPageIcon(page.id)}</span>
-                <span className="nav-label">{page.name}</span>
-            </NavLink>
+    const renderNavGroup = (page) => {
+        const subPages = page.id !== 'permissions' ? getVisibleSubPages(page.id) : null;
+        const hasSubPages = subPages && subPages.length > 0;
+        const isActive = location.pathname.startsWith(page.path);
+        const isExpanded = expandedGroups[page.id];
 
-            {/* Sub-navigation: แสดงเฉพาะเมื่อ sidebar เปิด + อยู่ในหน้านั้น */}
-            {sidebarOpen && location.pathname.startsWith(page.path) && (
-                page.id !== 'permissions' && getVisibleSubPages(page.id)?.map((sub) => (
-                    <NavLink
-                        key={sub.id}
-                        to={`${page.path}?tab=${sub.id}`}
-                        className={() => {
-                            const currentTab = new URLSearchParams(location.search).get('tab')
-                                || getVisibleSubPages(page.id)[0]?.id;
-                            return `sub-nav-item ${currentTab === sub.id ? 'active' : ''}`;
-                        }}
-                    >
-                        <span className="nav-label">{sub.name}</span>
-                    </NavLink>
-                ))
-            )}
-        </div>
-    );
+        const handleClick = (e) => {
+            if (hasSubPages && isActive) {
+                // ถ้าอยู่ในหน้านี้อยู่แล้ว → toggle ซ่อน/แสดง sub-menu
+                e.preventDefault();
+                toggleGroup(page.id);
+            } else if (hasSubPages) {
+                // ถ้ากดจากหน้าอื่น → เปิด sub-menu
+                setExpandedGroups((prev) => ({ ...prev, [page.id]: true }));
+            }
+        };
+
+        return (
+            <div key={page.id} className="nav-group">
+                {/* เมนูหลัก */}
+                <NavLink
+                    to={page.path}
+                    end
+                    className={() => `nav-item ${isActive ? 'active' : ''}`}
+                    title={!sidebarOpen ? page.name : ''}
+                    onClick={handleClick}
+                >
+                    <span className="nav-icon-wrapper">{getPageIcon(page.id)}</span>
+                    <span className="nav-label">{page.name}</span>
+                    {hasSubPages && sidebarOpen && (
+                        <span className={`nav-chevron ${isExpanded ? 'expanded' : ''}`}>
+                            <ChevronDown size={16} />
+                        </span>
+                    )}
+                </NavLink>
+
+                {/* Sub-navigation: แสดงเมื่อ sidebar เปิด + group ถูก expand */}
+                {sidebarOpen && isExpanded && hasSubPages && (
+                    <div className="sub-nav-list">
+                        {subPages.map((sub) => (
+                            <NavLink
+                                key={sub.id}
+                                to={`${page.path}?tab=${sub.id}`}
+                                className={() => {
+                                    const currentTab = new URLSearchParams(location.search).get('tab')
+                                        || getVisibleSubPages(page.id)[0]?.id;
+                                    return `sub-nav-item ${isActive && currentTab === sub.id ? 'active' : ''}`;
+                                }}
+                            >
+                                <span className="nav-label">{sub.name}</span>
+                            </NavLink>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     // =================================================================
     // Sub-component: แสดงกลุ่มเมนู (section title + items)
@@ -209,7 +257,7 @@ export default function Layout() {
             {isMobile && (
                 <header className="mobile-header">
                     <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
-                        ☰
+                        <Menu size={22} />
                     </button>
                     <span className="mobile-title">THAI HERB</span>
                     <span className="mobile-user">{currentUser?.avatar}</span>
@@ -262,6 +310,7 @@ export default function Layout() {
                 <nav className="sidebar-nav">
                     {renderMenuSection('เมนูหลัก', CORE_MENU_IDS)}
                     {renderMenuSection('การผลิต', PRODUCT_MENU_IDS, { marginTop: '16px' })}
+                    {renderMenuSection('ระบบเอกสาร', DOC_MENU_IDS, { marginTop: '16px' })}
                     {renderMenuSection('บุคลากร', HR_MENU_IDS, { marginTop: '16px' })}
                     {renderMenuSection('ระบบ', SYSTEM_MENU_IDS, { marginTop: '16px' })}
                 </nav>

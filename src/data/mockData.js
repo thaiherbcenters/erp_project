@@ -32,13 +32,11 @@
 //   - 'stock'     : พนักงานคลังสินค้า — เข้าถึง home, stock
 //   - 'rnd'       : นักวิจัยและพัฒนา — เข้าถึง home, rnd
 //   - 'packaging' : พนักงานบรรจุภัณฑ์ — เข้าถึง home, packaging
+//   - 'document_control': เจ้าหน้าที่ควบคุมเอกสาร — เข้าถึง home, document
 
 export const MOCK_USERS = [
   { id: 'it_admin', username: 'it_admin', password: 'admin123', displayName: 'ผู้ดูแลระบบ', role: 'admin', avatar: 'IT' },
   { id: 'exec', username: 'exec', password: 'password', displayName: 'ผู้บริหาร', role: 'executive', avatar: 'EX' },
-  { id: 'user1', username: 'user1', password: 'pass1', displayName: 'สมชาย ใจดี', role: 'user', avatar: 'U1' },
-  { id: 'user2', username: 'user2', password: 'pass2', displayName: 'สมหญิง รักเรียน', role: 'user', avatar: 'U2' },
-  { id: 'user3', username: 'user3', password: 'pass3', displayName: 'สมศักดิ์ มั่นคง', role: 'user', avatar: 'U3' },
   { id: 'qc1', username: 'qc1', password: 'qc123', displayName: 'เจ้าหน้าที่ QC', role: 'qc', avatar: 'QC' },
   { id: 'sales1', username: 'sales1', password: 'sales123', displayName: 'พนักงานขาย', role: 'sales', avatar: 'SL' },
   { id: 'acc1', username: 'acc1', password: 'acc123', displayName: 'พนักงานบัญชี', role: 'accountant', avatar: 'AC' },
@@ -49,6 +47,7 @@ export const MOCK_USERS = [
   { id: 'op1', username: 'op1', password: 'op123', displayName: 'พนักงานฝ่ายผลิต', role: 'operator', avatar: 'OP' },
   { id: 'rnd1', username: 'rnd1', password: 'rnd123', displayName: 'นักวิจัยและพัฒนา', role: 'rnd', avatar: 'RD' },
   { id: 'pkg1', username: 'pkg1', password: 'pkg123', displayName: 'พนักงานบรรจุภัณฑ์', role: 'packaging', avatar: 'PK' },
+  { id: 'doc1', username: 'doc1', password: 'doc123', displayName: 'เจ้าหน้าที่ควบคุมเอกสาร', role: 'document_control', avatar: 'DC' },
 ];
 
 // =============================================================================
@@ -439,6 +438,56 @@ export const ALL_PAGES = [
       },
     ],
   },
+
+  // --- ควบคุมเอกสาร (Document Control) ---
+  {
+    id: 'document', name: 'ควบคุมเอกสาร', path: '/document',
+    subPages: [
+      {
+        id: 'document_dashboard', name: 'Document Dashboard',
+        sections: [
+          { id: 'document_dashboard_stats', name: 'สถิติเอกสาร' },
+          { id: 'document_dashboard_recent', name: 'เอกสารอัปเดตล่าสุด' },
+        ],
+      },
+      {
+        id: 'document_list', name: 'รายการเอกสาร (Master List)',
+        sections: [
+          { id: 'document_list_search', name: 'ค้นหาเอกสาร' },
+          { id: 'document_list_table', name: 'ตารางรายชื่อเอกสาร' },
+        ],
+      },
+      {
+        id: 'document_forms', name: 'แบบฟอร์มเอกสาร (Form)',
+        sections: [
+          { id: 'document_forms_search', name: 'ค้นหาแบบฟอร์ม' },
+          { id: 'document_forms_table', name: 'ตารางแบบฟอร์ม' },
+        ],
+      },
+      {
+        id: 'document_request', name: 'ใบคำร้องเอกสาร (DAR)',
+        sections: [
+          { id: 'document_request_search', name: 'ค้นหาใบคำร้อง' },
+          { id: 'document_request_table', name: 'ตารางใบคำร้อง' },
+          { id: 'document_request_action', name: 'สร้างใบคำร้องใหม่' },
+        ],
+      },
+      {
+        id: 'document_library', name: 'คลังเอกสาร (Document Library)',
+        sections: [
+          { id: 'document_library_upload', name: 'อัปโหลดเอกสาร' },
+          { id: 'document_library_table', name: 'ตารางคลังเอกสาร' },
+          { id: 'document_library_delete', name: 'ลบเอกสาร' },
+        ],
+      },
+      {
+        id: 'document_customers', name: 'เอกสารข้อมูลลูกค้า',
+        sections: [
+          { id: 'document_customers_form', name: 'ฟอร์มข้อมูลลูกค้า' },
+        ],
+      },
+    ],
+  },
 ];
 
 // =============================================================================
@@ -505,13 +554,11 @@ export const getDefaultPermissions = () => {
   const operatorIds = getPageIds('operator');
   const rndIds = getPageIds('rnd');
   const packagingIds = getPageIds('packaging');
+  const documentIds = getPageIds('document');
 
   return {
     it_admin: allIds,                           // admin — เข้าถึงทุกหน้า
     exec: allIds,                           // executive — เข้าถึงทุกหน้า
-    user1: [...homeIds],                     // user ทั่วไป — เฉพาะหน้าหลัก
-    user2: [...homeIds],
-    user3: [...homeIds],
     qc1: [...homeIds, ...qcIds],           // qc — หน้าหลัก + QC
     sales1: [...homeIds, ...salesIds],         // sales — หน้าหลัก + ฝ่ายขาย
     acc1: [...homeIds, ...accountsIds],      // accountant — หน้าหลัก + บัญชี
@@ -522,6 +569,7 @@ export const getDefaultPermissions = () => {
     op1: [...homeIds, ...operatorIds],          // operator - หน้าหลัก + ฝ่ายผลิต
     rnd1: [...homeIds, ...rndIds],              // rnd - หน้าหลัก + วิจัยและพัฒนา
     pkg1: [...homeIds, ...packagingIds],         // packaging - หน้าหลัก + บรรจุภัณฑ์
+    doc1: [...homeIds, ...documentIds],          // document_control - หน้าหลัก + ควบคุมเอกสาร
   };
 };
 

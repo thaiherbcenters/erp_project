@@ -6,21 +6,19 @@
  * Context นี้จัดการ:
  *   1. การ Login / Logout
  *   2. เก็บ user ปัจจุบันใน localStorage
- *   3. ระบบสิทธิ์ 3 ระดับ (page → subPage → section)
+ *   3. ระบบสิทธิ์ 3 ระดับ (page → subPage → section) — อ่าน/เขียนผ่าน API
  *   4. ตรวจสอบสิทธิ์การเข้าถึง (hasPermission, hasSubPermission, hasSectionPermission)
  *   5. ดึงหน้าที่ user มีสิทธิ์เห็น (getVisiblePages, getVisibleSubPages)
- *
- * การใช้งาน:
- *   - ครอบ <AuthProvider> ไว้ที่ root ของ App
- *   - เรียกใช้ useAuth() ใน component ที่ต้องการ
  *
  * =============================================================================
  */
 
-import { createContext, useContext, useState, useEffect } from 'react';
-import { MOCK_USERS, ALL_PAGES, getDefaultPermissions } from '../data/mockData';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { ALL_PAGES } from '../data/mockData';
 
 const AuthContext = createContext(null);
+
+const API_BASE = 'http://localhost:5000/api';
 
 // =============================================================================
 // AuthProvider — ครอบ App ทั้งหมด
@@ -36,24 +34,12 @@ export function AuthProvider({ children }) {
 
     // ──────────────────────────────────────────────────────
     // State: สิทธิ์ของ user ทุกคน { userId: [permissionIds] }
+    // — ข้อมูลจริงอยู่ใน DB, state นี้ใช้เป็น cache เท่านั้น
     // ──────────────────────────────────────────────────────
-    const [permissions, setPermissions] = useState(() => {
-        const saved = localStorage.getItem('erp_permissions');
-        const defaults = getDefaultPermissions();
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                // Merge to ensure new users (like plan1, op1) get defaults even if saved exists
-                return { ...defaults, ...parsed };
-            } catch (e) {
-                return defaults;
-            }
-        }
-        return defaults;
-    });
+    const [permissions, setPermissions] = useState({});
 
     // ──────────────────────────────────────────────────────
-    // Sync state กับ localStorage
+    // Sync currentUser กับ localStorage
     // ──────────────────────────────────────────────────────
     useEffect(() => {
         if (currentUser) {
@@ -63,40 +49,94 @@ export function AuthProvider({ children }) {
         }
     }, [currentUser]);
 
-    useEffect(() => {
-        localStorage.setItem('erp_permissions', JSON.stringify(permissions));
-    }, [permissions]);
+    // =================================================================
+    // API helpers — อ่าน/เขียนสิทธิ์ผ่าน Backend
+    // =================================================================
+
+    /** ดึงสิทธิ์ของ user จาก Backend API */
+    const fetchPermissionsFromAPI = useCallback(async (userId) => {
+        try {
+            const res = await fetch(`${API_BASE}/permissions/${userId}`);
+            if (res.ok) {
+                const data = await res.json();
+                const perms = data.permissions || [];
+                setPermissions(prev => ({ ...prev, [userId]: perms }));
+                return perms;
+            }
+        } catch (err) {
+            console.error('Error fetching permissions:', err);
+        }
+        return [];
+    }, []);
+
+    /** บันทึกสิทธิ์ของ user ลง Backend API */
+    const savePermissionsToAPI = useCallback(async (userId, perms) => {
+        try {
+            await fetch(`${API_BASE}/permissions/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ permissions: perms }),
+            });
+        } catch (err) {
+            console.error('Error saving permissions:', err);
+        }
+    }, []);
 
     // =================================================================
     // Authentication — Login / Logout
     // =================================================================
 
-    /** ตรวจสอบ username + password แล้ว set user ปัจจุบัน */
-    const login = (username, password) => {
-        const user = MOCK_USERS.find(
-            (u) => u.username === username && u.password === password
-        );
-        if (user) {
-            setCurrentUser(user);
+    /** ตรวจสอบ username + password ผ่าน Backend API แล้ว set user ปัจจุบัน */
+    const login = async (username, password) => {
+        try {
+            const response = await fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await response.json();
 
-            // หาหน้าแรกที่ user มีสิทธิ์เข้าถึงเพื่อใช้ Redirect
-            let firstPageId = 'home'; // default
-            if (user.role !== 'admin') {
-                const userPerms = permissions[user.id] || [];
-                const firstAllowedPage = ALL_PAGES.find(p => userPerms.includes(p.id));
-                if (firstAllowedPage) {
-                    firstPageId = firstAllowedPage.id;
+            if (response.ok && data.user) {
+                const user = data.user;
+                setCurrentUser(user);
+                localStorage.setItem('erp_token', data.token);
+
+                // ดึงสิทธิ์จริงจาก DB (ไม่ใช่จาก token)
+                const apiPerms = await fetchPermissionsFromAPI(user.id);
+                
+                // Map to handle legacy vs new format { page_id, data_scope }
+                const perms = apiPerms.map(p => typeof p === 'string' ? { page_id: p, data_scope: 'all' } : p);
+
+                // Update permissions in state
+                setPermissions(prev => ({
+                    ...prev,
+                    [user.id]: perms
+                }));
+
+                // หาหน้าแรกที่ user มีสิทธิ์เข้าถึงเพื่อใช้ Redirect
+                let firstPageId = 'home'; // default
+                if (user.role !== 'admin') {
+                    const firstAllowedPage = ALL_PAGES.find(p => perms.some(userPerm => userPerm.page_id === p.id));
+                    if (firstAllowedPage) {
+                        firstPageId = firstAllowedPage.id;
+                    }
                 }
-            }
 
-            return { success: true, user, redirectPath: `/${firstPageId}` };
+                return { success: true, user, redirectPath: `/${firstPageId}` };
+            } else {
+                return { success: false, message: data.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
+            }
+        } catch (error) {
+            console.error('Login Error:', error);
+            return { success: false, message: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้' };
         }
-        return { success: false, message: 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
     };
 
     /** ล้าง user ปัจจุบัน (Logout) */
     const logout = () => {
         setCurrentUser(null);
+        setPermissions({});
+        localStorage.removeItem('erp_token');
     };
 
     // =================================================================
@@ -119,100 +159,110 @@ export function AuthProvider({ children }) {
     };
 
     // =================================================================
-    // Permission Updates — เปลี่ยนสิทธิ์ (ใช้ในหน้า PermissionManager)
+    // Permission Updates — เปลี่ยนสิทธิ์ + บันทึกลง DB ทันที
     // =================================================================
 
     /**
      * เปิด/ปิดสิทธิ์ระดับ page (cascade ไปยัง subPages + sections ทั้งหมด)
-     * เมื่อปิด → ลบ page + subPages + sections ทั้งหมด
-     * เมื่อเปิด → เพิ่ม page + subPages + sections ทั้งหมด
      */
-    const updatePermissions = (userId, pageId, enabled) => {
+    const updatePermissions = (userId, pageId, enabled, dataScope = 'all') => {
         setPermissions((prev) => {
             const userPerms = prev[userId] || [];
             const page = ALL_PAGES.find((p) => p.id === pageId);
             const childIds = getPageChildIds(page);
 
-            let newPerms;
+            let newPerms = [...userPerms];
             if (enabled) {
-                // เพิ่ม page + children ทั้งหมด (ไม่ซ้ำ)
-                newPerms = [...new Set([...userPerms, pageId, ...childIds])];
+                // Remove existing to replace
+                newPerms = newPerms.filter(p => p.page_id !== pageId && !childIds.includes(p.page_id));
+                newPerms.push({ page_id: pageId, data_scope: dataScope });
+                childIds.forEach(id => newPerms.push({ page_id: id, data_scope: dataScope }));
             } else {
-                // ลบ page + children ทั้งหมด
-                const removeSet = new Set([pageId, ...childIds]);
-                newPerms = userPerms.filter((p) => !removeSet.has(p));
+                newPerms = newPerms.filter(p => p.page_id !== pageId && !childIds.includes(p.page_id));
             }
+
+            // บันทึกลง DB ทันที
+            savePermissionsToAPI(userId, newPerms);
+
             return { ...prev, [userId]: newPerms };
         });
     };
 
     /**
      * เปิด/ปิดสิทธิ์ระดับ subPage (cascade ไปยัง sections)
-     * เมื่อปิด subPage สุดท้าย → ลบ page ออกด้วย
      */
-    const updateSubPermission = (userId, pageId, subId, enabled) => {
+    const updateSubPermission = (userId, pageId, subId, enabled, dataScope = 'all') => {
         setPermissions((prev) => {
             const userPerms = prev[userId] || [];
             const page = ALL_PAGES.find((p) => p.id === pageId);
             const subPage = page?.subPages?.find((s) => s.id === subId);
             const sectionIds = getSubPageChildIds(subPage);
 
-            let newPerms;
+            let newPerms = [...userPerms];
             if (enabled) {
-                // เพิ่ม subPage + sections + page (เผื่อยังไม่มี)
-                newPerms = [...new Set([...userPerms, pageId, subId, ...sectionIds])];
+                // Ensure page is enabled
+                if (!newPerms.some(p => p.page_id === pageId)) {
+                    newPerms.push({ page_id: pageId, data_scope: dataScope });
+                }
+                // Add subpage and sections
+                newPerms = newPerms.filter(p => p.page_id !== subId && !sectionIds.includes(p.page_id));
+                newPerms.push({ page_id: subId, data_scope: dataScope });
+                sectionIds.forEach(id => newPerms.push({ page_id: id, data_scope: dataScope }));
             } else {
-                // ลบ subPage + sections
-                const removeSet = new Set([subId, ...sectionIds]);
-                newPerms = userPerms.filter((p) => !removeSet.has(p));
+                // Remove subpage and sections
+                newPerms = newPerms.filter((p) => p.page_id !== subId && !sectionIds.includes(p.page_id));
 
-                // ถ้าไม่เหลือ subPage อื่น → ลบ page ออกด้วย
+                // If no subpages left, remove main page
                 const subIds = page?.subPages?.map((s) => s.id) || [];
-                const hasAnySub = subIds.some((sid) => sid !== subId && newPerms.includes(sid));
+                const hasAnySub = subIds.some((sid) => sid !== subId && newPerms.some(p => p.page_id === sid));
                 if (!hasAnySub) {
-                    newPerms = newPerms.filter((p) => p !== pageId);
+                    newPerms = newPerms.filter((p) => p.page_id !== pageId);
                 }
             }
+
+            // บันทึกลง DB ทันที
+            savePermissionsToAPI(userId, newPerms);
+
             return { ...prev, [userId]: newPerms };
         });
     };
 
     /**
      * เปิด/ปิดสิทธิ์ระดับ section (ระดับย่อยที่สุด)
-     * เมื่อปิด section สุดท้ายใน subPage → ลบ subPage
-     * เมื่อปิด subPage สุดท้ายใน page → ลบ page
      */
     const updateSectionPermission = (userId, pageId, subId, sectionId, enabled) => {
         setPermissions((prev) => {
             const userPerms = prev[userId] || [];
-            let newPerms;
+            let newPerms = [...userPerms];
 
             if (enabled) {
-                // เพิ่ม section + parent (subPage + page) เผื่อยังไม่มี
-                newPerms = [...new Set([...userPerms, pageId, subId, sectionId])];
+                const dataScope = 'all'; // Default for section when enabled separately
+                if (!newPerms.some(p => p.page_id === pageId)) newPerms.push({ page_id: pageId, data_scope: dataScope });
+                if (!newPerms.some(p => p.page_id === subId)) newPerms.push({ page_id: subId, data_scope: dataScope });
+                newPerms = newPerms.filter(p => p.page_id !== sectionId);
+                newPerms.push({ page_id: sectionId, data_scope: dataScope });
             } else {
-                // ลบเฉพาะ section
-                newPerms = userPerms.filter((p) => p !== sectionId);
+                newPerms = newPerms.filter((p) => p.page_id !== sectionId);
 
-                // ตรวจว่ายังมี section อื่นใน subPage นี้ไหม
                 const page = ALL_PAGES.find((p) => p.id === pageId);
                 const subPage = page?.subPages?.find((s) => s.id === subId);
                 const secIds = subPage?.sections?.map((s) => s.id) || [];
-                const hasAnySec = secIds.some((sid) => sid !== sectionId && newPerms.includes(sid));
+                const hasAnySec = secIds.some((sid) => sid !== sectionId && newPerms.some(p => p.page_id === sid));
 
                 if (!hasAnySec) {
-                    // ไม่เหลือ section → ลบ subPage
-                    newPerms = newPerms.filter((p) => p !== subId);
+                    newPerms = newPerms.filter((p) => p.page_id !== subId);
 
-                    // ตรวจว่ายังมี subPage อื่นใน page นี้ไหม
                     const subIds = page?.subPages?.map((s) => s.id) || [];
-                    const hasAnySub = subIds.some((sid) => sid !== subId && newPerms.includes(sid));
+                    const hasAnySub = subIds.some((sid) => sid !== subId && newPerms.some(p => p.page_id === sid));
                     if (!hasAnySub) {
-                        // ไม่เหลือ subPage → ลบ page
-                        newPerms = newPerms.filter((p) => p !== pageId);
+                        newPerms = newPerms.filter((p) => p.page_id !== pageId);
                     }
                 }
             }
+
+            // บันทึกลง DB ทันที
+            savePermissionsToAPI(userId, newPerms);
+
             return { ...prev, [userId]: newPerms };
         });
     };
@@ -226,7 +276,7 @@ export function AuthProvider({ children }) {
         if (!currentUser) return false;
         if (currentUser.role === 'admin') return true;
         const userPerms = permissions[currentUser.id] || [];
-        return userPerms.includes(pageId);
+        return userPerms.some(p => p.page_id === pageId);
     };
 
     /** ตรวจสิทธิ์ระดับ subPage */
@@ -234,7 +284,7 @@ export function AuthProvider({ children }) {
         if (!currentUser) return false;
         if (currentUser.role === 'admin') return true;
         const userPerms = permissions[currentUser.id] || [];
-        return userPerms.includes(subId);
+        return userPerms.some(p => p.page_id === subId);
     };
 
     /** ตรวจสิทธิ์ระดับ section */
@@ -242,7 +292,7 @@ export function AuthProvider({ children }) {
         if (!currentUser) return false;
         if (currentUser.role === 'admin') return true;
         const userPerms = permissions[currentUser.id] || [];
-        return userPerms.includes(sectionId);
+        return userPerms.some(p => p.page_id === sectionId);
     };
 
     // =================================================================
@@ -257,12 +307,17 @@ export function AuthProvider({ children }) {
         if (currentUser.role === 'admin') return page.subPages;
 
         const userPerms = permissions[currentUser.id] || [];
-        return page.subPages.filter((sub) => userPerms.includes(sub.id));
+        return page.subPages.filter((sub) => userPerms.some(p => p.page_id === sub.id));
     };
 
     /** ดึง permissions array ของ user ที่ระบุ (ใช้ใน PermissionManager) */
     const getUserPermissions = (userId) => {
         return permissions[userId] || [];
+    };
+
+    /** ดึงสิทธิ์ของ user จาก API (ใช้ใน PermissionManager เมื่อเลือก user) */
+    const loadUserPermissions = async (userId) => {
+        return await fetchPermissionsFromAPI(userId);
     };
 
     /**
@@ -275,8 +330,17 @@ export function AuthProvider({ children }) {
             return [...ALL_PAGES, { id: 'permissions', name: 'จัดการสิทธิ์', path: '/permissions' }];
         }
         const userPerms = permissions[currentUser.id] || [];
-        return ALL_PAGES.filter((page) => userPerms.includes(page.id));
+        return ALL_PAGES.filter((page) => userPerms.some(p => p.page_id === page.id));
     };
+
+    // =================================================================
+    // โหลดสิทธิ์ของ currentUser เมื่อ app เริ่มต้น (กรณี refresh หน้า)
+    // =================================================================
+    useEffect(() => {
+        if (currentUser && currentUser.id) {
+            fetchPermissionsFromAPI(currentUser.id);
+        }
+    }, [currentUser, fetchPermissionsFromAPI]);
 
     // =================================================================
     // Provider — ส่งค่าทั้งหมดให้ children
@@ -306,6 +370,9 @@ export function AuthProvider({ children }) {
                 getVisibleSubPages,
                 getUserPermissions,
                 getVisiblePages,
+
+                // API helpers (สำหรับ PermissionManager)
+                loadUserPermissions,
             }}
         >
             {children}
@@ -316,7 +383,6 @@ export function AuthProvider({ children }) {
 // =============================================================================
 // useAuth Hook — ใช้เข้าถึง AuthContext จาก component ลูก
 // =============================================================================
-// ใช้ได้เฉพาะภายใน <AuthProvider> เท่านั้น
 export function useAuth() {
     const context = useContext(AuthContext);
     if (!context) {

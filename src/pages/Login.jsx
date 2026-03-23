@@ -3,15 +3,14 @@
  * Login.jsx — หน้าเข้าสู่ระบบ (Login Page)
  * =============================================================================
  *
- * หน้า Login แบบ split-card:
+ * หน้า Login แบบ split-card (Professional / Formal):
  *   - ด้านซ้าย: ฟอร์มเข้าสู่ระบบ (username + password)
- *   - ด้านขวา: Showcase แสดง dashboard mockup (decorative)
+ *   - ด้านขวา: Branding panel แสดงโลโก้และชื่อระบบ
  *
  * ฟีเจอร์:
  *   - แสดง/ซ่อนรหัสผ่าน (Eye icon)
  *   - Loading spinner ขณะล็อกอิน
  *   - แสดง error message เมื่อล็อกอินผิดพลาด
- *   - Simulate network delay 800ms (จำลอง API call)
  *
  * =============================================================================
  */
@@ -19,7 +18,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, Lock, User } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import './Login.css';
 
@@ -34,20 +33,19 @@ export default function Login() {
     const { login } = useAuth();
     const navigate = useNavigate();
 
-    // ── Handle submit: จำลอง network delay → login → redirect ──
+    // ── Handle submit ──
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
 
-        // จำลองเวลาตอบสนองจาก server
         await new Promise((r) => setTimeout(r, 800));
 
-        const result = login(username, password);
+        const result = await login(username, password);
         if (result.success) {
             navigate(result.redirectPath);
         } else {
-            setError('Login failed. Please try again.');
+            setError(result.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
             setIsLoading(false);
         }
     };
@@ -61,18 +59,18 @@ export default function Login() {
                 {/* ============================================ */}
                 <div className="login-form-side">
                     {/* โลโก้ */}
-                    <div className="login-brand" style={{ marginBottom: '2rem' }}>
+                    <div className="login-brand">
                         <img
                             src={logoUrl}
                             alt="Thai Herb Centers"
-                            style={{ height: '48px', width: 'auto', objectFit: 'contain' }}
+                            className="login-brand-logo"
                         />
                     </div>
 
                     {/* ข้อความต้อนรับ */}
                     <div className="login-header-text">
-                        <h1>Welcome to ERP System</h1>
-                        <p>Please enter your credentials to access the enterprise portal.</p>
+                        <h1>เข้าสู่ระบบ</h1>
+                        <p>กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
                     </div>
 
                     {/* ฟอร์ม Login */}
@@ -80,53 +78,50 @@ export default function Login() {
                         {/* Error message */}
                         {error && (
                             <div className="login-error">
-                                <span>!</span> {error}
+                                <span className="login-error-icon">!</span>
+                                <span>{error}</span>
                             </div>
                         )}
 
                         {/* Username */}
                         <div className="form-group">
-                            <label htmlFor="username">Username</label>
-                            <input
-                                id="username"
-                                type="text"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                placeholder="Enter your username"
-                                required
-                                autoFocus
-                            />
+                            <label htmlFor="username">ชื่อผู้ใช้งาน</label>
+                            <div className="input-wrapper">
+                                <User size={18} className="input-icon" />
+                                <input
+                                    id="username"
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="กรอกชื่อผู้ใช้งาน"
+                                    required
+                                    autoFocus
+                                />
+                            </div>
                         </div>
 
                         {/* Password + toggle visibility */}
                         <div className="form-group">
-                            <label htmlFor="password">Password</label>
-                            <div className="password-input-wrapper">
+                            <label htmlFor="password">รหัสผ่าน</label>
+                            <div className="input-wrapper">
+                                <Lock size={18} className="input-icon" />
                                 <input
                                     id="password"
                                     type={showPassword ? 'text' : 'password'}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••••••"
+                                    placeholder="กรอกรหัสผ่าน"
                                     required
                                 />
                                 <button
                                     type="button"
                                     className="toggle-password"
                                     onClick={() => setShowPassword(!showPassword)}
+                                    aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
-                        </div>
-
-                        {/* Remember me + Forgot password */}
-                        <div className="form-actions-row">
-                            <label className="remember-me">
-                                <input type="checkbox" />
-                                <span>Remember Me</span>
-                            </label>
-                            <a href="#" className="forgot-password">Forgot Your Password?</a>
                         </div>
 
                         {/* Submit button */}
@@ -135,81 +130,40 @@ export default function Login() {
                             className={`btn-login ${isLoading ? 'loading' : ''}`}
                             disabled={isLoading}
                         >
-                            {isLoading ? <span className="spinner"></span> : 'Log In'}
+                            {isLoading ? <span className="spinner"></span> : 'เข้าสู่ระบบ'}
                         </button>
                     </form>
 
                     {/* Footer */}
                     <div className="login-footer">
-                        <span>Copyright © 2025 Thai Herb Centers.</span>
-                        <a href="#">Privacy Policy</a>
+                        <span>© 2025 Thai Herb Centers. สงวนลิขสิทธิ์.</span>
                     </div>
                 </div>
 
                 {/* ============================================ */}
-                {/* ด้านขวา: Showcase (decorative)                */}
+                {/* ด้านขวา: Branding Panel                       */}
                 {/* ============================================ */}
                 <div className="login-info-side">
-                    <div className="showcase-container">
-                        <div className="showcase-inner">
-                            {/* Floating decorative elements */}
-                            <div className="float-element fe-plus fe-1">+</div>
-                            <div className="float-element fe-plus fe-2">+</div>
-                            <div className="float-element fe-plus fe-3">+</div>
-                            <div className="float-element fe-dot fe-4"></div>
-                            <div className="float-element fe-dot fe-5"></div>
-
-                            {/* Mock dashboard card */}
-                            <div className="showcase-dashboard">
-                                <div className="dash-topbar">
-                                    <span className="dot-red"></span>
-                                    <span className="dot-yellow"></span>
-                                    <span className="dot-green"></span>
-                                    <div className="dash-url-bar">
-                                        <span className="search-icon">🔍</span>
-                                    </div>
-                                </div>
-                                <div className="dash-content">
-                                    <div className="mini-bars">
-                                        <div className="mini-bar mb-1"></div>
-                                        <div className="mini-bar mb-2"></div>
-                                        <div className="mini-bar mb-3"></div>
-                                        <div className="mini-bar mb-4"></div>
-                                        <div className="mini-bar mb-5"></div>
-                                    </div>
-                                    <svg className="mini-line-chart" viewBox="0 0 120 50">
-                                        <polyline points="0,40 20,35 40,25 60,30 80,15 100,20 120,5" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                        <circle cx="40" cy="25" r="3" fill="#3b82f6" />
-                                        <circle cx="80" cy="15" r="3" fill="#3b82f6" />
-                                        <circle cx="120" cy="5" r="3" fill="#f59e0b" />
-                                    </svg>
-                                </div>
+                    <div className="branding-panel">
+                        <div className="branding-content">
+                            <div className="branding-icon">
+                                <ShieldCheck size={48} strokeWidth={1.5} />
                             </div>
-
-                            {/* Floating checklist */}
-                            <div className="showcase-checklist">
-                                <div className="check-item"><span className="check-box">✓</span><div className="check-line"></div></div>
-                                <div className="check-item"><span className="check-box">✓</span><div className="check-line short"></div></div>
-                                <div className="check-item"><span className="check-box">✓</span><div className="check-line"></div></div>
-                            </div>
-
-                            {/* Floating pie chart */}
-                            <div className="showcase-pie">
-                                <svg viewBox="0 0 36 36">
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" strokeWidth="3" />
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#3b82f6" strokeWidth="3" strokeDasharray="60 40" strokeDashoffset="25" />
-                                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f59e0b" strokeWidth="3" strokeDasharray="25 75" strokeDashoffset="85" />
-                                </svg>
-                            </div>
-
-                            {/* Floating lightbulb */}
-                            <div className="showcase-bulb">💡</div>
-
-                            {/* Floating search bar */}
-                            <div className="showcase-search">
-                                <span>🔍</span>
-                                <div className="search-line"></div>
-                            </div>
+                            <h2 className="branding-title">
+                                ระบบจัดการทรัพยากรองค์กร
+                            </h2>
+                            <p className="branding-subtitle">
+                                Enterprise Resource Planning System
+                            </p>
+                            <div className="branding-divider"></div>
+                            <p className="branding-desc">
+                                ระบบบริหารจัดการเอกสาร ควบคุมคุณภาพ
+                                <br />
+                                และทรัพยากรองค์กรอย่างครบวงจร
+                            </p>
+                        </div>
+                        <div className="branding-footer-text">
+                            Thai Herb Centers
                         </div>
                     </div>
                 </div>

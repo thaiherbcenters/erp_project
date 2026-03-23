@@ -1,0 +1,700 @@
+/* =============================================================================
+ * DocumentControl.css — สไตล์เฉพาะหน้าควบคุมเอกสาร (Professional)
+ * ============================================================================= */
+
+/* ── Fade-in animation ── */
+.doc-fade-in {
+    animation: docFadeIn 0.2s ease;
+}
+
+@keyframes docFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ── Quick Info Row (Dashboard) ── */
+.doc-info-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.doc-info-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px !important;
+    transition: box-shadow 0.15s;
+}
+
+.doc-info-card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.doc-info-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.doc-info-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.doc-info-title {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.doc-info-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 2px;
+}
+
+/* ── Section Header (inside table cards) ── */
+.doc-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.doc-section-header h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+}
+
+.doc-section-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg);
+    padding: 3px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+/* ── Filter Group ── */
+.doc-filter-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.doc-filter-active {
+    background: var(--primary) !important;
+    color: #fff !important;
+    border-color: var(--primary) !important;
+}
+
+/* ── Result Count Info ── */
+.doc-result-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-bottom: 12px;
+    padding-left: 2px;
+}
+
+/* ── Action Buttons (View / Download / Edit) ── */
+.doc-action-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s;
+    margin: 0 2px;
+}
+
+.doc-action-btn:hover {
+    background: #f1f5f9;
+    color: var(--primary);
+}
+
+/* ── DAR Summary Strip ── */
+.doc-dar-summary {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    padding: 10px 18px;
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 14px;
+}
+
+.doc-dar-stat {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.doc-dar-stat strong {
+    font-weight: 700;
+    color: var(--text);
+}
+
+.doc-dar-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ── DAR Type Tag ── */
+.doc-type-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+/* ── Empty Row ── */
+.doc-empty-row {
+    text-align: center !important;
+    padding: 32px 16px !important;
+    color: var(--text-muted) !important;
+    font-style: italic;
+}
+
+/* ── No Access ── */
+.doc-no-access {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* ── Category Tag (หมวดเอกสาร) ── */
+.doc-cat-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #4338ca;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    letter-spacing: 0.3px;
+}
+
+/* ── Category Filter (dropdown ตัวกรองหมวด) ── */
+.doc-category-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 8px 14px;
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.doc-category-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* ── Custom Dropdown Wrapper ── */
+.doc-dropdown-wrapper {
+    position: relative;
+    flex: 1;
+    max-width: 420px;
+}
+
+.doc-dropdown-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 7px 12px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: left;
+}
+
+.doc-dropdown-trigger:hover {
+    border-color: var(--primary-light);
+}
+
+.doc-dropdown-trigger.open {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.08);
+}
+
+.doc-dropdown-text {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    font-weight: 400;
+}
+
+.doc-dropdown-icon {
+    font-size: 14px;
+}
+
+.doc-dropdown-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--border-light);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.doc-dropdown-arrow {
+    color: var(--text-muted);
+    transition: transform 0.15s ease;
+}
+
+.doc-dropdown-arrow.rotated {
+    transform: rotate(180deg);
+}
+
+/* ── Custom Dropdown Menu ── */
+.doc-dropdown-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 99;
+}
+
+.doc-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    z-index: 100;
+    max-height: 400px;
+    overflow-y: auto;
+    animation: dropdownSlideIn 0.15s ease;
+    padding: 4px 0;
+}
+
+@keyframes dropdownSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.doc-dropdown-header {
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.doc-dropdown-divider {
+    height: 1px;
+    background: var(--border-light);
+    margin: 4px 0;
+}
+
+.doc-dropdown-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+    gap: 10px;
+}
+
+.doc-dropdown-item:hover {
+    background: #f8fafc;
+}
+
+.doc-dropdown-item.active {
+    background: #eef2ff;
+}
+
+.doc-dropdown-item-icon {
+    font-size: 15px;
+}
+
+.doc-dropdown-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.doc-dropdown-item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.3;
+}
+
+.doc-dropdown-item.active .doc-dropdown-item-name {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.doc-dropdown-item-full {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.doc-dropdown-item-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.doc-dropdown-item.active .doc-dropdown-item-count {
+    background: #fff;
+    border-color: #c7d2fe;
+    color: var(--primary);
+}
+
+/* ── Active Filter Badge ── */
+.doc-active-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #4338ca;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.doc-clear-filter {
+    border: none;
+    background: transparent;
+    color: #4338ca;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.doc-clear-filter:hover {
+    color: #dc2626;
+}
+
+/* ── Responsive: Tablet ── */
+@media (max-width: 768px) {
+    .doc-info-row {
+        grid-template-columns: 1fr;
+    }
+
+    .doc-dar-summary {
+        flex-wrap: wrap;
+        gap: 8px 16px;
+        padding: 10px 14px;
+    }
+
+    .doc-filter-group {
+        width: 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+    }
+
+    .doc-category-filter {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .doc-category-select {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* ── DAR Table → Card Layout ── */
+    .doc-fade-in .table-card {
+        overflow-x: visible;
+        padding: 8px !important;
+    }
+
+    .doc-fade-in .data-table {
+        min-width: 0;
+    }
+
+    .doc-fade-in .data-table thead {
+        display: none;
+    }
+
+    .doc-fade-in .data-table tbody tr {
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-white);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        gap: 6px;
+        position: relative;
+    }
+
+    .doc-fade-in .data-table tbody tr:hover {
+        background: #fafbfc;
+    }
+
+    .doc-fade-in .data-table td {
+        display: flex;
+        align-items: center;
+        padding: 2px 0;
+        border-bottom: none;
+        font-size: 13px;
+    }
+
+    .doc-fade-in .data-table td::before {
+        content: attr(data-label);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        min-width: 90px;
+        flex-shrink: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    /* Hide # column on mobile */
+    .doc-fade-in .data-table td:first-child {
+        display: none;
+    }
+
+    /* Action columns: full width */
+    .doc-fade-in .data-table td:nth-last-child(1),
+    .doc-fade-in .data-table td:nth-last-child(2) {
+        justify-content: flex-start;
+        text-align: left;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding-top: 6px;
+        border-top: 1px solid var(--border-light);
+        margin-top: 4px;
+    }
+
+    .doc-fade-in .data-table td:nth-last-child(2) {
+        border-top: none;
+        margin-top: 0;
+        padding-top: 2px;
+    }
+
+    .doc-action-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    /* PDF Preview on mobile */
+    .pdf-preview-modal {
+        width: 98vw;
+        height: 85vh;
+        border-radius: 8px;
+    }
+
+    .pdf-preview-header {
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 14px;
+    }
+
+    .pdf-preview-header h3 {
+        font-size: 13px !important;
+    }
+}
+
+/* ── Responsive: Small Mobile ── */
+@media (max-width: 480px) {
+    .doc-dar-summary {
+        padding: 8px 10px;
+        gap: 6px 12px;
+    }
+
+    .doc-dar-stat {
+        font-size: 11px;
+    }
+
+    .doc-fade-in .data-table td::before {
+        min-width: 72px;
+        font-size: 10px;
+    }
+
+    .doc-fade-in .data-table td {
+        font-size: 12px;
+    }
+
+    .doc-action-btn {
+        width: 30px;
+        height: 30px;
+    }
+
+    .doc-type-tag {
+        font-size: 11px;
+    }
+
+    .pdf-preview-modal {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+    }
+}
+
+/* ── Form Fill Page (หน้ากรอกแบบฟอร์ม) ── */
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-field label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.form-field input[type="text"],
+.form-field input[type="date"],
+.form-field select,
+.form-field textarea {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--text);
+    background: var(--bg-white);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.08);
+}
+
+.form-field input::placeholder,
+.form-field textarea::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* ── PDF Preview Modal ── */
+.pdf-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: docFadeIn 0.15s ease;
+}
+
+.pdf-preview-modal {
+    width: 90vw;
+    max-width: 900px;
+    height: 90vh;
+    background: var(--bg-white);
+    border-radius: 8px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.pdf-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+}
+
+.pdf-preview-iframe {
+    flex: 1;
+    width: 100%;
+    border: none;
+}
+
+/* ── Spinner Animation ── */
+.spin-animation {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
