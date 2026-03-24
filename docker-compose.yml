@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  erp-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: erp-backend
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    # ผูกไฟล์ .env ของเครื่อง Server (ที่ไม่ได้อัปเข้า Git) ให้เข้าไปใน Container
+    env_file:
+      - ./backend/.env
+    networks:
+      - erp-network
+
+  erp-frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: erp-frontend
+    ports:
+      # เปิดเว็บใช้งานจริงที่พอร์ต 80 (ถ้าอยากดูพอร์ตเดิม สามารถเปลี่ยนด้านหน้าเป็น 5173:80 ได้)
+      - "80:80"
+    restart: unless-stopped
+    depends_on:
+      - erp-backend
+    networks:
+      - erp-network
+
+networks:
+  erp-network:
+    driver: bridge

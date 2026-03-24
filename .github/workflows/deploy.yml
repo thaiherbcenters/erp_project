@@ -1,0 +1,19 @@
+name: Deploy ERP Project (Docker CI/CD)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted # วิ่งไปทำงานที่ Docker Server ของคุณ (ผ่าน Runner)
+
+    steps:
+      - name: 📥 Pull Latest Code
+        uses: actions/checkout@v4
+
+      # สั่ง Docker ให้ลงโค้ดใหม่, Build และเปิดแอปทั้งหมดขึ้นมาใหม่เบ็ดเสร็จ
+      - name: 🐳 Deploy with Docker Compose
+        run: |
+          docker-compose up -d --build
