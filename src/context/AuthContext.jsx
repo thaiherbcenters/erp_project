@@ -18,7 +18,7 @@ import { ALL_PAGES } from '../data/mockData';
 
 const AuthContext = createContext(null);
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = 'http://10.0.0.10:5000/api';
 
 // =============================================================================
 // AuthProvider — ครอบ App ทั้งหมด
@@ -103,7 +103,7 @@ export function AuthProvider({ children }) {
 
                 // ดึงสิทธิ์จริงจาก DB (ไม่ใช่จาก token)
                 const apiPerms = await fetchPermissionsFromAPI(user.id);
-                
+
                 // Map to handle legacy vs new format { page_id, data_scope }
                 const perms = apiPerms.map(p => typeof p === 'string' ? { page_id: p, data_scope: 'all' } : p);
 
