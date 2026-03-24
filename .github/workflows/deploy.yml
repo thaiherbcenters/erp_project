@@ -13,6 +13,10 @@ jobs:
       - name: 📥 Pull Latest Code
         uses: actions/checkout@v4
 
+      - name: 🔐 Inject .env file
+        shell: bash
+        run: echo "${{ secrets.ENV_FILE }}" > backend/.env
+
       # สั่ง Docker ให้ลงโค้ดใหม่, Build และเปิดแอปทั้งหมดขึ้นมาใหม่เบ็ดเสร็จ
       - name: 🐳 Deploy with Docker Compose
         run: |
