@@ -5,12 +5,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors({
-    origin: '*', // อนุญาตให้ทุก IP (รวมถึง 10.0.0.x) เข้าถึงได้
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
 // Routes
