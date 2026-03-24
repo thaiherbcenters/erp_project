@@ -118,20 +118,20 @@ export default function DocumentControl() {
                 let dataScope = 'all';
                 let userId = '';
                 let department = '';
-                
+
                 if (currentUser) {
                     userId = currentUser.id;
                     department = currentUser.department || '';
                     const perms = getUserPermissions(currentUser.id);
                     // Check sub-page 'document_list' first, then parent 'document', then legacy 'document_control'
                     const docPerm = perms.find(p => p.page_id === 'document_list')
-                                || perms.find(p => p.page_id === 'document')
-                                || perms.find(p => p.page_id === 'document_control');
+                        || perms.find(p => p.page_id === 'document')
+                        || perms.find(p => p.page_id === 'document_control');
                     if (docPerm && docPerm.data_scope) {
                         dataScope = docPerm.data_scope;
                     }
                 }
-                
+
                 console.log('[DocumentControl] data_scope:', dataScope, '| department:', department, '| userId:', userId);
 
                 const queryParams = new URLSearchParams({
@@ -141,8 +141,8 @@ export default function DocumentControl() {
                 }).toString();
 
                 const [docRes, stdRes] = await Promise.all([
-                    fetch(`http://localhost:5000/api/documents?${queryParams}`),
-                    fetch('http://localhost:5000/api/documents/standards'),
+                    fetch(`http://10.0.0.10:5000/api/documents?${queryParams}`),
+                    fetch('http://10.0.0.10:5000/api/documents/standards'),
                 ]);
                 if (!docRes.ok) throw new Error('ไม่สามารถดึงข้อมูลเอกสารได้');
                 const docsJson = await docRes.json();
@@ -241,7 +241,7 @@ function DocumentDashboard({ hasPermission, documents, isLoading, error }) {
 
     const [darPendingCount, setDarPendingCount] = useState(0);
     useEffect(() => {
-        fetch('http://localhost:5000/api/submissions')
+        fetch('http://10.0.0.10:5000/api/submissions')
             .then(r => r.ok ? r.json() : [])
             .then(data => setDarPendingCount(data.filter(s => s.overall_status !== 'อนุมัติแล้ว' && s.overall_status !== 'ไม่อนุมัติ').length))
             .catch(() => { });
@@ -446,197 +446,197 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                 {/* ── Right Side (Filters) ── */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', flex: 2, minWidth: '450px' }}>
 
-                        {/* 1. Part Filter Dropdown */}
-                        <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '220px' }}>
-                            <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
-                                <button
-                                    style={{ width: '100%' }}
-                                    className={`doc-dropdown-trigger ${showPartDropdown ? 'open' : ''}`}
-                                    onClick={() => {
-                                        setShowPartDropdown(!showPartDropdown);
-                                        setShowCategoryDropdown(false);
-                                    }}
-                                >
-                                    <span className="doc-dropdown-text">
-                                        {filterPart === 'all' ? (
-                                            <>
-                                                <span className="doc-dropdown-icon">📁</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>ส่วน:</span> ทุกส่วน
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="doc-dropdown-icon">📂</span>
-                                                <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    ส่วน: {DOCUMENT_PARTS.find(p => p.id === filterPart)?.name.split(':')[0]}
-                                                </span>
-                                            </>
-                                        )}
-                                    </span>
-                                    <ChevronDown size={16} className={`doc-dropdown-arrow ${showPartDropdown ? 'rotated' : ''}`} />
-                                </button>
+                    {/* 1. Part Filter Dropdown */}
+                    <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '220px' }}>
+                        <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
+                            <button
+                                style={{ width: '100%' }}
+                                className={`doc-dropdown-trigger ${showPartDropdown ? 'open' : ''}`}
+                                onClick={() => {
+                                    setShowPartDropdown(!showPartDropdown);
+                                    setShowCategoryDropdown(false);
+                                }}
+                            >
+                                <span className="doc-dropdown-text">
+                                    {filterPart === 'all' ? (
+                                        <>
+                                            <span className="doc-dropdown-icon">📁</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>ส่วน:</span> ทุกส่วน
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="doc-dropdown-icon">📂</span>
+                                            <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                ส่วน: {DOCUMENT_PARTS.find(p => p.id === filterPart)?.name.split(':')[0]}
+                                            </span>
+                                        </>
+                                    )}
+                                </span>
+                                <ChevronDown size={16} className={`doc-dropdown-arrow ${showPartDropdown ? 'rotated' : ''}`} />
+                            </button>
 
-                                {showPartDropdown && (
-                                    <>
-                                        <div className="doc-dropdown-backdrop" onClick={() => setShowPartDropdown(false)} />
-                                        <div className="doc-dropdown-menu">
-                                            <div className="doc-dropdown-header">เลือกส่วนของเอกสาร</div>
+                            {showPartDropdown && (
+                                <>
+                                    <div className="doc-dropdown-backdrop" onClick={() => setShowPartDropdown(false)} />
+                                    <div className="doc-dropdown-menu">
+                                        <div className="doc-dropdown-header">เลือกส่วนของเอกสาร</div>
+                                        <div
+                                            className={`doc-dropdown-item ${filterPart === 'all' ? 'active' : ''}`}
+                                            onClick={() => { setFilterPart('all'); setFilterCategory('all'); setFilterType('all'); setShowPartDropdown(false); }}
+                                        >
+                                            <span className="doc-dropdown-item-icon">📁</span>
+                                            <span className="doc-dropdown-item-name">ทุกส่วน</span>
+                                        </div>
+                                        <div className="doc-dropdown-divider" />
+                                        {DOCUMENT_PARTS.map((part) => (
                                             <div
-                                                className={`doc-dropdown-item ${filterPart === 'all' ? 'active' : ''}`}
-                                                onClick={() => { setFilterPart('all'); setFilterCategory('all'); setFilterType('all'); setShowPartDropdown(false); }}
+                                                key={part.id}
+                                                className={`doc-dropdown-item ${filterPart === part.id ? 'active' : ''}`}
+                                                onClick={() => { setFilterPart(part.id); setFilterCategory('all'); setFilterType('all'); setShowPartDropdown(false); }}
                                             >
-                                                <span className="doc-dropdown-item-icon">📁</span>
-                                                <span className="doc-dropdown-item-name">ทุกส่วน</span>
-                                            </div>
-                                            <div className="doc-dropdown-divider" />
-                                            {DOCUMENT_PARTS.map((part) => (
-                                                <div
-                                                    key={part.id}
-                                                    className={`doc-dropdown-item ${filterPart === part.id ? 'active' : ''}`}
-                                                    onClick={() => { setFilterPart(part.id); setFilterCategory('all'); setFilterType('all'); setShowPartDropdown(false); }}
-                                                >
-                                                    <span className="doc-dropdown-item-icon">📄</span>
-                                                    <div className="doc-dropdown-item-info">
-                                                        <span className="doc-dropdown-item-name">{part.name}</span>
-                                                    </div>
+                                                <span className="doc-dropdown-item-icon">📄</span>
+                                                <div className="doc-dropdown-item-info">
+                                                    <span className="doc-dropdown-item-name">{part.name}</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 2. Category Filter (Custom Dropdown) ── */}
-                        <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '240px' }}>
-                            <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
-                                <button
-                                    style={{ width: '100%' }}
-                                    className={`doc-dropdown-trigger ${showCategoryDropdown ? 'open' : ''}`}
-                                    onClick={() => {
-                                        setShowCategoryDropdown(!showCategoryDropdown);
-                                        setShowPartDropdown(false);
-                                        setFilterType('all');
-                                    }}
-                                >
-                                    <span className="doc-dropdown-text">
-                                        {filterCategory === 'all' ? (
-                                            <>
-                                                <span className="doc-dropdown-icon">📁</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>หมวด:</span> ทุกหมวด
-                                                {filterPart === 'all' && <span className="doc-dropdown-count">{documents.length}</span>}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="doc-dropdown-icon">📂</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>หมวด:</span> {getCategoryShortName(filterCategory)}
-                                                <span className="doc-dropdown-count">
-                                                    {documents.filter(d => d.category === filterCategory).length}
-                                                </span>
-                                            </>
-                                        )}
-                                    </span>
-                                    <ChevronDown size={16} className={`doc-dropdown-arrow ${showCategoryDropdown ? 'rotated' : ''}`} />
-                                </button>
-
-                                {showCategoryDropdown && (
-                                    <>
-                                        <div className="doc-dropdown-backdrop" onClick={() => setShowCategoryDropdown(false)} />
-                                        <div className="doc-dropdown-menu">
-                                            <div className="doc-dropdown-header">เลือกหมวดเอกสาร</div>
-                                            <div
-                                                className={`doc-dropdown-item ${filterCategory === 'all' ? 'active' : ''}`}
-                                                onClick={() => { setFilterCategory('all'); setFilterType('all'); setShowCategoryDropdown(false); }}
-                                            >
-                                                <span className="doc-dropdown-item-icon">📁</span>
-                                                <span className="doc-dropdown-item-name">ทุกหมวด</span>
-                                                {filterPart === 'all' && <span className="doc-dropdown-item-count">{documents.length}</span>}
                                             </div>
-                                            <div className="doc-dropdown-divider" />
-                                            {DOCUMENT_CATEGORIES
-                                                .filter(cat => filterPart === 'all' || cat.partId === filterPart)
-                                                .filter(cat => documents.some(d => d.category === cat.id))
-                                                .map((cat) => {
-                                                    const count = documents.filter(d => d.category === cat.id).length;
-                                                    return (
-                                                        <div
-                                                            key={cat.id}
-                                                            className={`doc-dropdown-item ${filterCategory === cat.id ? 'active' : ''}`}
-                                                            onClick={() => { setFilterCategory(cat.id); setFilterType('all'); setShowCategoryDropdown(false); }}
-                                                        >
-                                                            <span className="doc-dropdown-item-icon">📄</span>
-                                                            <div className="doc-dropdown-item-info">
-                                                                <span className="doc-dropdown-item-name">{cat.shortName}</span>
-                                                                <span className="doc-dropdown-item-full">{cat.name}</span>
-                                                            </div>
-                                                            <span className="doc-dropdown-item-count">{count}</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
                         </div>
+                    </div>
 
-                        {/* 3. Standard Filter (Custom Dropdown) ── */}
-                        <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '240px' }}>
-                            <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
-                                <button
-                                    style={{ width: '100%' }}
-                                    className={`doc-dropdown-trigger ${showStandardDropdown ? 'open' : ''}`}
-                                    onClick={() => {
-                                        setShowStandardDropdown(!showStandardDropdown);
-                                        setShowCategoryDropdown(false);
-                                        setShowPartDropdown(false);
-                                        setFilterType('all');
-                                    }}
-                                >
-                                    <span className="doc-dropdown-text">
-                                        {filterStandard === 'all' ? (
-                                            <>
-                                                <span className="doc-dropdown-icon">🔖</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>มาตรฐาน:</span> ทั้งหมด
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="doc-dropdown-icon">🔖</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>มาตรฐาน:</span> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{filterStandard}</span>
-                                            </>
-                                        )}
-                                    </span>
-                                    <ChevronDown size={16} className={`doc-dropdown-arrow ${showStandardDropdown ? 'rotated' : ''}`} />
-                                </button>
+                    {/* 2. Category Filter (Custom Dropdown) ── */}
+                    <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '240px' }}>
+                        <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
+                            <button
+                                style={{ width: '100%' }}
+                                className={`doc-dropdown-trigger ${showCategoryDropdown ? 'open' : ''}`}
+                                onClick={() => {
+                                    setShowCategoryDropdown(!showCategoryDropdown);
+                                    setShowPartDropdown(false);
+                                    setFilterType('all');
+                                }}
+                            >
+                                <span className="doc-dropdown-text">
+                                    {filterCategory === 'all' ? (
+                                        <>
+                                            <span className="doc-dropdown-icon">📁</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>หมวด:</span> ทุกหมวด
+                                            {filterPart === 'all' && <span className="doc-dropdown-count">{documents.length}</span>}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="doc-dropdown-icon">📂</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>หมวด:</span> {getCategoryShortName(filterCategory)}
+                                            <span className="doc-dropdown-count">
+                                                {documents.filter(d => d.category === filterCategory).length}
+                                            </span>
+                                        </>
+                                    )}
+                                </span>
+                                <ChevronDown size={16} className={`doc-dropdown-arrow ${showCategoryDropdown ? 'rotated' : ''}`} />
+                            </button>
 
-                                {showStandardDropdown && (
-                                    <>
-                                        <div className="doc-dropdown-backdrop" onClick={() => setShowStandardDropdown(false)} />
-                                        <div className="doc-dropdown-menu">
-                                            <div className="doc-dropdown-header">เลือกมาตรฐานที่เกี่ยวข้อง</div>
+                            {showCategoryDropdown && (
+                                <>
+                                    <div className="doc-dropdown-backdrop" onClick={() => setShowCategoryDropdown(false)} />
+                                    <div className="doc-dropdown-menu">
+                                        <div className="doc-dropdown-header">เลือกหมวดเอกสาร</div>
+                                        <div
+                                            className={`doc-dropdown-item ${filterCategory === 'all' ? 'active' : ''}`}
+                                            onClick={() => { setFilterCategory('all'); setFilterType('all'); setShowCategoryDropdown(false); }}
+                                        >
+                                            <span className="doc-dropdown-item-icon">📁</span>
+                                            <span className="doc-dropdown-item-name">ทุกหมวด</span>
+                                            {filterPart === 'all' && <span className="doc-dropdown-item-count">{documents.length}</span>}
+                                        </div>
+                                        <div className="doc-dropdown-divider" />
+                                        {DOCUMENT_CATEGORIES
+                                            .filter(cat => filterPart === 'all' || cat.partId === filterPart)
+                                            .filter(cat => documents.some(d => d.category === cat.id))
+                                            .map((cat) => {
+                                                const count = documents.filter(d => d.category === cat.id).length;
+                                                return (
+                                                    <div
+                                                        key={cat.id}
+                                                        className={`doc-dropdown-item ${filterCategory === cat.id ? 'active' : ''}`}
+                                                        onClick={() => { setFilterCategory(cat.id); setFilterType('all'); setShowCategoryDropdown(false); }}
+                                                    >
+                                                        <span className="doc-dropdown-item-icon">📄</span>
+                                                        <div className="doc-dropdown-item-info">
+                                                            <span className="doc-dropdown-item-name">{cat.shortName}</span>
+                                                            <span className="doc-dropdown-item-full">{cat.name}</span>
+                                                        </div>
+                                                        <span className="doc-dropdown-item-count">{count}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* 3. Standard Filter (Custom Dropdown) ── */}
+                    <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '240px' }}>
+                        <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
+                            <button
+                                style={{ width: '100%' }}
+                                className={`doc-dropdown-trigger ${showStandardDropdown ? 'open' : ''}`}
+                                onClick={() => {
+                                    setShowStandardDropdown(!showStandardDropdown);
+                                    setShowCategoryDropdown(false);
+                                    setShowPartDropdown(false);
+                                    setFilterType('all');
+                                }}
+                            >
+                                <span className="doc-dropdown-text">
+                                    {filterStandard === 'all' ? (
+                                        <>
+                                            <span className="doc-dropdown-icon">🔖</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>มาตรฐาน:</span> ทั้งหมด
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="doc-dropdown-icon">🔖</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>มาตรฐาน:</span> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{filterStandard}</span>
+                                        </>
+                                    )}
+                                </span>
+                                <ChevronDown size={16} className={`doc-dropdown-arrow ${showStandardDropdown ? 'rotated' : ''}`} />
+                            </button>
+
+                            {showStandardDropdown && (
+                                <>
+                                    <div className="doc-dropdown-backdrop" onClick={() => setShowStandardDropdown(false)} />
+                                    <div className="doc-dropdown-menu">
+                                        <div className="doc-dropdown-header">เลือกมาตรฐานที่เกี่ยวข้อง</div>
+                                        <div
+                                            className={`doc-dropdown-item ${filterStandard === 'all' ? 'active' : ''}`}
+                                            onClick={() => { setFilterStandard('all'); setFilterType('all'); setShowStandardDropdown(false); }}
+                                        >
+                                            <span className="doc-dropdown-item-icon">🔖</span>
+                                            <span className="doc-dropdown-item-name">ทุกมาตรฐาน</span>
+                                        </div>
+                                        <div className="doc-dropdown-divider" />
+                                        {availableStandards.map((std) => (
                                             <div
-                                                className={`doc-dropdown-item ${filterStandard === 'all' ? 'active' : ''}`}
-                                                onClick={() => { setFilterStandard('all'); setFilterType('all'); setShowStandardDropdown(false); }}
+                                                key={std}
+                                                className={`doc-dropdown-item ${filterStandard === std ? 'active' : ''}`}
+                                                onClick={() => { setFilterStandard(std); setFilterType('all'); setShowStandardDropdown(false); }}
                                             >
                                                 <span className="doc-dropdown-item-icon">🔖</span>
-                                                <span className="doc-dropdown-item-name">ทุกมาตรฐาน</span>
-                                            </div>
-                                            <div className="doc-dropdown-divider" />
-                                            {availableStandards.map((std) => (
-                                                <div
-                                                    key={std}
-                                                    className={`doc-dropdown-item ${filterStandard === std ? 'active' : ''}`}
-                                                    onClick={() => { setFilterStandard(std); setFilterType('all'); setShowStandardDropdown(false); }}
-                                                >
-                                                    <span className="doc-dropdown-item-icon">🔖</span>
-                                                    <div className="doc-dropdown-item-info">
-                                                        <span className="doc-dropdown-item-name">{std}</span>
-                                                    </div>
+                                                <div className="doc-dropdown-item-info">
+                                                    <span className="doc-dropdown-item-name">{std}</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
                         </div>
+                    </div>
                 </div>
             </div>
 
@@ -710,7 +710,7 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                                 className="doc-action-btn"
                                                 title="ดูเอกสาร"
                                                 onClick={() => {
-                                                    window.open(`http://localhost:5000/api/documents/view/${doc.id}`, '_blank');
+                                                    window.open(`http://10.0.0.10:5000/api/documents/view/${doc.id}`, '_blank');
                                                 }}
                                             >
                                                 <Eye size={15} />
@@ -719,7 +719,7 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                                 className="doc-action-btn"
                                                 title="ดาวน์โหลด"
                                                 onClick={() => {
-                                                    window.location.href = `http://localhost:5000/api/documents/download/${doc.id}`;
+                                                    window.location.href = `http://10.0.0.10:5000/api/documents/download/${doc.id}`;
                                                 }}
                                             >
                                                 <Download size={15} />
@@ -833,198 +833,198 @@ function FormDocumentList({ hasPermission, documents, standards, isLoading, erro
                 {/* ── Right Side (Filters) ── */}
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', flex: 2, minWidth: '450px' }}>
 
-                        {/* 1. Part Filter Dropdown */}
-                        <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '220px' }}>
-                            <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
-                                <button
-                                    style={{ width: '100%' }}
-                                    className={`doc-dropdown-trigger ${showPartDropdown ? 'open' : ''}`}
-                                    onClick={() => {
-                                        setShowPartDropdown(!showPartDropdown);
-                                        setShowCategoryDropdown(false);
-                                        setShowStandardDropdown(false);
-                                    }}
-                                >
-                                    <span className="doc-dropdown-text">
-                                        {filterPart === 'all' ? (
-                                            <>
-                                                <span className="doc-dropdown-icon">📁</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>ส่วน:</span> ทุกส่วน
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="doc-dropdown-icon">📂</span>
-                                                <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    ส่วน: {DOCUMENT_PARTS.find(p => p.id === filterPart)?.name.split(':')[0]}
-                                                </span>
-                                            </>
-                                        )}
-                                    </span>
-                                    <ChevronDown size={16} className={`doc-dropdown-arrow ${showPartDropdown ? 'rotated' : ''}`} />
-                                </button>
+                    {/* 1. Part Filter Dropdown */}
+                    <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '220px' }}>
+                        <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
+                            <button
+                                style={{ width: '100%' }}
+                                className={`doc-dropdown-trigger ${showPartDropdown ? 'open' : ''}`}
+                                onClick={() => {
+                                    setShowPartDropdown(!showPartDropdown);
+                                    setShowCategoryDropdown(false);
+                                    setShowStandardDropdown(false);
+                                }}
+                            >
+                                <span className="doc-dropdown-text">
+                                    {filterPart === 'all' ? (
+                                        <>
+                                            <span className="doc-dropdown-icon">📁</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>ส่วน:</span> ทุกส่วน
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="doc-dropdown-icon">📂</span>
+                                            <span style={{ color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                ส่วน: {DOCUMENT_PARTS.find(p => p.id === filterPart)?.name.split(':')[0]}
+                                            </span>
+                                        </>
+                                    )}
+                                </span>
+                                <ChevronDown size={16} className={`doc-dropdown-arrow ${showPartDropdown ? 'rotated' : ''}`} />
+                            </button>
 
-                                {showPartDropdown && (
-                                    <>
-                                        <div className="doc-dropdown-backdrop" onClick={() => setShowPartDropdown(false)} />
-                                        <div className="doc-dropdown-menu">
-                                            <div className="doc-dropdown-header">เลือกส่วนของเอกสาร</div>
+                            {showPartDropdown && (
+                                <>
+                                    <div className="doc-dropdown-backdrop" onClick={() => setShowPartDropdown(false)} />
+                                    <div className="doc-dropdown-menu">
+                                        <div className="doc-dropdown-header">เลือกส่วนของเอกสาร</div>
+                                        <div
+                                            className={`doc-dropdown-item ${filterPart === 'all' ? 'active' : ''}`}
+                                            onClick={() => { setFilterPart('all'); setFilterCategory('all'); setShowPartDropdown(false); }}
+                                        >
+                                            <span className="doc-dropdown-item-icon">📁</span>
+                                            <span className="doc-dropdown-item-name">ทุกส่วน</span>
+                                        </div>
+                                        <div className="doc-dropdown-divider" />
+                                        {DOCUMENT_PARTS.map((part) => (
                                             <div
-                                                className={`doc-dropdown-item ${filterPart === 'all' ? 'active' : ''}`}
-                                                onClick={() => { setFilterPart('all'); setFilterCategory('all'); setShowPartDropdown(false); }}
+                                                key={part.id}
+                                                className={`doc-dropdown-item ${filterPart === part.id ? 'active' : ''}`}
+                                                onClick={() => { setFilterPart(part.id); setFilterCategory('all'); setShowPartDropdown(false); }}
                                             >
-                                                <span className="doc-dropdown-item-icon">📁</span>
-                                                <span className="doc-dropdown-item-name">ทุกส่วน</span>
-                                            </div>
-                                            <div className="doc-dropdown-divider" />
-                                            {DOCUMENT_PARTS.map((part) => (
-                                                <div
-                                                    key={part.id}
-                                                    className={`doc-dropdown-item ${filterPart === part.id ? 'active' : ''}`}
-                                                    onClick={() => { setFilterPart(part.id); setFilterCategory('all'); setShowPartDropdown(false); }}
-                                                >
-                                                    <span className="doc-dropdown-item-icon">📄</span>
-                                                    <div className="doc-dropdown-item-info">
-                                                        <span className="doc-dropdown-item-name">{part.name}</span>
-                                                    </div>
+                                                <span className="doc-dropdown-item-icon">📄</span>
+                                                <div className="doc-dropdown-item-info">
+                                                    <span className="doc-dropdown-item-name">{part.name}</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 2. Category Filter (Custom Dropdown) ── */}
-                        <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '240px' }}>
-                            <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
-                                <button
-                                    style={{ width: '100%' }}
-                                    className={`doc-dropdown-trigger ${showCategoryDropdown ? 'open' : ''}`}
-                                    onClick={() => {
-                                        setShowCategoryDropdown(!showCategoryDropdown);
-                                        setShowPartDropdown(false);
-                                        setShowStandardDropdown(false);
-                                    }}
-                                >
-                                    <span className="doc-dropdown-text">
-                                        {filterCategory === 'all' ? (
-                                            <>
-                                                <span className="doc-dropdown-icon">📁</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>หมวด:</span> ทุกหมวด
-                                                {filterPart === 'all' && <span className="doc-dropdown-count">{FORM_DOCUMENTS.length}</span>}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="doc-dropdown-icon">📂</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>หมวด:</span> {getCategoryShortName(filterCategory)}
-                                                <span className="doc-dropdown-count">
-                                                    {FORM_DOCUMENTS.filter(d => d.category === filterCategory).length}
-                                                </span>
-                                            </>
-                                        )}
-                                    </span>
-                                    <ChevronDown size={16} className={`doc-dropdown-arrow ${showCategoryDropdown ? 'rotated' : ''}`} />
-                                </button>
-
-                                {showCategoryDropdown && (
-                                    <>
-                                        <div className="doc-dropdown-backdrop" onClick={() => setShowCategoryDropdown(false)} />
-                                        <div className="doc-dropdown-menu">
-                                            <div className="doc-dropdown-header">เลือกหมวดเอกสาร</div>
-                                            <div
-                                                className={`doc-dropdown-item ${filterCategory === 'all' ? 'active' : ''}`}
-                                                onClick={() => { setFilterCategory('all'); setFilterStandard('all'); setShowCategoryDropdown(false); }}
-                                            >
-                                                <span className="doc-dropdown-item-icon">📁</span>
-                                                <span className="doc-dropdown-item-name">ทุกหมวด</span>
-                                                {filterPart === 'all' && <span className="doc-dropdown-count">{FORM_DOCUMENTS.length}</span>}
                                             </div>
-                                            <div className="doc-dropdown-divider" />
-                                            {categoriesWithForms
-                                                .filter(cat => filterPart === 'all' || cat.partId === filterPart)
-                                                .map((cat) => {
-                                                    const count = FORM_DOCUMENTS.filter(d => d.category === cat.id).length;
-                                                    return (
-                                                        <div
-                                                            key={cat.id}
-                                                            className={`doc-dropdown-item ${filterCategory === cat.id ? 'active' : ''}`}
-                                                            onClick={() => { setFilterCategory(cat.id); setFilterStandard('all'); setShowCategoryDropdown(false); }}
-                                                        >
-                                                            <span className="doc-dropdown-item-icon">📄</span>
-                                                            <div className="doc-dropdown-item-info">
-                                                                <span className="doc-dropdown-item-name">{cat.shortName}</span>
-                                                                <span className="doc-dropdown-item-full">{cat.name}</span>
-                                                            </div>
-                                                            <span className="doc-dropdown-item-count">{count}</span>
-                                                        </div>
-                                                    );
-                                                })}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
                         </div>
-                        {/* 3. Standard Filter (Custom Dropdown) ── */}
-                        <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '240px' }}>
-                            <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
-                                <button
-                                    style={{ width: '100%' }}
-                                    className={`doc-dropdown-trigger ${showStandardDropdown ? 'open' : ''}`}
-                                    onClick={() => {
-                                        setShowStandardDropdown(!showStandardDropdown);
-                                        setShowCategoryDropdown(false);
-                                        setShowPartDropdown(false);
-                                    }}
-                                >
-                                    <span className="doc-dropdown-text">
-                                        {filterStandard === 'all' ? (
-                                            <>
-                                                <span className="doc-dropdown-icon">🔖</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>มาตรฐาน:</span> ทั้งหมด
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span className="doc-dropdown-icon">🔖</span>
-                                                <span style={{ color: 'var(--text-secondary)' }}>มาตรฐาน:</span>{' '}
-                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                    {filterStandard}
-                                                </span>
-                                            </>
-                                        )}
-                                    </span>
-                                    <ChevronDown size={16} className={`doc-dropdown-arrow ${showStandardDropdown ? 'rotated' : ''}`} />
-                                </button>
+                    </div>
 
-                                {showStandardDropdown && (
-                                    <>
-                                        <div className="doc-dropdown-backdrop" onClick={() => setShowStandardDropdown(false)} />
-                                        <div className="doc-dropdown-menu">
-                                            <div className="doc-dropdown-header">เลือกมาตรฐานที่เกี่ยวข้อง</div>
+                    {/* 2. Category Filter (Custom Dropdown) ── */}
+                    <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '240px' }}>
+                        <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
+                            <button
+                                style={{ width: '100%' }}
+                                className={`doc-dropdown-trigger ${showCategoryDropdown ? 'open' : ''}`}
+                                onClick={() => {
+                                    setShowCategoryDropdown(!showCategoryDropdown);
+                                    setShowPartDropdown(false);
+                                    setShowStandardDropdown(false);
+                                }}
+                            >
+                                <span className="doc-dropdown-text">
+                                    {filterCategory === 'all' ? (
+                                        <>
+                                            <span className="doc-dropdown-icon">📁</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>หมวด:</span> ทุกหมวด
+                                            {filterPart === 'all' && <span className="doc-dropdown-count">{FORM_DOCUMENTS.length}</span>}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="doc-dropdown-icon">📂</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>หมวด:</span> {getCategoryShortName(filterCategory)}
+                                            <span className="doc-dropdown-count">
+                                                {FORM_DOCUMENTS.filter(d => d.category === filterCategory).length}
+                                            </span>
+                                        </>
+                                    )}
+                                </span>
+                                <ChevronDown size={16} className={`doc-dropdown-arrow ${showCategoryDropdown ? 'rotated' : ''}`} />
+                            </button>
+
+                            {showCategoryDropdown && (
+                                <>
+                                    <div className="doc-dropdown-backdrop" onClick={() => setShowCategoryDropdown(false)} />
+                                    <div className="doc-dropdown-menu">
+                                        <div className="doc-dropdown-header">เลือกหมวดเอกสาร</div>
+                                        <div
+                                            className={`doc-dropdown-item ${filterCategory === 'all' ? 'active' : ''}`}
+                                            onClick={() => { setFilterCategory('all'); setFilterStandard('all'); setShowCategoryDropdown(false); }}
+                                        >
+                                            <span className="doc-dropdown-item-icon">📁</span>
+                                            <span className="doc-dropdown-item-name">ทุกหมวด</span>
+                                            {filterPart === 'all' && <span className="doc-dropdown-count">{FORM_DOCUMENTS.length}</span>}
+                                        </div>
+                                        <div className="doc-dropdown-divider" />
+                                        {categoriesWithForms
+                                            .filter(cat => filterPart === 'all' || cat.partId === filterPart)
+                                            .map((cat) => {
+                                                const count = FORM_DOCUMENTS.filter(d => d.category === cat.id).length;
+                                                return (
+                                                    <div
+                                                        key={cat.id}
+                                                        className={`doc-dropdown-item ${filterCategory === cat.id ? 'active' : ''}`}
+                                                        onClick={() => { setFilterCategory(cat.id); setFilterStandard('all'); setShowCategoryDropdown(false); }}
+                                                    >
+                                                        <span className="doc-dropdown-item-icon">📄</span>
+                                                        <div className="doc-dropdown-item-info">
+                                                            <span className="doc-dropdown-item-name">{cat.shortName}</span>
+                                                            <span className="doc-dropdown-item-full">{cat.name}</span>
+                                                        </div>
+                                                        <span className="doc-dropdown-item-count">{count}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                    {/* 3. Standard Filter (Custom Dropdown) ── */}
+                    <div className="doc-category-filter" style={{ marginBottom: 0, padding: 0, border: 'none', background: 'transparent', flex: 1, maxWidth: '240px' }}>
+                        <div className="doc-dropdown-wrapper" style={{ width: '100%', maxWidth: '100%' }}>
+                            <button
+                                style={{ width: '100%' }}
+                                className={`doc-dropdown-trigger ${showStandardDropdown ? 'open' : ''}`}
+                                onClick={() => {
+                                    setShowStandardDropdown(!showStandardDropdown);
+                                    setShowCategoryDropdown(false);
+                                    setShowPartDropdown(false);
+                                }}
+                            >
+                                <span className="doc-dropdown-text">
+                                    {filterStandard === 'all' ? (
+                                        <>
+                                            <span className="doc-dropdown-icon">🔖</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>มาตรฐาน:</span> ทั้งหมด
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="doc-dropdown-icon">🔖</span>
+                                            <span style={{ color: 'var(--text-secondary)' }}>มาตรฐาน:</span>{' '}
+                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {filterStandard}
+                                            </span>
+                                        </>
+                                    )}
+                                </span>
+                                <ChevronDown size={16} className={`doc-dropdown-arrow ${showStandardDropdown ? 'rotated' : ''}`} />
+                            </button>
+
+                            {showStandardDropdown && (
+                                <>
+                                    <div className="doc-dropdown-backdrop" onClick={() => setShowStandardDropdown(false)} />
+                                    <div className="doc-dropdown-menu">
+                                        <div className="doc-dropdown-header">เลือกมาตรฐานที่เกี่ยวข้อง</div>
+                                        <div
+                                            className={`doc-dropdown-item ${filterStandard === 'all' ? 'active' : ''}`}
+                                            onClick={() => { setFilterStandard('all'); setShowStandardDropdown(false); }}
+                                        >
+                                            <span className="doc-dropdown-item-icon">🔖</span>
+                                            <span className="doc-dropdown-item-name">ทุกมาตรฐาน</span>
+                                        </div>
+                                        <div className="doc-dropdown-divider" />
+                                        {availableStandards.map((std) => (
                                             <div
-                                                className={`doc-dropdown-item ${filterStandard === 'all' ? 'active' : ''}`}
-                                                onClick={() => { setFilterStandard('all'); setShowStandardDropdown(false); }}
+                                                key={std}
+                                                className={`doc-dropdown-item ${filterStandard === std ? 'active' : ''}`}
+                                                onClick={() => { setFilterStandard(std); setShowStandardDropdown(false); }}
                                             >
                                                 <span className="doc-dropdown-item-icon">🔖</span>
-                                                <span className="doc-dropdown-item-name">ทุกมาตรฐาน</span>
-                                            </div>
-                                            <div className="doc-dropdown-divider" />
-                                            {availableStandards.map((std) => (
-                                                <div
-                                                    key={std}
-                                                    className={`doc-dropdown-item ${filterStandard === std ? 'active' : ''}`}
-                                                    onClick={() => { setFilterStandard(std); setShowStandardDropdown(false); }}
-                                                >
-                                                    <span className="doc-dropdown-item-icon">🔖</span>
-                                                    <div className="doc-dropdown-item-info">
-                                                        <span className="doc-dropdown-item-name">{std}</span>
-                                                    </div>
+                                                <div className="doc-dropdown-item-info">
+                                                    <span className="doc-dropdown-item-name">{std}</span>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    </>
-                                )}
-                            </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
                         </div>
+                    </div>
                 </div>
             </div>
 
@@ -1076,7 +1076,7 @@ function FormDocumentList({ hasPermission, documents, standards, isLoading, erro
                                                 className="doc-action-btn"
                                                 title="ดูเอกสาร"
                                                 onClick={() => {
-                                                    window.open(`http://localhost:5000/api/documents/view/${doc.id}`, '_blank');
+                                                    window.open(`http://10.0.0.10:5000/api/documents/view/${doc.id}`, '_blank');
                                                 }}
                                             >
                                                 <Eye size={15} />
@@ -1085,7 +1085,7 @@ function FormDocumentList({ hasPermission, documents, standards, isLoading, erro
                                                 className="doc-action-btn"
                                                 title="ดาวน์โหลด"
                                                 onClick={() => {
-                                                    window.location.href = `http://localhost:5000/api/documents/download/${doc.id}`;
+                                                    window.location.href = `http://10.0.0.10:5000/api/documents/download/${doc.id}`;
                                                 }}
                                             >
                                                 <Download size={15} />
@@ -1183,7 +1183,7 @@ function FormFillPage({ doc, onBack }) {
 
         setIsSubmitting(true);
         try {
-            const response = await fetch('http://localhost:5000/api/submissions', {
+            const response = await fetch('http://10.0.0.10:5000/api/submissions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1258,7 +1258,7 @@ function FormFillPage({ doc, onBack }) {
                 doc_date_creator: formatDateThai(new Date().toISOString().split('T')[0]),
             };
 
-            const response = await fetch('http://localhost:5000/api/forms/fill/FM-IT-01', {
+            const response = await fetch('http://10.0.0.10:5000/api/forms/fill/FM-IT-01', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fields }),
@@ -1601,8 +1601,8 @@ function DocumentRequest({ hasPermission }) {
         setLoading(true);
         try {
             const [subRes, approverRes] = await Promise.all([
-                fetch('http://localhost:5000/api/submissions'),
-                fetch('http://localhost:5000/api/submissions/approver-ids'),
+                fetch('http://10.0.0.10:5000/api/submissions'),
+                fetch('http://10.0.0.10:5000/api/submissions/approver-ids'),
             ]);
             if (subRes.ok) setSubmissions(await subRes.json());
             if (approverRes.ok) setApproverIds(await approverRes.json());
@@ -1670,7 +1670,7 @@ function DocumentRequest({ hasPermission }) {
     const handlePreviewSubmission = async (sub) => {
         setPreviewLoadingId(sub.submission_id);
         try {
-            const detailRes = await fetch(`http://localhost:5000/api/submissions`);
+            const detailRes = await fetch(`http://10.0.0.10:5000/api/submissions`);
             const allSubs = await detailRes.json();
             const fullSub = allSubs.find(s => s.submission_id === sub.submission_id) || sub;
 
@@ -1727,7 +1727,7 @@ function DocumentRequest({ hasPermission }) {
                 doc_date_approver: fullSub.step2_status === 'approved' && fullSub.step2_approved_at ? formatDateThai(fullSub.step2_approved_at.split('T')[0]) : '',
             };
 
-            const response = await fetch('http://localhost:5000/api/forms/fill/FM-IT-01', {
+            const response = await fetch('http://10.0.0.10:5000/api/forms/fill/FM-IT-01', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fields }),
@@ -1759,7 +1759,7 @@ function DocumentRequest({ hasPermission }) {
     const handleViewHistory = async (sub) => {
         setHistoryLoading(true);
         try {
-            const res = await fetch(`http://localhost:5000/api/submissions/${sub.submission_id}/history`);
+            const res = await fetch(`http://10.0.0.10:5000/api/submissions/${sub.submission_id}/history`);
             if (res.ok) {
                 const data = await res.json();
                 setHistoryModal(data);
@@ -1783,7 +1783,7 @@ function DocumentRequest({ hasPermission }) {
 
         setActionLoading(true);
         try {
-            const res = await fetch(`http://localhost:5000/api/submissions/${actionModal.id}/${actionModal.action}`, {
+            const res = await fetch(`http://10.0.0.10:5000/api/submissions/${actionModal.id}/${actionModal.action}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: currentUser.id, comment: actionComment }),
@@ -1954,58 +1954,58 @@ function DocumentRequest({ hasPermission }) {
 
                                         {/* คอลัมน์ จัดการ */}
                                         {showActionsColumn && (
-                                        <td data-label="จัดการ" style={{ textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
-                                                {/* Approver actions: อนุมัติ / ส่งกลับแก้ไข / ไม่อนุมัติ */}
-                                                {canApprove(sub) && (
-                                                    <>
+                                            <td data-label="จัดการ" style={{ textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                    {/* Approver actions: อนุมัติ / ส่งกลับแก้ไข / ไม่อนุมัติ */}
+                                                    {canApprove(sub) && (
+                                                        <>
+                                                            <button
+                                                                className="doc-action-btn"
+                                                                title="อนุมัติ"
+                                                                style={{ background: '#dcfce7', color: '#16a34a' }}
+                                                                onClick={() => setActionModal({ id: sub.submission_id, action: 'approve' })}
+                                                            >
+                                                                <CheckCircle size={14} />
+                                                            </button>
+                                                            <button
+                                                                className="doc-action-btn"
+                                                                title="ส่งกลับแก้ไข"
+                                                                style={{ background: '#fef3c7', color: '#d97706' }}
+                                                                onClick={() => setActionModal({ id: sub.submission_id, action: 'request-revision' })}
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                            <button
+                                                                className="doc-action-btn"
+                                                                title="ไม่อนุมัติ"
+                                                                style={{ background: '#fee2e2', color: '#dc2626' }}
+                                                                onClick={() => setActionModal({ id: sub.submission_id, action: 'reject' })}
+                                                            >
+                                                                <XCircle size={14} />
+                                                            </button>
+                                                        </>
+                                                    )}
+
+                                                    {/* ผู้ส่ง: แก้ไขและส่งใหม่ */}
+                                                    {canRevise(sub) && (
                                                         <button
                                                             className="doc-action-btn"
-                                                            title="อนุมัติ"
-                                                            style={{ background: '#dcfce7', color: '#16a34a' }}
-                                                            onClick={() => setActionModal({ id: sub.submission_id, action: 'approve' })}
-                                                        >
-                                                            <CheckCircle size={14} />
-                                                        </button>
-                                                        <button
-                                                            className="doc-action-btn"
-                                                            title="ส่งกลับแก้ไข"
+                                                            title="แก้ไขและส่งใหม่"
                                                             style={{ background: '#fef3c7', color: '#d97706' }}
-                                                            onClick={() => setActionModal({ id: sub.submission_id, action: 'request-revision' })}
+                                                            onClick={() => setRevisionEditSub(sub)}
                                                         >
-                                                            <Edit2 size={14} />
+                                                            <RefreshCw size={14} />
                                                         </button>
-                                                        <button
-                                                            className="doc-action-btn"
-                                                            title="ไม่อนุมัติ"
-                                                            style={{ background: '#fee2e2', color: '#dc2626' }}
-                                                            onClick={() => setActionModal({ id: sub.submission_id, action: 'reject' })}
-                                                        >
-                                                            <XCircle size={14} />
-                                                        </button>
-                                                    </>
-                                                )}
-
-                                                {/* ผู้ส่ง: แก้ไขและส่งใหม่ */}
-                                                {canRevise(sub) && (
-                                                    <button
-                                                        className="doc-action-btn"
-                                                        title="แก้ไขและส่งใหม่"
-                                                        style={{ background: '#fef3c7', color: '#d97706' }}
-                                                        onClick={() => setRevisionEditSub(sub)}
-                                                    >
-                                                        <RefreshCw size={14} />
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            {/* แสดงเหตุผลที่ต้องแก้ไข */}
-                                            {sub.overall_status === 'ส่งกลับแก้ไข' && sub.revision_comment && (
-                                                <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px', textAlign: 'left', maxWidth: '200px' }}>
-                                                    💬 {sub.revision_comment}
+                                                    )}
                                                 </div>
-                                            )}
-                                        </td>
+
+                                                {/* แสดงเหตุผลที่ต้องแก้ไข */}
+                                                {sub.overall_status === 'ส่งกลับแก้ไข' && sub.revision_comment && (
+                                                    <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px', textAlign: 'left', maxWidth: '200px' }}>
+                                                        💬 {sub.revision_comment}
+                                                    </div>
+                                                )}
+                                            </td>
                                         )}
                                     </tr>
                                 ))}
@@ -2064,8 +2064,8 @@ function DocumentRequest({ hasPermission }) {
                                 onChange={(e) => setActionComment(e.target.value)}
                                 placeholder={
                                     actionModal.action === 'approve' ? 'ความเห็นเพิ่มเติม...' :
-                                    actionModal.action === 'reject' ? 'ระบุเหตุผลที่ไม่อนุมัติ...' :
-                                    'ระบุส่วนที่ต้องแก้ไข เช่น ข้อมูลแผนกไม่ถูกต้อง, ต้องเพิ่มสิทธิ์...'
+                                        actionModal.action === 'reject' ? 'ระบุเหตุผลที่ไม่อนุมัติ...' :
+                                            'ระบุส่วนที่ต้องแก้ไข เช่น ข้อมูลแผนกไม่ถูกต้อง, ต้องเพิ่มสิทธิ์...'
                                 }
                                 style={{ width: '100%', resize: 'vertical' }}
                             />
@@ -2201,7 +2201,7 @@ function RevisionFormPage({ parentSub, onBack, currentUser, navigate }) {
 
         setIsSubmitting(true);
         try {
-            const response = await fetch('http://localhost:5000/api/submissions', {
+            const response = await fetch('http://10.0.0.10:5000/api/submissions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

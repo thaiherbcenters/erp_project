@@ -2,7 +2,7 @@ const http = require('http');
 
 async function testLib() {
     console.log('Testing GET /api/library...');
-    http.get('http://localhost:5000/api/library', (res) => {
+    http.get('http://10.0.0.10:5000/api/library', (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {

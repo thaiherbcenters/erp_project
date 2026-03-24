@@ -93,11 +93,11 @@ export default function PermissionManager() {
     const fetchUsers = async () => {
         setIsLoadingUsers(true);
         try {
-            const res = await fetch('http://localhost:5000/api/users');
+            const res = await fetch('http://10.0.0.10:5000/api/users');
             if (res.ok) {
                 const data = await res.json();
                 setUsers(data);
-                
+
                 // Load permissions for all non-admin users to correctly display badge counts
                 const nonAdmins = data.filter((u) => u.role !== 'admin');
                 await Promise.all(nonAdmins.map((user) => loadUserPermissions(user.id)));
@@ -112,7 +112,7 @@ export default function PermissionManager() {
     useEffect(() => {
         fetchUsers();
         // Fetch departments from DB
-        fetch('http://localhost:5000/api/departments')
+        fetch('http://10.0.0.10:5000/api/departments')
             .then(res => res.ok ? res.json() : [])
             .then(data => setDepartments(data))
             .catch(() => setDepartments([]));
@@ -125,7 +125,7 @@ export default function PermissionManager() {
         setIsCreating(true);
 
         try {
-            const res = await fetch('http://localhost:5000/api/users', {
+            const res = await fetch('http://10.0.0.10:5000/api/users', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newUserForm),
@@ -153,7 +153,7 @@ export default function PermissionManager() {
         }
 
         try {
-            const res = await fetch(`http://localhost:5000/api/users/${userId}`, {
+            const res = await fetch(`http://10.0.0.10:5000/api/users/${userId}`, {
                 method: 'DELETE',
             });
 
@@ -215,7 +215,7 @@ export default function PermissionManager() {
         const isEnabled = userPerms.some((p) => p.page_id === sectionId);
         updateSectionPermission(activeUserId, pageId, subId, sectionId, !isEnabled);
     };
-    
+
     // For Data Scope select
     const handleDataScopeChange = (pageId, isSub, parentId, scope) => {
         if (isSub) {
@@ -277,8 +277,8 @@ export default function PermissionManager() {
                         <span>ผู้ใช้งาน ({nonAdminUsers.length})</span>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                        <button 
-                            className="perm-btn-create-user" 
+                        <button
+                            className="perm-btn-create-user"
                             style={{ backgroundColor: '#fee2e2', color: '#dc2626' }}
                             onClick={() => activeUser && handleDeleteUser(activeUser.id, activeUser.displayName)}
                             title="ลบผู้ใช้งานที่กำลังเลือก"
@@ -286,8 +286,8 @@ export default function PermissionManager() {
                         >
                             <Trash2 size={16} />
                         </button>
-                        <button 
-                            className="perm-btn-create-user" 
+                        <button
+                            className="perm-btn-create-user"
                             onClick={() => setShowModal(true)}
                             title="สร้างผู้ใช้งานใหม่"
                         >
@@ -531,25 +531,25 @@ export default function PermissionManager() {
                         </div>
                         <form className="perm-modal-form" onSubmit={handleCreateUser}>
                             {createError && <div className="perm-modal-error">{createError}</div>}
-                            
+
                             <div className="perm-form-group">
                                 <label>Username (ชื่อเข้าสู่ระบบ)</label>
-                                <input 
-                                    type="text" 
-                                    required 
+                                <input
+                                    type="text"
+                                    required
                                     value={newUserForm.username}
-                                    onChange={e => setNewUserForm({...newUserForm, username: e.target.value})}
+                                    onChange={e => setNewUserForm({ ...newUserForm, username: e.target.value })}
                                     placeholder="เช่น: user01"
                                 />
                             </div>
-                            
+
                             <div className="perm-form-group">
                                 <label>Password (รหัสผ่าน)</label>
-                                <input 
-                                    type="password" 
-                                    required 
+                                <input
+                                    type="password"
+                                    required
                                     value={newUserForm.password}
-                                    onChange={e => setNewUserForm({...newUserForm, password: e.target.value})}
+                                    onChange={e => setNewUserForm({ ...newUserForm, password: e.target.value })}
                                     placeholder="รหัสผ่านสำหรับล็อกอิน"
                                     autoComplete="new-password"
                                 />
@@ -557,20 +557,20 @@ export default function PermissionManager() {
 
                             <div className="perm-form-group">
                                 <label>Display Name (ชื่อที่แสดงผล)</label>
-                                <input 
-                                    type="text" 
-                                    required 
+                                <input
+                                    type="text"
+                                    required
                                     value={newUserForm.displayName}
-                                    onChange={e => setNewUserForm({...newUserForm, displayName: e.target.value})}
+                                    onChange={e => setNewUserForm({ ...newUserForm, displayName: e.target.value })}
                                     placeholder="เช่น: สมชาย เข็มกลัด"
                                 />
                             </div>
 
                             <div className="perm-form-group">
                                 <label>Department (แผนก)</label>
-                                <select 
+                                <select
                                     value={newUserForm.department}
-                                    onChange={e => setNewUserForm({...newUserForm, department: e.target.value})}
+                                    onChange={e => setNewUserForm({ ...newUserForm, department: e.target.value })}
                                 >
                                     <option value="">(ไม่ระบุแผนก)</option>
                                     {departments.map(dept => (
@@ -583,9 +583,9 @@ export default function PermissionManager() {
 
                             <div className="perm-form-group">
                                 <label>Role (ตำแหน่ง/กลุ่มสิทธิ์ประจำ)</label>
-                                <select 
+                                <select
                                     value={newUserForm.role}
-                                    onChange={e => setNewUserForm({...newUserForm, role: e.target.value})}
+                                    onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })}
                                 >
                                     <option value="user">User (ผู้ใช้งานทั่วไป)</option>
                                     <option value="manager">Manager (ผู้จัดการ)</option>

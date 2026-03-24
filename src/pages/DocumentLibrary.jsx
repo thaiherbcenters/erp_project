@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import './DocumentLibrary.css';
 
-const API_BASE = 'http://localhost:5000/api/library';
+const API_BASE = 'http://10.0.0.10:5000/api/library';
 
 export default function DocumentLibrary({ hasPermission }) {
     if (!hasPermission('document_library_table'))
@@ -61,7 +61,7 @@ export default function DocumentLibrary({ hasPermission }) {
             let dataScope = 'all';
             let userId = '';
             let department = '';
-            
+
             if (currentUser) {
                 userId = currentUser.id;
                 department = currentUser.department || '';
@@ -69,8 +69,8 @@ export default function DocumentLibrary({ hasPermission }) {
                 // Check sub-page 'document_library' first, then parent 'document', then legacy 'document_control'
                 const libPerm = perms.find(p => p.page_id === 'document_library');
                 const docPerm = perms.find(p => p.page_id === 'document')
-                            || perms.find(p => p.page_id === 'document_control');
-                
+                    || perms.find(p => p.page_id === 'document_control');
+
                 if (libPerm && libPerm.data_scope) {
                     dataScope = libPerm.data_scope;
                 } else if (docPerm && docPerm.data_scope) {
