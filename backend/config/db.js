@@ -6,9 +6,10 @@ const config = {
     database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
+    port: parseInt(process.env.DB_PORT) || 1433,
     options: {
-        trustServerCertificate: true,
-        encrypt: false,
+        trustServerCertificate: true, // Keep true if using self-signed cert on local network 10.0.0.x
+        encrypt: true, // Security fix: encrypt traffic to true
     },
     connectionTimeout: 10000,
 };
