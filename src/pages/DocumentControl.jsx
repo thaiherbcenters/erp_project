@@ -141,8 +141,8 @@ export default function DocumentControl() {
                 }).toString();
 
                 const [docRes, stdRes] = await Promise.all([
-                    fetch(`http://localhost:5000/api/documents?${queryParams}`),
-                    fetch('http://localhost:5000/api/documents/standards'),
+                    fetch(`http://61.7.209.84:5000/api/documents?${queryParams}`),
+                    fetch('http://61.7.209.84:5000/api/documents/standards'),
                 ]);
                 if (!docRes.ok) throw new Error('ไม่สามารถดึงข้อมูลเอกสารได้');
                 const docsJson = await docRes.json();
@@ -241,7 +241,7 @@ function DocumentDashboard({ hasPermission, documents, isLoading, error }) {
 
     const [darPendingCount, setDarPendingCount] = useState(0);
     useEffect(() => {
-        fetch('http://localhost:5000/api/submissions')
+        fetch('http://61.7.209.84:5000/api/submissions')
             .then(r => r.ok ? r.json() : [])
             .then(data => setDarPendingCount(data.filter(s => s.overall_status !== 'อนุมัติแล้ว' && s.overall_status !== 'ไม่อนุมัติ').length))
             .catch(() => { });
@@ -710,7 +710,7 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                                 className="doc-action-btn"
                                                 title="ดูเอกสาร"
                                                 onClick={() => {
-                                                    window.open(`http://localhost:5000/api/documents/view/${doc.id}`, '_blank');
+                                                    window.open(`http://61.7.209.84:5000/api/documents/view/${doc.id}`, '_blank');
                                                 }}
                                             >
                                                 <Eye size={15} />
@@ -719,7 +719,7 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                                 className="doc-action-btn"
                                                 title="ดาวน์โหลด"
                                                 onClick={() => {
-                                                    window.location.href = `http://localhost:5000/api/documents/download/${doc.id}`;
+                                                    window.location.href = `http://61.7.209.84:5000/api/documents/download/${doc.id}`;
                                                 }}
                                             >
                                                 <Download size={15} />
@@ -1076,7 +1076,7 @@ function FormDocumentList({ hasPermission, documents, standards, isLoading, erro
                                                 className="doc-action-btn"
                                                 title="ดูเอกสาร"
                                                 onClick={() => {
-                                                    window.open(`http://localhost:5000/api/documents/view/${doc.id}`, '_blank');
+                                                    window.open(`http://61.7.209.84:5000/api/documents/view/${doc.id}`, '_blank');
                                                 }}
                                             >
                                                 <Eye size={15} />
@@ -1085,7 +1085,7 @@ function FormDocumentList({ hasPermission, documents, standards, isLoading, erro
                                                 className="doc-action-btn"
                                                 title="ดาวน์โหลด"
                                                 onClick={() => {
-                                                    window.location.href = `http://localhost:5000/api/documents/download/${doc.id}`;
+                                                    window.location.href = `http://61.7.209.84:5000/api/documents/download/${doc.id}`;
                                                 }}
                                             >
                                                 <Download size={15} />
@@ -1183,7 +1183,7 @@ function FormFillPage({ doc, onBack }) {
 
         setIsSubmitting(true);
         try {
-            const response = await fetch('http://localhost:5000/api/submissions', {
+            const response = await fetch('http://61.7.209.84:5000/api/submissions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1258,7 +1258,7 @@ function FormFillPage({ doc, onBack }) {
                 doc_date_creator: formatDateThai(new Date().toISOString().split('T')[0]),
             };
 
-            const response = await fetch('http://localhost:5000/api/forms/fill/FM-IT-01', {
+            const response = await fetch('http://61.7.209.84:5000/api/forms/fill/FM-IT-01', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fields }),
@@ -1601,8 +1601,8 @@ function DocumentRequest({ hasPermission }) {
         setLoading(true);
         try {
             const [subRes, approverRes] = await Promise.all([
-                fetch('http://localhost:5000/api/submissions'),
-                fetch('http://localhost:5000/api/submissions/approver-ids'),
+                fetch('http://61.7.209.84:5000/api/submissions'),
+                fetch('http://61.7.209.84:5000/api/submissions/approver-ids'),
             ]);
             if (subRes.ok) setSubmissions(await subRes.json());
             if (approverRes.ok) setApproverIds(await approverRes.json());
@@ -1670,7 +1670,7 @@ function DocumentRequest({ hasPermission }) {
     const handlePreviewSubmission = async (sub) => {
         setPreviewLoadingId(sub.submission_id);
         try {
-            const detailRes = await fetch(`http://localhost:5000/api/submissions`);
+            const detailRes = await fetch(`http://61.7.209.84:5000/api/submissions`);
             const allSubs = await detailRes.json();
             const fullSub = allSubs.find(s => s.submission_id === sub.submission_id) || sub;
 
@@ -1727,7 +1727,7 @@ function DocumentRequest({ hasPermission }) {
                 doc_date_approver: fullSub.step2_status === 'approved' && fullSub.step2_approved_at ? formatDateThai(fullSub.step2_approved_at.split('T')[0]) : '',
             };
 
-            const response = await fetch('http://localhost:5000/api/forms/fill/FM-IT-01', {
+            const response = await fetch('http://61.7.209.84:5000/api/forms/fill/FM-IT-01', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fields }),
@@ -1759,7 +1759,7 @@ function DocumentRequest({ hasPermission }) {
     const handleViewHistory = async (sub) => {
         setHistoryLoading(true);
         try {
-            const res = await fetch(`http://localhost:5000/api/submissions/${sub.submission_id}/history`);
+            const res = await fetch(`http://61.7.209.84:5000/api/submissions/${sub.submission_id}/history`);
             if (res.ok) {
                 const data = await res.json();
                 setHistoryModal(data);
@@ -1783,7 +1783,7 @@ function DocumentRequest({ hasPermission }) {
 
         setActionLoading(true);
         try {
-            const res = await fetch(`http://localhost:5000/api/submissions/${actionModal.id}/${actionModal.action}`, {
+            const res = await fetch(`http://61.7.209.84:5000/api/submissions/${actionModal.id}/${actionModal.action}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: currentUser.id, comment: actionComment }),
@@ -2201,7 +2201,7 @@ function RevisionFormPage({ parentSub, onBack, currentUser, navigate }) {
 
         setIsSubmitting(true);
         try {
-            const response = await fetch('http://localhost:5000/api/submissions', {
+            const response = await fetch('http://61.7.209.84:5000/api/submissions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
