@@ -9,7 +9,7 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'development',
-        DB_SERVER: 'localhost'
+        DB_SERVER: '127.0.0.1'
       },
       env_production: {
         NODE_ENV: 'production'
