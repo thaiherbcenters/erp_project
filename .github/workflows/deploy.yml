@@ -23,20 +23,9 @@ jobs:
           
           # ชุดคำสั่งที่จะนำไปรันบน Windows Server ของคุณแบบอัตโนมัติ
           script: |
-            # 1. เข้าไปที่โฟลเดอร์โปรเจกต์ 
             cd C:\Users\Administrator\Documents\GitHub\erp_project
-            
-            # 2. ดึงอัปเดตโค้ดล่าสุดจาก GitHub
             git pull origin main
-            
-            # 3. ติดตั้งแพ็คเกจที่อาจมีอัปเดตใหม่
             npm install
-            
-            # 4. Build หน้าเว็บ (Frontend) ใหม่
             npm run build
-            
-            # 5. สั่งให้ PM2 รีสตาร์ทระบบหลังบ้านและหน้าบ้านใหม่ด้วยไฟล์ ecosystem
             npx pm2 restart ecosystem.config.cjs
-            
-            # 6. บันทึกระบบไว้เผื่อ Windows รีสตาร์ท
             npx pm2 save
