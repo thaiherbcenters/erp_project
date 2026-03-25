@@ -1,26 +1,42 @@
-name: Deploy ERP Project (Docker CI/CD)
+name: Deploy ERP to Windows Server
 
+# ระบุให้ Action นี้ทำงานเมื่อมีการ Push โค้ดเข้าสู่ Branch 'main'
 on:
   push:
     branches:
-      - main
+      - main 
 
 jobs:
   deploy:
-    runs-on: self-hosted # วิ่งไปทำงานที่ Docker Server ของคุณ (ผ่าน Runner)
+    name: Deploy API to Server
+    runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Pull Latest Code
-        uses: actions/checkout@v4
-
-      - name: 🔐 Inject .env file
-        shell: powershell
-        run: |
-          Set-Content -Path backend/.env -Value $env:ENV_FILE
-        env:
-          ENV_FILE: ${{ secrets.ENV_FILE }}
-
-      # สั่ง Docker ให้ลงโค้ดใหม่, Build และเปิดแอปทั้งหมดขึ้นมาใหม่เบ็ดเสร็จ
-      - name: 🐳 Deploy with Docker Compose
-        run: |
-          docker-compose up -d --build
+      - name: Connect and Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          # ตัวแปรเหล่านี้ตั้งค่าได้ที่หน้า Settings > Secrets and variables > Actions ของ GitHub
+          host: ${{ secrets.SERVER_HOST }}     
+          username: ${{ secrets.SERVER_USER }} 
+          key: ${{ secrets.SERVER_SSH_KEY }}   
+          port: ${{ secrets.SERVER_PORT }}
+          
+          # ชุดคำสั่งที่จะนำไปรันบน Windows Server ของคุณแบบอัตโนมัติ
+          script: |
+            # 1. เข้าไปที่โฟลเดอร์โปรเจกต์ 
+            cd C:\Users\Administrator\Documents\GitHub\erp_project
+            
+            # 2. ดึงอัปเดตโค้ดล่าสุดจาก GitHub
+            git pull origin main
+            
+            # 3. ติดตั้งแพ็คเกจที่อาจมีอัปเดตใหม่
+            npm install
+            
+            # 4. Build หน้าเว็บ (Frontend) ใหม่
+            npm run build
+            
+            # 5. สั่งให้ PM2 รีสตาร์ทระบบหลังบ้านและหน้าบ้านใหม่ด้วยไฟล์ ecosystem
+            npx pm2 restart ecosystem.config.cjs
+            
+            # 6. บันทึกระบบไว้เผื่อ Windows รีสตาร์ท
+            npx pm2 save

@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import './Settings.css';
 
-const API = 'http://10.0.0.10:5000/api';
+const API = 'http://localhost:5000/api';
 
 // Role labels (fallback if DB roles not loaded yet)
 const ROLE_OPTIONS_FALLBACK = [

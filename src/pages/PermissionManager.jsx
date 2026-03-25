@@ -93,7 +93,7 @@ export default function PermissionManager() {
     const fetchUsers = async () => {
         setIsLoadingUsers(true);
         try {
-            const res = await fetch('http://10.0.0.10:5000/api/users');
+            const res = await fetch('http://localhost:5000/api/users');
             if (res.ok) {
                 const data = await res.json();
                 setUsers(data);
@@ -112,7 +112,7 @@ export default function PermissionManager() {
     useEffect(() => {
         fetchUsers();
         // Fetch departments from DB
-        fetch('http://10.0.0.10:5000/api/departments')
+        fetch('http://localhost:5000/api/departments')
             .then(res => res.ok ? res.json() : [])
             .then(data => setDepartments(data))
             .catch(() => setDepartments([]));
@@ -125,7 +125,7 @@ export default function PermissionManager() {
         setIsCreating(true);
 
         try {
-            const res = await fetch('http://10.0.0.10:5000/api/users', {
+            const res = await fetch('http://localhost:5000/api/users', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newUserForm),
@@ -153,7 +153,7 @@ export default function PermissionManager() {
         }
 
         try {
-            const res = await fetch(`http://10.0.0.10:5000/api/users/${userId}`, {
+            const res = await fetch(`http://localhost:5000/api/users/${userId}`, {
                 method: 'DELETE',
             });
 
