@@ -1,6 +1,5 @@
 name: Deploy ERP to Windows Server
 
-# ระบุให้ Action นี้ทำงานเมื่อมีการ Push โค้ดเข้าสู่ Branch 'main'
 on:
   push:
     branches:
@@ -9,23 +8,16 @@ on:
 jobs:
   deploy:
     name: Deploy API to Server
-    runs-on: ubuntu-latest
+    
+    # พระเอกของเรา! เปลี่ยนมารันบนเครื่อง Server ของคุณเองโดยตรง 
+    runs-on: self-hosted
 
     steps:
-      - name: Connect and Deploy via SSH
-        uses: appleboy/ssh-action@master
-        with:
-          # ตัวแปรเหล่านี้ตั้งค่าได้ที่หน้า Settings > Secrets and variables > Actions ของ GitHub
-          host: ${{ secrets.SERVER_HOST }}     
-          username: ${{ secrets.SERVER_USER }} 
-          password: ${{ secrets.SERVER_PASSWORD }}   
-          port: ${{ secrets.SERVER_PORT }}
-          
-          # ชุดคำสั่งที่จะนำไปรันบน Windows Server ของคุณแบบอัตโนมัติ
-          script: |
-            cd C:\Users\Administrator\Documents\GitHub\erp_project
-            git pull origin main
-            npm install
-            npm run build
-            npx pm2 restart ecosystem.config.cjs
-            npx pm2 save
+      - name: Run Deploy Command on Windows Server
+        run: |
+          cd C:\Users\Administrator\Documents\GitHub\erp_project
+          git pull origin main
+          npm install
+          npm run build
+          npx pm2 restart ecosystem.config.cjs
+          npx pm2 save
