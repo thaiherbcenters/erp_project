@@ -18,7 +18,7 @@ jobs:
           # ตัวแปรเหล่านี้ตั้งค่าได้ที่หน้า Settings > Secrets and variables > Actions ของ GitHub
           host: ${{ secrets.SERVER_HOST }}     
           username: ${{ secrets.SERVER_USER }} 
-          key: ${{ secrets.SERVER_SSH_KEY }}   
+          password: ${{ secrets.SERVER_PASSWORD }}   
           port: ${{ secrets.SERVER_PORT }}
           
           # ชุดคำสั่งที่จะนำไปรันบน Windows Server ของคุณแบบอัตโนมัติ
