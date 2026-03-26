@@ -9,8 +9,8 @@ import {
     ArrowLeft, Info
 } from 'lucide-react';
 import './DocumentLibrary.css';
+import API_BASE from '../config';
 
-const API_BASE = `${import.meta.env.VITE_API_URL}/library`;
 
 export default function DocumentLibrary({ hasPermission }) {
     if (!hasPermission('document_library_table'))

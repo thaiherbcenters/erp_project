@@ -17,8 +17,8 @@ import {
     Search, Plus, Pencil, Trash2, KeyRound, X, UserPlus
 } from 'lucide-react';
 import './Settings.css';
+import API_BASE from '../config';
 
-const API = `${import.meta.env.VITE_API_URL}`;
 
 // Role labels (fallback if DB roles not loaded yet)
 const ROLE_OPTIONS_FALLBACK = [

@@ -15,10 +15,9 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ALL_PAGES } from '../data/mockData';
+import API_BASE from '../config';
 
 const AuthContext = createContext(null);
-
-const API_BASE = `${import.meta.env.VITE_API_URL}`;
 
 // =============================================================================
 // AuthProvider — ครอบ App ทั้งหมด

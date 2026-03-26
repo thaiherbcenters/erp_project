@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { ALL_PAGES } from '../data/mockData';
 import { ShieldCheck, Users, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, UserPlus, X, Trash2, Globe, Building2, User } from 'lucide-react';
 import './PermissionManager.css';
+import API_BASE from '../config';
 
 // Scope options config
 const SCOPE_OPTIONS = [
@@ -93,7 +94,7 @@ export default function PermissionManager() {
     const fetchUsers = async () => {
         setIsLoadingUsers(true);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/users`);
+            const res = await fetch(`${API_BASE}/users`);
             if (res.ok) {
                 const data = await res.json();
                 setUsers(data);
@@ -112,7 +113,7 @@ export default function PermissionManager() {
     useEffect(() => {
         fetchUsers();
         // Fetch departments from DB
-        fetch(`${import.meta.env.VITE_API_URL}/departments`)
+        fetch(`${API_BASE}/departments`)
             .then(res => res.ok ? res.json() : [])
             .then(data => setDepartments(data))
             .catch(() => setDepartments([]));
@@ -125,7 +126,7 @@ export default function PermissionManager() {
         setIsCreating(true);
 
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/users`, {
+            const res = await fetch(`${API_BASE}/users`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newUserForm),
@@ -153,7 +154,7 @@ export default function PermissionManager() {
         }
 
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/users/${userId}`, {
+            const res = await fetch(`${API_BASE}/users/${userId}`, {
                 method: 'DELETE',
             });
 

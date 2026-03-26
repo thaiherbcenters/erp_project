@@ -51,6 +51,7 @@ import './DocumentControl.css';
 import { DOCUMENT_PARTS, DOCUMENT_CATEGORIES, DOCUMENTS } from './documentData';
 import DocumentLibrary from './DocumentLibrary';
 import CustomerDocument from './CustomerDocument';
+import API_BASE from '../config';
 
 
 /** Helper: ดึงชื่อย่อหมวดจาก category id */
@@ -141,8 +142,8 @@ export default function DocumentControl() {
                 }).toString();
 
                 const [docRes, stdRes] = await Promise.all([
-                    fetch(`${import.meta.env.VITE_API_URL}/documents?${queryParams}`),
-                    fetch(`${import.meta.env.VITE_API_URL}/documents/standards`),
+                    fetch(`${API_BASE}/documents?${queryParams}`),
+                    fetch(`${API_BASE}/documents/standards`),
                 ]);
                 if (!docRes.ok) throw new Error('ไม่สามารถดึงข้อมูลเอกสารได้');
                 const docsJson = await docRes.json();
@@ -241,7 +242,7 @@ function DocumentDashboard({ hasPermission, documents, isLoading, error }) {
 
     const [darPendingCount, setDarPendingCount] = useState(0);
     useEffect(() => {
-        fetch(`${import.meta.env.VITE_API_URL}/submissions`)
+        fetch(`${API_BASE}/submissions`)
             .then(r => r.ok ? r.json() : [])
             .then(data => setDarPendingCount(data.filter(s => s.overall_status !== 'อนุมัติแล้ว' && s.overall_status !== 'ไม่อนุมัติ').length))
             .catch(() => { });
@@ -710,7 +711,7 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                                 className="doc-action-btn"
                                                 title="ดูเอกสาร"
                                                 onClick={() => {
-                                                    window.open(`${import.meta.env.VITE_API_URL}/documents/view/${doc.id}`, '_blank');
+                                                    window.open(`${API_BASE}/documents/view/${doc.id}`, '_blank');
                                                 }}
                                             >
                                                 <Eye size={15} />
@@ -719,7 +720,7 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                                 className="doc-action-btn"
                                                 title="ดาวน์โหลด"
                                                 onClick={() => {
-                                                    window.location.href = `${import.meta.env.VITE_API_URL}/documents/download/${doc.id}`;
+                                                    window.location.href = `${API_BASE}/documents/download/${doc.id}`;
                                                 }}
                                             >
                                                 <Download size={15} />
@@ -1076,7 +1077,7 @@ function FormDocumentList({ hasPermission, documents, standards, isLoading, erro
                                                 className="doc-action-btn"
                                                 title="ดูเอกสาร"
                                                 onClick={() => {
-                                                    window.open(`${import.meta.env.VITE_API_URL}/documents/view/${doc.id}`, '_blank');
+                                                    window.open(`${API_BASE}/documents/view/${doc.id}`, '_blank');
                                                 }}
                                             >
                                                 <Eye size={15} />
@@ -1085,7 +1086,7 @@ function FormDocumentList({ hasPermission, documents, standards, isLoading, erro
                                                 className="doc-action-btn"
                                                 title="ดาวน์โหลด"
                                                 onClick={() => {
-                                                    window.location.href = `${import.meta.env.VITE_API_URL}/documents/download/${doc.id}`;
+                                                    window.location.href = `${API_BASE}/documents/download/${doc.id}`;
                                                 }}
                                             >
                                                 <Download size={15} />
@@ -1183,7 +1184,7 @@ function FormFillPage({ doc, onBack }) {
 
         setIsSubmitting(true);
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/submissions`, {
+            const response = await fetch(`${API_BASE}/submissions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1258,7 +1259,7 @@ function FormFillPage({ doc, onBack }) {
                 doc_date_creator: formatDateThai(new Date().toISOString().split('T')[0]),
             };
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/forms/fill/FM-IT-01`, {
+            const response = await fetch(`${API_BASE}/forms/fill/FM-IT-01`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fields }),
@@ -1601,8 +1602,8 @@ function DocumentRequest({ hasPermission }) {
         setLoading(true);
         try {
             const [subRes, approverRes] = await Promise.all([
-                fetch(`${import.meta.env.VITE_API_URL}/submissions`),
-                fetch(`${import.meta.env.VITE_API_URL}/submissions/approver-ids`),
+                fetch(`${API_BASE}/submissions`),
+                fetch(`${API_BASE}/submissions/approver-ids`),
             ]);
             if (subRes.ok) setSubmissions(await subRes.json());
             if (approverRes.ok) setApproverIds(await approverRes.json());
@@ -1670,7 +1671,7 @@ function DocumentRequest({ hasPermission }) {
     const handlePreviewSubmission = async (sub) => {
         setPreviewLoadingId(sub.submission_id);
         try {
-            const detailRes = await fetch(`${import.meta.env.VITE_API_URL}/submissions`);
+            const detailRes = await fetch(`${API_BASE}/submissions`);
             const allSubs = await detailRes.json();
             const fullSub = allSubs.find(s => s.submission_id === sub.submission_id) || sub;
 
@@ -1727,7 +1728,7 @@ function DocumentRequest({ hasPermission }) {
                 doc_date_approver: fullSub.step2_status === 'approved' && fullSub.step2_approved_at ? formatDateThai(fullSub.step2_approved_at.split('T')[0]) : '',
             };
 
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/forms/fill/FM-IT-01`, {
+            const response = await fetch(`${API_BASE}/forms/fill/FM-IT-01`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fields }),
@@ -1759,7 +1760,7 @@ function DocumentRequest({ hasPermission }) {
     const handleViewHistory = async (sub) => {
         setHistoryLoading(true);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/submissions/${sub.submission_id}/history`);
+            const res = await fetch(`${API_BASE}/submissions/${sub.submission_id}/history`);
             if (res.ok) {
                 const data = await res.json();
                 setHistoryModal(data);
@@ -1783,7 +1784,7 @@ function DocumentRequest({ hasPermission }) {
 
         setActionLoading(true);
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL}/submissions/${actionModal.id}/${actionModal.action}`, {
+            const res = await fetch(`${API_BASE}/submissions/${actionModal.id}/${actionModal.action}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId: currentUser.id, comment: actionComment }),
@@ -2201,7 +2202,7 @@ function RevisionFormPage({ parentSub, onBack, currentUser, navigate }) {
 
         setIsSubmitting(true);
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/submissions`, {
+            const response = await fetch(`${API_BASE}/submissions`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
