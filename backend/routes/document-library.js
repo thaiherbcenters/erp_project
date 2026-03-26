@@ -118,9 +118,9 @@ router.post('/folders', async (req, res) => {
             .input('parent_id', sql.Int, parent_id || null)
             .input('created_by', sql.NVarChar, created_by || 'Unknown')
             .query(`
-                INSERT INTO DocumentLibraryFolders (folder_name, parent_id, created_by)
+                INSERT INTO DocumentLibraryFolders (folder_name, parent_id, created_by, created_date)
                 OUTPUT INSERTED.id, INSERTED.folder_name, INSERTED.parent_id, INSERTED.created_by, INSERTED.created_date
-                VALUES (@folder_name, @parent_id, @created_by);
+                VALUES (@folder_name, @parent_id, @created_by, GETDATE());
             `);
 
         // Audit Log
@@ -130,8 +130,8 @@ router.post('/folders', async (req, res) => {
             .input('action_by', sql.NVarChar, created_by || 'Unknown')
             .input('details', sql.NVarChar, `Created folder: ${folder_name.trim()} (parent_id: ${parent_id || 'root'})`)
             .query(`
-                INSERT INTO DocumentLibraryLogs (action_type, doc_original_name, action_by, details)
-                VALUES (@action_type, @doc_original_name, @action_by, @details);
+                INSERT INTO DocumentLibraryLogs (action_type, doc_original_name, action_by, action_date, details)
+                VALUES (@action_type, @doc_original_name, @action_by, GETDATE(), @details);
             `);
 
         res.json({ success: true, data: result.recordset[0] });
@@ -203,8 +203,8 @@ router.delete('/folders/:id', async (req, res) => {
             .input('action_by', sql.NVarChar, deletedBy)
             .input('details', sql.NVarChar, `Deleted folder: ${folderName}`)
             .query(`
-                INSERT INTO DocumentLibraryLogs (action_type, doc_original_name, action_by, details)
-                VALUES (@action_type, @doc_original_name, @action_by, @details);
+                INSERT INTO DocumentLibraryLogs (action_type, doc_original_name, action_by, action_date, details)
+                VALUES (@action_type, @doc_original_name, @action_by, GETDATE(), @details);
             `);
 
         res.json({ success: true, message: 'ลบโฟลเดอร์สำเร็จ' });
@@ -300,9 +300,9 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             .input('file_size', sql.BigInt, fileSize)
             .input('folder_id', sql.Int, folder_id ? parseInt(folder_id) : null)
             .query(`
-                INSERT INTO dbo.DocumentLibrary (original_name, stored_name, file_path, description, uploaded_by, file_size, folder_id)
+                INSERT INTO dbo.DocumentLibrary (original_name, stored_name, file_path, description, uploaded_by, file_size, folder_id, upload_date)
                 OUTPUT INSERTED.id, INSERTED.upload_date
-                VALUES (@original_name, @stored_name, @file_path, @description, @uploaded_by, @file_size, @folder_id);
+                VALUES (@original_name, @stored_name, @file_path, @description, @uploaded_by, @file_size, @folder_id, GETDATE());
             `);
 
         const newDoc = insertResult.recordset[0];
@@ -408,8 +408,8 @@ router.delete('/:id', async (req, res) => {
             .input('action_by', sql.NVarChar, deletedBy)
             .input('details', sql.NVarChar, `Deleted file: ${doc.stored_name}`)
             .query(`
-                INSERT INTO dbo.DocumentLibraryLogs (action_type, doc_original_name, action_by, details)
-                VALUES (@action_type, @doc_original_name, @action_by, @details);
+                INSERT INTO dbo.DocumentLibraryLogs (action_type, doc_original_name, action_by, action_date, details)
+                VALUES (@action_type, @doc_original_name, @action_by, GETDATE(), @details);
             `);
 
         // Delete physical file

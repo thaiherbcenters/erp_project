@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import './Settings.css';
 import API_BASE from '../config';
+const API = API_BASE;
 
 
 // Role labels (fallback if DB roles not loaded yet)
