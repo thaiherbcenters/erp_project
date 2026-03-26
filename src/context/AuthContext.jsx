@@ -18,7 +18,7 @@ import { ALL_PAGES } from '../data/mockData';
 
 const AuthContext = createContext(null);
 
-const API_BASE = 'http://61.7.209.84:5000/api';
+const API_BASE = `${import.meta.env.VITE_API_URL}`;
 
 // =============================================================================
 // AuthProvider — ครอบ App ทั้งหมด

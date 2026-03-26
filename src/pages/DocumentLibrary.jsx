@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import './DocumentLibrary.css';
 
-const API_BASE = 'http://61.7.209.84:5000/api/library';
+const API_BASE = `${import.meta.env.VITE_API_URL}/library`;
 
 export default function DocumentLibrary({ hasPermission }) {
     if (!hasPermission('document_library_table'))
