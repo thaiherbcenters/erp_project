@@ -11,6 +11,7 @@ import {
 import './DocumentLibrary.css';
 import API_BASE from '../config';
 
+const LIBRARY_API = `${API_BASE}/library`;
 
 export default function DocumentLibrary({ hasPermission }) {
     if (!hasPermission('document_library_table'))
@@ -91,8 +92,8 @@ export default function DocumentLibrary({ hasPermission }) {
             const qs = `?${queryParams.toString()}`;
 
             const [foldersRes, filesRes] = await Promise.all([
-                fetch(`${API_BASE}/folders${qs}`),
-                fetch(`${API_BASE}${qs}`)
+                fetch(`${LIBRARY_API}/folders${qs}`),
+                fetch(`${LIBRARY_API}${qs}`)
             ]);
 
             if (foldersRes.ok) setFolders(await foldersRes.json());
@@ -110,7 +111,7 @@ export default function DocumentLibrary({ hasPermission }) {
             return;
         }
         try {
-            const res = await fetch(`${API_BASE}/folders/${folderId}/path`);
+            const res = await fetch(`${LIBRARY_API}/folders/${folderId}/path`);
             if (res.ok) setBreadcrumb(await res.json());
         } catch (err) {
             console.error('Error fetching breadcrumb:', err);
@@ -160,7 +161,7 @@ export default function DocumentLibrary({ hasPermission }) {
         if (!newFolderName.trim()) return;
         setIsCreatingFolder(true);
         try {
-            const res = await fetch(`${API_BASE}/folders`, {
+            const res = await fetch(`${LIBRARY_API}/folders`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -185,7 +186,7 @@ export default function DocumentLibrary({ hasPermission }) {
         e.preventDefault();
         if (!renameName.trim() || !renameTarget) return;
         try {
-            const res = await fetch(`${API_BASE}/folders/${renameTarget.id}`, {
+            const res = await fetch(`${LIBRARY_API}/folders/${renameTarget.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ folder_name: renameName.trim() })
@@ -204,7 +205,7 @@ export default function DocumentLibrary({ hasPermission }) {
     const handleDeleteFolder = async (folder) => {
         if (!window.confirm(`ลบโฟลเดอร์ "${folder.folder_name}" ?`)) return;
         try {
-            const res = await fetch(`${API_BASE}/folders/${folder.id}?user=${currentUser?.username}`, { method: 'DELETE' });
+            const res = await fetch(`${LIBRARY_API}/folders/${folder.id}?user=${currentUser?.username}`, { method: 'DELETE' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
             fetchContents(currentFolderId);
@@ -231,7 +232,7 @@ export default function DocumentLibrary({ hasPermission }) {
         if (currentFolderId) formData.append('folder_id', currentFolderId);
 
         try {
-            const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData });
+            const res = await fetch(`${LIBRARY_API}/upload`, { method: 'POST', body: formData });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'การอัปโหลดล้มเหลว');
             setShowUploadModal(false);
@@ -248,7 +249,7 @@ export default function DocumentLibrary({ hasPermission }) {
     const handleDeleteFile = async (id, name) => {
         if (!window.confirm(`ลบไฟล์ "${name}" ?`)) return;
         try {
-            const res = await fetch(`${API_BASE}/${id}?user=${currentUser?.username}`, { method: 'DELETE' });
+            const res = await fetch(`${LIBRARY_API}/${id}?user=${currentUser?.username}`, { method: 'DELETE' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
             fetchContents(currentFolderId);
@@ -590,10 +591,10 @@ export default function DocumentLibrary({ hasPermission }) {
                 >
                     {contextMenu.type === 'file' ? (
                         <>
-                            <button className="drive-ctx-item" onClick={() => { window.open(`${API_BASE}/action/view/${contextMenu.item.id}`, '_blank'); setContextMenu(null); }}>
+                            <button className="drive-ctx-item" onClick={() => { window.open(`${LIBRARY_API}/action/view/${contextMenu.item.id}`, '_blank'); setContextMenu(null); }}>
                                 <Eye size={15} /> ดูเอกสาร
                             </button>
-                            <button className="drive-ctx-item" onClick={() => { window.location.href = `${API_BASE}/action/download/${contextMenu.item.id}`; setContextMenu(null); }}>
+                            <button className="drive-ctx-item" onClick={() => { window.location.href = `${LIBRARY_API}/action/download/${contextMenu.item.id}`; setContextMenu(null); }}>
                                 <Download size={15} /> ดาวน์โหลด
                             </button>
                             {hasPermission('document_library_delete') && (
