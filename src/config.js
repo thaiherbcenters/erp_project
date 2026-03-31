@@ -14,6 +14,6 @@
  * =============================================================================
  */
 
-const API_BASE = `http://${window.location.hostname}:5000/api`;
+const API_BASE = '/api';
 
 export default API_BASE;
