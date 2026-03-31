@@ -19,5 +19,5 @@ jobs:
           git pull origin main
           npm install
           npm run build
-          npx pm2 restart ecosystem.config.cjs
+          npx pm2 restart erp_backend
           npx pm2 save

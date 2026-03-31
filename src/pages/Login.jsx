@@ -69,7 +69,7 @@ export default function Login() {
 
                     {/* ข้อความต้อนรับ */}
                     <div className="login-header-text">
-                        <h1>เข้าสู่ระบบ</h1>
+                        <h1>เข้าสู่ระบบ (Live!)</h1>
                         <p>กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
                     </div>
 
