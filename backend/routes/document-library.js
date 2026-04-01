@@ -298,7 +298,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             .input('description', sql.NVarChar, description || '')
             .input('uploaded_by', sql.NVarChar, uploader)
             .input('file_size', sql.BigInt, fileSize)
-            .input('folder_id', sql.Int, folder_id ? parseInt(folder_id) : null)
+            .input('folder_id', sql.Int, (folder_id && folder_id !== 'null' && folder_id !== 'undefined') ? parseInt(folder_id) : null)
             .query(`
                 INSERT INTO dbo.DocumentLibrary (original_name, stored_name, file_path, description, uploaded_by, file_size, folder_id, upload_date)
                 OUTPUT INSERTED.id, INSERTED.upload_date
@@ -314,8 +314,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             .input('action_by', sql.NVarChar, uploader)
             .input('details', sql.NVarChar, `Uploaded file: ${storedName} (${fileSize} bytes) to folder_id: ${folder_id || 'root'}`)
             .query(`
-                INSERT INTO dbo.DocumentLibraryLogs (action_type, doc_original_name, action_by, details)
-                VALUES (@action_type, @doc_original_name, @action_by, @details);
+                INSERT INTO dbo.DocumentLibraryLogs (action_type, doc_original_name, action_by, action_date, details)
+                VALUES (@action_type, @doc_original_name, @action_by, GETDATE(), @details);
             `);
 
         res.json({
