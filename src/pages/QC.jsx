@@ -1,22 +1,17 @@
 /**
  * =============================================================================
- * QC.jsx — หน้าตรวจสอบคุณภาพ (Quality Control)
+ * QC.jsx — หน้าตรวจสอบคุณภาพ (Quality Control) — เชื่อมกับ Production
  * =============================================================================
- *
- * แสดงข้อมูลการตรวจสอบคุณภาพสินค้า:
- *   - Tab qc_dashboard : สรุปผลตวจ
- *   - Tab qc_incoming  : วัตถุดิบเข้า (Incoming)
- *   - Tab qc_inprocess : ระหว่างผลิต (In-Process)
- *   - Tab qc_final     : ก่อนบรรจุ (Final)
- *   - Tab qc_defect    : ของเสีย (Defect / NCR)
- *   - Tab qc_reports   : รายงาน (Reports)
- *
+ * Integration:
+ *   - Production ส่งคำขอ QC → แสดงในหน้า QC In-Process / QC Final
+ *   - QC กด ผ่าน/ไม่ผ่าน → ผลกลับไปอัปเดต Production Stepper อัตโนมัติ
  * =============================================================================
  */
 
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useProduction } from '../context/ProductionContext';
 import {
     MOCK_QC_INCOMING,
     MOCK_QC_INPROCESS,
@@ -24,75 +19,178 @@ import {
     MOCK_QC_DEFECT
 } from '../data/mockData';
 import './PageCommon.css';
+import './QC.css';
 
 export default function QC() {
     const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
+    const { qcRequests, submitQcResult, getPendingQcRequests } = useProduction();
     const visibleSubPages = getVisibleSubPages('qc');
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'qc_dashboard';
 
-    // ── States: ค้นหา ──
     const [searchIncoming, setSearchIncoming] = useState('');
     const [searchInprocess, setSearchInprocess] = useState('');
     const [searchFinal, setSearchFinal] = useState('');
     const [searchDefect, setSearchDefect] = useState('');
+    const [inspectingRequest, setInspectingRequest] = useState(null);
+    const [inspectNotes, setInspectNotes] = useState('');
 
-    // ── กรองข้อมูล ──
+    // ── Filter old mock data ──
     const filteredIncoming = MOCK_QC_INCOMING.filter((item) =>
         item.lotNumber.toLowerCase().includes(searchIncoming.toLowerCase()) ||
-        item.item.toLowerCase().includes(searchIncoming.toLowerCase()) ||
-        item.result.toLowerCase().includes(searchIncoming.toLowerCase())
+        item.item.toLowerCase().includes(searchIncoming.toLowerCase())
     );
-
-    const filteredInprocess = MOCK_QC_INPROCESS.filter((item) =>
-        item.lotNumber.toLowerCase().includes(searchInprocess.toLowerCase()) ||
-        item.process.toLowerCase().includes(searchInprocess.toLowerCase()) ||
-        item.result.toLowerCase().includes(searchInprocess.toLowerCase())
-    );
-
-    const filteredFinal = MOCK_QC_FINAL.filter((item) =>
-        item.lotNumber.toLowerCase().includes(searchFinal.toLowerCase()) ||
-        item.product.toLowerCase().includes(searchFinal.toLowerCase()) ||
-        item.result.toLowerCase().includes(searchFinal.toLowerCase())
-    );
-
     const filteredDefect = MOCK_QC_DEFECT.filter((item) =>
         item.ncrNumber.toLowerCase().includes(searchDefect.toLowerCase()) ||
-        item.item.toLowerCase().includes(searchDefect.toLowerCase()) ||
-        item.status.toLowerCase().includes(searchDefect.toLowerCase())
+        item.item.toLowerCase().includes(searchDefect.toLowerCase())
     );
 
-    // ── สถิติสำหรับ Dashboard ──
-    const allQcItems = [...MOCK_QC_INCOMING, ...MOCK_QC_INPROCESS, ...MOCK_QC_FINAL];
-    const totalInspections = allQcItems.length;
-    const passedCount = allQcItems.filter((i) => i.result === 'ผ่าน').length;
-    const failedCount = allQcItems.filter((i) => i.result === 'ไม่ผ่าน').length;
-    const pendingCount = allQcItems.filter((i) => i.result === 'รอตรวจสอบ').length;
+    // ── QC Requests from Production ──
+    const qcInprocessRequests = qcRequests.filter(r => r.type === 'qc_inprocess');
+    const qcFinalRequests = qcRequests.filter(r => r.type === 'qc_final');
+    const pendingRequests = getPendingQcRequests();
 
-    // ── เลือก badge class ──
+    // ── Stats ──
+    const allQcItems = [...MOCK_QC_INCOMING, ...MOCK_QC_INPROCESS, ...MOCK_QC_FINAL];
+    const totalInspections = allQcItems.length + qcRequests.length;
+    const passedCount = allQcItems.filter(i => i.result === 'ผ่าน').length + qcRequests.filter(r => r.status === 'ผ่าน').length;
+    const failedCount = allQcItems.filter(i => i.result === 'ไม่ผ่าน').length + qcRequests.filter(r => r.status === 'ไม่ผ่าน').length;
+    const pendingCount = allQcItems.filter(i => i.result === 'รอตรวจสอบ').length + pendingRequests.length;
+
     const getResultBadge = (result) => {
         switch (result) {
             case 'ผ่าน': return 'badge-success';
             case 'ไม่ผ่าน': return 'badge-danger';
-            case 'รอตรวจสอบ': return 'badge-warning';
+            case 'รอตรวจสอบ': case 'รอตรวจ': return 'badge-warning';
             default: return 'badge-neutral';
         }
     };
-
     const getStatusBadge = (status) => {
         if (status === 'ดำเนินการแล้ว') return 'badge-success';
         if (status === 'รอดำเนินการ') return 'badge-warning';
         return 'badge-neutral';
     };
 
+    // ── Handle QC inspection submit ──
+    const handleInspect = (requestId, result) => {
+        submitQcResult(requestId, result, 'qc1', inspectNotes);
+        setInspectingRequest(null);
+        setInspectNotes('');
+    };
+
+    // ── Render QC requests from Production as a table ──
+    const renderProductionQcTable = (requests, type) => {
+        if (requests.length === 0 && type === 'qc_inprocess' && MOCK_QC_INPROCESS.length === 0) {
+            return <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>ยังไม่มีรายการ</p>;
+        }
+
+        return (
+            <>
+                {/* Pending requests from Production (highlighted) */}
+                {requests.filter(r => r.status === 'รอตรวจ').length > 0 && (
+                    <div className="qc-pending-section">
+                        <h4 className="qc-pending-title">
+                            🔔 คำขอตรวจจากฝ่ายผลิต ({requests.filter(r => r.status === 'รอตรวจ').length} รายการ)
+                        </h4>
+                        <div className="qc-pending-grid">
+                            {requests.filter(r => r.status === 'รอตรวจ').map(req => (
+                                <div key={req.id} className="qc-pending-card">
+                                    <div className="qc-pending-header">
+                                        <div>
+                                            <span className="qc-pending-batch">{req.batchNo}</span>
+                                            <span className="qc-pending-jo">← {req.jobOrderId}</span>
+                                        </div>
+                                        <span className="badge badge-warning">⏳ รอตรวจ</span>
+                                    </div>
+                                    <div className="qc-pending-product">{req.formulaName}</div>
+                                    <div className="qc-pending-meta">
+                                        <span>📅 ส่ง: {req.requestedAt}</span>
+                                        <span>🏭 {req.line}</span>
+                                    </div>
+
+                                    {inspectingRequest === req.id ? (
+                                        <div className="qc-inspect-form">
+                                            <textarea
+                                                className="qc-inspect-notes"
+                                                placeholder="หมายเหตุ (ถ้ามี)..."
+                                                value={inspectNotes}
+                                                onChange={(e) => setInspectNotes(e.target.value)}
+                                            />
+                                            <div className="qc-inspect-actions">
+                                                <button className="qc-btn qc-btn-pass" onClick={() => handleInspect(req.id, 'ผ่าน')}>
+                                                    ✅ ผ่าน
+                                                </button>
+                                                <button className="qc-btn qc-btn-fail" onClick={() => handleInspect(req.id, 'ไม่ผ่าน')}>
+                                                    ❌ ไม่ผ่าน
+                                                </button>
+                                                <button className="qc-btn qc-btn-cancel" onClick={() => { setInspectingRequest(null); setInspectNotes(''); }}>
+                                                    ยกเลิก
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="qc-pending-actions">
+                                            <button className="qc-btn qc-btn-inspect" onClick={() => setInspectingRequest(req.id)}>
+                                                🔍 ตรวจสอบ
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Completed QC results */}
+                {requests.filter(r => r.status !== 'รอตรวจ').length > 0 && (
+                    <div className="card table-card" style={{ marginTop: 16 }}>
+                        <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                            ผลตรวจจากฝ่ายผลิต
+                        </h4>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Batch No.</th>
+                                    <th>ใบสั่งผลิต</th>
+                                    <th>ผลิตภัณฑ์</th>
+                                    <th>ไลน์</th>
+                                    <th>วันที่ส่ง</th>
+                                    <th>วันที่ตรวจ</th>
+                                    <th>ผู้ตรวจ</th>
+                                    <th>ผลตรวจ</th>
+                                    <th>หมายเหตุ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {requests.filter(r => r.status !== 'รอตรวจ').map(req => (
+                                    <tr key={req.id}>
+                                        <td className="text-bold">{req.batchNo}</td>
+                                        <td><span className="op-jo-ref">{req.jobOrderId}</span></td>
+                                        <td>{req.formulaName}</td>
+                                        <td>{req.line}</td>
+                                        <td>{req.requestedAt}</td>
+                                        <td>{req.inspectedAt || '—'}</td>
+                                        <td>{req.inspector || '—'}</td>
+                                        <td><span className={`badge ${getResultBadge(req.status)}`}>{req.status}</span></td>
+                                        <td>{req.notes || '—'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </>
+        );
+    };
+
     return (
         <div className="page-content">
             <div className="page-title">
                 <h1>ตรวจสอบคุณภาพ (QC)</h1>
-                <p>จัดการและติดตามผลการตรวจสอบคุณภาพสินค้า (Incoming, In-Process, Final)</p>
+                <p>จัดการและติดตามผลการตรวจสอบคุณภาพสินค้า</p>
             </div>
 
-            {/* ── Tab: Dashboard สรุปผลตรวจ ── */}
+            {/* ── Dashboard ── */}
             {(activeTab === 'qc_dashboard' && hasSubPermission('qc_dashboard')) && (
                 <div className="subpage-content" key="qc_dashboard">
                     <div className="summary-row">
@@ -133,54 +231,54 @@ export default function QC() {
                             </div>
                         )}
                     </div>
+
+                    {/* Pending requests banner on dashboard */}
+                    {pendingRequests.length > 0 && (
+                        <div className="qc-dashboard-alert">
+                            <div className="qc-dashboard-alert-icon">🔔</div>
+                            <div>
+                                <strong>มีคำขอตรวจใหม่จากฝ่ายผลิต {pendingRequests.length} รายการ</strong>
+                                <p>กรุณาเข้าไปตรวจที่ Tab "QC In-Process" หรือ "QC Final"</p>
+                                <div className="qc-dashboard-alert-items">
+                                    {pendingRequests.map(r => (
+                                        <span key={r.id} className="qc-dashboard-alert-tag">
+                                            {r.batchNo} — {r.formulaName} ({r.typeLabel})
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* ── Tab: Incoming (วัตถุดิบเข้า) ── */}
+            {/* ── Incoming ── */}
             {(activeTab === 'qc_incoming' && hasSubPermission('qc_incoming')) && (
                 <div className="subpage-content" key="qc_incoming">
                     {hasSectionPermission('qc_incoming_search') && (
                         <div className="toolbar">
                             <div className="search-box">
                                 <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์ Lot No., วัตถุดิบ, หรือผลตรวจ..."
-                                    value={searchIncoming}
-                                    onChange={(e) => setSearchIncoming(e.target.value)}
-                                />
+                                <input type="text" placeholder="พิมพ์ Lot No., วัตถุดิบ..." value={searchIncoming} onChange={(e) => setSearchIncoming(e.target.value)} />
                             </div>
                             <button className="btn-primary">+ ตรวจรับวัตถุดิบ</button>
                         </div>
                     )}
-
                     {hasSectionPermission('qc_incoming_table') && (
                         <div className="table-card card">
                             <table className="data-table">
                                 <thead>
-                                    <tr>
-                                        <th>วันที่</th>
-                                        <th>Lot Number</th>
-                                        <th>วัตถุดิบ (Item)</th>
-                                        <th>Supplier</th>
-                                        <th>ผู้ตรวจสอบ</th>
-                                        <th>ผลตรวจ</th>
-                                        <th>หมายเหตุ</th>
-                                    </tr>
+                                    <tr><th>วันที่</th><th>Lot Number</th><th>วัตถุดิบ</th><th>Supplier</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
                                 </thead>
                                 <tbody>
-                                    {filteredIncoming.map((item) => (
+                                    {filteredIncoming.map(item => (
                                         <tr key={item.id}>
                                             <td>{item.date}</td>
                                             <td className="text-bold">{item.lotNumber}</td>
                                             <td>{item.item}</td>
                                             <td>{item.supplier}</td>
                                             <td>{item.inspector}</td>
-                                            <td>
-                                                <span className={`badge ${getResultBadge(item.result)}`}>
-                                                    {item.result}
-                                                </span>
-                                            </td>
+                                            <td><span className={`badge ${getResultBadge(item.result)}`}>{item.result}</span></td>
                                             <td className="text-muted">{item.notes}</td>
                                         </tr>
                                     ))}
@@ -191,51 +289,41 @@ export default function QC() {
                 </div>
             )}
 
-            {/* ── Tab: In-Process (ระหว่างผลิต) ── */}
+            {/* ── In-Process — NOW WITH PRODUCTION QC REQUESTS ── */}
             {(activeTab === 'qc_inprocess' && hasSubPermission('qc_inprocess')) && (
                 <div className="subpage-content" key="qc_inprocess">
+                    {renderProductionQcTable(qcInprocessRequests, 'qc_inprocess')}
+
+                    {/* Old mock data below */}
                     {hasSectionPermission('qc_inprocess_search') && (
-                        <div className="toolbar">
+                        <div className="toolbar" style={{ marginTop: 16 }}>
                             <div className="search-box">
                                 <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์ Lot No., กระบวนการ..."
-                                    value={searchInprocess}
-                                    onChange={(e) => setSearchInprocess(e.target.value)}
-                                />
+                                <input type="text" placeholder="พิมพ์ Lot No., กระบวนการ..." value={searchInprocess} onChange={(e) => setSearchInprocess(e.target.value)} />
                             </div>
-                            <button className="btn-primary">+ บันทึกผลระหว่างกระบวนการ</button>
                         </div>
                     )}
-
-                    {hasSectionPermission('qc_inprocess_table') && (
-                        <div className="table-card card">
+                    {hasSectionPermission('qc_inprocess_table') && MOCK_QC_INPROCESS.length > 0 && (
+                        <div className="table-card card" style={{ marginTop: 8 }}>
+                            <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>
+                                ข้อมูลเดิม (Legacy)
+                            </h4>
                             <table className="data-table">
                                 <thead>
-                                    <tr>
-                                        <th>วันที่</th>
-                                        <th>Lot Number</th>
-                                        <th>กระบวนการ</th>
-                                        <th>Line ผลิต</th>
-                                        <th>ผู้ตรวจสอบ</th>
-                                        <th>ผลตรวจ</th>
-                                        <th>หมายเหตุ</th>
-                                    </tr>
+                                    <tr><th>วันที่</th><th>Lot Number</th><th>กระบวนการ</th><th>Line</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
                                 </thead>
                                 <tbody>
-                                    {filteredInprocess.map((item) => (
+                                    {MOCK_QC_INPROCESS.filter(i =>
+                                        i.lotNumber.toLowerCase().includes(searchInprocess.toLowerCase()) ||
+                                        i.process.toLowerCase().includes(searchInprocess.toLowerCase())
+                                    ).map(item => (
                                         <tr key={item.id}>
                                             <td>{item.date}</td>
                                             <td className="text-bold">{item.lotNumber}</td>
                                             <td>{item.process}</td>
                                             <td>{item.line}</td>
                                             <td>{item.inspector}</td>
-                                            <td>
-                                                <span className={`badge ${getResultBadge(item.result)}`}>
-                                                    {item.result}
-                                                </span>
-                                            </td>
+                                            <td><span className={`badge ${getResultBadge(item.result)}`}>{item.result}</span></td>
                                             <td className="text-muted">{item.notes}</td>
                                         </tr>
                                     ))}
@@ -246,51 +334,40 @@ export default function QC() {
                 </div>
             )}
 
-            {/* ── Tab: Final (ตรวจสอบก่อนบรรจุ) ── */}
+            {/* ── Final — NOW WITH PRODUCTION QC REQUESTS ── */}
             {(activeTab === 'qc_final' && hasSubPermission('qc_final')) && (
                 <div className="subpage-content" key="qc_final">
+                    {renderProductionQcTable(qcFinalRequests, 'qc_final')}
+
                     {hasSectionPermission('qc_final_search') && (
-                        <div className="toolbar">
+                        <div className="toolbar" style={{ marginTop: 16 }}>
                             <div className="search-box">
                                 <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์ Lot No., สินค้าสำเร็จรูป..."
-                                    value={searchFinal}
-                                    onChange={(e) => setSearchFinal(e.target.value)}
-                                />
+                                <input type="text" placeholder="พิมพ์ Lot No., สินค้า..." value={searchFinal} onChange={(e) => setSearchFinal(e.target.value)} />
                             </div>
-                            <button className="btn-primary">+ ตรวจสอบก่อนบรรจุ</button>
                         </div>
                     )}
-
-                    {hasSectionPermission('qc_final_table') && (
-                        <div className="table-card card">
+                    {hasSectionPermission('qc_final_table') && MOCK_QC_FINAL.length > 0 && (
+                        <div className="table-card card" style={{ marginTop: 8 }}>
+                            <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>
+                                ข้อมูลเดิม (Legacy)
+                            </h4>
                             <table className="data-table">
                                 <thead>
-                                    <tr>
-                                        <th>วันที่</th>
-                                        <th>Lot Number</th>
-                                        <th>สินค้าสำเร็จรูป</th>
-                                        <th>จำนวน (ชิ้น)</th>
-                                        <th>ผู้ตรวจสอบ</th>
-                                        <th>ผลตรวจ</th>
-                                        <th>หมายเหตุ</th>
-                                    </tr>
+                                    <tr><th>วันที่</th><th>Lot Number</th><th>สินค้า</th><th>จำนวน</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
                                 </thead>
                                 <tbody>
-                                    {filteredFinal.map((item) => (
+                                    {MOCK_QC_FINAL.filter(i =>
+                                        i.lotNumber.toLowerCase().includes(searchFinal.toLowerCase()) ||
+                                        i.product.toLowerCase().includes(searchFinal.toLowerCase())
+                                    ).map(item => (
                                         <tr key={item.id}>
                                             <td>{item.date}</td>
                                             <td className="text-bold">{item.lotNumber}</td>
                                             <td>{item.product}</td>
                                             <td>{item.qty}</td>
                                             <td>{item.inspector}</td>
-                                            <td>
-                                                <span className={`badge ${getResultBadge(item.result)}`}>
-                                                    {item.result}
-                                                </span>
-                                            </td>
+                                            <td><span className={`badge ${getResultBadge(item.result)}`}>{item.result}</span></td>
                                             <td className="text-muted">{item.notes}</td>
                                         </tr>
                                     ))}
@@ -301,50 +378,33 @@ export default function QC() {
                 </div>
             )}
 
-            {/* ── Tab: Defect / NCR (ของเสีย) ── */}
+            {/* ── Defect / NCR ── */}
             {(activeTab === 'qc_defect' && hasSubPermission('qc_defect')) && (
                 <div className="subpage-content" key="qc_defect">
                     {hasSectionPermission('qc_defect_search') && (
                         <div className="toolbar">
                             <div className="search-box">
                                 <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์ NCR No., สินค้า/วัตถุดิบ หรือปัญหา..."
-                                    value={searchDefect}
-                                    onChange={(e) => setSearchDefect(e.target.value)}
-                                />
+                                <input type="text" placeholder="พิมพ์ NCR No., สินค้า..." value={searchDefect} onChange={(e) => setSearchDefect(e.target.value)} />
                             </div>
                             <button className="btn-danger">+ สร้าง NCR</button>
                         </div>
                     )}
-
                     {hasSectionPermission('qc_defect_table') && (
                         <div className="table-card card">
                             <table className="data-table">
                                 <thead>
-                                    <tr>
-                                        <th>เลขที่ NCR</th>
-                                        <th>Lot อ้างอิง</th>
-                                        <th>สินค้า/วัตถุดิบ</th>
-                                        <th>ปัญหาที่พบ (Issue)</th>
-                                        <th>การจัดการ (Action)</th>
-                                        <th>สถานะ</th>
-                                    </tr>
+                                    <tr><th>เลขที่ NCR</th><th>Lot อ้างอิง</th><th>สินค้า</th><th>ปัญหา</th><th>การจัดการ</th><th>สถานะ</th></tr>
                                 </thead>
                                 <tbody>
-                                    {filteredDefect.map((item) => (
+                                    {filteredDefect.map(item => (
                                         <tr key={item.id}>
                                             <td className="text-bold text-danger">{item.ncrNumber}</td>
                                             <td>{item.refLot}</td>
                                             <td>{item.item}</td>
                                             <td>{item.issue}</td>
                                             <td>{item.action}</td>
-                                            <td>
-                                                <span className={`badge ${getStatusBadge(item.status)}`}>
-                                                    {item.status}
-                                                </span>
-                                            </td>
+                                            <td><span className={`badge ${getStatusBadge(item.status)}`}>{item.status}</span></td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -354,7 +414,7 @@ export default function QC() {
                 </div>
             )}
 
-            {/* ── Tab: Reports ── */}
+            {/* ── Reports ── */}
             {(activeTab === 'qc_reports' && hasSubPermission('qc_reports')) && (
                 <div className="subpage-content" key="qc_reports">
                     {hasSectionPermission('qc_reports_list') && (
@@ -362,7 +422,7 @@ export default function QC() {
                             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
                             <h3>รายงานและการวิเคราะห์คุณภาพ</h3>
                             <p className="text-muted" style={{ marginTop: '0.5rem' }}>
-                                สามารถดึงรายงานสรุป (Monthly / Yearly QC Report) และวิเคราะห์สัดส่วนของเสียได้จากส่วนนี้
+                                สามารถดึงรายงานสรุป (Monthly / Yearly QC Report) จากส่วนนี้
                             </p>
                             <button className="btn-primary" style={{ marginTop: '1.5rem' }}>สร้างรายงานใหม่</button>
                         </div>

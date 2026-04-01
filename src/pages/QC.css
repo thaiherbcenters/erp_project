@@ -1,0 +1,245 @@
+/* =============================================================================
+   QC.css — Styles for QC Module (Production Integration)
+   ============================================================================= */
+
+/* ── Dashboard Alert Banner ── */
+.qc-dashboard-alert {
+    display: flex;
+    gap: 14px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border: 2px solid #f59e0b;
+    border-radius: 10px;
+    margin-top: 16px;
+    animation: qcAlertPulse 2s ease-in-out infinite;
+}
+
+@keyframes qcAlertPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.2); }
+    50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12); }
+}
+
+.qc-dashboard-alert-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.qc-dashboard-alert strong {
+    font-size: 14px;
+    color: #92400e;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.qc-dashboard-alert p {
+    font-size: 12px;
+    color: #a16207;
+    margin: 0 0 8px;
+}
+
+.qc-dashboard-alert-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.qc-dashboard-alert-tag {
+    background: rgba(255,255,255,0.7);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #92400e;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ── Pending QC Section ── */
+.qc-pending-section {
+    margin-bottom: 8px;
+}
+
+.qc-pending-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #92400e;
+    margin: 0 0 12px;
+    padding: 8px 14px;
+    background: #fffbeb;
+    border-radius: 8px;
+    border-left: 4px solid #f59e0b;
+}
+
+.qc-pending-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+}
+
+.qc-pending-card {
+    background: #fff;
+    border: 2px solid #fde68a;
+    border-radius: 10px;
+    padding: 16px;
+    transition: all 0.2s;
+    animation: qcPendingPulse 2s ease-in-out infinite;
+}
+
+@keyframes qcPendingPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.2); }
+    50% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.12); }
+}
+
+.qc-pending-card:hover {
+    border-color: #f59e0b;
+}
+
+.qc-pending-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.qc-pending-batch {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.qc-pending-jo {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: 6px;
+}
+
+.qc-pending-product {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 6px;
+}
+
+.qc-pending-meta {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.qc-pending-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── Inspect Form (inline) ── */
+.qc-inspect-form {
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px dashed #fde68a;
+}
+
+.qc-inspect-notes {
+    width: 100%;
+    min-height: 50px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    resize: vertical;
+    margin-bottom: 8px;
+    box-sizing: border-box;
+}
+
+.qc-inspect-notes:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.qc-inspect-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── QC Buttons ── */
+.qc-btn {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.qc-btn-inspect {
+    background: #2563eb;
+    color: #fff;
+    width: 100%;
+    justify-content: center;
+    padding: 8px;
+    font-size: 13px;
+}
+
+.qc-btn-inspect:hover {
+    background: #1d4ed8;
+}
+
+.qc-btn-pass {
+    background: #059669;
+    color: #fff;
+    flex: 1;
+    justify-content: center;
+    padding: 8px;
+    font-size: 13px;
+}
+
+.qc-btn-pass:hover {
+    background: #047857;
+}
+
+.qc-btn-fail {
+    background: #ef4444;
+    color: #fff;
+    flex: 1;
+    justify-content: center;
+    padding: 8px;
+    font-size: 13px;
+}
+
+.qc-btn-fail:hover {
+    background: #dc2626;
+}
+
+.qc-btn-cancel {
+    background: var(--bg);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    padding: 8px;
+    font-size: 12px;
+}
+
+.qc-btn-cancel:hover {
+    background: var(--border);
+}
+
+/* ── JO Reference (reuse from Operator) ── */
+.op-jo-ref {
+    background: #f0ebff;
+    color: #7b7bf5;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .qc-pending-grid { grid-template-columns: 1fr; }
+    .qc-inspect-actions { flex-wrap: wrap; }
+}

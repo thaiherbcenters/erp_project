@@ -1,44 +1,41 @@
 /**
  * =============================================================================
- * Operator.jsx — หน้าฝ่ายผลิต (Production Operator) + Workflow Stepper
+ * Operator.jsx — หน้าฝ่ายผลิต + Workflow Stepper + ส่งคำขอ QC
  * =============================================================================
- * ประกอบด้วย 2 sub-pages:
- *   1. งานของฉัน              — รายการงาน + Stepper ขั้นตอนการผลิต
- *   2. ประวัติการผลิต          — ตารางประวัติงานที่ทำเสร็จแล้ว
- *
  * Production Workflow Steps:
  *   In Progress 1 → QC In-Process → In Progress 2 → Completed
  *   → Packaging → QC Final → Stock (เข้าคลัง)
+ *
+ * เมื่อถึงขั้นตอน QC → ส่งคำขอ QC อัตโนมัติ → QC ตรวจ → ผลกลับมาอัปเดต
  * =============================================================================
  */
 
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useProduction } from '../context/ProductionContext';
 import {
     CheckSquare, Play, CheckCircle, Search,
     Clock, Package, AlertTriangle, Activity, ClipboardList,
     Timer, TrendingUp, Repeat, ShieldCheck, Warehouse,
-    SearchCheck, ChevronRight, Eye, XCircle
+    SearchCheck, ChevronRight, Eye, XCircle, Send
 } from 'lucide-react';
-import {
-    MOCK_PRODUCTION_TASKS, MOCK_JOB_ORDERS, PRODUCTION_STEPS
-} from '../data/productionMockData';
+import { PRODUCTION_STEPS } from '../data/productionMockData';
 import './PageCommon.css';
 import './Operator.css';
 
-// Icon map for the stepper
+// Icon map
 const STEP_ICONS = {
     Play, SearchCheck, Repeat, CheckCircle, Package, ShieldCheck, Warehouse
 };
 
 export default function Operator() {
     const { getVisibleSubPages, hasSectionPermission } = useAuth();
+    const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests } = useProduction();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('operator');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
 
-    const [tasks, setTasks] = useState(MOCK_PRODUCTION_TASKS);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTask, setSelectedTask] = useState(null);
 
@@ -48,55 +45,38 @@ export default function Operator() {
     const totalProduced = tasks.reduce((sum, t) => sum + t.producedQty, 0);
     const totalDefect = tasks.reduce((sum, t) => sum + t.defectQty, 0);
 
-    // ── Advance step ──
-    const advanceStep = (taskId) => {
-        setTasks(prev => prev.map(t => {
-            if (t.id !== taskId) return t;
-            const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === t.currentStep);
-            if (currentIdx >= PRODUCTION_STEPS.length - 1) return t; // already at last step
-            const nextStep = PRODUCTION_STEPS[currentIdx + 1];
-            const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
-            const newStepTimes = { ...t.stepTimes, [nextStep.key]: now };
-            const isFinished = nextStep.key === 'stock';
-            return {
-                ...t,
-                currentStep: nextStep.key,
-                stepTimes: newStepTimes,
-                status: isFinished ? 'เสร็จสิ้น' : 'กำลังทำ',
-                endTime: isFinished ? now : null,
-            };
-        }));
-        // Also update selectedTask if open
-        setSelectedTask(prev => {
-            if (!prev || prev.id !== taskId) return prev;
-            const t = tasks.find(x => x.id === taskId);
-            if (!t) return prev;
-            const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === t.currentStep);
-            const nextStep = PRODUCTION_STEPS[currentIdx + 1];
-            if (!nextStep) return prev;
-            const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
-            return {
-                ...t,
-                currentStep: nextStep.key,
-                stepTimes: { ...t.stepTimes, [nextStep.key]: now },
-                status: nextStep.key === 'stock' ? 'เสร็จสิ้น' : 'กำลังทำ',
-                endTime: nextStep.key === 'stock' ? now : null,
-            };
-        });
+    // ── Check if task is waiting for QC result ──
+    const isWaitingForQc = (task) => {
+        if (task.currentStep !== 'qc_inprocess' && task.currentStep !== 'qc_final') return false;
+        const pendingReq = qcRequests.find(r => r.taskId === task.id && r.type === task.currentStep && r.status === 'รอตรวจ');
+        return !!pendingReq;
     };
 
-    const startTask = (taskId) => {
-        const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
-        setTasks(prev => prev.map(t => {
-            if (t.id !== taskId) return t;
-            return {
-                ...t,
-                status: 'กำลังทำ',
-                currentStep: 'production_1',
-                startTime: now,
-                stepTimes: { ...t.stepTimes, production_1: now },
-            };
-        }));
+    // ── Check if task already sent QC request ──
+    const hasQcRequest = (task) => {
+        return qcRequests.some(r => r.taskId === task.id && r.type === task.currentStep);
+    };
+
+    // ── Handle advancing to next step (with QC auto-send) ──
+    const handleAdvanceStep = (taskId) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
+        const nextStep = PRODUCTION_STEPS[currentIdx + 1];
+        if (!nextStep) return;
+
+        // If next step is QC, advance AND auto-send QC request
+        if (nextStep.key === 'qc_inprocess' || nextStep.key === 'qc_final') {
+            advanceTaskStep(taskId);
+            // Send QC request after advancing
+            setTimeout(() => {
+                const updatedTask = { ...task, currentStep: nextStep.key };
+                sendQcRequest(updatedTask, nextStep.key);
+            }, 100);
+        } else {
+            advanceTaskStep(taskId);
+        }
     };
 
     const getStatusBadge = (status) => {
@@ -112,6 +92,7 @@ export default function Operator() {
     // ══════════════════════════════════════════════════════════════════
     const WorkflowStepper = ({ task, compact = false }) => {
         const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
+        const waitingQc = isWaitingForQc(task);
 
         return (
             <div className={`op-stepper ${compact ? 'op-stepper-compact' : ''}`}>
@@ -119,24 +100,25 @@ export default function Operator() {
                     const isDone = idx < currentIdx;
                     const isCurrent = idx === currentIdx;
                     const isFuture = idx > currentIdx;
+                    const isQcStep = step.key === 'qc_inprocess' || step.key === 'qc_final';
+                    const isQcWaiting = isCurrent && isQcStep && waitingQc;
                     const StepIcon = STEP_ICONS[step.icon] || CheckCircle;
                     const time = task.stepTimes?.[step.key];
 
                     return (
                         <div key={step.key} className="op-step-wrapper">
-                            {/* Connector line */}
                             {idx > 0 && (
                                 <div className={`op-step-connector ${isDone ? 'done' : isCurrent ? 'current' : ''}`} />
                             )}
-                            {/* Step circle */}
-                            <div className={`op-step ${isDone ? 'done' : isCurrent ? 'current' : 'future'}`}>
+                            <div className={`op-step ${isDone ? 'done' : isCurrent ? (isQcWaiting ? 'qc-waiting' : 'current') : 'future'}`}>
                                 <div className="op-step-circle">
                                     {isDone ? <CheckCircle size={compact ? 14 : 16} /> : <StepIcon size={compact ? 14 : 16} />}
                                 </div>
                                 <div className="op-step-info">
                                     <span className="op-step-label">{compact ? step.shortLabel : step.label}</span>
                                     {!compact && time && <span className="op-step-time">{time}</span>}
-                                    {!compact && isCurrent && !time && <span className="op-step-time op-step-now">ดำเนินการอยู่</span>}
+                                    {!compact && isCurrent && isQcWaiting && <span className="op-step-time op-step-qc-waiting">⏳ รอ QC ตรวจ</span>}
+                                    {!compact && isCurrent && !isQcStep && !time && <span className="op-step-time op-step-now">ดำเนินการอยู่</span>}
                                 </div>
                             </div>
                         </div>
@@ -147,14 +129,18 @@ export default function Operator() {
     };
 
     // ══════════════════════════════════════════════════════════════════
-    // Task Detail Modal with Full Stepper
+    // Task Detail Modal
     // ══════════════════════════════════════════════════════════════════
     const renderTaskModal = () => {
         if (!selectedTask) return null;
-        const task = selectedTask;
+        // Get fresh task data from context
+        const task = tasks.find(t => t.id === selectedTask.id) || selectedTask;
         const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
         const isLastStep = currentIdx >= PRODUCTION_STEPS.length - 1;
         const nextStep = !isLastStep ? PRODUCTION_STEPS[currentIdx + 1] : null;
+        const isQcStep = task.currentStep === 'qc_inprocess' || task.currentStep === 'qc_final';
+        const waitingQc = isWaitingForQc(task);
+        const qcReqForTask = qcRequests.filter(r => r.taskId === task.id);
 
         return (
             <div className="rnd-modal-overlay" onClick={() => setSelectedTask(null)}>
@@ -172,7 +158,6 @@ export default function Operator() {
                     </div>
 
                     <div className="rnd-modal-body">
-                        {/* Info Grid */}
                         <div className="rnd-modal-info-grid">
                             <div className="rnd-modal-info-item">
                                 <label>กระบวนการ</label>
@@ -188,8 +173,9 @@ export default function Operator() {
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ขั้นตอนปัจจุบัน</label>
-                                <span style={{ color: '#7b7bf5', fontWeight: 700 }}>
+                                <span style={{ color: waitingQc ? '#f59e0b' : '#7b7bf5', fontWeight: 700 }}>
                                     {PRODUCTION_STEPS.find(s => s.key === task.currentStep)?.label}
+                                    {waitingQc && ' (รอ QC)'}
                                 </span>
                             </div>
                         </div>
@@ -202,22 +188,55 @@ export default function Operator() {
                             <WorkflowStepper task={task} compact={false} />
                         </div>
 
-                        {/* Next Step Action */}
-                        {!isLastStep && task.status !== 'เสร็จสิ้น' && (
+                        {/* QC Waiting State */}
+                        {waitingQc && (
+                            <div className="op-qc-waiting-banner">
+                                <SearchCheck size={20} />
+                                <div>
+                                    <strong>📋 ส่งคำขอ QC แล้ว — รอเจ้าหน้าที่ QC ตรวจ</strong>
+                                    <p>เมื่อ QC ตรวจผ่าน ระบบจะเลื่อนขั้นตอนให้อัตโนมัติ</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* QC Send Button (if at QC step but hasn't sent yet) */}
+                        {isQcStep && !hasQcRequest(task) && (
+                            <div className="op-modal-next-action" style={{ background: '#fef3c7', borderColor: '#fde68a' }}>
+                                <span>ขั้นตอนนี้ต้องส่งให้ QC ตรวจ</span>
+                                <button className="op-btn op-btn-qc" onClick={() => sendQcRequest(task, task.currentStep)}>
+                                    <Send size={14} /> ส่งคำขอ QC
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Normal Next Step (non-QC) */}
+                        {!isLastStep && !isQcStep && task.status !== 'เสร็จสิ้น' && (
                             <div className="op-modal-next-action">
                                 <span>ขั้นตอนถัดไป: <strong>{nextStep?.label}</strong></span>
-                                <button className="op-btn op-btn-start" onClick={() => {
-                                    advanceStep(task.id);
-                                    // refresh selected task
-                                    setTimeout(() => {
-                                        setSelectedTask(prev => {
-                                            if (!prev) return null;
-                                            return tasks.find(t => t.id === prev.id) || prev;
-                                        });
-                                    }, 50);
-                                }}>
+                                <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
                                     <ChevronRight size={14} /> ไปขั้นตอนถัดไป
                                 </button>
+                            </div>
+                        )}
+
+                        {/* QC History for this task */}
+                        {qcReqForTask.length > 0 && (
+                            <div className="op-qc-history">
+                                <h4 style={{ margin: '16px 0 8px', fontSize: 13, fontWeight: 700 }}>📋 ประวัติ QC ของงานนี้</h4>
+                                {qcReqForTask.map(r => (
+                                    <div key={r.id} className={`op-qc-history-item ${r.status === 'ผ่าน' ? 'passed' : r.status === 'ไม่ผ่าน' ? 'failed' : 'pending'}`}>
+                                        <div className="op-qc-history-top">
+                                            <span className="op-qc-history-type">{r.typeLabel}</span>
+                                            <span className={`badge ${r.status === 'ผ่าน' ? 'badge-success' : r.status === 'ไม่ผ่าน' ? 'badge-danger' : 'badge-warning'}`}>{r.status}</span>
+                                        </div>
+                                        <div className="op-qc-history-meta">
+                                            <span>📅 ส่ง: {r.requestedAt}</span>
+                                            {r.inspectedAt && <span>✅ ตรวจ: {r.inspectedAt}</span>}
+                                            {r.inspector && <span>👤 โดย: {r.inspector}</span>}
+                                        </div>
+                                        {r.notes && <div className="op-qc-history-note">💬 {r.notes}</div>}
+                                    </div>
+                                ))}
                             </div>
                         )}
                     </div>
@@ -231,7 +250,6 @@ export default function Operator() {
     // ══════════════════════════════════════════════════════════════════
     const renderDashboard = () => {
         const currentActive = tasks.filter(t => t.status === 'กำลังทำ');
-        const pending = tasks.filter(t => t.status !== 'เสร็จสิ้น');
 
         return (
             <div className="operator-dashboard">
@@ -270,20 +288,24 @@ export default function Operator() {
                                 const currentStepObj = PRODUCTION_STEPS.find(s => s.key === task.currentStep);
                                 const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
                                 const isLastStep = currentIdx >= PRODUCTION_STEPS.length - 1;
+                                const isQcStep = task.currentStep === 'qc_inprocess' || task.currentStep === 'qc_final';
+                                const waitingQc = isWaitingForQc(task);
+                                const needsSendQc = isQcStep && !hasQcRequest(task);
 
                                 return (
-                                    <div key={task.id} className="op-active-card">
+                                    <div key={task.id} className={`op-active-card ${waitingQc ? 'op-active-card-qc' : ''}`}>
                                         <div className="op-active-top">
                                             <div>
                                                 <span className="op-active-batch">{task.batchNo}</span>
                                                 <span className="op-active-job">← {task.jobOrderId}</span>
                                             </div>
-                                            <span className="op-status-badge op-status-active">{currentStepObj?.shortLabel}</span>
+                                            <span className={`op-status-badge ${waitingQc ? 'op-status-qc' : 'op-status-active'}`}>
+                                                {waitingQc ? '⏳ รอ QC' : currentStepObj?.shortLabel}
+                                            </span>
                                         </div>
                                         <div className="op-active-product">{task.formulaName}</div>
                                         <div className="op-active-process">{task.process} • {task.line}</div>
 
-                                        {/* Mini Stepper */}
                                         <WorkflowStepper task={task} compact={true} />
 
                                         <div className="op-active-progress">
@@ -294,11 +316,17 @@ export default function Operator() {
                                         </div>
 
                                         <div className="op-active-actions">
-                                            {!isLastStep && (
-                                                <button className="op-btn op-btn-start" onClick={() => advanceStep(task.id)}>
+                                            {waitingQc ? (
+                                                <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
+                                            ) : needsSendQc ? (
+                                                <button className="op-btn op-btn-qc" onClick={() => sendQcRequest(task, task.currentStep)}>
+                                                    <Send size={14} /> ส่งคำขอ QC
+                                                </button>
+                                            ) : !isLastStep && !isQcStep ? (
+                                                <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
                                                     <ChevronRight size={14} /> ขั้นตอนถัดไป
                                                 </button>
-                                            )}
+                                            ) : null}
                                             <button className="op-btn op-btn-detail" onClick={() => setSelectedTask(task)}>
                                                 <Eye size={14} /> รายละเอียด
                                             </button>
@@ -332,15 +360,16 @@ export default function Operator() {
                                 <tbody>
                                     {tasks.filter(t => t.status !== 'เสร็จสิ้น').map(task => {
                                         const stepObj = PRODUCTION_STEPS.find(s => s.key === task.currentStep);
+                                        const waitingQc = isWaitingForQc(task);
                                         return (
-                                            <tr key={task.id}>
+                                            <tr key={task.id} className={waitingQc ? 'op-row-qc-waiting' : ''}>
                                                 <td className="text-bold">{task.id}</td>
                                                 <td><span className="op-jo-ref">{task.jobOrderId}</span></td>
                                                 <td>{task.formulaName}</td>
                                                 <td><span className="badge badge-neutral">{task.batchNo}</span></td>
                                                 <td>
-                                                    <span className="op-step-badge">
-                                                        {stepObj?.shortLabel || '—'}
+                                                    <span className={`op-step-badge ${waitingQc ? 'op-step-badge-qc' : ''}`}>
+                                                        {waitingQc ? '⏳ รอ QC ตรวจ' : stepObj?.shortLabel || '—'}
                                                     </span>
                                                 </td>
                                                 <td>{task.expectedQty.toLocaleString()}</td>
@@ -352,9 +381,7 @@ export default function Operator() {
                                                 </td>
                                                 <td><span className={`op-status-badge ${getStatusBadge(task.status)}`}>{task.status}</span></td>
                                                 <td>
-                                                    <button className="btn-sm" onClick={() => setSelectedTask(task)}>
-                                                        <Eye size={14} />
-                                                    </button>
+                                                    <button className="btn-sm" onClick={() => setSelectedTask(task)}><Eye size={14} /></button>
                                                 </td>
                                             </tr>
                                         );
@@ -369,14 +396,13 @@ export default function Operator() {
     };
 
     // ══════════════════════════════════════════════════════════════════
-    // 2. ประวัติการผลิต (Production History)
+    // 2. ประวัติการผลิต
     // ══════════════════════════════════════════════════════════════════
     const renderHistory = () => {
         const completed = tasks.filter(t => t.status === 'เสร็จสิ้น');
         const filtered = completed.filter(t =>
             t.formulaName.includes(searchTerm) || t.jobOrderId.includes(searchTerm) || t.batchNo.includes(searchTerm)
         );
-
         const totalYield = completed.reduce((sum, t) => sum + t.producedQty, 0);
         const totalDefects = completed.reduce((sum, t) => sum + t.defectQty, 0);
         const yieldRate = totalYield > 0 ? (((totalYield - totalDefects) / totalYield) * 100).toFixed(1) : 0;
@@ -387,7 +413,6 @@ export default function Operator() {
                     <h1>ประวัติการผลิต</h1>
                     <p>บันทึกผลการผลิตที่ดำเนินการเสร็จสิ้นแล้ว</p>
                 </div>
-
                 <div className="summary-row">
                     <div className="card summary-card">
                         <div className="summary-icon" style={{ background: '#ecfdf5', color: '#059669' }}><CheckCircle size={20} /></div>
@@ -402,7 +427,6 @@ export default function Operator() {
                         <div><span className="summary-label">อัตราผลผลิตดี</span><span className="summary-value">{yieldRate}%</span></div>
                     </div>
                 </div>
-
                 {hasSectionPermission('operator_history_search') && (
                     <div className="toolbar">
                         <div className="search-box">
@@ -411,7 +435,6 @@ export default function Operator() {
                         </div>
                     </div>
                 )}
-
                 {hasSectionPermission('operator_history_table') && (
                     <div className="card table-card">
                         <table className="data-table">
@@ -442,21 +465,15 @@ export default function Operator() {
                                             <td style={{ fontWeight: 600, color: '#059669' }}>{task.producedQty.toLocaleString()}</td>
                                             <td style={{ color: task.defectQty > 0 ? '#ef4444' : 'var(--text-muted)' }}>{task.defectQty}</td>
                                             <td>
-                                                <span className={`badge ${parseFloat(rate) >= 99 ? 'badge-success' : parseFloat(rate) >= 95 ? 'badge-warning' : 'badge-danger'}`}>
-                                                    {rate}%
-                                                </span>
+                                                <span className={`badge ${parseFloat(rate) >= 99 ? 'badge-success' : parseFloat(rate) >= 95 ? 'badge-warning' : 'badge-danger'}`}>{rate}%</span>
                                             </td>
                                             <td style={{ fontSize: 11 }}>{task.startTime}<br />{task.endTime || '—'}</td>
-                                            <td>
-                                                <button className="btn-sm" onClick={() => setSelectedTask(task)}>
-                                                    <Eye size={14} />
-                                                </button>
-                                            </td>
+                                            <td><button className="btn-sm" onClick={() => setSelectedTask(task)}><Eye size={14} /></button></td>
                                         </tr>
                                     );
                                 })}
                                 {filtered.length === 0 && (
-                                    <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีประวัติการผลิต</td></tr>
+                                    <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีประวัติ</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -466,9 +483,6 @@ export default function Operator() {
         );
     };
 
-    // ══════════════════════════════════════════════════════════════════
-    // Main Render
-    // ══════════════════════════════════════════════════════════════════
     if (visibleSubPages.length === 0) {
         return <div className="page-container"><p className="no-permission">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p></div>;
     }

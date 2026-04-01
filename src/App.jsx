@@ -29,6 +29,7 @@
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ProductionProvider } from './context/ProductionContext';
 
 // Components
 import Layout from './components/Layout';
@@ -55,6 +56,7 @@ import DocumentControl from './pages/DocumentControl';
 function App() {
   return (
     <AuthProvider>
+      <ProductionProvider>
       <BrowserRouter>
         <Routes>
           {/* ── หน้า Login (ไม่ต้องล็อกอิน) ── */}
@@ -122,6 +124,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </ProductionProvider>
     </AuthProvider>
   );
 }
