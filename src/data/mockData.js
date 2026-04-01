@@ -394,10 +394,17 @@ export const ALL_PAGES = [
     id: 'operator', name: 'ฝ่ายผลิต', path: '/operator',
     subPages: [
       {
-        id: 'operator_dashboard', name: 'Production Operator',
+        id: 'operator_dashboard', name: 'งานของฉัน',
         sections: [
           { id: 'operator_dashboard_tasks', name: 'งานที่ต้องรับผิดชอบ' },
           { id: 'operator_dashboard_status', name: 'อัปเดตสถานะการผลิต' },
+        ],
+      },
+      {
+        id: 'operator_history', name: 'ประวัติการผลิต',
+        sections: [
+          { id: 'operator_history_search', name: 'ค้นหาประวัติ' },
+          { id: 'operator_history_table', name: 'ตารางประวัติการผลิต' },
         ],
       },
     ],
@@ -415,7 +422,15 @@ export const ALL_PAGES = [
         ],
       },
       {
-        id: 'rnd_projects', name: 'Research & Development',
+        id: 'rnd_formulas', name: 'สูตรการผลิต (BOM)',
+        sections: [
+          { id: 'rnd_formulas_search', name: 'ค้นหาสูตร' },
+          { id: 'rnd_formulas_table', name: 'ตารางสูตรการผลิต' },
+          { id: 'rnd_formulas_action', name: 'จัดการสูตร (Create/Edit)' },
+        ],
+      },
+      {
+        id: 'rnd_projects', name: 'โครงการวิจัย',
         sections: [
           { id: 'rnd_projects_search', name: 'ค้นหาโครงการ' },
           { id: 'rnd_projects_table', name: 'ตารางโครงการวิจัย' },
