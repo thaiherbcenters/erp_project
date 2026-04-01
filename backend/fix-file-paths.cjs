@@ -27,7 +27,7 @@ async function fix() {
     // แก้ทั้งหมดให้เป็น .pdf (ลบ _dummy ออกด้วย)
     const result = await pool.request().query(`
         UPDATE Documents 
-        SET file_path = 'D:\\ERP_Data\\Documents\\' + doc_code + '.pdf'
+        SET file_path = 'E:\\Documents\\' + doc_code + '.pdf'
         WHERE file_path IS NOT NULL
     `);
     console.log(`\n🔧 แก้ไขแล้ว ${result.rowsAffected[0]} รายการ`);

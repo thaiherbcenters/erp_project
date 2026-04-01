@@ -6,7 +6,7 @@ const { poolPromise, sql } = require('../config/db');
 const multer = require('multer');
 
 // โฟลเดอร์ปลายทางสำหรับเก็บไฟล์เอกสารจริง (Windows Server)
-const RECORDS_ROOT = process.env.DOCUMENT_RECORDS_ROOT || 'D:\\ERP_Data\\Documents\\records';
+const RECORDS_ROOT = process.env.DOCUMENT_RECORDS_ROOT || 'E:\\Documents\\records';
 
 // กำหนด storage สำหรับ multer
 const storage = multer.diskStorage({

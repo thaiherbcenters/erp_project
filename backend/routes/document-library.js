@@ -6,7 +6,7 @@ const multer = require('multer');
 const { poolPromise, sql } = require('../config/db');
 
 // Physical storage path for Document Library
-const LIBRARY_ROOT = process.env.DOCUMENT_RECORDS_ROOT || 'D:\\ERP_Data\\Documents\\records';
+const LIBRARY_ROOT = process.env.DOCUMENT_RECORDS_ROOT || 'E:\\Documents\\records';
 
 // Setup multer storage
 const storage = multer.diskStorage({

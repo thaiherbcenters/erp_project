@@ -5,7 +5,7 @@ const path = require('path');
 const { PDFDocument, PDFName } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit'); // ต้องมี fontkit เพื่อฝังฟอนต์ภาษาไทย
 
-const TEMPLATES_DIR = 'D:\\ERP_Data\\Templates';
+const TEMPLATES_DIR = 'E:\\Templates';
 const FONTS_DIR = path.join(__dirname, '..', 'fonts');
 
 // POST /api/forms/fill/:templateId
