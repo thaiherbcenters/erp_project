@@ -1,5 +1,5 @@
 /* =============================================================================
-   Operator.css — Styles for Production Operator Module
+   Operator.css — Styles for Production Operator Module + Workflow Stepper
    ============================================================================= */
 
 /* ── Section Titles ── */
@@ -13,14 +13,177 @@
     gap: 6px;
 }
 
-/* ── Active Task Cards ── */
+/* ===========================================================================
+   WORKFLOW STEPPER — The main visual step tracker
+   =========================================================================== */
+.op-stepper {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin: 12px 0;
+    position: relative;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.op-step-wrapper {
+    display: flex;
+    align-items: flex-start;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+}
+
+/* Connector line between steps */
+.op-step-connector {
+    position: absolute;
+    top: 16px;
+    left: -50%;
+    right: 50%;
+    height: 3px;
+    background: #e2e8f0;
+    z-index: 0;
+    transition: background 0.3s;
+}
+
+.op-step-wrapper:first-child .op-step-connector {
+    display: none;
+}
+
+.op-step-connector.done {
+    background: linear-gradient(90deg, #059669, #34d399);
+}
+
+.op-step-connector.current {
+    background: linear-gradient(90deg, #059669, #7b7bf5);
+}
+
+/* Step circle + info */
+.op-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+}
+
+.op-step-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid;
+    transition: all 0.3s;
+    flex-shrink: 0;
+}
+
+/* Done step */
+.op-step.done .op-step-circle {
+    background: #059669;
+    border-color: #059669;
+    color: #fff;
+}
+
+/* Current step */
+.op-step.current .op-step-circle {
+    background: #fff;
+    border-color: #7b7bf5;
+    color: #7b7bf5;
+    box-shadow: 0 0 0 4px rgba(123, 123, 245, 0.15);
+    animation: opStepPulse 2s ease-in-out infinite;
+}
+
+@keyframes opStepPulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(123, 123, 245, 0.15); }
+    50% { box-shadow: 0 0 0 8px rgba(123, 123, 245, 0.08); }
+}
+
+/* Future step */
+.op-step.future .op-step-circle {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #94a3b8;
+}
+
+/* Step label + time */
+.op-step-info {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
+
+.op-step-label {
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.op-step.done .op-step-label { color: #059669; }
+.op-step.current .op-step-label { color: #7b7bf5; font-weight: 700; }
+.op-step.future .op-step-label { color: #94a3b8; }
+
+.op-step-time {
+    font-size: 10px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.op-step-now {
+    color: #7b7bf5;
+    font-weight: 600;
+    animation: opBlink 1.5s ease-in-out infinite;
+}
+
+@keyframes opBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* ── Compact Stepper (inside task cards) ── */
+.op-stepper-compact {
+    margin: 8px 0 12px;
+    gap: 0;
+}
+
+.op-stepper-compact .op-step-circle {
+    width: 24px;
+    height: 24px;
+    border-width: 2px;
+}
+
+.op-stepper-compact .op-step-connector {
+    top: 11px;
+    height: 2px;
+}
+
+.op-stepper-compact .op-step-info {
+    margin-top: 4px;
+}
+
+.op-stepper-compact .op-step-label {
+    font-size: 9px;
+    max-width: 60px;
+}
+
+/* ===========================================================================
+   ACTIVE TASK CARDS
+   =========================================================================== */
 .op-active-section {
     margin-bottom: 8px;
 }
 
 .op-active-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
     gap: 12px;
 }
 
@@ -42,7 +205,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .op-active-batch {
@@ -61,20 +224,20 @@
     font-size: 15px;
     font-weight: 700;
     color: var(--text);
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .op-active-process {
     font-size: 12px;
     color: var(--text-secondary);
-    margin-bottom: 10px;
+    margin-bottom: 4px;
 }
 
 .op-active-progress {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .op-active-progress-bar {
@@ -104,7 +267,9 @@
     gap: 8px;
 }
 
-/* ── Status Badges ── */
+/* ===========================================================================
+   STATUS BADGES
+   =========================================================================== */
 .op-status-badge {
     padding: 3px 10px;
     border-radius: 12px;
@@ -138,6 +303,18 @@
     border: 1px solid var(--border);
 }
 
+/* Step badge (in table) */
+.op-step-badge {
+    background: #f0ebff;
+    color: #7b7bf5;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-block;
+    border: 1px solid #ddd6fe;
+}
+
 /* ── JO Reference ── */
 .op-jo-ref {
     background: #f0ebff;
@@ -148,7 +325,9 @@
     font-weight: 600;
 }
 
-/* ── Buttons ── */
+/* ===========================================================================
+   BUTTONS
+   =========================================================================== */
 .op-btn {
     padding: 5px 12px;
     border: none;
@@ -181,6 +360,53 @@
     background: #047857;
 }
 
+.op-btn-detail {
+    background: var(--bg-white);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.op-btn-detail:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+
+/* ===========================================================================
+   MODAL STEPPER (Full size in detail modal)
+   =========================================================================== */
+.op-modal-stepper-section {
+    background: #f8fafc;
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-top: 16px;
+}
+
+.op-modal-stepper-section .op-stepper {
+    margin: 0;
+}
+
+.op-modal-next-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #eff6ff;
+    border-radius: 8px;
+    border: 1px solid #bfdbfe;
+}
+
+.op-modal-next-action span {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.op-modal-next-action strong {
+    color: #2563eb;
+}
+
 /* ── Pulse Icon ── */
 .op-pulse {
     animation: opIconPulse 1.5s ease-in-out infinite;
@@ -192,7 +418,55 @@
     50% { transform: scale(1.15); opacity: 0.8; }
 }
 
-/* ── Responsive ── */
-@media (max-width: 768px) {
+/* ===========================================================================
+   RESPONSIVE
+   =========================================================================== */
+@media (max-width: 900px) {
     .op-active-grid { grid-template-columns: 1fr; }
+    
+    .op-stepper:not(.op-stepper-compact) {
+        flex-direction: column;
+        gap: 0;
+        align-items: stretch;
+    }
+
+    .op-stepper:not(.op-stepper-compact) .op-step-wrapper {
+        flex-direction: row;
+        align-items: center;
+    }
+
+    .op-stepper:not(.op-stepper-compact) .op-step {
+        flex-direction: row;
+        text-align: left;
+        gap: 10px;
+        padding: 6px 0;
+    }
+
+    .op-stepper:not(.op-stepper-compact) .op-step-info {
+        margin-top: 0;
+        align-items: flex-start;
+    }
+
+    .op-stepper:not(.op-stepper-compact) .op-step-label {
+        max-width: none;
+    }
+
+    .op-stepper:not(.op-stepper-compact) .op-step-connector {
+        position: absolute;
+        top: auto;
+        left: 16px;
+        right: auto;
+        width: 3px;
+        height: 100%;
+    }
+}
+
+@media (max-width: 600px) {
+    .op-stepper-compact .op-step-label {
+        display: none;
+    }
+    .op-stepper-compact .op-step-circle {
+        width: 20px;
+        height: 20px;
+    }
 }

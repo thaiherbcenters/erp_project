@@ -299,7 +299,21 @@ export const MOCK_JOB_ORDERS = [
 ];
 
 // =============================================================================
-// 6. งานฝ่ายผลิต (Production Tasks) — อ้างอิง jobOrderId จาก Planner
+// 6. ขั้นตอนการผลิต (Production Steps) — ลำดับขั้นตอนมาตรฐาน
+// =============================================================================
+// ใช้ระบุว่างานแต่ละชิ้นอยู่ที่ขั้นตอนไหน
+export const PRODUCTION_STEPS = [
+    { key: 'production_1',   label: 'ผลิตขั้นตอนที่ 1',    shortLabel: 'In Progress 1',  icon: 'Play',        description: 'เตรียมวัตถุดิบ / ผสม / ขึ้นรูป' },
+    { key: 'qc_inprocess',   label: 'QC In-Process',       shortLabel: 'QC ระหว่างผลิต', icon: 'SearchCheck', description: 'ตรวจสอบระหว่างการผลิต' },
+    { key: 'production_2',   label: 'ผลิตขั้นตอนที่ 2',    shortLabel: 'In Progress 2',  icon: 'Repeat',      description: 'ดำเนินการผลิตต่อ / ปรับปรุง' },
+    { key: 'completed',      label: 'ผลิตเสร็จ',           shortLabel: 'Completed',      icon: 'CheckCircle', description: 'กระบวนการผลิตเสร็จสมบูรณ์' },
+    { key: 'packaging',      label: 'บรรจุภัณฑ์',          shortLabel: 'Packaging',      icon: 'Package',     description: 'บรรจุภัณฑ์ / ติดฉลาก / แพ็ค' },
+    { key: 'qc_final',       label: 'QC Final',            shortLabel: 'QC ขั้นสุดท้าย', icon: 'ShieldCheck', description: 'ตรวจสอบคุณภาพขั้นสุดท้าย' },
+    { key: 'stock',          label: 'เข้าคลัง',            shortLabel: 'Stock',          icon: 'Warehouse',   description: 'สินค้าเข้าคลัง พร้อมจำหน่าย' },
+];
+
+// =============================================================================
+// 7. งานฝ่ายผลิต (Production Tasks) — อ้างอิง jobOrderId จาก Planner
 // =============================================================================
 export const MOCK_PRODUCTION_TASKS = [
     {
@@ -313,6 +327,16 @@ export const MOCK_PRODUCTION_TASKS = [
         producedQty: 900,
         defectQty: 15,
         status: 'เสร็จสิ้น',
+        currentStep: 'stock',   // งานนี้เสร็จสิ้นจนเข้าคลังแล้ว
+        stepTimes: {
+            production_1: '2026-04-01 08:00',
+            qc_inprocess: '2026-04-01 10:30',
+            production_2: '2026-04-01 11:00',
+            completed: '2026-04-01 14:00',
+            packaging: '2026-04-01 14:30',
+            qc_final: '2026-04-01 15:30',
+            stock: '2026-04-01 16:30',
+        },
         operator: 'op1',
         startTime: '2026-04-01 08:00',
         endTime: '2026-04-01 16:30',
@@ -328,6 +352,12 @@ export const MOCK_PRODUCTION_TASKS = [
         producedQty: 450,
         defectQty: 5,
         status: 'กำลังทำ',
+        currentStep: 'production_2',   // กำลังอยู่ขั้นตอนผลิตที่ 2
+        stepTimes: {
+            production_1: '2026-04-02 08:00',
+            qc_inprocess: '2026-04-02 10:15',
+            production_2: '2026-04-02 11:00',
+        },
         operator: 'op1',
         startTime: '2026-04-02 08:00',
         endTime: null,
@@ -343,6 +373,16 @@ export const MOCK_PRODUCTION_TASKS = [
         producedQty: 800,
         defectQty: 3,
         status: 'เสร็จสิ้น',
+        currentStep: 'stock',
+        stepTimes: {
+            production_1: '2026-03-15 08:00',
+            qc_inprocess: '2026-03-15 11:00',
+            production_2: '2026-03-15 12:00',
+            completed: '2026-03-16 10:00',
+            packaging: '2026-03-16 13:00',
+            qc_final: '2026-03-17 09:00',
+            stock: '2026-03-17 15:00',
+        },
         operator: 'op1',
         startTime: '2026-03-15 08:00',
         endTime: '2026-03-17 15:00',
@@ -357,10 +397,18 @@ export const MOCK_PRODUCTION_TASKS = [
         expectedQty: 500,
         producedQty: 500,
         defectQty: 8,
-        status: 'เสร็จสิ้น',
+        status: 'กำลังทำ',
+        currentStep: 'packaging',   // กำลังอยู่ขั้นตอนบรรจุ
+        stepTimes: {
+            production_1: '2026-03-01 08:00',
+            qc_inprocess: '2026-03-01 12:00',
+            production_2: '2026-03-01 14:00',
+            completed: '2026-03-02 10:00',
+            packaging: '2026-03-02 13:00',
+        },
         operator: 'op1',
         startTime: '2026-03-01 08:00',
-        endTime: '2026-03-03 16:00',
+        endTime: null,
     },
     {
         id: 'PT-005',
@@ -372,9 +420,15 @@ export const MOCK_PRODUCTION_TASKS = [
         expectedQty: 500,
         producedQty: 500,
         defectQty: 2,
-        status: 'เสร็จสิ้น',
+        status: 'กำลังทำ',
+        currentStep: 'qc_inprocess',   // กำลังรอ QC ระหว่างผลิต
+        stepTimes: {
+            production_1: '2026-03-04 08:00',
+            qc_inprocess: '2026-03-04 11:00',
+        },
         operator: 'op1',
         startTime: '2026-03-04 08:00',
-        endTime: '2026-03-06 14:00',
+        endTime: null,
     },
 ];
+
