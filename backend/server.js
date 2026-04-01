@@ -33,6 +33,16 @@ app.get('/', (req, res) => {
     res.send('API is running...');
 });
 
+// Global Error Handler for unexpected middleware errors (e.g., multer fs errors)
+app.use((err, req, res, next) => {
+    console.error('Unhandled Server Error:', err);
+    res.status(500).json({ 
+        success: false, 
+        message: 'Internal Server Error', 
+        error: err.message || err.toString() 
+    });
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 Server listening on port ${PORT}`);
 });
