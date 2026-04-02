@@ -6,26 +6,34 @@ const { poolPromise, sql } = require('../config/db');
 const multer = require('multer');
 
 // โฟลเดอร์ปลายทางสำหรับเก็บไฟล์เอกสารจริง (Windows Server)
-const RECORDS_ROOT = process.env.DOCUMENT_RECORDS_ROOT || 'E:\\Documents\\records';
+const DOCUMENTS_ROOT = process.env.DOCUMENT_UPLOAD_ROOT || 'E:\\Documents';
 
 // กำหนด storage สำหรับ multer
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         try {
-            if (!fs.existsSync(RECORDS_ROOT)) {
-                fs.mkdirSync(RECORDS_ROOT, { recursive: true });
+            if (!fs.existsSync(DOCUMENTS_ROOT)) {
+                fs.mkdirSync(DOCUMENTS_ROOT, { recursive: true });
             }
         } catch (err) {
-            console.error('Error ensuring RECORDS_ROOT exists:', err);
+            console.error('Error ensuring DOCUMENTS_ROOT exists:', err);
         }
-        cb(null, RECORDS_ROOT);
+        cb(null, DOCUMENTS_ROOT);
     },
     filename: (req, file, cb) => {
-        const originalName = file.originalname || 'document';
-        const ext = path.extname(originalName);
-        const safeCode = (req.body.doc_code || 'DOC').replace(/[^A-Za-z0-9_-]/g, '_');
-        const timestamp = Date.now();
-        cb(null, `${safeCode}_${timestamp}${ext}`);
+        // Fix Thai filename encoding issue from multer
+        const decodedName = file.originalname ? Buffer.from(file.originalname, 'latin1').toString('utf8') : 'document';
+        const ext = path.extname(decodedName);
+
+        // ถ้ามี custom_filename ให้ใช้ชื่อที่ผู้ใช้ตั้ง มิฉะนั้นใช้ doc_code + timestamp
+        if (req.body.custom_filename && req.body.custom_filename.trim()) {
+            const safeName = req.body.custom_filename.trim().replace(/[<>:"/\\|?*]/g, '_');
+            cb(null, `${safeName}${ext}`);
+        } else {
+            const safeCode = (req.body.doc_code || 'DOC').replace(/[^A-Za-z0-9\u0E00-\u0E7F_-]/g, '_');
+            const timestamp = Date.now();
+            cb(null, `${safeCode}_${timestamp}${ext}`);
+        }
     },
 });
 
@@ -236,6 +244,7 @@ router.get('/:action/:code', async (req, res) => {
 });
 
 // อัปโหลดเอกสารใหม่ + บันทึก meta ลงตาราง Documents
+// รองรับ custom_filename สำหรับตั้งชื่อไฟล์ใหม่
 router.post('/upload', upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
@@ -250,6 +259,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             revision,
             effective_date,
             status,
+            custom_filename,
         } = req.body;
 
         if (!doc_code || !doc_name || !category) {
@@ -257,6 +267,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
         }
 
         const filePath = req.file.path;
+        const storedFileName = req.file.filename;
 
         const pool = await poolPromise;
 
@@ -278,6 +289,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             success: true,
             message: 'อัปโหลดเอกสารสำเร็จ',
             filePath,
+            storedFileName,
         });
     } catch (err) {
         console.error('Error uploading document:', err);

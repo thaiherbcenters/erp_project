@@ -12,7 +12,7 @@
  * =============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -45,6 +45,7 @@ import {
     RotateCcw,
     History,
     RefreshCw,
+    UploadCloud,
 } from 'lucide-react';
 import './PageCommon.css';
 import './DocumentControl.css';
@@ -383,6 +384,8 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
     if (!hasPermission('document_list_search'))
         return <div className="doc-no-access">ไม่มีสิทธิ์เข้าถึงหน้านี้</div>;
 
+    const { currentUser } = useAuth();
+
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all');
     const [filterPart, setFilterPart] = useState('all');
@@ -391,6 +394,18 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
     const [showPartDropdown, setShowPartDropdown] = useState(false);
     const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
     const [showStandardDropdown, setShowStandardDropdown] = useState(false);
+
+    // Upload state
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [uploadFile, setUploadFile] = useState(null);
+    const [customFileName, setCustomFileName] = useState('');
+    const [uploadDocCode, setUploadDocCode] = useState('');
+    const [uploadDocName, setUploadDocName] = useState('');
+    const [uploadCategory, setUploadCategory] = useState('');
+    const [uploadTypeTag, setUploadTypeTag] = useState('Manual');
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadResult, setUploadResult] = useState(null);
+    const fileInputRef = useRef(null);
 
     if (isLoading) {
         return <div className="doc-no-access">กำลังโหลดข้อมูลเอกสาร...</div>;
@@ -431,16 +446,29 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
             {/* ── Top Bar ── */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', gap: '20px' }}>
 
-                {/* ── Left Side (Search & Info) ── */}
+                {/* ── Left Side (Search & Upload) ── */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-                    <div className="search-box" style={{ maxWidth: '400px', margin: 0 }}>
-                        <Search size={16} />
-                        <input
-                            type="text"
-                            placeholder="ค้นหารหัส หรือ ชื่อเอกสาร..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <div className="search-box" style={{ maxWidth: '400px', margin: 0, flex: 1 }}>
+                            <Search size={16} />
+                            <input
+                                type="text"
+                                placeholder="ค้นหารหัส หรือ ชื่อเอกสาร..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <button
+                            className="doc-upload-btn"
+                            onClick={() => {
+                                setShowUploadModal(true);
+                                setUploadResult(null);
+                            }}
+                            title="อัปโหลดเอกสาร"
+                        >
+                            <UploadCloud size={17} />
+                            <span>อัปโหลดเอกสาร</span>
+                        </button>
                     </div>
                 </div>
 
@@ -736,6 +764,235 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                             )}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════ */}
+            {/* ── Upload Document Modal ── */}
+            {/* ══════════════════════════════════════════════════════════ */}
+            {showUploadModal && (
+                <div className="doc-upload-overlay" onClick={() => { if (!isUploading) { setShowUploadModal(false); setUploadFile(null); setCustomFileName(''); setUploadResult(null); } }}>
+                    <div className="doc-upload-modal" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="doc-upload-modal-header">
+                            <h3>
+                                <div style={{ background: '#e0e7ff', padding: '7px', borderRadius: '8px', display: 'flex', color: '#4f46e5' }}>
+                                    <UploadCloud size={18} />
+                                </div>
+                                อัปโหลดเอกสาร
+                            </h3>
+                            <button
+                                className="doc-upload-modal-close"
+                                onClick={() => { if (!isUploading) { setShowUploadModal(false); setUploadFile(null); setCustomFileName(''); setUploadResult(null); } }}
+                            >
+                                <XCircle size={20} />
+                            </button>
+                        </div>
+
+                        {/* Success Message */}
+                        {uploadResult && uploadResult.success && (
+                            <div className="doc-upload-success">
+                                <CheckCircle size={20} />
+                                <span>{uploadResult.message}</span>
+                            </div>
+                        )}
+
+                        {/* Error Message */}
+                        {uploadResult && !uploadResult.success && (
+                            <div className="doc-upload-error">
+                                <AlertCircle size={20} />
+                                <span>{uploadResult.message}</span>
+                            </div>
+                        )}
+
+                        {/* Form */}
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!uploadFile || !uploadDocCode || !uploadDocName || !uploadCategory) {
+                                setUploadResult({ success: false, message: 'กรุณากรอกข้อมูลให้ครบถ้วน' });
+                                return;
+                            }
+                            setIsUploading(true);
+                            setUploadResult(null);
+                            try {
+                                const formData = new FormData();
+                                formData.append('file', uploadFile);
+                                formData.append('doc_code', uploadDocCode);
+                                formData.append('doc_name', uploadDocName);
+                                formData.append('category', uploadCategory);
+                                formData.append('typeTag', uploadTypeTag);
+                                formData.append('status', 'ใช้งาน');
+                                if (customFileName.trim()) {
+                                    formData.append('custom_filename', customFileName.trim());
+                                }
+
+                                const res = await fetch(`${API_BASE}/documents/upload`, {
+                                    method: 'POST',
+                                    body: formData,
+                                });
+                                const data = await res.json();
+                                if (!res.ok) throw new Error(data.message || 'การอัปโหลดล้มเหลว');
+
+                                setUploadResult({ success: true, message: `อัปโหลดเอกสาร "${uploadDocName}" สำเร็จ!` });
+                                // Reset form after success
+                                setTimeout(() => {
+                                    setUploadFile(null);
+                                    setCustomFileName('');
+                                    setUploadDocCode('');
+                                    setUploadDocName('');
+                                    setUploadCategory('');
+                                    setUploadTypeTag('Manual');
+                                    // Reload page to refresh document list
+                                    window.location.reload();
+                                }, 1500);
+                            } catch (err) {
+                                setUploadResult({ success: false, message: err.message });
+                            } finally {
+                                setIsUploading(false);
+                            }
+                        }}>
+                            <div className="doc-upload-modal-body">
+                                {/* File Dropzone */}
+                                <div className="doc-upload-form-group">
+                                    <label className="doc-upload-label">เลือกไฟล์ <span className="required">*</span></label>
+                                    <div
+                                        className={`doc-upload-dropzone ${uploadFile ? 'has-file' : ''}`}
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <input
+                                            type="file"
+                                            ref={fileInputRef}
+                                            onChange={(e) => {
+                                                if (e.target.files && e.target.files.length > 0) {
+                                                    const file = e.target.files[0];
+                                                    setUploadFile(file);
+                                                    // Auto-set custom filename from original file if empty
+                                                    if (!customFileName) {
+                                                        const nameWithoutExt = file.name.replace(/\.[^.]+$/, '');
+                                                        setCustomFileName(nameWithoutExt);
+                                                    }
+                                                }
+                                            }}
+                                            style={{ display: 'none' }}
+                                        />
+                                        {!uploadFile ? (
+                                            <>
+                                                <UploadCloud className="doc-upload-dropzone-icon" size={36} />
+                                                <div className="doc-upload-dropzone-text">คลิกเพื่อเลือกไฟล์ หรือลากมาวาง</div>
+                                                <div className="doc-upload-dropzone-sub">PDF, Word, Excel, รูปภาพ ฯลฯ</div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle className="doc-upload-dropzone-icon" size={36} />
+                                                <div className="doc-upload-dropzone-text" style={{ color: '#059669' }}>
+                                                    {uploadFile.name}
+                                                </div>
+                                                <div className="doc-upload-dropzone-sub">
+                                                    {(uploadFile.size / 1024).toFixed(1)} KB • คลิกเพื่อเปลี่ยน
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Custom Filename */}
+                                <div className="doc-upload-form-group">
+                                    <label className="doc-upload-label">
+                                        <Edit2 size={13} style={{ marginRight: '5px' }} />
+                                        ตั้งชื่อไฟล์ใหม่ (ถ้าต้องการ)
+                                    </label>
+                                    <input
+                                        className="doc-upload-input"
+                                        type="text"
+                                        placeholder="เช่น คู่มือ-ISO-9001-Rev02"
+                                        value={customFileName}
+                                        onChange={(e) => setCustomFileName(e.target.value)}
+                                    />
+                                    <span className="doc-upload-hint">ระบบจะเพิ่มนามสกุลไฟล์ให้อัตโนมัติ • ไฟล์เก็บที่ E:\Documents</span>
+                                </div>
+
+                                {/* Doc Code & Doc Name */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px' }}>
+                                    <div className="doc-upload-form-group">
+                                        <label className="doc-upload-label">รหัสเอกสาร <span className="required">*</span></label>
+                                        <input
+                                            className="doc-upload-input"
+                                            type="text"
+                                            placeholder="เช่น IMS-MN-01"
+                                            value={uploadDocCode}
+                                            onChange={(e) => setUploadDocCode(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="doc-upload-form-group">
+                                        <label className="doc-upload-label">ชื่อเอกสาร <span className="required">*</span></label>
+                                        <input
+                                            className="doc-upload-input"
+                                            type="text"
+                                            placeholder="เช่น คู่มือระบบบริหารบูรณาการ"
+                                            value={uploadDocName}
+                                            onChange={(e) => setUploadDocName(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Category & Type */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                                    <div className="doc-upload-form-group">
+                                        <label className="doc-upload-label">หมวดเอกสาร <span className="required">*</span></label>
+                                        <select
+                                            className="doc-upload-input"
+                                            value={uploadCategory}
+                                            onChange={(e) => setUploadCategory(e.target.value)}
+                                            required
+                                        >
+                                            <option value="">-- เลือกหมวด --</option>
+                                            {DOCUMENT_CATEGORIES.map(cat => (
+                                                <option key={cat.id} value={cat.id}>{cat.shortName} — {cat.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="doc-upload-form-group">
+                                        <label className="doc-upload-label">ประเภทเอกสาร</label>
+                                        <select
+                                            className="doc-upload-input"
+                                            value={uploadTypeTag}
+                                            onChange={(e) => setUploadTypeTag(e.target.value)}
+                                        >
+                                            <option value="Manual">Manual</option>
+                                            <option value="SOP">SOP</option>
+                                            <option value="WI">WI</option>
+                                            <option value="Form">Form</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Footer */}
+                            <div className="doc-upload-modal-footer">
+                                <button
+                                    type="button"
+                                    className="doc-upload-btn-ghost"
+                                    onClick={() => { if (!isUploading) { setShowUploadModal(false); setUploadFile(null); setCustomFileName(''); setUploadResult(null); } }}
+                                    disabled={isUploading}
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="doc-upload-btn-primary"
+                                    disabled={isUploading || !uploadFile || !uploadDocCode || !uploadDocName || !uploadCategory}
+                                >
+                                    {isUploading ? (
+                                        <><Loader size={16} className="spin" /> กำลังอัปโหลด...</>
+                                    ) : (
+                                        <><UploadCloud size={16} /> อัปโหลด</>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
         </div>
