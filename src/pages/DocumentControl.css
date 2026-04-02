@@ -137,6 +137,11 @@
     color: var(--primary);
 }
 
+.doc-action-btn-danger:hover {
+    background: #fef2f2;
+    color: #ef4444;
+}
+
 /* ── DAR Summary Strip ── */
 .doc-dar-summary {
     display: flex;

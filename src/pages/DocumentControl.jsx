@@ -46,6 +46,7 @@ import {
     History,
     RefreshCw,
     UploadCloud,
+    Trash2,
 } from 'lucide-react';
 import './PageCommon.css';
 import './DocumentControl.css';
@@ -403,6 +404,9 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
     const [uploadDocName, setUploadDocName] = useState('');
     const [uploadCategory, setUploadCategory] = useState('');
     const [uploadTypeTag, setUploadTypeTag] = useState('Manual');
+    const [uploadStandard, setUploadStandard] = useState('');
+    const [uploadRevision, setUploadRevision] = useState('00');
+    const [uploadEffectiveDate, setUploadEffectiveDate] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState(null);
     const fileInputRef = useRef(null);
@@ -753,6 +757,24 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                             >
                                                 <Download size={15} />
                                             </button>
+                                            <button
+                                                className="doc-action-btn doc-action-btn-danger"
+                                                title="ลบเอกสาร"
+                                                onClick={async () => {
+                                                    if (!window.confirm(`ต้องการลบเอกสาร "${doc.id} - ${doc.name}" หรือไม่?\n\nการลบจะลบทั้งข้อมูลในระบบและไฟล์เอกสารจริง`)) return;
+                                                    try {
+                                                        const res = await fetch(`${API_BASE}/documents/${doc.id}?user=${currentUser?.username || 'Unknown'}`, { method: 'DELETE' });
+                                                        const data = await res.json();
+                                                        if (!res.ok) throw new Error(data.message || 'ลบไม่สำเร็จ');
+                                                        alert('ลบเอกสารสำเร็จ');
+                                                        window.location.reload();
+                                                    } catch (err) {
+                                                        alert(`เกิดข้อผิดพลาด: ${err.message}`);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 size={15} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -816,15 +838,24 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                             setUploadResult(null);
                             try {
                                 const formData = new FormData();
-                                formData.append('file', uploadFile);
+                                // ⚠️ ต้อง append text fields ก่อน file — multer อ่าน req.body ตามลำดับ
                                 formData.append('doc_code', uploadDocCode);
                                 formData.append('doc_name', uploadDocName);
                                 formData.append('category', uploadCategory);
                                 formData.append('typeTag', uploadTypeTag);
+                                formData.append('revision', uploadRevision || '00');
                                 formData.append('status', 'ใช้งาน');
+                                if (uploadStandard.trim()) {
+                                    formData.append('standard', uploadStandard.trim());
+                                }
+                                if (uploadEffectiveDate) {
+                                    formData.append('effective_date', uploadEffectiveDate);
+                                }
                                 if (customFileName.trim()) {
                                     formData.append('custom_filename', customFileName.trim());
                                 }
+                                // file ต้องอยู่สุดท้าย เพื่อให้ multer อ่าน fields ข้างบนก่อน
+                                formData.append('file', uploadFile);
 
                                 const res = await fetch(`${API_BASE}/documents/upload`, {
                                     method: 'POST',
@@ -842,6 +873,9 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                     setUploadDocName('');
                                     setUploadCategory('');
                                     setUploadTypeTag('Manual');
+                                    setUploadStandard('');
+                                    setUploadRevision('00');
+                                    setUploadEffectiveDate('');
                                     // Reload page to refresh document list
                                     window.location.reload();
                                 }, 1500);
@@ -965,6 +999,39 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                             <option value="WI">WI</option>
                                             <option value="Form">Form</option>
                                         </select>
+                                    </div>
+                                </div>
+
+                                {/* Standard, Rev, Effective Date */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '14px' }}>
+                                    <div className="doc-upload-form-group">
+                                        <label className="doc-upload-label">มาตรฐาน</label>
+                                        <input
+                                            className="doc-upload-input"
+                                            type="text"
+                                            placeholder="เช่น ISO 9001 / GMP"
+                                            value={uploadStandard}
+                                            onChange={(e) => setUploadStandard(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="doc-upload-form-group">
+                                        <label className="doc-upload-label">Rev.</label>
+                                        <input
+                                            className="doc-upload-input"
+                                            type="text"
+                                            placeholder="00"
+                                            value={uploadRevision}
+                                            onChange={(e) => setUploadRevision(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="doc-upload-form-group">
+                                        <label className="doc-upload-label">วันที่บังคับใช้</label>
+                                        <input
+                                            className="doc-upload-input"
+                                            type="date"
+                                            value={uploadEffectiveDate}
+                                            onChange={(e) => setUploadEffectiveDate(e.target.value)}
+                                        />
                                     </div>
                                 </div>
                             </div>

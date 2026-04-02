@@ -259,6 +259,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             revision,
             effective_date,
             status,
+            standard,
             custom_filename,
         } = req.body;
 
@@ -266,8 +267,33 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             return res.status(400).json({ message: 'ต้องระบุรหัสเอกสาร ชื่อเอกสาร และหมวด' });
         }
 
-        const filePath = req.file.path;
+        let filePath = req.file.path;
         const storedFileName = req.file.filename;
+        const decodedOriginal = req.file.originalname ? Buffer.from(req.file.originalname, 'latin1').toString('utf8') : 'document';
+        const ext = path.extname(decodedOriginal);
+
+        // Safety rename: ถ้า multer ตั้งชื่อผิด (เพราะ field order) → rename ให้ถูก
+        const expectedName = custom_filename
+            ? custom_filename.trim().replace(/[<>:"/\\|?*]/g, '_') + ext
+            : null;
+
+        if (expectedName && storedFileName !== expectedName) {
+            const newPath = path.join(DOCUMENTS_ROOT, expectedName);
+            try {
+                // ถ้ามีไฟล์ชื่อซ้ำ ให้เพิ่ม timestamp
+                let finalPath = newPath;
+                if (fs.existsSync(newPath)) {
+                    const nameNoExt = expectedName.replace(/\.[^.]+$/, '');
+                    finalPath = path.join(DOCUMENTS_ROOT, `${nameNoExt}_${Date.now()}${ext}`);
+                }
+                fs.renameSync(filePath, finalPath);
+                filePath = finalPath;
+                console.log(`[UPLOAD] Renamed: ${storedFileName} → ${path.basename(finalPath)}`);
+            } catch (renameErr) {
+                console.error('Failed to rename file:', renameErr.message);
+                // ใช้ path เดิมถ้า rename ไม่ได้
+            }
+        }
 
         const pool = await poolPromise;
 
@@ -276,24 +302,82 @@ router.post('/upload', upload.single('file'), async (req, res) => {
             .input('doc_name', sql.NVarChar, doc_name)
             .input('category', sql.NVarChar, category)
             .input('type_tag', sql.NVarChar, typeTag || null)
-            .input('revision', sql.NVarChar, revision || null)
+            .input('revision', sql.NVarChar, revision || '00')
             .input('effective_date', sql.Date, effective_date || null)
             .input('status', sql.NVarChar, status || 'ใช้งาน')
+            .input('standard', sql.NVarChar, standard || null)
             .input('file_path', sql.NVarChar, filePath)
             .query(`
-                INSERT INTO Documents (doc_code, doc_name, category, type_tag, revision, effective_date, status, file_path)
-                VALUES (@doc_code, @doc_name, @category, @type_tag, @revision, @effective_date, @status, @file_path);
+                INSERT INTO Documents (doc_code, doc_name, category, type_tag, revision, effective_date, status, standard, file_path)
+                VALUES (@doc_code, @doc_name, @category, @type_tag, @revision, @effective_date, @status, @standard, @file_path);
             `);
 
         res.json({
             success: true,
             message: 'อัปโหลดเอกสารสำเร็จ',
             filePath,
-            storedFileName,
+            storedFileName: path.basename(filePath),
         });
     } catch (err) {
         console.error('Error uploading document:', err);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปโหลดเอกสาร' });
+    }
+});
+
+// ลบเอกสาร — ลบทั้งข้อมูลในฐานข้อมูลและไฟล์จริงบนเซิร์ฟเวอร์
+router.delete('/:doc_code', async (req, res) => {
+    try {
+        const { doc_code } = req.params;
+        const deletedBy = req.query.user || 'Unknown';
+
+        const pool = await poolPromise;
+
+        // 1. ดึงข้อมูลเอกสารก่อนลบ (เพื่อลบไฟล์จริง)
+        const docResult = await pool.request()
+            .input('doc_code', sql.NVarChar, doc_code)
+            .query('SELECT doc_id, doc_code, doc_name, file_path FROM Documents WHERE doc_code = @doc_code');
+
+        if (docResult.recordset.length === 0) {
+            return res.status(404).json({ message: 'ไม่พบเอกสารนี้ในระบบ' });
+        }
+
+        const doc = docResult.recordset[0];
+
+        // 2. ลบ DocumentStandards ที่เกี่ยวข้อง (ถ้ามี)
+        try {
+            await pool.request()
+                .input('doc_id', sql.Int, doc.doc_id)
+                .query('DELETE FROM DocumentStandards WHERE doc_id = @doc_id');
+        } catch (err) {
+            console.log('No DocumentStandards to delete or table not found:', err.message);
+        }
+
+        // 3. ลบข้อมูลเอกสารจากฐานข้อมูล
+        await pool.request()
+            .input('doc_code', sql.NVarChar, doc_code)
+            .query('DELETE FROM Documents WHERE doc_code = @doc_code');
+
+        // 4. ลบไฟล์จริงบนเซิร์ฟเวอร์ (ถ้ามี)
+        if (doc.file_path) {
+            try {
+                if (fs.existsSync(doc.file_path)) {
+                    fs.unlinkSync(doc.file_path);
+                    console.log(`[DELETE] Physical file deleted: ${doc.file_path}`);
+                }
+            } catch (fileErr) {
+                console.error('Failed to delete physical file:', fileErr.message);
+            }
+        }
+
+        console.log(`[DELETE] Document ${doc_code} deleted by ${deletedBy}`);
+
+        res.json({
+            success: true,
+            message: `ลบเอกสาร "${doc.doc_name}" สำเร็จ`,
+        });
+    } catch (err) {
+        console.error('Error deleting document:', err);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการลบเอกสาร' });
     }
 });
 
