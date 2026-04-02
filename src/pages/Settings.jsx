@@ -12,10 +12,12 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Users, Building2, Wrench,
-    Search, Plus, Pencil, Trash2, KeyRound, X, UserPlus
+    Search, Plus, Pencil, Trash2, KeyRound, X, UserPlus, ShieldCheck
 } from 'lucide-react';
+import PermissionManager from './PermissionManager';
 import './Settings.css';
 import API_BASE from '../config';
 const API = API_BASE;
@@ -44,8 +46,13 @@ const getRoleLabelFromList = (role, rolesList) => {
 };
 
 export default function Settings() {
-    const [activeTab, setActiveTab] = useState('users');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'settings_user';
     const [toast, setToast] = useState(null);
+
+    const setActiveTab = (tab) => {
+        setSearchParams({ tab });
+    };
 
     const showToast = (message, type = 'success') => {
         setToast({ message, type });
@@ -62,14 +69,18 @@ export default function Settings() {
 
             {/* Tabs */}
             <div className="settings-tabs">
-                <button className={`settings-tab ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
+                <button className={`settings-tab ${['users', 'settings_user'].includes(activeTab) ? 'active' : ''}`} onClick={() => setActiveTab('settings_user')}>
                     <Users size={16} /> ผู้ใช้งาน
                 </button>
-                <button className={`settings-tab ${activeTab === 'departments' ? 'active' : ''}`} onClick={() => setActiveTab('departments')}>
+                <button className={`settings-tab ${['departments', 'settings_departments'].includes(activeTab) ? 'active' : ''}`} onClick={() => setActiveTab('settings_departments')}>
                     <Building2 size={16} /> แผนก
                 </button>
-                <button className={`settings-tab ${activeTab === 'roles' ? 'active' : ''}`} onClick={() => setActiveTab('roles')}>
+                <button className={`settings-tab ${['roles', 'settings_roles'].includes(activeTab) ? 'active' : ''}`} onClick={() => setActiveTab('settings_roles')}>
                     <Wrench size={16} /> ตำแหน่ง
+                </button>
+                {/* Check if user has permission tab allowed (admin only, but handled by AuthContext) */}
+                <button className={`settings-tab ${activeTab === 'permissions' ? 'active' : ''}`} onClick={() => setActiveTab('permissions')}>
+                    <ShieldCheck size={16} /> จัดการสิทธิ์
                 </button>
                 <button className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`} onClick={() => setActiveTab('general')}>
                     <SettingsIcon size={16} /> ทั่วไป
@@ -77,9 +88,10 @@ export default function Settings() {
             </div>
 
             {/* Tab Content */}
-            {activeTab === 'users' && <UsersTab showToast={showToast} />}
-            {activeTab === 'departments' && <DepartmentsTab showToast={showToast} />}
-            {activeTab === 'roles' && <RolesTab showToast={showToast} />}
+            {['users', 'settings_user'].includes(activeTab) && <UsersTab showToast={showToast} />}
+            {['departments', 'settings_departments'].includes(activeTab) && <DepartmentsTab showToast={showToast} />}
+            {['roles', 'settings_roles'].includes(activeTab) && <RolesTab showToast={showToast} />}
+            {activeTab === 'permissions' && <div className="settings-permissions-wrapper"><PermissionManager isEmbed={true} /></div>}
             {activeTab === 'general' && <GeneralTab />}
 
             {/* Toast */}

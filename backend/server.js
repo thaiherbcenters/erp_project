@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -7,6 +8,9 @@ const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files for uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -18,6 +22,7 @@ const formSubmissionRoutes = require('./routes/form-submissions');
 const documentLibraryRoutes = require('./routes/document-library');
 const departmentRoutes = require('./routes/departments');
 const roleRoutes = require('./routes/roles');
+const employeeRoutes = require('./routes/employees');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -28,6 +33,7 @@ app.use('/api/forms', formFillRoutes);
 app.use('/api/submissions', formSubmissionRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/roles', roleRoutes);
+app.use('/api/employees', employeeRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

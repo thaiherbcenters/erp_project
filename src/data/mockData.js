@@ -329,24 +329,6 @@ export const ALL_PAGES = [
           { id: 'settings_user_info', name: 'ข้อมูลส่วนตัว' },
         ],
       },
-      {
-        id: 'settings_display', name: 'การแสดงผล',
-        sections: [
-          { id: 'settings_display_theme', name: 'ธีมและภาษา' },
-        ],
-      },
-      {
-        id: 'settings_notification', name: 'การแจ้งเตือน',
-        sections: [
-          { id: 'settings_notification_config', name: 'ตั้งค่าแจ้งเตือน' },
-        ],
-      },
-      {
-        id: 'settings_security', name: 'ความปลอดภัย',
-        sections: [
-          { id: 'settings_security_config', name: 'ตั้งค่าความปลอดภัย' },
-        ],
-      },
     ],
   },
 

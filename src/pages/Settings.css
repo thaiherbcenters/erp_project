@@ -582,3 +582,10 @@
         max-width: 100%;
     }
 }
+
+/* ── Permissions Embed Wrapper ── */
+.settings-permissions-wrapper {
+    background: transparent;
+    min-height: calc(100vh - 200px);
+    margin: -10px -10px; /* Compensate if there was padding */
+}

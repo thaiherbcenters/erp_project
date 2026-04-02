@@ -303,10 +303,18 @@ export function AuthProvider({ children }) {
         const page = ALL_PAGES.find((p) => p.id === pageId);
         if (!page || !page.subPages) return [];
         if (!currentUser) return [];
-        if (currentUser.role === 'admin') return page.subPages;
+
+        let subPages = [...page.subPages];
+        
+        // Inject จัดการสิทธิ์ as a sub-page of Settings for admin
+        if (currentUser.role === 'admin' && pageId === 'settings') {
+            subPages.push({ id: 'permissions', name: 'จัดการสิทธิ์' });
+        }
+
+        if (currentUser.role === 'admin') return subPages;
 
         const userPerms = permissions[currentUser.id] || [];
-        return page.subPages.filter((sub) => userPerms.some(p => p.page_id === sub.id));
+        return subPages.filter((sub) => userPerms.some(p => p.page_id === sub.id));
     };
 
     /** ดึง permissions array ของ user ที่ระบุ (ใช้ใน PermissionManager) */
@@ -326,7 +334,7 @@ export function AuthProvider({ children }) {
     const getVisiblePages = () => {
         if (!currentUser) return [];
         if (currentUser.role === 'admin') {
-            return [...ALL_PAGES, { id: 'permissions', name: 'จัดการสิทธิ์', path: '/permissions' }];
+            return [...ALL_PAGES]; // permissions is now inside settings
         }
         const userPerms = permissions[currentUser.id] || [];
         return ALL_PAGES.filter((page) => userPerms.some(p => p.page_id === page.id));

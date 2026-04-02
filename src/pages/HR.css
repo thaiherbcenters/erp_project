@@ -1,0 +1,567 @@
+/* =============================================================================
+ * HR.css — หน้าบุคลากร (Human Resources) Styles
+ * ============================================================================= */
+
+/* ── Employee Table Enhancements ── */
+.hr-employee-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.hr-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+    flex-shrink: 0;
+    letter-spacing: 0.5px;
+}
+
+.hr-employee-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.hr-employee-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: #1e293b;
+}
+
+.hr-employee-nickname {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+/* ── Action Buttons ── */
+.hr-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.hr-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    cursor: pointer;
+    color: #64748b;
+    transition: all 0.15s;
+    font-size: 0;
+}
+
+.hr-action-btn:hover {
+    background: #f1f5f9;
+    color: #334155;
+    border-color: #cbd5e1;
+}
+
+.hr-action-btn.view:hover {
+    background: #eff6ff;
+    color: #2563eb;
+    border-color: #93c5fd;
+}
+
+.hr-action-btn.edit:hover {
+    background: #fffbeb;
+    color: #d97706;
+    border-color: #fcd34d;
+}
+
+.hr-action-btn.delete:hover {
+    background: #fef2f2;
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+/* ── Badge employment type ── */
+.badge-employment {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.badge-permanent {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.badge-contract {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
+.badge-probation {
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+}
+
+.badge-parttime {
+    background: #faf5ff;
+    color: #7c3aed;
+    border: 1px solid #ddd6fe;
+}
+
+/* ── Modal ── */
+.hr-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: hrFadeIn 0.15s ease;
+}
+
+@keyframes hrFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.hr-modal {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    width: 95%;
+    max-width: 720px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    animation: hrSlideUp 0.2s ease;
+}
+
+@keyframes hrSlideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.hr-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    flex-shrink: 0;
+}
+
+.hr-modal-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hr-modal-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: #f1f5f9;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    transition: all 0.15s;
+}
+
+.hr-modal-close:hover {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.hr-modal-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.hr-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 24px;
+    border-top: 1px solid #f1f5f9;
+    flex-shrink: 0;
+}
+
+/* ── Form Section ── */
+.hr-form-section {
+    margin-bottom: 20px;
+}
+
+.hr-form-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #6366f1;
+    margin: 0 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #eef2ff;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.hr-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.hr-form-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.hr-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hr-form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.hr-form-group label {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.hr-form-group input,
+.hr-form-group select,
+.hr-form-group textarea {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #1e293b;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-sizing: border-box;
+}
+
+/* ── Avatar Upload UI ── */
+.hr-avatar-upload-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.hr-avatar-upload-preview {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    border: 2px dashed #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #94a3b8;
+}
+
+.hr-avatar-upload-preview:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+}
+
+.hr-avatar-upload-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.hr-avatar-upload-preview.has-image {
+    border: 2px solid #e2e8f0;
+}
+
+.hr-avatar-upload-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.hr-avatar-upload-preview:hover .hr-avatar-upload-overlay {
+    opacity: 1;
+}
+
+.hr-avatar-file-input {
+    display: none;
+}
+
+.hr-avatar-upload-btn {
+    font-size: 12px;
+    color: #6366f1;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 6px 12px;
+    background: #eef2ff;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.hr-avatar-upload-btn:hover {
+    background: #e0e7ff;
+}
+
+.hr-avatar-remove-btn {
+    font-size: 12px;
+    color: #ef4444;
+    font-weight: 600;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+}
+.hr-avatar-remove-btn:hover {
+    text-decoration: underline;
+}
+
+.hr-form-group textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.hr-form-group input:focus,
+.hr-form-group select:focus,
+.hr-form-group textarea:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* ── Detail View (Read-only) ── */
+.hr-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+}
+
+.hr-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.hr-detail-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.hr-detail-value {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #1e293b;
+}
+
+.hr-detail-value.empty {
+    color: #cbd5e1;
+    font-style: italic;
+}
+
+/* Detail Header */
+.hr-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid #f1f5f9;
+}
+
+.hr-detail-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #6366f1, #818cf8);
+    flex-shrink: 0;
+}
+
+.hr-detail-name {
+    flex: 1;
+}
+
+.hr-detail-name h3 {
+    margin: 0 0 2px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.hr-detail-name p {
+    margin: 0;
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+/* ── Buttons ── */
+.hr-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.hr-btn-cancel {
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.hr-btn-cancel:hover {
+    background: #f1f5f9;
+}
+
+.hr-btn-save {
+    background: #6366f1;
+    color: #fff;
+}
+
+.hr-btn-save:hover {
+    background: #4f46e5;
+}
+
+.hr-btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ── Filter / Stats Bar ── */
+.hr-stats-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.hr-stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+}
+
+.hr-stat-chip .hr-stat-num {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+/* ── Error message ── */
+.hr-error {
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    border: 1px solid #fecaca;
+    margin-bottom: 12px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .hr-modal {
+        max-width: 100%;
+        width: 100%;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+
+    .hr-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hr-form-grid-2 {
+        grid-template-columns: 1fr;
+    }
+
+    .hr-detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hr-stats-bar {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 600px) {
+    .hr-modal-body {
+        padding: 16px;
+    }
+
+    .hr-form-section-title {
+        font-size: 12px;
+    }
+}

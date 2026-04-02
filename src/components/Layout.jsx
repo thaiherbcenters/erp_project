@@ -109,7 +109,7 @@ const CORE_MENU_IDS = ['home', 'stock', 'sales', 'accounts', 'procurement', 'rep
 const PRODUCT_MENU_IDS = ['planning', 'operator', 'rnd', 'packaging'];
 const DOC_MENU_IDS = ['document'];
 const HR_MENU_IDS = ['hr'];
-const SYSTEM_MENU_IDS = ['settings', 'permissions'];
+const SYSTEM_MENU_IDS = ['settings'];
 
 // =============================================================================
 // Layout Component

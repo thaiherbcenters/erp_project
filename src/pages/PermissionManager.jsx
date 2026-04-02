@@ -71,7 +71,7 @@ function ScopeChip({ value, onChange, small }) {
     );
 }
 
-export default function PermissionManager() {
+export default function PermissionManager({ isEmbed = false }) {
     const { updatePermissions, updateSubPermission, updateSectionPermission, getUserPermissions, loadUserPermissions } = useAuth();
 
     // ── State ──
@@ -266,7 +266,7 @@ export default function PermissionManager() {
     // Render
     // =================================================================
     return (
-        <div className="perm-layout">
+        <div className={`perm-layout ${isEmbed ? 'perm-layout-embed' : ''}`}>
 
             {/* ============================================================ */}
             {/* Sidebar — รายชื่อผู้ใช้ */}

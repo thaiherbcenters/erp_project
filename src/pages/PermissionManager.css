@@ -817,3 +817,15 @@
         justify-content: center;
     }
 }
+
+/* ── Embed Layout Adjustments ── */
+.perm-layout-embed {
+    min-height: auto;
+    background: transparent;
+}
+
+.perm-layout-embed .perm-sidebar,
+.perm-layout-embed .perm-main {
+    border: none;
+    box-shadow: none;
+}
