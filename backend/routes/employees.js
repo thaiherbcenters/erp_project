@@ -21,16 +21,16 @@ const multer = require('multer');
 const { poolPromise, sql } = require('../config/db');
 
 // ============================================================
-// Setup multer for avatar uploads
+// Setup multer for avatar uploads (E:\Documents\Avatars)
 // ============================================================
-const uploadDir = path.join(__dirname, '../uploads/avatars');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
+const AVATAR_ROOT = process.env.AVATAR_UPLOAD_ROOT || 'E:\\Documents\\Avatars';
+if (!fs.existsSync(AVATAR_ROOT)) {
+    fs.mkdirSync(AVATAR_ROOT, { recursive: true });
 }
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, uploadDir);
+        cb(null, AVATAR_ROOT);
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -367,22 +367,17 @@ router.post('/:id/avatar', upload.single('avatar'), async (req, res) => {
         const { id } = req.params;
         const pool = await poolPromise;
 
-        // Path ที่จะเซฟลง DB (relative เพื่อให้ frontend เรียกผ่าน static route ได้)
-        // เพราะเรา route /uploads ให้ serve static แล้ว
-        // ดังนั้น path จะเป็น /uploads/avatars/filename.ext
-        const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+        // บันทึกเฉพาะชื่อไฟล์ใน Database
+         // เมื่อจะดึงมาแสดง ให้วิ่งมาที่ /api/employees/avatar/filename
+        const avatarFilename = req.file.filename;
 
         // Get old avatar to delete it if exists
         const oldEmp = await pool.request()
             .input('id', sql.Int, id)
             .query('SELECT profile_image_url FROM Employees WHERE employee_id = @id');
 
-        if (oldEmp.recordset.length === 0) {
-            fs.unlinkSync(req.file.path); // delete uploaded if no employee found
-            return res.status(404).json({ message: 'ไม่พบพนักงาน' });
-        }
-
-        // Update DB
+        // Update DB (เก็บแค่ชื่อไฟล์ หรือ endpoint ที่จะดึงไฟล์)
+        const avatarUrl = `/api/employees/avatar/${avatarFilename}`;
         await pool.request()
             .input('profile_image_url', sql.NVarChar, avatarUrl)
             .input('id', sql.Int, id)
@@ -392,10 +387,11 @@ router.post('/:id/avatar', upload.single('avatar'), async (req, res) => {
                 WHERE employee_id = @id
             `);
 
-        // Try to delete old file if it sits in our upload dir
-        const oldUrl = oldEmp.recordset[0].profile_image_url;
-        if (oldUrl && oldUrl.startsWith('/uploads/avatars/')) {
-            const oldPath = path.join(__dirname, '../', oldUrl);
+        // Try to delete old file
+        if (oldEmp.recordset.length > 0 && oldEmp.recordset[0].profile_image_url) {
+            const oldUrl = oldEmp.recordset[0].profile_image_url;
+            const oldFilename = oldUrl.split('/').pop();
+            const oldPath = path.join(AVATAR_ROOT, oldFilename);
             if (fs.existsSync(oldPath)) {
                 fs.unlinkSync(oldPath);
             }
@@ -409,6 +405,20 @@ router.post('/:id/avatar', upload.single('avatar'), async (req, res) => {
     } catch (err) {
         console.error('Error uploading avatar:', err);
         res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัพโหลดรูปภาพ' });
+    }
+});
+
+// ============================================================
+// 7. GET /api/employees/avatar/:filename — อ่านไฟล์รูปภาพ
+// ============================================================
+router.get('/avatar/:filename', (req, res) => {
+    const { filename } = req.params;
+    const filePath = path.join(AVATAR_ROOT, filename);
+
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+    } else {
+        res.status(404).send('Not Found');
     }
 });
 
