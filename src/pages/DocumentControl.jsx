@@ -404,7 +404,7 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
     const [uploadDocName, setUploadDocName] = useState('');
     const [uploadCategory, setUploadCategory] = useState('');
     const [uploadTypeTag, setUploadTypeTag] = useState('Manual');
-    const [uploadStandard, setUploadStandard] = useState('');
+    const [uploadStandard, setUploadStandard] = useState([]);
     const [uploadRevision, setUploadRevision] = useState('00');
     const [uploadEffectiveDate, setUploadEffectiveDate] = useState('');
     const [isUploading, setIsUploading] = useState(false);
@@ -845,8 +845,8 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                 formData.append('typeTag', uploadTypeTag);
                                 formData.append('revision', uploadRevision || '00');
                                 formData.append('status', 'ใช้งาน');
-                                if (uploadStandard.trim()) {
-                                    formData.append('standard', uploadStandard.trim());
+                                if (uploadStandard.length > 0) {
+                                    formData.append('standard', uploadStandard.join(' / '));
                                 }
                                 if (uploadEffectiveDate) {
                                     formData.append('effective_date', uploadEffectiveDate);
@@ -873,7 +873,7 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                     setUploadDocName('');
                                     setUploadCategory('');
                                     setUploadTypeTag('Manual');
-                                    setUploadStandard('');
+                                    setUploadStandard([]);
                                     setUploadRevision('00');
                                     setUploadEffectiveDate('');
                                     // Reload page to refresh document list
@@ -1006,13 +1006,29 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '14px' }}>
                                     <div className="doc-upload-form-group">
                                         <label className="doc-upload-label">มาตรฐาน</label>
-                                        <input
-                                            className="doc-upload-input"
-                                            type="text"
-                                            placeholder="เช่น ISO 9001 / GMP"
-                                            value={uploadStandard}
-                                            onChange={(e) => setUploadStandard(e.target.value)}
-                                        />
+                                        <div className="doc-upload-chips">
+                                            {availableStandards.map(std => (
+                                                <button
+                                                    key={std}
+                                                    type="button"
+                                                    className={`doc-upload-chip ${uploadStandard.includes(std) ? 'active' : ''}`}
+                                                    onClick={() => {
+                                                        setUploadStandard(prev =>
+                                                            prev.includes(std)
+                                                                ? prev.filter(s => s !== std)
+                                                                : [...prev, std]
+                                                        );
+                                                    }}
+                                                >
+                                                    {std}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {uploadStandard.length > 0 && (
+                                            <span className="doc-upload-hint">
+                                                เลือกแล้ว: {uploadStandard.join(' / ')}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="doc-upload-form-group">
                                         <label className="doc-upload-label">Rev.</label>

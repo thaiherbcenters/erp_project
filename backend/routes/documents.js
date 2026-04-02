@@ -357,15 +357,22 @@ router.delete('/:doc_code', async (req, res) => {
             .input('doc_code', sql.NVarChar, doc_code)
             .query('DELETE FROM Documents WHERE doc_code = @doc_code');
 
-        // 4. ลบไฟล์จริงบนเซิร์ฟเวอร์ (ถ้ามี)
+        // 4. ย้ายไฟล์ไปถังขยะแทนการลบถาวร (สำรองไว้กู้คืนได้)
+        const TRASH_DIR = path.join(DOCUMENTS_ROOT, '_trash');
         if (doc.file_path) {
             try {
                 if (fs.existsSync(doc.file_path)) {
-                    fs.unlinkSync(doc.file_path);
-                    console.log(`[DELETE] Physical file deleted: ${doc.file_path}`);
+                    if (!fs.existsSync(TRASH_DIR)) {
+                        fs.mkdirSync(TRASH_DIR, { recursive: true });
+                    }
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    const trashName = `${timestamp}__${path.basename(doc.file_path)}`;
+                    const trashPath = path.join(TRASH_DIR, trashName);
+                    fs.renameSync(doc.file_path, trashPath);
+                    console.log(`[DELETE] File moved to trash: ${trashPath}`);
                 }
             } catch (fileErr) {
-                console.error('Failed to delete physical file:', fileErr.message);
+                console.error('Failed to move file to trash:', fileErr.message);
             }
         }
 
