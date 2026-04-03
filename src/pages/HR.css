@@ -565,3 +565,747 @@
         font-size: 12px;
     }
 }
+
+/* =============================================================================
+   ATTENDANCE TAB STYLES
+   ============================================================================= */
+
+/* ── Summary Cards ── */
+.att-summary-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.att-summary-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.att-summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.att-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.att-card-present .att-card-icon { background: #dcfce7; color: #16a34a; }
+.att-card-late .att-card-icon { background: #fef3c7; color: #d97706; }
+.att-card-absent .att-card-icon { background: #fee2e2; color: #dc2626; }
+.att-card-leave .att-card-icon { background: #dbeafe; color: #2563eb; }
+.att-card-ot .att-card-icon { background: #ede9fe; color: #7c3aed; }
+
+.att-card-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.att-card-num {
+    font-size: 26px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+}
+
+.att-card-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+/* ── Toolbar ── */
+.att-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+}
+
+.att-toolbar-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.att-filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.att-filter-group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.att-filter-group input[type="date"],
+.att-filter-group select {
+    padding: 7px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    font-size: 13px;
+    color: #334155;
+    min-width: 130px;
+}
+
+.att-filter-group input[type="date"]:focus,
+.att-filter-group select:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+}
+
+.att-search-group {
+    flex: 1;
+    min-width: 160px;
+}
+
+.att-toolbar-actions {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.att-btn-leave {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.att-btn-leave:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+/* ── Attendance Status Badges ── */
+.att-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+
+.att-badge-normal {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.att-badge-late {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.att-badge-absent {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.att-badge-leave {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.att-badge-ot {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+
+/* ── Leave Balance Chips ── */
+.att-leave-balance-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.att-leave-balance-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 18px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    min-width: 90px;
+}
+
+.att-lb-type {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.att-lb-nums {
+    font-size: 13px;
+    color: #334155;
+}
+
+.att-lb-nums strong {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+/* ── Responsive Attendance ── */
+@media (max-width: 1024px) {
+    .att-summary-row {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .att-summary-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .att-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .att-toolbar-actions {
+        justify-content: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .att-summary-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Print Styles ── */
+/* =============================================================================
+   HR DASHBOARD STYLES
+   ============================================================================= */
+
+/* ── Stats Row ── */
+.dash-stats-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.dash-stat-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px;
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    transition: transform 0.15s, box-shadow 0.15s;
+    position: relative;
+    overflow: hidden;
+}
+
+.dash-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+}
+
+.dash-stat-primary::before { background: linear-gradient(180deg, #6366f1, #818cf8); }
+.dash-stat-green::before { background: linear-gradient(180deg, #16a34a, #4ade80); }
+.dash-stat-amber::before { background: linear-gradient(180deg, #d97706, #fbbf24); }
+.dash-stat-blue::before { background: linear-gradient(180deg, #2563eb, #60a5fa); }
+.dash-stat-violet::before { background: linear-gradient(180deg, #7c3aed, #a78bfa); }
+
+.dash-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.dash-stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dash-stat-primary .dash-stat-icon { background: #eef2ff; color: #6366f1; }
+.dash-stat-green .dash-stat-icon { background: #dcfce7; color: #16a34a; }
+.dash-stat-amber .dash-stat-icon { background: #fef3c7; color: #d97706; }
+.dash-stat-blue .dash-stat-icon { background: #dbeafe; color: #2563eb; }
+.dash-stat-violet .dash-stat-icon { background: #ede9fe; color: #7c3aed; }
+
+.dash-stat-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-stat-num {
+    font-size: 28px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+}
+
+.dash-stat-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+/* ── Grid Layout ── */
+.dash-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+/* ── Panel ── */
+.dash-panel {
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.dash-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 8px;
+}
+
+.dash-panel-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.dash-panel-body {
+    padding: 8px 20px 20px;
+}
+
+/* ── Department Bar Chart ── */
+.dash-bar-item {
+    margin-bottom: 10px;
+}
+
+.dash-bar-item:last-child {
+    margin-bottom: 0;
+}
+
+.dash-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #334155;
+    margin-bottom: 4px;
+    font-weight: 500;
+}
+
+.dash-bar-count {
+    font-weight: 700;
+    color: #6366f1;
+}
+
+.dash-bar-track {
+    height: 8px;
+    background: #f1f5f9;
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.dash-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1, #818cf8);
+    border-radius: 99px;
+    transition: width 0.6s ease;
+    min-width: 4px;
+}
+
+/* ── Employment Type Chips ── */
+.dash-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.dash-type-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+}
+
+.dash-type-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.dash-type-chip span {
+    font-size: 12px;
+    color: #64748b;
+    flex: 1;
+}
+
+.dash-type-chip strong {
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+/* ── Gender Bar ── */
+.dash-divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 16px 0 8px;
+}
+
+.dash-gender-row {
+    margin-top: 10px;
+}
+
+.dash-gender-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 99px;
+    overflow: hidden;
+    background: #f1f5f9;
+}
+
+.dash-gender-male {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    transition: width 0.6s;
+}
+
+.dash-gender-female {
+    height: 100%;
+    background: linear-gradient(90deg, #ec4899, #f9a8d4);
+    transition: width 0.6s;
+}
+
+.dash-gender-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #64748b;
+}
+
+/* ── Badge Count ── */
+.dash-badge-count {
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* ── List Items (leaves, events) ── */
+.dash-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dash-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #f1f5f9;
+    transition: background 0.15s;
+}
+
+.dash-list-item:hover {
+    background: #eef2ff;
+}
+
+.dash-list-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #e0e7ff;
+    color: #4f46e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.dash-list-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.dash-list-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.dash-list-sub {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 1px;
+}
+
+/* ── Empty State ── */
+.dash-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 28px;
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+/* ── Event Title ── */
+.dash-event-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 8px;
+    padding-left: 2px;
+}
+
+/* ── Responsive Dashboard ── */
+@media (max-width: 1200px) {
+    .dash-stats-row {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .dash-stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .dash-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .dash-stats-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ── Print Styles ── */
+@media print {
+    body {
+        background: #fff !important;
+    }
+    
+    /* Hide everything EXCEPT the modal overlay */
+    body > div.app-container > :not(main),
+    .sidebar, 
+    .top-nav, 
+    .page-title, 
+    .hr-stats-bar, 
+    .toolbar, 
+    .table-card {
+        display: none !important;
+    }
+
+    .page-content, .subpage-content, .main-content {
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        height: auto !important;
+        width: 100% !important;
+    }
+    
+    .hr-modal-overlay {
+        position: absolute !important;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background: #fff !important;
+        backdrop-filter: none !important;
+        padding: 0 !important;
+        align-items: flex-start;
+        display: block !important;
+    }
+    
+    .hr-modal {
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        max-height: none !important;
+        border: none !important;
+    }
+
+    .hr-modal-body {
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    /* --- Strict Black & White Official Document Format --- */
+    * {
+        color: #000 !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    /* Compress vertical layout for 1-page fit */
+    .hr-modal-header {
+        padding: 0 0 10px 0 !important;
+        border-bottom: 2px solid #000 !important;
+        margin-bottom: 10px !important;
+    }
+    
+    .hr-modal-header h2 {
+        font-size: 16px !important;
+        font-weight: bold !important;
+    }
+
+    .hr-detail-header {
+        padding-bottom: 10px !important;
+        margin-bottom: 10px !important;
+        border-bottom: 1px solid #000 !important;
+    }
+    
+    .hr-detail-avatar {
+        width: 44px !important;
+        height: 44px !important;
+        font-size: 16px !important;
+        border: 1px solid #000 !important;
+        background: #fff !important;
+        color: #000 !important;
+    }
+
+    .hr-detail-name h3 {
+        font-size: 16px !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* Make Badges Black & White Outline */
+    .badge, .badge-employment, [class*="badge-"] {
+        background: #fff !important;
+        color: #000 !important;
+        border: 1px solid #000 !important;
+        font-weight: normal !important;
+    }
+
+    .hr-form-section {
+        margin-bottom: 12px !important;
+    }
+
+    .hr-form-section-title {
+        font-size: 14px !important;
+        margin: 0 0 6px !important;
+        padding-bottom: 4px !important;
+        color: #000 !important;
+        border-bottom: 1px solid #000 !important;
+    }
+
+    /* Make grid 3 columns to save space */
+    .hr-detail-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+        row-gap: 2px !important;
+        column-gap: 16px !important;
+    }
+
+    .hr-detail-item {
+        padding: 4px 0 !important;
+        border-bottom: 1px dotted #888 !important;
+    }
+
+    .hr-detail-label {
+        font-size: 11px !important;
+        color: #444 !important;
+        font-weight: normal !important;
+    }
+
+    .hr-detail-value {
+        font-size: 13px !important;
+        color: #000 !important;
+    }
+
+    /* Force all SVGs / Icons to be black */
+    svg {
+        stroke: #000 !important;
+        fill: none !important;
+    }
+
+    /* Hide buttons inside modal */
+    .hr-modal-close, .hr-modal-footer, .hr-modal-header button {
+        display: none !important;
+    }
+
+    /* Ensure printing ignores browser defaults */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}

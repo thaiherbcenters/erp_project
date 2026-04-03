@@ -23,6 +23,8 @@ const documentLibraryRoutes = require('./routes/document-library');
 const departmentRoutes = require('./routes/departments');
 const roleRoutes = require('./routes/roles');
 const employeeRoutes = require('./routes/employees');
+const attendanceRoutes = require('./routes/attendance');
+const leaveRequestRoutes = require('./routes/leave-requests');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -34,6 +36,8 @@ app.use('/api/submissions', formSubmissionRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/employees', employeeRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/leave-requests', leaveRequestRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

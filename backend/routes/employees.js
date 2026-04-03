@@ -23,9 +23,21 @@ const { poolPromise, sql } = require('../config/db');
 // ============================================================
 // Setup multer for avatar uploads (E:\Documents\Avatars)
 // ============================================================
-const AVATAR_ROOT = process.env.AVATAR_UPLOAD_ROOT || 'E:\\Documents\\Avatars';
-if (!fs.existsSync(AVATAR_ROOT)) {
-    fs.mkdirSync(AVATAR_ROOT, { recursive: true });
+let AVATAR_ROOT = process.env.AVATAR_UPLOAD_ROOT || 'E:\\Documents\\Avatars';
+try {
+    if (!fs.existsSync(AVATAR_ROOT)) {
+        fs.mkdirSync(AVATAR_ROOT, { recursive: true });
+    }
+} catch (error) {
+    if (error.code === 'ENOENT') {
+        // Fallback for local dev without E: drive
+        AVATAR_ROOT = path.join(__dirname, '..', 'uploads', 'avatars');
+        if (!fs.existsSync(AVATAR_ROOT)) {
+            fs.mkdirSync(AVATAR_ROOT, { recursive: true });
+        }
+    } else {
+        throw error;
+    }
 }
 
 const storage = multer.diskStorage({
