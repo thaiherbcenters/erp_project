@@ -25,6 +25,7 @@ const roleRoutes = require('./routes/roles');
 const employeeRoutes = require('./routes/employees');
 const attendanceRoutes = require('./routes/attendance');
 const leaveRequestRoutes = require('./routes/leave-requests');
+const customerRoutes = require('./routes/customers');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -38,6 +39,7 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leave-requests', leaveRequestRoutes);
+app.use('/api/customers', customerRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

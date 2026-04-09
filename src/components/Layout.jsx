@@ -74,6 +74,7 @@ const PAGE_ICONS = {
     rnd: <FlaskConical size={20} />,
     packaging: <PackageOpen size={20} />,
     document: <FileText size={20} />,
+    customer: <Users size={20} />,
 };
 
 const getPageIcon = (pageId) => {
@@ -105,7 +106,7 @@ const getRoleLabel = (role) => ROLE_LABELS[role] || 'ผู้ใช้งาน
 // =============================================================================
 // กำหนดว่า page ใดอยู่ในกลุ่มเมนูไหน
 // =============================================================================
-const CORE_MENU_IDS = ['home', 'stock', 'sales', 'accounts', 'procurement', 'reports', 'qc'];
+const CORE_MENU_IDS = ['home', 'customer', 'stock', 'sales', 'accounts', 'procurement', 'reports', 'qc'];
 const PRODUCT_MENU_IDS = ['planning', 'operator', 'rnd', 'packaging'];
 const DOC_MENU_IDS = ['document'];
 const HR_MENU_IDS = ['hr'];

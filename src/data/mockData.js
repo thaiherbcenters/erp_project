@@ -90,6 +90,26 @@ export const ALL_PAGES = [
     ],
   },
 
+  // --- ลูกค้า (Customers) ---
+  {
+    id: 'customer', name: 'ลูกค้า', path: '/customer',
+    subPages: [
+      {
+        id: 'customer_list', name: 'จัดการลูกค้า',
+        sections: [
+          { id: 'customer_list_search', name: 'ค้นหา' },
+          { id: 'customer_list_table', name: 'ตารางลูกค้า' },
+        ],
+      },
+      {
+        id: 'customer_history', name: 'ประวัติ',
+        sections: [
+          { id: 'customer_history_view', name: 'ดูประวัติ' },
+        ],
+      },
+    ],
+  },
+
   // --- คลังสินค้า (Inventory) ---
   {
     id: 'stock', name: 'คลังสินค้า', path: '/stock',
@@ -541,6 +561,7 @@ export const getDefaultPermissions = () => {
   };
 
   const homeIds = getPageIds('home');
+  const customerIds = getPageIds('customer');
   const qcIds = getPageIds('qc');
   const salesIds = getPageIds('sales');
   const accountsIds = getPageIds('accounts');
@@ -557,8 +578,8 @@ export const getDefaultPermissions = () => {
     it_admin: allIds,                           // admin — เข้าถึงทุกหน้า
     exec: allIds,                           // executive — เข้าถึงทุกหน้า
     qc1: [...homeIds, ...qcIds],           // qc — หน้าหลัก + QC
-    sales1: [...homeIds, ...salesIds],         // sales — หน้าหลัก + ฝ่ายขาย
-    acc1: [...homeIds, ...accountsIds],      // accountant — หน้าหลัก + บัญชี
+    sales1: [...homeIds, ...salesIds, ...customerIds],         // sales — หน้าหลัก + ฝ่ายขาย + ลูกค้า
+    acc1: [...homeIds, ...accountsIds, ...customerIds],      // accountant — หน้าหลัก + บัญชี + ลูกค้า
     proc1: [...homeIds, ...procIds],          // procurement — หน้าหลัก + จัดซื้อ
     hr1: [...homeIds, ...hrIds],            // hr — หน้าหลัก + บุคลากร
     stock1: [...homeIds, ...stockIds],          // stock — หน้าหลัก + คลังสินค้า

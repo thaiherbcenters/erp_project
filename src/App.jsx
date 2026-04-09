@@ -38,6 +38,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 // Pages
 import Login from './pages/Login';
 import Home from './pages/Home';
+import Customer from './pages/Customer';
 import Stock from './pages/Stock';
 import Sales from './pages/Sales';
 import Accounts from './pages/Accounts';
@@ -71,6 +72,9 @@ function App() {
             {/* เมนูหลัก */}
             <Route path="/home" element={
               <ProtectedRoute pageId="home"><Home /></ProtectedRoute>
+            } />
+            <Route path="/customer" element={
+              <ProtectedRoute pageId="customer"><Customer /></ProtectedRoute>
             } />
             <Route path="/stock" element={
               <ProtectedRoute pageId="stock"><Stock /></ProtectedRoute>
