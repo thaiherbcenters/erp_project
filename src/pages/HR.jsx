@@ -37,7 +37,7 @@ const EMPTY_FORM = {
     bank_name: '', bank_account_number: '', bank_account_name: '',
     social_security_id: '', tax_id: '',
     emergency_contact_name: '', emergency_contact_phone: '', emergency_contact_relation: '',
-    status: 'ปฏิบัติงาน',
+    status: 'ปฏิบัติงาน', CompanyID: '',
 };
 
 // ── Helper: format date for display ──
@@ -89,6 +89,7 @@ function getEmploymentBadge(type) {
 function EmployeeProfileTab({ hasSectionPermission }) {
     const [employees, setEmployees] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -128,10 +129,21 @@ function EmployeeProfileTab({ hasSectionPermission }) {
         }
     }, []);
 
+    // ── Fetch companies ──
+    const fetchCompanies = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_BASE}/companies`);
+            if (res.ok) setCompanies(await res.json());
+        } catch (err) {
+            console.error('Failed to fetch companies:', err);
+        }
+    }, []);
+
     useEffect(() => {
         fetchEmployees();
         fetchDepartments();
-    }, [fetchEmployees, fetchDepartments]);
+        fetchCompanies();
+    }, [fetchEmployees, fetchDepartments, fetchCompanies]);
 
     // ── Search filter ──
     const filtered = employees.filter(emp => {
@@ -143,7 +155,8 @@ function EmployeeProfileTab({ hasSectionPermission }) {
             emp.nickname?.toLowerCase().includes(q) ||
             emp.position?.toLowerCase().includes(q) ||
             emp.department_name?.toLowerCase().includes(q) ||
-            emp.department_code?.toLowerCase().includes(q)
+            emp.department_code?.toLowerCase().includes(q) ||
+            emp.CompanyName?.toLowerCase().includes(q)
         );
     });
 
@@ -192,6 +205,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
             emergency_contact_phone: emp.emergency_contact_phone || '',
             emergency_contact_relation: emp.emergency_contact_relation || '',
             status: emp.status || 'ปฏิบัติงาน',
+            CompanyID: emp.CompanyID || '',
         });
         setSelectedEmployee(emp);
         setError('');
@@ -252,7 +266,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
 
             const body = { ...formData };
             // Convert empty strings to null for date/number fields
-            ['date_of_birth', 'start_date', 'end_date', 'probation_end_date'].forEach(k => {
+            ['date_of_birth', 'start_date', 'end_date', 'probation_end_date', 'CompanyID'].forEach(k => {
                 if (!body[k]) body[k] = null;
             });
             if (!body.salary) body.salary = null;
@@ -368,8 +382,9 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                     <th>รหัส</th>
                                     <th>ชื่อ-สกุล</th>
                                     <th>ชื่อเล่น</th>
-                                    <th>ตำแหน่ง</th>
+                                    <th>บริษัท</th>
                                     <th>แผนก</th>
+                                    <th>ตำแหน่ง</th>
                                     <th>ประเภท</th>
                                     <th>สถานะ</th>
                                     <th style={{ textAlign: 'center' }}>จัดการ</th>
@@ -399,8 +414,9 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                         <td style={{ color: emp.nickname ? '#475569' : '#cbd5e1' }}>
                                             {emp.nickname || '—'}
                                         </td>
-                                        <td>{emp.position || '—'}</td>
+                                        <td>{emp.CompanyName || '—'}</td>
                                         <td>{emp.department_name || emp.department_code || '—'}</td>
+                                        <td>{emp.position || '—'}</td>
                                         <td>
                                             <span className={`badge-employment ${getEmploymentBadge(emp.employment_type)}`}>
                                                 {emp.employment_type || '—'}
@@ -539,6 +555,15 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                             <div className="hr-form-section">
                                 <div className="hr-form-section-title"><Briefcase size={14} /> ข้อมูลการจ้างงาน</div>
                                 <div className="hr-form-grid">
+                                    <div className="hr-form-group">
+                                        <label>บริษัท</label>
+                                        <select value={formData.CompanyID} onChange={e => updateField('CompanyID', e.target.value)}>
+                                            <option value="">เลือกบริษัท</option>
+                                            {companies.map(c => (
+                                                <option key={c.CompanyID} value={c.CompanyID}>{c.CompanyName}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                     <div className="hr-form-group">
                                         <label>แผนก</label>
                                         <select value={formData.department_code} onChange={e => updateField('department_code', e.target.value)}>
@@ -708,7 +733,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                 <div className="hr-detail-avatar">{getAvatar(selectedEmployee)}</div>
                                 <div className="hr-detail-name">
                                     <h3>{selectedEmployee.prefix}{selectedEmployee.first_name} {selectedEmployee.last_name} {selectedEmployee.nickname ? `(${selectedEmployee.nickname})` : ''}</h3>
-                                    <p>{selectedEmployee.employee_code} · {selectedEmployee.position || '—'} · {selectedEmployee.department_name || selectedEmployee.department_code || '—'}</p>
+                                    <p>{selectedEmployee.employee_code} · {selectedEmployee.position || '—'} · {selectedEmployee.department_name || selectedEmployee.department_code || '—'} · {selectedEmployee.CompanyName || 'ไม่มีระบุบริษัท'}</p>
                                 </div>
                                 <span className={`badge ${getStatusClass(selectedEmployee.status)}`} style={{ fontSize: '12px', padding: '4px 12px' }}>
                                     {selectedEmployee.status}
@@ -732,6 +757,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                             <div className="hr-form-section">
                                 <div className="hr-form-section-title"><Briefcase size={14} /> ข้อมูลการจ้างงาน</div>
                                 <div className="hr-detail-grid">
+                                    <DetailItem label="บริษัท" value={selectedEmployee.CompanyName} />
                                     <DetailItem label="ประเภทพนักงาน" value={selectedEmployee.employment_type} />
                                     <DetailItem label="วันเริ่มงาน" value={fmtDate(selectedEmployee.start_date)} />
                                     <DetailItem label="วันสิ้นสุดสัญญา" value={fmtDate(selectedEmployee.end_date)} />

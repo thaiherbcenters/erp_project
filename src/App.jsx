@@ -30,6 +30,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProductionProvider } from './context/ProductionContext';
+import { PlannerProvider } from './context/PlannerContext';
 
 // Components
 import Layout from './components/Layout';
@@ -58,76 +59,78 @@ function App() {
   return (
     <AuthProvider>
       <ProductionProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* ── หน้า Login (ไม่ต้องล็อกอิน) ── */}
-          <Route path="/" element={<Login />} />
+        <PlannerProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* ── หน้า Login (ไม่ต้องล็อกอิน) ── */}
+              <Route path="/" element={<Login />} />
 
-          {/* ── หน้าที่ต้องล็อกอิน (มี Layout ครอบ) ── */}
-          <Route element={
-            <ProtectedRoute pageId={null}>
-              <Layout />
-            </ProtectedRoute>
-          }>
-            {/* เมนูหลัก */}
-            <Route path="/home" element={
-              <ProtectedRoute pageId="home"><Home /></ProtectedRoute>
-            } />
-            <Route path="/customer" element={
-              <ProtectedRoute pageId="customer"><Customer /></ProtectedRoute>
-            } />
-            <Route path="/stock" element={
-              <ProtectedRoute pageId="stock"><Stock /></ProtectedRoute>
-            } />
-            <Route path="/sales" element={
-              <ProtectedRoute pageId="sales"><Sales /></ProtectedRoute>
-            } />
-            <Route path="/accounts" element={
-              <ProtectedRoute pageId="accounts"><Accounts /></ProtectedRoute>
-            } />
-            <Route path="/procurement" element={
-              <ProtectedRoute pageId="procurement"><Procurement /></ProtectedRoute>
-            } />
-            <Route path="/reports" element={
-              <ProtectedRoute pageId="reports"><Reports /></ProtectedRoute>
-            } />
-            <Route path="/qc" element={
-              <ProtectedRoute pageId="qc"><QC /></ProtectedRoute>
-            } />
-            <Route path="/planning" element={
-              <ProtectedRoute pageId="planning"><Planning /></ProtectedRoute>
-            } />
-            <Route path="/operator" element={
-              <ProtectedRoute pageId="operator"><Operator /></ProtectedRoute>
-            } />
-            <Route path="/rnd" element={
-              <ProtectedRoute pageId="rnd"><RnD /></ProtectedRoute>
-            } />
-            <Route path="/packaging" element={
-              <ProtectedRoute pageId="packaging"><Packaging /></ProtectedRoute>
-            } />
-            <Route path="/document" element={
-              <ProtectedRoute pageId="document"><DocumentControl /></ProtectedRoute>
-            } />
+              {/* ── หน้าที่ต้องล็อกอิน (มี Layout ครอบ) ── */}
+              <Route element={
+                <ProtectedRoute pageId={null}>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                {/* เมนูหลัก */}
+                <Route path="/home" element={
+                  <ProtectedRoute pageId="home"><Home /></ProtectedRoute>
+                } />
+                <Route path="/customer" element={
+                  <ProtectedRoute pageId="customer"><Customer /></ProtectedRoute>
+                } />
+                <Route path="/stock" element={
+                  <ProtectedRoute pageId="stock"><Stock /></ProtectedRoute>
+                } />
+                <Route path="/sales" element={
+                  <ProtectedRoute pageId="sales"><Sales /></ProtectedRoute>
+                } />
+                <Route path="/accounts" element={
+                  <ProtectedRoute pageId="accounts"><Accounts /></ProtectedRoute>
+                } />
+                <Route path="/procurement" element={
+                  <ProtectedRoute pageId="procurement"><Procurement /></ProtectedRoute>
+                } />
+                <Route path="/reports" element={
+                  <ProtectedRoute pageId="reports"><Reports /></ProtectedRoute>
+                } />
+                <Route path="/qc" element={
+                  <ProtectedRoute pageId="qc"><QC /></ProtectedRoute>
+                } />
+                <Route path="/planning" element={
+                  <ProtectedRoute pageId="planning"><Planning /></ProtectedRoute>
+                } />
+                <Route path="/operator" element={
+                  <ProtectedRoute pageId="operator"><Operator /></ProtectedRoute>
+                } />
+                <Route path="/rnd" element={
+                  <ProtectedRoute pageId="rnd"><RnD /></ProtectedRoute>
+                } />
+                <Route path="/packaging" element={
+                  <ProtectedRoute pageId="packaging"><Packaging /></ProtectedRoute>
+                } />
+                <Route path="/document" element={
+                  <ProtectedRoute pageId="document"><DocumentControl /></ProtectedRoute>
+                } />
 
-            {/* บุคลากร */}
-            <Route path="/hr" element={
-              <ProtectedRoute pageId="hr"><HR /></ProtectedRoute>
-            } />
+                {/* บุคลากร */}
+                <Route path="/hr" element={
+                  <ProtectedRoute pageId="hr"><HR /></ProtectedRoute>
+                } />
 
-            {/* ระบบ */}
-            <Route path="/settings" element={
-              <ProtectedRoute pageId="settings"><Settings /></ProtectedRoute>
-            } />
-            <Route path="/permissions" element={
-              <ProtectedRoute adminOnly><PermissionManager /></ProtectedRoute>
-            } />
-          </Route>
+                {/* ระบบ */}
+                <Route path="/settings" element={
+                  <ProtectedRoute pageId="settings"><Settings /></ProtectedRoute>
+                } />
+                <Route path="/permissions" element={
+                  <ProtectedRoute adminOnly><PermissionManager /></ProtectedRoute>
+                } />
+              </Route>
 
-          {/* ── Route ไม่ตรง → redirect กลับหน้า Login ── */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+              {/* ── Route ไม่ตรง → redirect กลับหน้า Login ── */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </BrowserRouter>
+        </PlannerProvider>
       </ProductionProvider>
     </AuthProvider>
   );

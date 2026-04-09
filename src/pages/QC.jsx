@@ -8,16 +8,11 @@
  * =============================================================================
  */
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
-import {
-    MOCK_QC_INCOMING,
-    MOCK_QC_INPROCESS,
-    MOCK_QC_FINAL,
-    MOCK_QC_DEFECT
-} from '../data/mockData';
+import API_BASE from '../config';
 import './PageCommon.css';
 import './QC.css';
 
@@ -35,14 +30,59 @@ export default function QC() {
     const [inspectingRequest, setInspectingRequest] = useState(null);
     const [inspectNotes, setInspectNotes] = useState('');
 
-    // ── Filter old mock data ──
-    const filteredIncoming = MOCK_QC_INCOMING.filter((item) =>
-        item.lotNumber.toLowerCase().includes(searchIncoming.toLowerCase()) ||
-        item.item.toLowerCase().includes(searchIncoming.toLowerCase())
+    const [incomings, setIncomings] = useState([]);
+    const [defects, setDefects] = useState([]);
+
+    // ── Fetch Data ──
+    const fetchQcData = useCallback(async () => {
+        try {
+            const resInc = await fetch(`${API_BASE}/qc/incoming`);
+            if (resInc.ok) {
+                const data = await resInc.json();
+                setIncomings(data.map(d => ({
+                    id: d.IncomingID,
+                    lotNumber: d.LotNumber,
+                    item: d.ItemName,
+                    supplier: d.SupplierName,
+                    inspector: d.InspectorID,
+                    result: d.Result,
+                    notes: d.Notes,
+                    date: d.CreatedAt ? new Date(d.CreatedAt).toLocaleDateString('th-TH') : ''
+                })));
+            }
+
+            const resDef = await fetch(`${API_BASE}/qc/defect`);
+            if (resDef.ok) {
+                const data = await resDef.json();
+                setDefects(data.map(d => ({
+                    id: d.NcrID,
+                    ncrNumber: d.NcrNumber,
+                    refLot: d.RefLot,
+                    item: d.ItemName,
+                    issue: d.IssueDescription,
+                    action: d.ActionTaken,
+                    status: d.Status,
+                    date: d.CreatedAt ? new Date(d.CreatedAt).toLocaleDateString('th-TH') : ''
+                })));
+            }
+        } catch (err) {
+            console.error('Error fetching QC data:', err);
+        }
+    }, []);
+
+    import('react').then(React => {
+        React.useEffect(() => {
+            fetchQcData();
+        }, [fetchQcData]);
+    });
+
+    const filteredIncoming = incomings.filter((item) =>
+        item.lotNumber?.toLowerCase().includes(searchIncoming.toLowerCase()) ||
+        item.item?.toLowerCase().includes(searchIncoming.toLowerCase())
     );
-    const filteredDefect = MOCK_QC_DEFECT.filter((item) =>
-        item.ncrNumber.toLowerCase().includes(searchDefect.toLowerCase()) ||
-        item.item.toLowerCase().includes(searchDefect.toLowerCase())
+    const filteredDefect = defects.filter((item) =>
+        item.ncrNumber?.toLowerCase().includes(searchDefect.toLowerCase()) ||
+        item.item?.toLowerCase().includes(searchDefect.toLowerCase())
     );
 
     // ── QC Requests from Production ──
@@ -51,7 +91,7 @@ export default function QC() {
     const pendingRequests = getPendingQcRequests();
 
     // ── Stats ──
-    const allQcItems = [...MOCK_QC_INCOMING, ...MOCK_QC_INPROCESS, ...MOCK_QC_FINAL];
+    const allQcItems = [...incomings];
     const totalInspections = allQcItems.length + qcRequests.length;
     const passedCount = allQcItems.filter(i => i.result === 'ผ่าน').length + qcRequests.filter(r => r.status === 'ผ่าน').length;
     const failedCount = allQcItems.filter(i => i.result === 'ไม่ผ่าน').length + qcRequests.filter(r => r.status === 'ไม่ผ่าน').length;
@@ -80,7 +120,7 @@ export default function QC() {
 
     // ── Render QC requests from Production as a table ──
     const renderProductionQcTable = (requests, type) => {
-        if (requests.length === 0 && type === 'qc_inprocess' && MOCK_QC_INPROCESS.length === 0) {
+        if (requests.length === 0) {
             return <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>ยังไม่มีรายการ</p>;
         }
 
@@ -294,43 +334,16 @@ export default function QC() {
                 <div className="subpage-content" key="qc_inprocess">
                     {renderProductionQcTable(qcInprocessRequests, 'qc_inprocess')}
 
-                    {/* Old mock data below */}
+                    {/* Production QC requests */}
                     {hasSectionPermission('qc_inprocess_search') && (
                         <div className="toolbar" style={{ marginTop: 16 }}>
                             <div className="search-box">
                                 <span>ค้นหา</span>
-                                <input type="text" placeholder="พิมพ์ Lot No., กระบวนการ..." value={searchInprocess} onChange={(e) => setSearchInprocess(e.target.value)} />
+                                <input type="text" placeholder="ค้นหาข้อมูล..." value={searchInprocess} onChange={(e) => setSearchInprocess(e.target.value)} />
                             </div>
                         </div>
                     )}
-                    {hasSectionPermission('qc_inprocess_table') && MOCK_QC_INPROCESS.length > 0 && (
-                        <div className="table-card card" style={{ marginTop: 8 }}>
-                            <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>
-                                ข้อมูลเดิม (Legacy)
-                            </h4>
-                            <table className="data-table">
-                                <thead>
-                                    <tr><th>วันที่</th><th>Lot Number</th><th>กระบวนการ</th><th>Line</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
-                                </thead>
-                                <tbody>
-                                    {MOCK_QC_INPROCESS.filter(i =>
-                                        i.lotNumber.toLowerCase().includes(searchInprocess.toLowerCase()) ||
-                                        i.process.toLowerCase().includes(searchInprocess.toLowerCase())
-                                    ).map(item => (
-                                        <tr key={item.id}>
-                                            <td>{item.date}</td>
-                                            <td className="text-bold">{item.lotNumber}</td>
-                                            <td>{item.process}</td>
-                                            <td>{item.line}</td>
-                                            <td>{item.inspector}</td>
-                                            <td><span className={`badge ${getResultBadge(item.result)}`}>{item.result}</span></td>
-                                            <td className="text-muted">{item.notes}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+
                 </div>
             )}
 
@@ -343,38 +356,11 @@ export default function QC() {
                         <div className="toolbar" style={{ marginTop: 16 }}>
                             <div className="search-box">
                                 <span>ค้นหา</span>
-                                <input type="text" placeholder="พิมพ์ Lot No., สินค้า..." value={searchFinal} onChange={(e) => setSearchFinal(e.target.value)} />
+                                <input type="text" placeholder="ค้นหาข้อมูล..." value={searchFinal} onChange={(e) => setSearchFinal(e.target.value)} />
                             </div>
                         </div>
                     )}
-                    {hasSectionPermission('qc_final_table') && MOCK_QC_FINAL.length > 0 && (
-                        <div className="table-card card" style={{ marginTop: 8 }}>
-                            <h4 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: 'var(--text-muted)' }}>
-                                ข้อมูลเดิม (Legacy)
-                            </h4>
-                            <table className="data-table">
-                                <thead>
-                                    <tr><th>วันที่</th><th>Lot Number</th><th>สินค้า</th><th>จำนวน</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
-                                </thead>
-                                <tbody>
-                                    {MOCK_QC_FINAL.filter(i =>
-                                        i.lotNumber.toLowerCase().includes(searchFinal.toLowerCase()) ||
-                                        i.product.toLowerCase().includes(searchFinal.toLowerCase())
-                                    ).map(item => (
-                                        <tr key={item.id}>
-                                            <td>{item.date}</td>
-                                            <td className="text-bold">{item.lotNumber}</td>
-                                            <td>{item.product}</td>
-                                            <td>{item.qty}</td>
-                                            <td>{item.inspector}</td>
-                                            <td><span className={`badge ${getResultBadge(item.result)}`}>{item.result}</span></td>
-                                            <td className="text-muted">{item.notes}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
+
                 </div>
             )}
 

@@ -19,10 +19,11 @@ import { useAuth } from '../context/AuthContext';
 import {
     Search, Plus, Filter, CalendarDays, PieChart, Activity,
     CheckCircle, Wrench, Package, ClipboardList, AlertTriangle,
-    ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock
+    ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock, Play
 } from 'lucide-react';
+import { usePlanner } from '../context/PlannerContext';
 import {
-    MOCK_FORMULAS, MOCK_JOB_ORDERS, MOCK_RAW_MATERIALS
+    MOCK_FORMULAS, MOCK_RAW_MATERIALS
 } from '../data/productionMockData';
 import './PageCommon.css';
 import './Planning.css';
@@ -32,16 +33,78 @@ export default function Planning() {
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('planning');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
+    const { jobs, loading, releaseJobOrder, createJob } = usePlanner();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
     const [selectedJob, setSelectedJob] = useState(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
+    const [createForm, setCreateForm] = useState({
+        formulaId: '',
+        formulaName: '',
+        batchQty: 1,
+        batchSize: 0,
+        totalQty: 0,
+        unit: '',
+        priority: 'ปกติ',
+        planDate: new Date().toISOString().split('T')[0],
+        dueDate: '',
+        assignedLine: 'Line A',
+        notes: '',
+        customerName: '',
+        customerPO: '',
+        productionType: 'ผลิตตามแผน',
+    });
+
+    // Handle formula selection in create form
+    const handleFormulaSelect = (formulaId) => {
+        const formula = MOCK_FORMULAS.find(f => f.id === formulaId);
+        if (formula) {
+            const batchQty = createForm.batchQty || 1;
+            setCreateForm(prev => ({
+                ...prev,
+                formulaId: formula.id,
+                formulaName: formula.name,
+                batchSize: formula.batchSize,
+                unit: formula.unit,
+                totalQty: batchQty * formula.batchSize,
+            }));
+        }
+    };
+
+    // Handle batch qty change
+    const handleBatchQtyChange = (val) => {
+        const qty = parseInt(val) || 0;
+        setCreateForm(prev => ({ ...prev, batchQty: qty, totalQty: qty * prev.batchSize }));
+    };
+
+    // Submit create form
+    const handleCreateSubmit = async () => {
+        if (!createForm.formulaId) return alert('กรุณาเลือกสูตรการผลิต');
+        if (!createForm.batchQty || createForm.batchQty < 1) return alert('กรุณาระบุจำนวน Batch');
+        if (!createForm.dueDate) return alert('กรุณาระบุวันกำหนดเสร็จ');
+        setIsCreating(true);
+        const res = await createJob(createForm);
+        setIsCreating(false);
+        if (res.success) {
+            alert('สร้างใบสั่งผลิตสำเร็จ!');
+            setShowCreateModal(false);
+            setCreateForm({
+                formulaId: '', formulaName: '', batchQty: 1, batchSize: 0, totalQty: 0, unit: '',
+                priority: 'ปกติ', planDate: new Date().toISOString().split('T')[0], dueDate: '',
+                assignedLine: 'Line A', notes: '', customerName: '', customerPO: '', productionType: 'ผลิตตามแผน',
+            });
+        } else {
+            alert('สร้างไม่สำเร็จ: ' + res.message);
+        }
+    };
 
     // ── Stats ──
-    const totalJobs = MOCK_JOB_ORDERS.length;
-    const inProgressJobs = MOCK_JOB_ORDERS.filter(j => j.status === 'กำลังผลิต').length;
-    const waitingJobs = MOCK_JOB_ORDERS.filter(j => j.status === 'รอผลิต').length;
-    const completedJobs = MOCK_JOB_ORDERS.filter(j => j.status === 'เสร็จสิ้น').length;
+    const totalJobs = jobs.length;
+    const inProgressJobs = jobs.filter(j => j.status === 'กำลังผลิต').length;
+    const waitingJobs = jobs.filter(j => j.status === 'รอผลิต').length;
+    const completedJobs = jobs.filter(j => j.status === 'เสร็จสิ้น').length;
 
     const getStatusBadge = (status) => {
         switch (status) {
@@ -129,7 +192,9 @@ export default function Planning() {
                             </tr>
                         </thead>
                         <tbody>
-                            {MOCK_JOB_ORDERS.slice(0, 3).map(job => (
+                            {loading ? (
+                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูล...</td></tr>
+                            ) : jobs.slice(0, 3).map(job => (
                                 <tr key={job.id}>
                                     <td className="text-bold">{job.id}</td>
                                     <td>{job.formulaName}</td>
@@ -154,9 +219,18 @@ export default function Planning() {
     // ══════════════════════════════════════════════════════════════════
     // 2. ใบสั่งผลิต (Job Order List)
     // ══════════════════════════════════════════════════════════════════
+    const handleReleaseJob = async (jobId) => {
+        if (!window.confirm(`ยืนยันการส่งใบสั่งผลิต ${jobId} ให้ฝ่ายผลิต?\nระบบจะทำการตั้งคิวงานใหม่ทันที`)) return;
+        const res = await releaseJobOrder(jobId);
+        if (res.success) {
+            alert('ส่งงานให้ฝ่ายผลิตเรียบร้อยแล้ว! สามารถดูคิวงานได้ที่หน้าฝ่ายผลิต');
+        } else {
+            alert('เกิดข้อผิดพลาด: ' + res.message);
+        }
+    };
     const renderPlanList = () => {
         const statuses = ['ทั้งหมด', 'รอผลิต', 'กำลังผลิต', 'เสร็จสิ้น'];
-        const filtered = MOCK_JOB_ORDERS.filter(j => {
+        const filtered = jobs.filter(j => {
             const matchSearch = j.formulaName.includes(searchTerm) || j.id.includes(searchTerm);
             const matchStatus = statusFilter === 'ทั้งหมด' || j.status === statusFilter;
             return matchSearch && matchStatus;
@@ -186,7 +260,7 @@ export default function Planning() {
                         </div>
                     </div>
                     {hasSectionPermission('planning_list_action') && (
-                        <button className="btn-primary"><Plus size={16} /> สร้างใบสั่งผลิต</button>
+                        <button className="btn-primary" onClick={() => setShowCreateModal(true)}><Plus size={16} /> สร้างใบสั่งผลิต</button>
                     )}
                 </div>
 
@@ -230,6 +304,16 @@ export default function Planning() {
                                         </td>
                                         <td>
                                             <button className="btn-sm" onClick={() => setSelectedJob(job)}><Eye size={14} /></button>
+                                            {job.status === 'รอผลิต' && (
+                                                <button 
+                                                    className="btn-sm" 
+                                                    style={{ background: '#e0e7ff', color: '#4338ca', marginLeft: 4 }} 
+                                                    title="ปล่อยให้ฝ่ายผลิต" 
+                                                    onClick={() => handleReleaseJob(job.id)}
+                                                >
+                                                    <Play size={14} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -249,7 +333,7 @@ export default function Planning() {
     // ══════════════════════════════════════════════════════════════════
     const renderMaterials = () => {
         // คำนวณ BOM Explosion จาก Job Orders ที่ยังไม่เสร็จ
-        const activeJobs = MOCK_JOB_ORDERS.filter(j => j.status === 'กำลังผลิต' || j.status === 'รอผลิต');
+        const activeJobs = jobs.filter(j => j.status === 'กำลังผลิต' || j.status === 'รอผลิต');
         const materialRequirements = {};
 
         activeJobs.forEach(job => {
@@ -363,7 +447,7 @@ export default function Planning() {
             <div className="card">
                 {/* Simple timeline bars */}
                 <div className="plan-timeline">
-                    {MOCK_JOB_ORDERS.filter(j => j.status !== 'เสร็จสิ้น').map(job => (
+                    {jobs.filter(j => j.status !== 'เสร็จสิ้น').map(job => (
                         <div key={job.id} className="plan-timeline-row">
                             <div className="plan-timeline-label">
                                 <span className="plan-timeline-id">{job.id}</span>
@@ -491,6 +575,198 @@ export default function Planning() {
     };
 
     // ══════════════════════════════════════════════════════════════════
+    // Create Job Order Modal
+    // ══════════════════════════════════════════════════════════════════
+    const renderCreateModal = () => {
+        if (!showCreateModal) return null;
+        const approvedFormulas = MOCK_FORMULAS.filter(f => f.status === 'อนุมัติ');
+        const selectedFormula = MOCK_FORMULAS.find(f => f.id === createForm.formulaId);
+        
+        return (
+            <div className="rnd-modal-overlay" onClick={() => setShowCreateModal(false)}>
+                <div className="rnd-modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+                    <div className="rnd-modal-header">
+                        <div>
+                            <h2>สร้างใบสั่งผลิตใหม่</h2>
+                            <div className="rnd-modal-meta">
+                                <span className="badge badge-primary">Production Plan</span>
+                            </div>
+                        </div>
+                        <button className="rnd-modal-close" onClick={() => setShowCreateModal(false)}><XCircle size={22} /></button>
+                    </div>
+                    <div className="rnd-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                        {/* ── Section 1: สูตรการผลิต ── */}
+                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Beaker size={16} style={{ color: '#7b7bf5' }} /> เลือกสูตรการผลิต (จาก R&D)
+                        </h4>
+                        <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
+                            <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                <label>สูตรที่อนุมัติแล้ว <span style={{ color: '#ef4444' }}>*</span></label>
+                                <select 
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.formulaId} 
+                                    onChange={(e) => handleFormulaSelect(e.target.value)}
+                                >
+                                    <option value="">-- เลือกสูตร --</option>
+                                    {approvedFormulas.map(f => (
+                                        <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize} {f.unit}/batch)</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {selectedFormula && (
+                                <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1', background: '#f0fdf4', padding: 12, borderRadius: 8 }}>
+                                    <label style={{ color: '#059669' }}>รายละเอียดสูตร</label>
+                                    <span style={{ fontSize: 13 }}>
+                                        {selectedFormula.description}<br/>
+                                        <strong>Batch Size:</strong> {selectedFormula.batchSize} {selectedFormula.unit} | 
+                                        <strong> อายุสินค้า:</strong> {selectedFormula.shelfLife} | 
+                                        <strong> Version:</strong> {selectedFormula.version}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── Section 2: จำนวนการผลิต ── */}
+                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Package size={16} style={{ color: '#1e88e5' }} /> จำนวนการผลิต
+                        </h4>
+                        <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
+                            <div className="rnd-modal-info-item">
+                                <label>จำนวน Batch <span style={{ color: '#ef4444' }}>*</span></label>
+                                <input type="number" min="1" max="100"
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.batchQty}
+                                    onChange={(e) => handleBatchQtyChange(e.target.value)}
+                                />
+                            </div>
+                            <div className="rnd-modal-info-item">
+                                <label>ขนาดต่อ Batch</label>
+                                <span style={{ fontSize: 16, fontWeight: 700, color: '#7b7bf5' }}>
+                                    {createForm.batchSize > 0 ? `${createForm.batchSize.toLocaleString()} ${createForm.unit}` : '—'}
+                                </span>
+                            </div>
+                            <div className="rnd-modal-info-item" style={{ background: '#f0ebff', padding: 12, borderRadius: 8 }}>
+                                <label style={{ color: '#7b7bf5', fontWeight: 700 }}>จำนวนรวมทั้งหมด</label>
+                                <span style={{ fontSize: 18, fontWeight: 800, color: '#5b21b6' }}>
+                                    {createForm.totalQty > 0 ? `${createForm.totalQty.toLocaleString()} ${createForm.unit}` : '—'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* ── Section 3: การวางแผน ── */}
+                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <CalendarDays size={16} style={{ color: '#f59e0b' }} /> การวางแผนและกำหนดการ
+                        </h4>
+                        <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
+                            <div className="rnd-modal-info-item">
+                                <label>ประเภทการผลิต</label>
+                                <select style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.productionType}
+                                    onChange={(e) => setCreateForm({...createForm, productionType: e.target.value})}
+                                >
+                                    <option value="ผลิตตามแผน">ผลิตตามแผน (MTS)</option>
+                                    <option value="ผลิตตามออเดอร์">ผลิตตามออเดอร์ (MTO)</option>
+                                    <option value="ผลิตเร่งด่วน">ผลิตเร่งด่วน (Urgent)</option>
+                                    <option value="ผลิตทดสอบ">ผลิตทดสอบ (Trial Run)</option>
+                                </select>
+                            </div>
+                            <div className="rnd-modal-info-item">
+                                <label>ความสำคัญ <span style={{ color: '#ef4444' }}>*</span></label>
+                                <select style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.priority}
+                                    onChange={(e) => setCreateForm({...createForm, priority: e.target.value})}
+                                >
+                                    <option value="ต่ำ">ต่ำ</option>
+                                    <option value="ปกติ">ปกติ</option>
+                                    <option value="สูง">สูง (ด่วน)</option>
+                                </select>
+                            </div>
+                            <div className="rnd-modal-info-item">
+                                <label>วันเริ่มผลิต</label>
+                                <input type="date" 
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.planDate}
+                                    onChange={(e) => setCreateForm({...createForm, planDate: e.target.value})}
+                                />
+                            </div>
+                            <div className="rnd-modal-info-item">
+                                <label>กำหนดเสร็จ <span style={{ color: '#ef4444' }}>*</span></label>
+                                <input type="date"
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.dueDate}
+                                    onChange={(e) => setCreateForm({...createForm, dueDate: e.target.value})}
+                                />
+                            </div>
+                            <div className="rnd-modal-info-item">
+                                <label>สายการผลิต (Production Line)</label>
+                                <select style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.assignedLine}
+                                    onChange={(e) => setCreateForm({...createForm, assignedLine: e.target.value})}
+                                >
+                                    <option value="Line A">Line A (สายหลัก)</option>
+                                    <option value="Line B">Line B (สายรอง)</option>
+                                    <option value="Line C">Line C (สารเคมี)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* ── Section 4: ข้อมูลลูกค้า (ถ้ามี) ── */}
+                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <ClipboardList size={16} style={{ color: '#059669' }} /> ข้อมูลเพิ่มเติม (ถ้ามี)
+                        </h4>
+                        <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
+                            <div className="rnd-modal-info-item">
+                                <label>ชื่อลูกค้า / บริษัท</label>
+                                <input type="text" placeholder="เช่น บจก.สมุนไพรไทย"
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.customerName}
+                                    onChange={(e) => setCreateForm({...createForm, customerName: e.target.value})}
+                                />
+                            </div>
+                            <div className="rnd-modal-info-item">
+                                <label>เลขที่ PO / เลขอ้างอิง</label>
+                                <input type="text" placeholder="เช่น PO-2026-0510"
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                    value={createForm.customerPO}
+                                    onChange={(e) => setCreateForm({...createForm, customerPO: e.target.value})}
+                                />
+                            </div>
+                            <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                <label>หมายเหตุ / คำสั่งพิเศษ</label>
+                                <textarea rows={3} placeholder="เช่น ต้องติดฉลากภาษาอังกฤษ, ห่อพิเศษสำหรับส่งออก"
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14, resize: 'vertical' }}
+                                    value={createForm.notes}
+                                    onChange={(e) => setCreateForm({...createForm, notes: e.target.value})}
+                                />
+                            </div>
+                        </div>
+
+                        {/* ── Summary ── */}
+                        {createForm.formulaId && (
+                            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: 16, marginBottom: 8 }}>
+                                <strong style={{ color: '#1d4ed8', fontSize: 14 }}>📋 สรุปใบสั่งผลิต</strong>
+                                <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.8, color: '#374151' }}>
+                                    <div>สูตร: <strong>{createForm.formulaName}</strong> ({createForm.formulaId})</div>
+                                    <div>ผลิต: <strong>{createForm.batchQty} batch × {createForm.batchSize.toLocaleString()} = {createForm.totalQty.toLocaleString()} {createForm.unit}</strong></div>
+                                    <div>ไลน์: <strong>{createForm.assignedLine}</strong> | ความสำคัญ: <strong>{createForm.priority}</strong></div>
+                                    <div>กำหนดการ: {createForm.planDate} → {createForm.dueDate || '(ยังไม่ระบุ)'}</div>
+                                    {createForm.customerName && <div>ลูกค้า: <strong>{createForm.customerName}</strong> {createForm.customerPO && `(${createForm.customerPO})`}</div>}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="rnd-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '16px 24px', borderTop: '1px solid #e5e7eb' }}>
+                        <button className="btn-secondary" onClick={() => setShowCreateModal(false)} disabled={isCreating}>ยกเลิก</button>
+                        <button className="btn-primary" onClick={handleCreateSubmit} disabled={isCreating || !createForm.formulaId}>
+                            {isCreating ? 'กำลังสร้าง...' : '✅ สร้างใบสั่งผลิต'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // ══════════════════════════════════════════════════════════════════
     // Main Render
     // ══════════════════════════════════════════════════════════════════
     if (visibleSubPages.length === 0) {
@@ -505,6 +781,7 @@ export default function Planning() {
             {currentTab === 'planning_gantt' && renderGantt()}
             {currentTab === 'planning_qc_link' && renderQCLink()}
             {renderJobModal()}
+            {renderCreateModal()}
         </div>
     );
 }

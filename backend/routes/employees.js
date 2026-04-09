@@ -129,9 +129,12 @@ router.get('/', async (req, res) => {
                 e.status,
                 e.is_active,
                 e.created_at,
-                e.updated_at
+                e.updated_at,
+                e.CompanyID,
+                c.CompanyName
             FROM Employees e
             LEFT JOIN Departments d ON e.department_code = d.dept_code
+            LEFT JOIN Company c ON e.CompanyID = c.CompanyID
             ${condition}
             ORDER BY e.employee_id ASC
         `);
@@ -156,9 +159,11 @@ router.get('/:id', async (req, res) => {
             .query(`
                 SELECT 
                     e.*,
-                    d.dept_name AS department_name
+                    d.dept_name AS department_name,
+                    c.CompanyName
                 FROM Employees e
                 LEFT JOIN Departments d ON e.department_code = d.dept_code
+                LEFT JOIN Company c ON e.CompanyID = c.CompanyID
                 WHERE e.employee_id = @id
             `);
 
@@ -187,7 +192,7 @@ router.post('/', async (req, res) => {
             bank_name, bank_account_number, bank_account_name,
             social_security_id, tax_id,
             emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
-            status
+            status, CompanyID
         } = req.body;
 
         if (!first_name || !last_name) {
@@ -230,6 +235,7 @@ router.post('/', async (req, res) => {
             .input('emergency_contact_phone', sql.NVarChar, emergency_contact_phone || null)
             .input('emergency_contact_relation', sql.NVarChar, emergency_contact_relation || null)
             .input('status', sql.NVarChar, status || 'ปฏิบัติงาน')
+            .input('CompanyID', sql.Int, CompanyID || null)
             .query(`
                 INSERT INTO Employees (
                     employee_code, prefix, first_name, last_name, nickname, gender,
@@ -240,7 +246,7 @@ router.post('/', async (req, res) => {
                     bank_name, bank_account_number, bank_account_name,
                     social_security_id, tax_id,
                     emergency_contact_name, emergency_contact_phone, emergency_contact_relation,
-                    status
+                    status, CompanyID
                 )
                 OUTPUT INSERTED.employee_id, INSERTED.employee_code
                 VALUES (
@@ -252,7 +258,7 @@ router.post('/', async (req, res) => {
                     @bank_name, @bank_account_number, @bank_account_name,
                     @social_security_id, @tax_id,
                     @emergency_contact_name, @emergency_contact_phone, @emergency_contact_relation,
-                    @status
+                    @status, @CompanyID
                 )
             `);
 
@@ -308,6 +314,7 @@ router.put('/:id', async (req, res) => {
             emergency_contact_relation: sql.NVarChar,
             status: sql.NVarChar,
             is_active: sql.Bit,
+            CompanyID: sql.Int,
         };
 
         const sets = [];

@@ -10,15 +10,16 @@
  * =============================================================================
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
+import API_BASE from '../config';
 import {
     CheckSquare, Play, CheckCircle, Search,
     Clock, Package, AlertTriangle, Activity, ClipboardList,
     Timer, TrendingUp, Repeat, ShieldCheck, Warehouse,
-    SearchCheck, ChevronRight, Eye, XCircle, Send
+    SearchCheck, ChevronRight, Eye, XCircle, Send, Plus, Save
 } from 'lucide-react';
 import { PRODUCTION_STEPS } from '../data/productionMockData';
 import './PageCommon.css';
@@ -30,14 +31,53 @@ const STEP_ICONS = {
 };
 
 export default function Operator() {
-    const { getVisibleSubPages, hasSectionPermission } = useAuth();
-    const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests } = useProduction();
+    const { user, getVisibleSubPages, hasSectionPermission } = useAuth();
+    const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('operator');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTask, setSelectedTask] = useState(null);
+    const [selectedTaskLogs, setSelectedTaskLogs] = useState([]);
+    const [logForm, setLogForm] = useState({ producedQty: '', defectQty: '', notes: '' });
+    const [isSubmittingLog, setIsSubmittingLog] = useState(false);
+
+    useEffect(() => {
+        if (selectedTask) {
+            fetch(`${API_BASE}/production/tasks/${selectedTask.id}/logs`)
+                .then(res => res.json())
+                .then(data => setSelectedTaskLogs(data))
+                .catch(err => console.error('Failed to fetch logs', err));
+        } else {
+            setSelectedTaskLogs([]);
+            setLogForm({ producedQty: '', defectQty: '', notes: '' });
+        }
+    }, [selectedTask]);
+
+    const handleAddLog = async () => {
+        if (!selectedTask) return;
+        if (!logForm.producedQty && !logForm.defectQty) return;
+        
+        setIsSubmittingLog(true);
+        const res = await addProductionLog(selectedTask.id, {
+            producedQty: parseInt(logForm.producedQty) || 0,
+            defectQty: parseInt(logForm.defectQty) || 0,
+            notes: logForm.notes,
+            operatorId: user?.username || 'operator'
+        });
+        
+        setIsSubmittingLog(false);
+        if (res.success) {
+            setLogForm({ producedQty: '', defectQty: '', notes: '' });
+            // Refresh logs
+            fetch(`${API_BASE}/production/tasks/${selectedTask.id}/logs`)
+                .then(res => res.json())
+                .then(data => setSelectedTaskLogs(data));
+        } else {
+            alert('บันทึกไม่สำเร็จ: ' + res.message);
+        }
+    };
 
     // ── Stats ──
     const activeTasks = tasks.filter(t => t.status === 'กำลังทำ');
@@ -216,6 +256,93 @@ export default function Operator() {
                                 <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
                                     <ChevronRight size={14} /> ไปขั้นตอนถัดไป
                                 </button>
+                            </div>
+                        )}
+
+                        {/* ==================================================== */}
+                        {/* UPDATE PRODUCTION LOGS SECTION */}
+                        {/* ==================================================== */}
+                        {task.status !== 'เสร็จสิ้น' && (
+                            <div className="op-log-section">
+                                <h4 style={{ margin: '24px 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: '#374151' }}>
+                                    <Plus size={16} /> บันทึกยอดผลิต/เสีย (อัปเดตรายกะ)
+                                </h4>
+                                <div className="op-log-form">
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label>ยอดดี (เพิ่ม)</label>
+                                        <input 
+                                            type="number" 
+                                            min="0" 
+                                            style={{ width: '100%', padding: '6px' }}
+                                            value={logForm.producedQty}
+                                            onChange={(e) => setLogForm({...logForm, producedQty: e.target.value})}
+                                            placeholder="จำนวนชิ้น"
+                                            disabled={isSubmittingLog}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0 }}>
+                                        <label style={{ color: '#ef4444' }}>ของเสีย (เพิ่ม)</label>
+                                        <input 
+                                            type="number" 
+                                            min="0" 
+                                            style={{ width: '100%', padding: '6px', borderColor: '#fca5a5' }}
+                                            value={logForm.defectQty}
+                                            onChange={(e) => setLogForm({...logForm, defectQty: e.target.value})}
+                                            placeholder="จำนวนชิ้น"
+                                            disabled={isSubmittingLog}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginBottom: 0, flex: 2 }}>
+                                        <label>หมายเหตุ</label>
+                                        <input 
+                                            type="text" 
+                                            style={{ width: '100%', padding: '6px' }}
+                                            value={logForm.notes}
+                                            onChange={(e) => setLogForm({...logForm, notes: e.target.value})}
+                                            placeholder="ระบุหมายเหตุถ้ามี"
+                                            disabled={isSubmittingLog}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                        <button 
+                                            className="op-btn" 
+                                            style={{ height: '36px', background: 'var(--primary)', color: 'white', padding: '0 12px', borderRadius: 4, fontWeight: 600 }}
+                                            onClick={handleAddLog}
+                                            disabled={isSubmittingLog || (!logForm.producedQty && !logForm.defectQty)}
+                                        >
+                                            {isSubmittingLog ? 'รอ...' : <><Save size={14} /> บันทึก</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* LIST LOG HISTORY */}
+                        {selectedTaskLogs.length > 0 && (
+                            <div className="op-qc-history" style={{ marginTop: 24, background: '#f8fafc' }}>
+                                <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700 }}>📅 ประวัติการลงยอดผลิต</h4>
+                                <table style={{ width: '100%', fontSize: 13, textAlign: 'left', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
+                                            <th style={{ padding: '4px 0' }}>เวลา</th>
+                                            <th>โดย</th>
+                                            <th>ยอดดี (+)</th>
+                                            <th>เสีย (+)</th>
+                                            <th>หมายเหตุ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {selectedTaskLogs.map(log => (
+                                            <tr key={log.LogID} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                <td style={{ padding: '6px 0', color: '#475569' }}>{new Date(log.LogDate).toLocaleString('th-TH')}</td>
+                                                <td>{log.OperatorID}</td>
+                                                <td style={{ color: '#059669', fontWeight: 600 }}>+{log.ProducedQty}</td>
+                                                <td style={{ color: log.DefectQty > 0 ? '#ef4444' : '#94a3b8' }}>{log.DefectQty > 0 ? `+${log.DefectQty}` : '-'}</td>
+                                                <td style={{ color: '#475569' }}>{log.Notes || '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
                         )}
 

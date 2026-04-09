@@ -26,6 +26,10 @@ const employeeRoutes = require('./routes/employees');
 const attendanceRoutes = require('./routes/attendance');
 const leaveRequestRoutes = require('./routes/leave-requests');
 const customerRoutes = require('./routes/customers');
+const companyRoutes = require('./routes/companies');
+const qcRoutes = require('./routes/qc');
+const productionRoutes = require('./routes/production');
+const plannerRoutes = require('./routes/planner');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -40,6 +44,10 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/leave-requests', leaveRequestRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/companies', companyRoutes);
+app.use('/api/qc', qcRoutes);
+app.use('/api/production', productionRoutes);
+app.use('/api/planner', plannerRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');
