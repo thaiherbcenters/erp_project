@@ -89,6 +89,45 @@ router.put('/tasks/:id/advance', async (req, res) => {
         if (result.rowsAffected[0] === 0) {
             return res.status(404).json({ message: 'Task not found' });
         }
+
+        // --- Integration: Auto-create Packaging Task if entering 'packaging' step ---
+        if (currentStep === 'packaging') {
+            try {
+                const taskResult = await pool.request()
+                    .input('TaskID', sql.VarChar, taskId)
+                    .query('SELECT BatchNo, FormulaName, Line, ExpectedQty FROM Production_Tasks WHERE TaskID = @TaskID');
+                
+                if (taskResult.recordset.length > 0) {
+                    const taskData = taskResult.recordset[0];
+                    const pkgId = `PKG-${Date.now().toString().slice(-6)}-${Math.floor(Math.random()*1000)}`;
+                    
+                    // Check if already exists to prevent duplicate
+                    const checkPkg = await pool.request()
+                        .input('BatchNo', sql.VarChar, taskData.BatchNo)
+                        .query('SELECT COUNT(*) as cnt FROM Packaging_Tasks WHERE BatchNo = @BatchNo');
+                        
+                    if (checkPkg.recordset[0].cnt === 0) {
+                        await pool.request()
+                            .input('TaskID', sql.VarChar, pkgId)
+                            .input('BatchNo', sql.VarChar, taskData.BatchNo)
+                            .input('Product', sql.NVarChar, taskData.FormulaName)
+                            .input('Line', sql.VarChar, taskData.Line)
+                            .input('Qty', sql.Int, taskData.ExpectedQty)
+                            .input('Status', sql.NVarChar, 'รอบรรจุ')
+                            .input('Destination', sql.NVarChar, 'คลัง')
+                            .query(`
+                                INSERT INTO Packaging_Tasks (TaskID, BatchNo, Product, Line, Qty, Status, Destination)
+                                VALUES (@TaskID, @BatchNo, @Product, @Line, @Qty, @Status, @Destination)
+                            `);
+                    }
+                }
+            } catch (pkgErr) {
+                console.error('Error auto-creating packaging task:', pkgErr);
+                // We don't fail the advance response because of this, but it should be logged.
+            }
+        }
+        // -----------------------------------------------------------------------------
+
         res.json(result.recordset[0]);
     } catch (err) {
         console.error('Error advancing task step:', err);

@@ -250,12 +250,19 @@ export default function Operator() {
                         )}
 
                         {/* Normal Next Step (non-QC) */}
-                        {!isLastStep && !isQcStep && task.status !== 'เสร็จสิ้น' && (
+                        {!isLastStep && !isQcStep && task.currentStep !== 'packaging' && task.status !== 'เสร็จสิ้น' && (
                             <div className="op-modal-next-action">
                                 <span>ขั้นตอนถัดไป: <strong>{nextStep?.label}</strong></span>
                                 <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
                                     <ChevronRight size={14} /> ไปขั้นตอนถัดไป
                                 </button>
+                            </div>
+                        )}
+
+                        {/* Packaging Wait State */}
+                        {task.currentStep === 'packaging' && (
+                            <div className="op-modal-next-action" style={{ background: '#f5f3ff', borderColor: '#ddd6fe' }}>
+                                <span style={{ color: '#8b5cf6', fontWeight: 700 }}>📦 ข้อมูลถูกส่งไปฝ่ายบรรจุภัณฑ์แล้ว กรุณารอ...</span>
                             </div>
                         )}
 
@@ -426,8 +433,8 @@ export default function Operator() {
                                                 <span className="op-active-batch">{task.batchNo}</span>
                                                 <span className="op-active-job">← {task.jobOrderId}</span>
                                             </div>
-                                            <span className={`op-status-badge ${waitingQc ? 'op-status-qc' : 'op-status-active'}`}>
-                                                {waitingQc ? '⏳ รอ QC' : currentStepObj?.shortLabel}
+                                            <span className={`op-status-badge ${waitingQc ? 'op-status-qc' : task.currentStep === 'packaging' ? 'op-status-pkg' : 'op-status-active'}`}>
+                                                {waitingQc ? '⏳ รอ QC' : task.currentStep === 'packaging' ? '📦 รอ Pack' : currentStepObj?.shortLabel}
                                             </span>
                                         </div>
                                         <div className="op-active-product">{task.formulaName}</div>
@@ -449,6 +456,8 @@ export default function Operator() {
                                                 <button className="op-btn op-btn-qc" onClick={() => sendQcRequest(task, task.currentStep)}>
                                                     <Send size={14} /> ส่งคำขอ QC
                                                 </button>
+                                            ) : task.currentStep === 'packaging' ? (
+                                                <span className="op-waiting-label" style={{ color: '#8b5cf6', background: '#f5f3ff' }}>📦 รอแผนกบรรจุภัณฑ์...</span>
                                             ) : !isLastStep && !isQcStep ? (
                                                 <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
                                                     <ChevronRight size={14} /> ขั้นตอนถัดไป

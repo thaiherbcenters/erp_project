@@ -331,6 +331,12 @@ export const ALL_PAGES = [
         ],
       },
       {
+        id: 'qc_formula_lab', name: 'QC/Lab ทดสอบสูตร',
+        sections: [
+          { id: 'qc_formula_lab_list', name: 'รายการทดสอบสูตร' },
+        ],
+      },
+      {
         id: 'qc_reports', name: 'Reports',
         sections: [
           { id: 'qc_reports_list', name: 'รายงานคุณภาพ' },
@@ -380,12 +386,6 @@ export const ALL_PAGES = [
         id: 'planning_gantt', name: 'Gantt / Timeline',
         sections: [
           { id: 'planning_gantt_chart', name: 'แผนภูมิการผลิต' },
-        ],
-      },
-      {
-        id: 'planning_qc_link', name: 'QC & Production Link',
-        sections: [
-          { id: 'planning_qc_link_status', name: 'สถานะเชื่อมโยง QC' },
         ],
       },
     ],
@@ -438,10 +438,37 @@ export const ALL_PAGES = [
           { id: 'rnd_projects_table', name: 'ตารางโครงการวิจัย' },
         ],
       },
+      {
+        id: 'rnd_pharmacist', name: 'เภสัชกร',
+        sections: [
+          { id: 'rnd_pharmacist_approve', name: 'อนุมัติสูตรโดยเภสัชกร' },
+        ],
+      },
     ],
   },
 
-  // --- บรรจุภัณฑ์ (Packaging) ---
+
+  // --- ฝ่ายจัดส่งและกระจายสินค้า (Fulfillment & Shipping) ---
+  {
+    id: 'fulfillment', name: 'ฝ่ายจัดส่ง (Shipping)', path: '/fulfillment',
+    subPages: [
+      {
+        id: 'fulfillment_dashboard', name: 'Shipping Dashboard',
+        sections: [
+          { id: 'fulfillment_dashboard_stats', name: 'สถิติการจัดส่ง' },
+        ],
+      },
+      {
+        id: 'fulfillment_orders', name: 'รายการแพ็คจัดส่ง',
+        sections: [
+          { id: 'fulfillment_orders_table', name: 'ตารางรอแพ็คและจัดส่ง' },
+          { id: 'fulfillment_orders_action', name: 'จัดการแพ็คสินค้า / พิมพ์ปะหน้า' },
+        ],
+      },
+    ],
+  },
+
+  // --- บรรจุภัณฑ์โรงงาน (Production Packaging) ---
   {
     id: 'packaging', name: 'บรรจุภัณฑ์', path: '/packaging',
     subPages: [
@@ -573,16 +600,17 @@ export const getDefaultPermissions = () => {
   const rndIds = getPageIds('rnd');
   const packagingIds = getPageIds('packaging');
   const documentIds = getPageIds('document');
+  const fulfillmentIds = getPageIds('fulfillment');
 
   return {
     it_admin: allIds,                           // admin — เข้าถึงทุกหน้า
     exec: allIds,                           // executive — เข้าถึงทุกหน้า
     qc1: [...homeIds, ...qcIds],           // qc — หน้าหลัก + QC
-    sales1: [...homeIds, ...salesIds, ...customerIds],         // sales — หน้าหลัก + ฝ่ายขาย + ลูกค้า
-    acc1: [...homeIds, ...accountsIds, ...customerIds],      // accountant — หน้าหลัก + บัญชี + ลูกค้า
+    sales1: [...homeIds, ...salesIds, ...customerIds, ...fulfillmentIds], // sales — หน้าหลัก + ฝ่ายขาย + จัดส่ง
+    acc1: [...homeIds, ...accountsIds, ...customerIds],      // accountant — หน้าหลัก + บัญชี
     proc1: [...homeIds, ...procIds],          // procurement — หน้าหลัก + จัดซื้อ
     hr1: [...homeIds, ...hrIds],            // hr — หน้าหลัก + บุคลากร
-    stock1: [...homeIds, ...stockIds],          // stock — หน้าหลัก + คลังสินค้า
+    stock1: [...homeIds, ...stockIds, ...fulfillmentIds],     // stock — หน้าหลัก + คลังสินค้า + จัดส่ง
     plan1: [...homeIds, ...planningIds],         // planner - หน้าหลัก + วางแผนการผลิต
     op1: [...homeIds, ...operatorIds],          // operator - หน้าหลัก + ฝ่ายผลิต
     rnd1: [...homeIds, ...rndIds],              // rnd - หน้าหลัก + วิจัยและพัฒนา

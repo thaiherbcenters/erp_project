@@ -50,6 +50,7 @@ import {
     PackageOpen,
     FileText,
     Menu,
+    Truck,
 } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoSmallUrl from '../assets/logo-small.png';
@@ -73,6 +74,7 @@ const PAGE_ICONS = {
     operator: <Wrench size={20} />,
     rnd: <FlaskConical size={20} />,
     packaging: <PackageOpen size={20} />,
+    fulfillment: <Truck size={20} />,
     document: <FileText size={20} />,
     customer: <Users size={20} />,
 };
@@ -107,6 +109,7 @@ const getRoleLabel = (role) => ROLE_LABELS[role] || 'ผู้ใช้งาน
 // กำหนดว่า page ใดอยู่ในกลุ่มเมนูไหน
 // =============================================================================
 const CORE_MENU_IDS = ['home', 'customer', 'stock', 'sales', 'accounts', 'procurement', 'reports', 'qc'];
+const LOGISTICS_MENU_IDS = ['fulfillment'];
 const PRODUCT_MENU_IDS = ['planning', 'operator', 'rnd', 'packaging'];
 const DOC_MENU_IDS = ['document'];
 const HR_MENU_IDS = ['hr'];
@@ -311,6 +314,7 @@ export default function Layout() {
                 <nav className="sidebar-nav">
                     {renderMenuSection('เมนูหลัก', CORE_MENU_IDS)}
                     {renderMenuSection('การผลิต', PRODUCT_MENU_IDS, { marginTop: '16px' })}
+                    {renderMenuSection('จัดส่ง', LOGISTICS_MENU_IDS, { marginTop: '16px' })}
                     {renderMenuSection('ระบบเอกสาร', DOC_MENU_IDS, { marginTop: '16px' })}
                     {renderMenuSection('บุคลากร', HR_MENU_IDS, { marginTop: '16px' })}
                     {renderMenuSection('ระบบ', SYSTEM_MENU_IDS, { marginTop: '16px' })}

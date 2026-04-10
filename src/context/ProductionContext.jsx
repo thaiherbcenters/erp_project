@@ -121,10 +121,24 @@ export function ProductionProvider({ children }) {
                 // Refresh list
                 await fetchQcRequests();
 
-                // If passed, advance production step (still mocked locally)
+                // If passed, advance production step or update packaging
                 const request = qcRequests.find(r => r.id === requestId);
-                if (request && result === 'ผ่าน') {
-                    advanceTaskStep(request.taskId);
+                if (request && request.taskId) {
+                    if (request.taskId.startsWith('PKG-')) {
+                        // Map QC results directly to Packaging task status
+                        const nextStatus = result === 'ผ่าน' ? 'QC ผ่าน' : 'บรรจุเสร็จ'; // If failed, send back to 'บรรจุเสร็จ' to repack
+                        try {
+                            await fetch(`${API_BASE}/packaging/tasks/${request.taskId}/status`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: nextStatus })
+                            });
+                        } catch (pkgErr) {
+                            console.error('Failed to update packaging task after QC:', pkgErr);
+                        }
+                    } else if (result === 'ผ่าน') {
+                        advanceTaskStep(request.taskId);
+                    }
                 }
             }
         } catch (err) {

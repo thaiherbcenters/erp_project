@@ -22,9 +22,7 @@ import {
     ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock, Play
 } from 'lucide-react';
 import { usePlanner } from '../context/PlannerContext';
-import {
-    MOCK_FORMULAS, MOCK_RAW_MATERIALS
-} from '../data/productionMockData';
+import { useRnD } from '../context/RnDContext';
 import './PageCommon.css';
 import './Planning.css';
 
@@ -34,6 +32,7 @@ export default function Planning() {
     const visibleSubPages = getVisibleSubPages('planning');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
     const { jobs, loading, releaseJobOrder, createJob } = usePlanner();
+    const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS } = useRnD();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
@@ -73,10 +72,14 @@ export default function Planning() {
         }
     };
 
-    // Handle batch qty change
-    const handleBatchQtyChange = (val) => {
+    // Handle total qty change
+    const handleTotalQtyChange = (val) => {
         const qty = parseInt(val) || 0;
-        setCreateForm(prev => ({ ...prev, batchQty: qty, totalQty: qty * prev.batchSize }));
+        setCreateForm(prev => {
+            const bSize = prev.batchSize > 0 ? prev.batchSize : 1;
+            const bQty = Math.ceil(qty / bSize);
+            return { ...prev, totalQty: qty, batchQty: bQty };
+        });
     };
 
     // Submit create form
@@ -632,11 +635,12 @@ export default function Planning() {
                         </h4>
                         <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
                             <div className="rnd-modal-info-item">
-                                <label>จำนวน Batch <span style={{ color: '#ef4444' }}>*</span></label>
-                                <input type="number" min="1" max="100"
+                                <label>ยอดผลิตที่ต้องการรวม <span style={{ color: '#ef4444' }}>*</span></label>
+                                <input type="number" min="1"
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.batchQty}
-                                    onChange={(e) => handleBatchQtyChange(e.target.value)}
+                                    value={createForm.totalQty}
+                                    onChange={(e) => handleTotalQtyChange(e.target.value)}
+                                    placeholder="ใส่จำนวณรวมที่ต้องการ"
                                 />
                             </div>
                             <div className="rnd-modal-info-item">
@@ -646,9 +650,9 @@ export default function Planning() {
                                 </span>
                             </div>
                             <div className="rnd-modal-info-item" style={{ background: '#f0ebff', padding: 12, borderRadius: 8 }}>
-                                <label style={{ color: '#7b7bf5', fontWeight: 700 }}>จำนวนรวมทั้งหมด</label>
+                                <label style={{ color: '#7b7bf5', fontWeight: 700 }}>ระบบจะจัดคิวรันงานจำนวน</label>
                                 <span style={{ fontSize: 18, fontWeight: 800, color: '#5b21b6' }}>
-                                    {createForm.totalQty > 0 ? `${createForm.totalQty.toLocaleString()} ${createForm.unit}` : '—'}
+                                    {createForm.batchQty > 0 ? `${createForm.batchQty.toLocaleString()} Batch` : '—'}
                                 </span>
                             </div>
                         </div>
@@ -778,8 +782,6 @@ export default function Planning() {
             {currentTab === 'planning_overview' && renderOverview()}
             {currentTab === 'planning_list' && renderPlanList()}
             {currentTab === 'planning_materials' && renderMaterials()}
-            {currentTab === 'planning_gantt' && renderGantt()}
-            {currentTab === 'planning_qc_link' && renderQCLink()}
             {renderJobModal()}
             {renderCreateModal()}
         </div>

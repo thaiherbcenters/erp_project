@@ -53,13 +53,16 @@ import Planning from './pages/Planning';
 import Operator from './pages/Operator';
 import RnD from './pages/RnD';
 import Packaging from './pages/Packaging';
+import Fulfillment from './pages/Fulfillment';
 import DocumentControl from './pages/DocumentControl';
+import { RnDProvider } from './context/RnDContext';
 
 function App() {
   return (
     <AuthProvider>
       <ProductionProvider>
         <PlannerProvider>
+          <RnDProvider>
           <BrowserRouter>
             <Routes>
               {/* ── หน้า Login (ไม่ต้องล็อกอิน) ── */}
@@ -105,6 +108,9 @@ function App() {
                 <Route path="/rnd" element={
                   <ProtectedRoute pageId="rnd"><RnD /></ProtectedRoute>
                 } />
+                <Route path="/fulfillment" element={
+                  <ProtectedRoute pageId="fulfillment"><Fulfillment /></ProtectedRoute>
+                } />
                 <Route path="/packaging" element={
                   <ProtectedRoute pageId="packaging"><Packaging /></ProtectedRoute>
                 } />
@@ -130,6 +136,7 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
+          </RnDProvider>
         </PlannerProvider>
       </ProductionProvider>
     </AuthProvider>

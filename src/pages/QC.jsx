@@ -12,6 +12,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
+import { useRnD } from '../context/RnDContext';
 import API_BASE from '../config';
 import './PageCommon.css';
 import './QC.css';
@@ -29,6 +30,35 @@ export default function QC() {
     const [searchDefect, setSearchDefect] = useState('');
     const [inspectingRequest, setInspectingRequest] = useState(null);
     const [inspectNotes, setInspectNotes] = useState('');
+
+    // QC/Lab Formula Testing
+    const { formulas, fetchFormulaTests, submitFormulaTest } = useRnD();
+    const [formulaTests, setFormulaTests] = useState([]);
+    const [showTestForm, setShowTestForm] = useState(false);
+    const [testFormData, setTestFormData] = useState({
+        formulaId: '', testedBy: '', pH: '', viscosity: '', color: '', smell: '', stability: '', microbial: '', overallResult: '', notes: ''
+    });
+    const [testSaving, setTestSaving] = useState(false);
+
+    const pendingFormulas = formulas.filter(f => f.status === 'รอทดสอบ');
+
+    const loadFormulaTests = useCallback(async () => {
+        const data = await fetchFormulaTests();
+        setFormulaTests(data);
+    }, [fetchFormulaTests]);
+
+    const handleSubmitTest = async () => {
+        if (!testFormData.formulaId || !testFormData.overallResult) return alert('กรุณาเลือกสูตรและระบุผลทดสอบ');
+        setTestSaving(true);
+        const res = await submitFormulaTest(testFormData);
+        setTestSaving(false);
+        if (res.success) {
+            alert('บันทึกผลทดสอบสำเร็จ!');
+            setShowTestForm(false);
+            setTestFormData({ formulaId: '', testedBy: '', pH: '', viscosity: '', color: '', smell: '', stability: '', microbial: '', overallResult: '', notes: '' });
+            loadFormulaTests();
+        } else alert('เกิดข้อผิดพลาด');
+    };
 
     const [incomings, setIncomings] = useState([]);
     const [defects, setDefects] = useState([]);
@@ -70,11 +100,10 @@ export default function QC() {
         }
     }, []);
 
-    import('react').then(React => {
-        React.useEffect(() => {
-            fetchQcData();
-        }, [fetchQcData]);
-    });
+    useEffect(() => {
+        fetchQcData();
+        loadFormulaTests();
+    }, [fetchQcData, loadFormulaTests]);
 
     const filteredIncoming = incomings.filter((item) =>
         item.lotNumber?.toLowerCase().includes(searchIncoming.toLowerCase()) ||
@@ -400,6 +429,135 @@ export default function QC() {
                 </div>
             )}
 
+            {/* ── QC/Lab Formula Testing ── */}
+            {(activeTab === 'qc_formula_lab' && hasSubPermission('qc_formula_lab')) && (
+                <div className="subpage-content" key="qc_formula_lab">
+                    <div className="page-title">
+                        <h1>🧪 QC/Lab ทดสอบสูตร</h1>
+                        <p>ทดสอบสูตรผลิตภัณฑ์จาก R&D — กรอกผลตรวจ pH, สี, กลิ่น, ความหนืด แล้วส่งผลกลับ</p>
+                    </div>
+
+                    {/* สูตรรอทดสอบ */}
+                    {pendingFormulas.length > 0 && (
+                        <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #f59e0b' }}>
+                            <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: '#92400e' }}>⏳ สูตรรอทดสอบ ({pendingFormulas.length})</h3>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {pendingFormulas.map(f => (
+                                    <button key={f.id} className="btn-sm" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}
+                                        onClick={() => { setTestFormData({ ...testFormData, formulaId: f.id }); setShowTestForm(true); }}>
+                                        🧪 {f.id} — {f.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                        <button className="btn-primary" onClick={() => setShowTestForm(true)}>➕ บันทึกผลทดสอบสูตร</button>
+                    </div>
+
+                    {/* ใบทดสอบสูตร Modal */}
+                    {showTestForm && (
+                        <div className="rnd-modal-overlay" onClick={() => setShowTestForm(false)}>
+                            <div className="rnd-modal" style={{ maxWidth: 650 }} onClick={e => e.stopPropagation()}>
+                                <div className="rnd-modal-header">
+                                    <h2>📋 ใบทดสอบสูตร (Formula Test Report)</h2>
+                                    <button className="rnd-modal-close" onClick={() => setShowTestForm(false)}>✕</button>
+                                </div>
+                                <div className="rnd-modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+                                    <div className="rnd-modal-info-grid">
+                                        <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                            <label>สูตรที่ทดสอบ <span style={{ color: '#ef4444' }}>*</span></label>
+                                            <select style={fmtInput} value={testFormData.formulaId} onChange={e => setTestFormData({ ...testFormData, formulaId: e.target.value })}>
+                                                <option value="">-- เลือกสูตร --</option>
+                                                {formulas.filter(f => f.status === 'รอทดสอบ' || f.status === 'ร่าง' || f.status === 'ทดสอบไม่ผ่าน').map(f => (
+                                                    <option key={f.id} value={f.id}>{f.id} — {f.name} [{f.status}]</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="rnd-modal-info-item">
+                                            <label>ผู้ทดสอบ</label>
+                                            <input type="text" style={fmtInput} value={testFormData.testedBy} onChange={e => setTestFormData({ ...testFormData, testedBy: e.target.value })} placeholder="ชื่อผู้ทดสอบ" />
+                                        </div>
+                                        <div className="rnd-modal-info-item">
+                                            <label>ค่า pH</label>
+                                            <input type="text" style={fmtInput} value={testFormData.pH} onChange={e => setTestFormData({ ...testFormData, pH: e.target.value })} placeholder="เช่น 5.5" />
+                                        </div>
+                                        <div className="rnd-modal-info-item">
+                                            <label>ความหนืด (Viscosity)</label>
+                                            <input type="text" style={fmtInput} value={testFormData.viscosity} onChange={e => setTestFormData({ ...testFormData, viscosity: e.target.value })} placeholder="เช่น 2500 cP" />
+                                        </div>
+                                        <div className="rnd-modal-info-item">
+                                            <label>สี (Color)</label>
+                                            <input type="text" style={fmtInput} value={testFormData.color} onChange={e => setTestFormData({ ...testFormData, color: e.target.value })} placeholder="เช่น ขาวนวล" />
+                                        </div>
+                                        <div className="rnd-modal-info-item">
+                                            <label>กลิ่น (Smell)</label>
+                                            <input type="text" style={fmtInput} value={testFormData.smell} onChange={e => setTestFormData({ ...testFormData, smell: e.target.value })} placeholder="เช่น หอมอ่อน" />
+                                        </div>
+                                        <div className="rnd-modal-info-item">
+                                            <label>ความคงตัว (Stability)</label>
+                                            <input type="text" style={fmtInput} value={testFormData.stability} onChange={e => setTestFormData({ ...testFormData, stability: e.target.value })} placeholder="เช่น คงตัวดี 3 เดือน" />
+                                        </div>
+                                        <div className="rnd-modal-info-item">
+                                            <label>จุลินทรีย์ (Microbial)</label>
+                                            <input type="text" style={fmtInput} value={testFormData.microbial} onChange={e => setTestFormData({ ...testFormData, microbial: e.target.value })} placeholder="เช่น ไม่พบ" />
+                                        </div>
+                                        <div className="rnd-modal-info-item">
+                                            <label>ผลรวม <span style={{ color: '#ef4444' }}>*</span></label>
+                                            <select style={fmtInput} value={testFormData.overallResult} onChange={e => setTestFormData({ ...testFormData, overallResult: e.target.value })}>
+                                                <option value="">-- เลือกผล --</option>
+                                                <option value="ผ่าน">✅ ผ่าน</option>
+                                                <option value="ไม่ผ่าน">❌ ไม่ผ่าน</option>
+                                            </select>
+                                        </div>
+                                        <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                            <label>หมายเหตุ / รายละเอียดเพิ่มเติม</label>
+                                            <textarea rows={3} style={{ ...fmtInput, resize: 'vertical' }} value={testFormData.notes} onChange={e => setTestFormData({ ...testFormData, notes: e.target.value })} placeholder="รายละเอียดผลทดสอบ..." />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '16px 24px', borderTop: '1px solid #e5e7eb' }}>
+                                    <button className="btn-secondary" onClick={() => setShowTestForm(false)}>ยกเลิก</button>
+                                    <button className="btn-primary" onClick={handleSubmitTest} disabled={testSaving}>{testSaving ? 'กำลังบันทึก...' : '✅ บันทึกผลทดสอบ'}</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ตารางผลทดสอบที่ผ่านมา */}
+                    <div className="card table-card">
+                        <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>📊 ประวัติผลทดสอบสูตร ({formulaTests.length})</h3>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>สูตร</th><th>ชื่อสูตร</th><th>วันที่</th><th>ผู้ทดสอบ</th>
+                                    <th>pH</th><th>สี</th><th>กลิ่น</th><th>Microbial</th><th>ผลรวม</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {formulaTests.map(t => (
+                                    <tr key={t.id}>
+                                        <td className="text-bold">{t.formulaId}</td>
+                                        <td>{t.formulaName}</td>
+                                        <td>{t.testDate}</td>
+                                        <td>{t.testedBy}</td>
+                                        <td>{t.pH}</td>
+                                        <td>{t.color}</td>
+                                        <td>{t.smell}</td>
+                                        <td>{t.microbial}</td>
+                                        <td><span className={`badge ${t.overallResult === 'ผ่าน' ? 'badge-success' : 'badge-danger'}`}>{t.overallResult}</span></td>
+                                    </tr>
+                                ))}
+                                {formulaTests.length === 0 && (
+                                    <tr><td colSpan="9" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ยังไม่มีผลทดสอบ</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             {/* ── Reports ── */}
             {(activeTab === 'qc_reports' && hasSubPermission('qc_reports')) && (
                 <div className="subpage-content" key="qc_reports">
@@ -418,3 +576,5 @@ export default function QC() {
         </div>
     );
 }
+
+const fmtInput = { width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 };

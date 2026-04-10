@@ -30,6 +30,8 @@ const companyRoutes = require('./routes/companies');
 const qcRoutes = require('./routes/qc');
 const productionRoutes = require('./routes/production');
 const plannerRoutes = require('./routes/planner');
+const rndRoutes = require('./routes/rnd');
+const packagingRoutes = require('./routes/packaging');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -48,6 +50,8 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/qc', qcRoutes);
 app.use('/api/production', productionRoutes);
 app.use('/api/planner', plannerRoutes);
+app.use('/api/rnd', rndRoutes);
+app.use('/api/packaging', packagingRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

@@ -4,28 +4,24 @@
  * =============================================================================
  * ประกอบด้วย 1 sub-page:
  *   1. Packaging — จัดการงานบรรจุภัณฑ์
+ *
+ * Flow:  ฝ่ายผลิต (Operator) → Packaging → QC Final → คลัง / จัดส่ง
  * =============================================================================
  */
 
-import { useState } from 'react';
+// ── Imports ──
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     PackageOpen, PackageCheck, Clock, AlertTriangle,
-    CheckCircle2, Search, Plus, Box
+    CheckCircle2, Search, Plus, Box, Eye, Send,
+    X, ShieldCheck, Truck, Warehouse
 } from 'lucide-react';
 import './PageCommon.css';
 import './Packaging.css';
 
-// ── Mock Data ──
-const MOCK_PACKAGING_ORDERS = [
-    { id: 1, code: 'PKG-2026-001', product: 'ครีมสมุนไพรบำรุงผิว 50g', batch: 'B-2026-015', qty: 500, packed: 320, packType: 'กล่อง + ซอง', line: 'Pack-01', assignee: 'สมชาย', dueDate: '2026-03-10', status: 'กำลังบรรจุ' },
-    { id: 2, code: 'PKG-2026-002', product: 'น้ำมันหอมระเหย 30ml', batch: 'B-2026-018', qty: 1000, packed: 1000, packType: 'ขวด + กล่อง', line: 'Pack-02', assignee: 'สมหญิง', dueDate: '2026-03-08', status: 'เสร็จสิ้น' },
-    { id: 3, code: 'PKG-2026-003', product: 'แชมพูสมุนไพร 250ml', batch: 'B-2026-020', qty: 300, packed: 0, packType: 'ขวด + ฉลาก', line: 'Pack-01', assignee: 'สมศักดิ์', dueDate: '2026-03-12', status: 'รอบรรจุ' },
-    { id: 4, code: 'PKG-2026-004', product: 'สบู่สมุนไพร 100g', batch: 'B-2026-022', qty: 800, packed: 450, packType: 'ซอง + กล่อง', line: 'Pack-03', assignee: 'สมชาย', dueDate: '2026-03-11', status: 'กำลังบรรจุ' },
-    { id: 5, code: 'PKG-2026-005', product: 'อาหารเสริมแคปซูล 60 เม็ด', batch: 'B-2026-025', qty: 200, packed: 200, packType: 'กระปุก + กล่อง + ซีล', line: 'Pack-02', assignee: 'สมหญิง', dueDate: '2026-03-07', status: 'เสร็จสิ้น' },
-];
-
+// ── Mock Data — วัสดุบรรจุภัณฑ์ (ยังไม่เชื่อม DB) ──
 const MOCK_PACKAGING_MATERIALS = [
     { id: 1, name: 'กล่องกระดาษลูกฟูก (เล็ก)', inStock: 2500, reserved: 800, unit: 'ใบ' },
     { id: 2, name: 'ขวดพลาสติก PET 30ml', inStock: 1200, reserved: 1000, unit: 'ใบ' },
@@ -34,6 +30,26 @@ const MOCK_PACKAGING_MATERIALS = [
     { id: 5, name: 'ซีลฝาขวด', inStock: 800, reserved: 200, unit: 'ชิ้น' },
 ];
 
+// ── Helper: สีสถานะ ──
+const getStatusBadge = (status) => {
+    const map = {
+        'รอบรรจุ':     'badge-danger',
+        'กำลังบรรจุ':   'badge-warning',
+        'บรรจุเสร็จ':   'badge-info',
+        'รอ QC Final': 'badge-purple',
+        'QC ผ่าน':     'badge-success',
+        'ส่งมอบแล้ว':   'badge-muted',
+    };
+    return map[status] || 'badge-info';
+};
+
+const getDestBadge = (dest) => {
+    if (dest === 'คลัง') return { bg: '#e0e7ff', color: '#4338ca', icon: <Warehouse size={12} /> };
+    return { bg: '#d1fae5', color: '#065f46', icon: <Truck size={12} /> };
+};
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export default function Packaging() {
     const { getVisibleSubPages, hasSectionPermission } = useAuth();
     const location = useLocation();
@@ -41,27 +57,226 @@ export default function Packaging() {
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
+    const [orders, setOrders] = useState([]);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    const fetchTasks = async () => {
+        setLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/packaging/tasks`);
+            if (!res.ok) throw new Error('Failed to fetch packaging tasks');
+            const data = await res.json();
+            setOrders(data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchTasks();
+    }, []);
 
     // ── Stats ──
-    const totalOrders = MOCK_PACKAGING_ORDERS.length;
-    const inProgress = MOCK_PACKAGING_ORDERS.filter(o => o.status === 'กำลังบรรจุ').length;
-    const waiting = MOCK_PACKAGING_ORDERS.filter(o => o.status === 'รอบรรจุ').length;
-    const completed = MOCK_PACKAGING_ORDERS.filter(o => o.status === 'เสร็จสิ้น').length;
+    const totalOrders = orders.length;
+    const inProgress = orders.filter(o => o.status === 'กำลังบรรจุ').length;
+    const waiting = orders.filter(o => o.status === 'รอบรรจุ').length;
+    const readyForQC = orders.filter(o => o.status === 'บรรจุเสร็จ').length;
+    const waitingQC = orders.filter(o => o.status === 'รอ QC Final').length;
+    const completed = orders.filter(o => ['QC ผ่าน', 'ส่งมอบแล้ว'].includes(o.status)).length;
 
-    // ── Packaging Dashboard ──
-    const renderPackaging = () => {
-        const filtered = MOCK_PACKAGING_ORDERS.filter(o =>
-            o.product.includes(searchTerm) || o.code.includes(searchTerm) || o.batch.includes(searchTerm)
+    // ── Actions ──
+    const updateTaskStatus = async (orderId, newStatus, fullOrder = null) => {
+        try {
+            const res = await fetch(`${API_URL}/packaging/tasks/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (res.ok) {
+                // If it's a QC request, we also need to create a QC ticket
+                if (newStatus === 'รอ QC Final' && fullOrder) {
+                    await fetch(`${API_URL}/qc/requests`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            requestID: `QCR-${Date.now()}`,
+                            taskID: fullOrder.id,
+                            jobOrderID: fullOrder.batch, // Map batch as fallback since Packaging_Tasks doesn't have JO
+                            batchNo: fullOrder.batch,
+                            formulaName: fullOrder.product,
+                            line: fullOrder.line,
+                            type: 'qc_final',
+                            requestedAt: new Date().toISOString(),
+                            status: 'รอตรวจ'
+                        })
+                    });
+                }
+
+                // Refresh data instead of only changing state to ensure sync
+                fetchTasks();
+                // Also update local selected order if it's open
+                setSelectedOrder(prev => prev?.id === orderId ? { ...prev, status: newStatus } : prev);
+            } else {
+                alert('เกิดข้อผิดพลาดในการอัปเดตสถานะ');
+            }
+        } catch (err) {
+            console.error('Update err', err);
+            alert('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+        }
+    };
+
+    const handleSendToQC = (order) => {
+        updateTaskStatus(order.id, 'รอ QC Final', order);
+    };
+
+    const handleMarkAsDelivered = (orderId) => {
+        updateTaskStatus(orderId, 'ส่งมอบแล้ว');
+    };
+
+    // ── Filter ──
+    const statusOptions = ['ทั้งหมด', 'รอบรรจุ', 'กำลังบรรจุ', 'บรรจุเสร็จ', 'รอ QC Final', 'QC ผ่าน', 'ส่งมอบแล้ว'];
+    const filtered = orders.filter(o => {
+        const matchSearch = o.product.includes(searchTerm) || o.code.includes(searchTerm) || o.batch.includes(searchTerm);
+        const matchStatus = statusFilter === 'ทั้งหมด' || o.status === statusFilter;
+        return matchSearch && matchStatus;
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    // Modal: รายละเอียดคำสั่งบรรจุ
+    // ══════════════════════════════════════════════════════════════
+    const renderDetailModal = () => {
+        if (!selectedOrder) return null;
+        const o = selectedOrder;
+        const dest = getDestBadge(o.destination);
+        const progress = o.qty > 0 ? Math.round((o.packed / o.qty) * 100) : 0;
+
+        return (
+            <div className="pkg-modal-overlay" onClick={() => setSelectedOrder(null)}>
+                <div className="pkg-modal" onClick={e => e.stopPropagation()}>
+                    {/* Header */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 24px', borderBottom: '1px solid #e5e7eb' }}>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>📦 {o.code}</h2>
+                            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#71717a' }}>{o.product}</p>
+                        </div>
+                        <button onClick={() => setSelectedOrder(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717a' }}>
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div style={{ padding: '20px 24px' }}>
+                        {/* Status + Destination */}
+                        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+                            <span className={`badge ${getStatusBadge(o.status)}`} style={{ fontSize: 13, padding: '6px 14px' }}>
+                                {o.status}
+                            </span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: dest.bg, color: dest.color, padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600 }}>
+                                {dest.icon} {o.destination}
+                            </span>
+                        </div>
+
+                        {/* Info Grid */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 24px' }}>
+                            <div>
+                                <span style={{ fontSize: 12, color: '#a1a1aa', fontWeight: 500 }}>Batch</span>
+                                <p style={{ margin: '2px 0 0', fontWeight: 600 }}>{o.batch}</p>
+                            </div>
+                            <div>
+                                <span style={{ fontSize: 12, color: '#a1a1aa', fontWeight: 500 }}>ประเภทบรรจุ</span>
+                                <p style={{ margin: '2px 0 0', fontWeight: 600 }}>{o.packType}</p>
+                            </div>
+                            <div>
+                                <span style={{ fontSize: 12, color: '#a1a1aa', fontWeight: 500 }}>Line บรรจุ</span>
+                                <p style={{ margin: '2px 0 0', fontWeight: 600 }}>{o.line}</p>
+                            </div>
+                            <div>
+                                <span style={{ fontSize: 12, color: '#a1a1aa', fontWeight: 500 }}>ผู้รับผิดชอบ</span>
+                                <p style={{ margin: '2px 0 0', fontWeight: 600 }}>{o.assignee}</p>
+                            </div>
+                            <div>
+                                <span style={{ fontSize: 12, color: '#a1a1aa', fontWeight: 500 }}>กำหนดส่ง</span>
+                                <p style={{ margin: '2px 0 0', fontWeight: 600 }}>{o.dueDate}</p>
+                            </div>
+                            {o.customer && (
+                                <div>
+                                    <span style={{ fontSize: 12, color: '#a1a1aa', fontWeight: 500 }}>ลูกค้า OEM</span>
+                                    <p style={{ margin: '2px 0 0', fontWeight: 600, color: '#0d9488' }}>{o.customer}</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Progress */}
+                        <div style={{ marginTop: 20 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <span style={{ fontSize: 13, fontWeight: 600 }}>ความคืบหน้าการบรรจุ</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: progress === 100 ? '#16a34a' : '#4f46e5' }}>{progress}%</span>
+                            </div>
+                            <div className="progress-container" style={{ height: 28, borderRadius: 8 }}>
+                                <div className="progress-bar" style={{
+                                    width: `${progress}%`,
+                                    backgroundColor: progress === 100 ? '#16a34a' : '#6366f1',
+                                    borderRadius: 8,
+                                }} />
+                                <span className="progress-text" style={{ fontSize: 12 }}>{o.packed.toLocaleString()} / {o.qty.toLocaleString()}</span>
+                            </div>
+                        </div>
+
+                        {/* Note */}
+                        {o.note && (
+                            <div style={{ marginTop: 16, padding: '12px 16px', background: '#fafaf9', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                                <span style={{ fontSize: 12, color: '#a1a1aa', fontWeight: 500 }}>หมายเหตุ</span>
+                                <p style={{ margin: '4px 0 0', fontSize: 14 }}>{o.note}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer Actions */}
+                    <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                        {o.status === 'บรรจุเสร็จ' && (
+                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                                onClick={() => handleSendToQC(o)}>
+                                <Send size={14} /> ส่ง QC Final ตรวจสอบ
+                            </button>
+                        )}
+                        {o.status === 'QC ผ่าน' && o.destination === 'คลัง' && (
+                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#4338ca' }}
+                                onClick={() => handleMarkAsDelivered(o.id)}>
+                                <Warehouse size={14} /> ส่งเข้าคลังสินค้า
+                            </button>
+                        )}
+                        {o.status === 'QC ผ่าน' && o.destination === 'จัดส่ง OEM' && (
+                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#0d9488' }}
+                                onClick={() => handleMarkAsDelivered(o.id)}>
+                                <Truck size={14} /> ส่งต่อฝ่ายจัดส่ง (OEM)
+                            </button>
+                        )}
+                        <button className="btn-secondary" onClick={() => setSelectedOrder(null)}
+                            style={{ padding: '8px 20px', borderRadius: 8, fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <X size={14} /> ปิด
+                        </button>
+                    </div>
+                </div>
+            </div>
         );
+    };
 
+    // ══════════════════════════════════════════════════════════════
+    // Packaging Dashboard
+    // ══════════════════════════════════════════════════════════════
+    const renderPackaging = () => {
         return (
             <div className="packaging-main">
                 <div className="page-title">
-                    <h1>Packaging</h1>
-                    <p>จัดการงานบรรจุภัณฑ์และติดตามสถานะการบรรจุ</p>
+                    <h1>📦 Packaging (บรรจุภัณฑ์)</h1>
+                    <p>จัดการงานบรรจุภัณฑ์และติดตามสถานะการบรรจุ → ส่ง QC Final</p>
                 </div>
 
-                {/* Summary Cards */}
+                {/* ── Summary Cards ── */}
                 {hasSectionPermission('packaging_main_stats') && (
                     <div className="summary-row">
                         <div className="card summary-card">
@@ -69,36 +284,119 @@ export default function Packaging() {
                             <div><span className="summary-label">คำสั่งบรรจุทั้งหมด</span><span className="summary-value">{totalOrders}</span></div>
                         </div>
                         <div className="card summary-card">
-                            <div className="summary-icon" style={{ background: '#fff8e1', color: '#f9a825' }}><Clock size={20} /></div>
-                            <div><span className="summary-label">กำลังบรรจุ</span><span className="summary-value">{inProgress}</span></div>
-                        </div>
-                        <div className="card summary-card">
                             <div className="summary-icon" style={{ background: '#fce4ec', color: '#e53935' }}><AlertTriangle size={20} /></div>
                             <div><span className="summary-label">รอบรรจุ</span><span className="summary-value">{waiting}</span></div>
                         </div>
                         <div className="card summary-card">
+                            <div className="summary-icon" style={{ background: '#fff8e1', color: '#f9a825' }}><Clock size={20} /></div>
+                            <div><span className="summary-label">กำลังบรรจุ</span><span className="summary-value">{inProgress}</span></div>
+                        </div>
+                        <div className="card summary-card">
+                            <div className="summary-icon" style={{ background: '#e0e7ff', color: '#4f46e5' }}><PackageCheck size={20} /></div>
+                            <div><span className="summary-label">บรรจุเสร็จ / รอ QC</span><span className="summary-value">{readyForQC + waitingQC}</span></div>
+                        </div>
+                        <div className="card summary-card">
                             <div className="summary-icon" style={{ background: '#e8f5e9', color: '#43a047' }}><CheckCircle2 size={20} /></div>
-                            <div><span className="summary-label">เสร็จสิ้น</span><span className="summary-value">{completed}</span></div>
+                            <div><span className="summary-label">QC ผ่าน / ส่งมอบ</span><span className="summary-value">{completed}</span></div>
                         </div>
                     </div>
                 )}
 
-                {/* Orders Table */}
+                {/* ── Flow Indicator ── */}
+                <div className="card" style={{ padding: '14px 20px', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, fontWeight: 500 }}>
+                        <span style={{ color: '#71717a' }}>🔄 Flow:</span>
+                        <span className="badge badge-danger" style={{ fontSize: 11 }}>รอบรรจุ</span>
+                        <span style={{ color: '#d4d4d8' }}>→</span>
+                        <span className="badge badge-warning" style={{ fontSize: 11 }}>กำลังบรรจุ</span>
+                        <span style={{ color: '#d4d4d8' }}>→</span>
+                        <span className="badge badge-info" style={{ fontSize: 11 }}>บรรจุเสร็จ</span>
+                        <span style={{ color: '#d4d4d8' }}>→</span>
+                        <span className="badge badge-purple" style={{ fontSize: 11 }}>รอ QC Final</span>
+                        <span style={{ color: '#d4d4d8' }}>→</span>
+                        <span className="badge badge-success" style={{ fontSize: 11 }}>QC ผ่าน</span>
+                        <span style={{ color: '#d4d4d8' }}>→</span>
+                        <span className="badge badge-muted" style={{ fontSize: 11 }}>ส่งมอบ</span>
+                    </div>
+                </div>
+
+                {/* ── Active Tasks (Kanban Board) ── */}
+                {loading ? null : (
+                    <div style={{ marginBottom: 24 }}>
+                        <h3 className="card-title" style={{ fontSize: '1.1rem', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <PackageOpen size={18} className="pkg-pulse" /> งานบรรจุภัณฑ์ที่กำลังดำเนินการ
+                        </h3>
+                        <div className="pkg-active-grid">
+                            {orders.filter(o => o.status === 'รอบรรจุ' || o.status === 'กำลังบรรจุ').map(order => (
+                                <div key={order.id} className="pkg-active-card">
+                                    <div className="pkg-active-top">
+                                        <div>
+                                            <span className="pkg-active-batch">{order.batch}</span>
+                                            <span className="pkg-batch-code">รหัส: {order.code}</span>
+                                        </div>
+                                        <span className={`badge ${getStatusBadge(order.status)}`}>{order.status}</span>
+                                    </div>
+                                    <div className="pkg-active-product">{order.product}</div>
+                                    <div className="pkg-active-meta">
+                                        <Box size={14} /> {order.packType} • {order.line}
+                                    </div>
+                                    <div className="progress-container">
+                                        <div className="progress-bar" style={{ width: `${order.qty > 0 ? (order.packed / order.qty) * 100 : 0}%`, backgroundColor: 'var(--primary)' }}></div>
+                                        <span className="progress-text">{order.packed} / {order.qty}</span>
+                                    </div>
+                                    <div className="pkg-active-actions">
+                                        {order.status === 'รอบรรจุ' ? (
+                                            <button className="pkg-btn-start" onClick={() => updateTaskStatus(order.id, 'กำลังบรรจุ')}>
+                                                เริ่มบรรจุ
+                                            </button>
+                                        ) : order.status === 'กำลังบรรจุ' ? (
+                                            <button className="pkg-btn-complete" onClick={() => updateTaskStatus(order.id, 'บรรจุเสร็จ')}>
+                                                <CheckCircle2 size={14} style={{ marginRight: 4, verticalAlign: 'text-bottom' }} /> บรรจุเสร็จ
+                                            </button>
+                                        ) : null}
+                                        <button className="btn-sm" onClick={() => setSelectedOrder(order)} style={{ background: '#f4f4f5', color: '#1a1a2e', border: '1px solid #e4e4e7', padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                                            <Eye size={14} style={{ marginRight: 4, verticalAlign: 'text-bottom' }} /> รายละเอียด
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                            {orders.filter(o => o.status === 'รอบรรจุ' || o.status === 'กำลังบรรจุ').length === 0 && (
+                                <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px dashed #cbd5e1', textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+                                    ✅ ไม่มีงานบรรจุภัณฑ์ที่ค้างอยู่
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Toolbar ── */}
                 {hasSectionPermission('packaging_main_orders') && (
                     <>
                         <div className="toolbar">
-                            <div className="search-box">
-                                <Search size={16} />
-                                <input
-                                    type="text"
-                                    placeholder="ค้นหาคำสั่งบรรจุ..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+                            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <div className="search-box">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="ค้นหาคำสั่งบรรจุ..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                </div>
+                                <select
+                                    value={statusFilter}
+                                    onChange={(e) => setStatusFilter(e.target.value)}
+                                    style={{ padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 13, background: '#fff', cursor: 'pointer' }}
+                                >
+                                    {statusOptions.map(s => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
                             </div>
                             <button className="btn-primary"><Plus size={16} /> สร้างคำสั่งบรรจุ</button>
                         </div>
 
+                        {/* ── Orders Table ── */}
                         <div className="card table-card">
                             <table className="data-table">
                                 <thead>
@@ -108,48 +406,89 @@ export default function Packaging() {
                                         <th>Batch</th>
                                         <th>ประเภทบรรจุ</th>
                                         <th>Line</th>
-                                        <th>ผู้รับผิดชอบ</th>
+                                        <th>ปลายทาง</th>
                                         <th>ความคืบหน้า</th>
                                         <th>กำหนดส่ง</th>
                                         <th>สถานะ</th>
+                                        <th>จัดการ</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filtered.map(order => (
-                                        <tr key={order.id}>
-                                            <td className="text-bold">{order.code}</td>
-                                            <td>{order.product}</td>
-                                            <td>{order.batch}</td>
-                                            <td><span className="badge badge-info">{order.packType}</span></td>
-                                            <td>{order.line}</td>
-                                            <td>{order.assignee}</td>
-                                            <td>
-                                                <div className="progress-container">
-                                                    <div className="progress-bar" style={{
-                                                        width: `${(order.packed / order.qty) * 100}%`,
-                                                        backgroundColor: order.status === 'เสร็จสิ้น' ? 'var(--success, #43a047)' : 'var(--primary, #7b7bf5)'
-                                                    }}></div>
-                                                    <span className="progress-text">{order.packed} / {order.qty}</span>
-                                                </div>
-                                            </td>
-                                            <td>{order.dueDate}</td>
-                                            <td>
-                                                <span className={`badge ${order.status === 'เสร็จสิ้น' ? 'badge-success' : order.status === 'กำลังบรรจุ' ? 'badge-warning' : 'badge-danger'}`}>
-                                                    {order.status}
-                                                </span>
+                                    {loading ? (
+                                        <tr><td colSpan="10" style={{ textAlign: 'center', padding: '32px' }}>กำลังโหลดข้อมูล...</td></tr>
+                                    ) : filtered.map(order => {
+                                        const dest = getDestBadge(order.destination);
+                                        return (
+                                            <tr key={order.id}>
+                                                <td className="text-bold">{order.code}</td>
+                                                <td>{order.product}</td>
+                                                <td>{order.batch}</td>
+                                                <td><span className="badge badge-info">{order.packType}</span></td>
+                                                <td>{order.line}</td>
+                                                <td>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: dest.bg, color: dest.color, padding: '3px 10px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                                                        {dest.icon} {order.destination}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    {(() => {
+                                                        const pct = order.qty > 0 ? Math.round((order.packed / order.qty) * 100) : 0;
+                                                        const isDone = pct === 100;
+                                                        return (
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                <span style={{ fontSize: 13, fontWeight: 600, color: isDone ? '#16a34a' : '#3f3f46' }}>
+                                                                    {order.packed.toLocaleString()}<span style={{ color: '#a1a1aa', fontWeight: 400 }}> / {order.qty.toLocaleString()}</span>
+                                                                </span>
+                                                                <span style={{
+                                                                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
+                                                                    background: isDone ? '#dcfce7' : pct > 0 ? '#fef3c7' : '#f4f4f5',
+                                                                    color: isDone ? '#16a34a' : pct > 0 ? '#d97706' : '#a1a1aa',
+                                                                }}>
+                                                                    {pct}%
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </td>
+                                                <td>{order.dueDate}</td>
+                                                <td>
+                                                    <span className={`badge ${getStatusBadge(order.status)}`}>
+                                                        {order.status}
+                                                    </span>
+                                                </td>
+                                                <td style={{ whiteSpace: 'nowrap' }}>
+                                                    <div style={{ display: 'flex', gap: 4 }}>
+                                                        <button className="btn-sm" onClick={() => setSelectedOrder(order)} title="ดูรายละเอียด">
+                                                            <Eye size={14} />
+                                                        </button>
+                                                        {order.status === 'บรรจุเสร็จ' && (
+                                                            <button className="btn-sm btn-primary" title="ส่ง QC Final"
+                                                                onClick={() => handleSendToQC(order)}>
+                                                                <Send size={14} /> QC
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {filtered.length === 0 && (
+                                        <tr>
+                                            <td colSpan="10" style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
+                                                ไม่พบรายการที่ค้นหา
                                             </td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
                     </>
                 )}
 
-                {/* Packaging Materials */}
+                {/* ── Packaging Materials ── */}
                 {hasSectionPermission('packaging_main_materials') && (
                     <div className="card table-card" style={{ marginTop: '20px' }}>
-                        <h3 className="card-title">วัสดุบรรจุภัณฑ์คงเหลือ</h3>
+                        <h3 className="card-title">🧱 วัสดุบรรจุภัณฑ์คงเหลือ</h3>
                         <table className="data-table">
                             <thead>
                                 <tr>
@@ -197,6 +536,7 @@ export default function Packaging() {
     return (
         <div className="page-container packaging-page page-enter">
             {currentTab === 'packaging_main' && renderPackaging()}
+            {renderDetailModal()}
         </div>
     );
 }

@@ -9,7 +9,7 @@
     font-weight: 600;
     color: var(--text, #1a1a2e);
     margin: 0 0 16px 0;
-    padding-bottom: 12px;
+    padding: 16px 24px;
     border-bottom: 1px solid var(--border-light, #eee);
 }
 
@@ -17,6 +17,7 @@
     margin-bottom: 16px;
 }
 
+/* ── Progress Bar ── */
 .progress-container {
     position: relative;
     width: 100%;
@@ -40,4 +41,161 @@
     font-size: 11px;
     font-weight: 600;
     color: var(--text, #1a1a2e);
+}
+
+/* ── Extra Badge Styles ── */
+.badge-purple {
+    background: #ede9fe;
+    color: #7c3aed;
+}
+
+.badge-muted {
+    background: #f4f4f5;
+    color: #a1a1aa;
+}
+
+/* ── Modal ── */
+.pkg-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: pkgFadeIn 0.2s;
+}
+
+.pkg-modal {
+    background: var(--bg-white, #fff);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    animation: pkgSlideUp 0.25s;
+}
+
+@keyframes pkgFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes pkgSlideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Active Tasks Grid (Kanban Style) ── */
+.pkg-active-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.pkg-active-card {
+    background: #fff;
+    border: 1px solid var(--border-light, #e2e8f0);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+}
+
+.pkg-active-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.pkg-active-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.pkg-active-batch {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text, #1a1a2e);
+}
+
+.pkg-batch-code {
+    display: block;
+    color: var(--text-muted, #71717a);
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.pkg-active-product {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary-dark, #5c5ce0);
+}
+
+.pkg-active-meta {
+    font-size: 12px;
+    color: var(--text-secondary, #475569);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pkg-active-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light, #f1f5f9);
+}
+
+.pkg-btn-start {
+    background: #e0e7ff;
+    color: #4338ca;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.pkg-btn-start:hover {
+    background: #c7d2fe;
+}
+
+.pkg-btn-complete {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.pkg-btn-complete:hover {
+    background: #059669;
+}
+
+.pkg-pulse {
+    animation: pkgIconPulse 1.5s ease-in-out infinite;
+    color: #3b82f6;
+}
+
+@keyframes pkgIconPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.8; }
 }
