@@ -650,10 +650,17 @@ export default function Planning() {
                                 </span>
                             </div>
                             <div className="rnd-modal-info-item" style={{ background: '#f0ebff', padding: 12, borderRadius: 8 }}>
-                                <label style={{ color: '#7b7bf5', fontWeight: 700 }}>ระบบจะจัดคิวรันงานจำนวน</label>
-                                <span style={{ fontSize: 18, fontWeight: 800, color: '#5b21b6' }}>
-                                    {createForm.batchQty > 0 ? `${createForm.batchQty.toLocaleString()} Batch` : '—'}
-                                </span>
+                                <label style={{ color: '#7b7bf5', fontWeight: 700 }}>จำนวน Batch (จำนวนใบงาน)</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                    <input 
+                                        type="number" min="1"
+                                        style={{ width: '80px', padding: '6px 12px', borderRadius: 8, border: '1.5px solid #c4b5fd', fontSize: 16, fontWeight: 700, color: '#5b21b6' }}
+                                        value={createForm.batchQty}
+                                        onChange={(e) => setCreateForm(prev => ({ ...prev, batchQty: parseInt(e.target.value) || 1 }))}
+                                    />
+                                    <span style={{ fontSize: 16, fontWeight: 800, color: '#5b21b6' }}>Batch</span>
+                                </div>
+                                <p style={{ margin: '4px 0 0', fontSize: 11, color: '#7b7bf5' }}>* ระบบจะแยกเป็นหลายใบงานตามจำนวนเครื่องผสม สามารถแก้เป็น 1 ได้ถ้าต้องการใบเดียว</p>
                             </div>
                         </div>
 

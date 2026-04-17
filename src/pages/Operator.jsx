@@ -590,7 +590,7 @@ export default function Operator() {
                             </thead>
                             <tbody>
                                 {filtered.map(task => {
-                                    const rate = ((task.producedQty - task.defectQty) / task.producedQty * 100).toFixed(1);
+                                    const rate = task.producedQty > 0 ? ((task.producedQty - task.defectQty) / task.producedQty * 100).toFixed(1) : '0.0';
                                     return (
                                         <tr key={task.id}>
                                             <td className="text-bold">{task.id}</td>

@@ -140,11 +140,47 @@ export default function QC() {
         return 'badge-neutral';
     };
 
-    // ── Handle QC inspection submit ──
-    const handleInspect = (requestId, result) => {
-        submitQcResult(requestId, result, 'qc1', inspectNotes);
-        setInspectingRequest(null);
+    // ── Inspect QC Request (Checklists) ──
+    const [checklistData, setChecklistData] = useState([]);
+    const [loadingCriteria, setLoadingCriteria] = useState(false);
+
+    const openInspectModal = async (req) => {
+        setInspectingRequest(req);
         setInspectNotes('');
+        setLoadingCriteria(true);
+        // fetch criteria
+        try {
+            const url = `${API_BASE}/qc/criteria?category=${encodeURIComponent(req.formulaName || '')}&stage=${req.type}`;
+            const res = await fetch(url);
+            if (res.ok) {
+                const criteria = await res.json();
+                setChecklistData(criteria.map(c => ({
+                    CriteriaID: c.CriteriaID,
+                    CheckItem: c.CheckItem,
+                    StandardRequirement: c.StandardRequirement,
+                    IsPass: true, // Default pass
+                    ActualValue: ''
+                })));
+            }
+        } catch (err) {
+            console.error('Failed to load QC criteria', err);
+        } finally {
+            setLoadingCriteria(false);
+        }
+    };
+
+    const handleInspectSubmit = (finalResult) => {
+        if (!inspectingRequest) return;
+        submitQcResult(inspectingRequest.id, finalResult, 'qc_user', inspectNotes, checklistData);
+        setInspectingRequest(null);
+        setChecklistData([]);
+        setInspectNotes('');
+    };
+
+    const handleChecklistChange = (criteriaId, field, value) => {
+        setChecklistData(prev => prev.map(item => 
+            item.CriteriaID === criteriaId ? { ...item, [field]: value } : item
+        ));
     };
 
     // ── Render QC requests from Production as a table ──
@@ -176,36 +212,101 @@ export default function QC() {
                                         <span>📅 ส่ง: {req.requestedAt}</span>
                                         <span>🏭 {req.line}</span>
                                     </div>
-
-                                    {inspectingRequest === req.id ? (
-                                        <div className="qc-inspect-form">
-                                            <textarea
-                                                className="qc-inspect-notes"
-                                                placeholder="หมายเหตุ (ถ้ามี)..."
-                                                value={inspectNotes}
-                                                onChange={(e) => setInspectNotes(e.target.value)}
-                                            />
-                                            <div className="qc-inspect-actions">
-                                                <button className="qc-btn qc-btn-pass" onClick={() => handleInspect(req.id, 'ผ่าน')}>
-                                                    ✅ ผ่าน
-                                                </button>
-                                                <button className="qc-btn qc-btn-fail" onClick={() => handleInspect(req.id, 'ไม่ผ่าน')}>
-                                                    ❌ ไม่ผ่าน
-                                                </button>
-                                                <button className="qc-btn qc-btn-cancel" onClick={() => { setInspectingRequest(null); setInspectNotes(''); }}>
-                                                    ยกเลิก
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="qc-pending-actions">
-                                            <button className="qc-btn qc-btn-inspect" onClick={() => setInspectingRequest(req.id)}>
-                                                🔍 ตรวจสอบ
-                                            </button>
-                                        </div>
-                                    )}
+                                    
+                                    <div className="qc-pending-actions">
+                                        <button className="qc-btn qc-btn-inspect" onClick={() => openInspectModal(req)}>
+                                            🔍 ตรวจสอบคุณภาพ
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Inspect Modal Overlay */}
+                {inspectingRequest && inspectingRequest.type === type && (
+                    <div className="pkg-modal-overlay" onClick={() => setInspectingRequest(null)}>
+                        <div className="pkg-modal" style={{ maxWidth: 800, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', background: '#f8fafc' }}>
+                                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>🔍 แบบฟอร์มตรวจ QC ({inspectingRequest.type === 'qc_inprocess' ? 'In-Process' : 'Final'})</h2>
+                                <p style={{ margin: '4px 0 0', fontSize: 14, color: '#64748b' }}>
+                                    {inspectingRequest.batchNo} — {inspectingRequest.formulaName}
+                                </p>
+                            </div>
+                            
+                            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
+                                {loadingCriteria ? (
+                                    <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>กำลังโหลดเกณฑ์มาตรฐาน...</div>
+                                ) : (
+                                    <div className="qc-checklist-container">
+                                        <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            📋 รายการที่ต้องตรวจสอบ (มาตรฐาน)
+                                        </h3>
+                                        
+                                        {checklistData.length === 0 ? (
+                                            <p style={{ color: '#94a3b8', fontSize: 14 }}>ไม่มีหัวข้อตรวจแบบเฉพาะเจาะจง (ใช้การประเมินทั่วไป)</p>
+                                        ) : (
+                                            <table className="data-table" style={{ marginBottom: 20 }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th style={{ width: 60, textAlign: 'center' }}>ผ่าน</th>
+                                                        <th>หัวข้อที่ตรวจ</th>
+                                                        <th>เกณฑ์อ้างอิง Spec</th>
+                                                        <th>ค่าที่วัดได้จริง (Optional)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {checklistData.map((item) => (
+                                                        <tr key={item.CriteriaID} style={{ background: item.IsPass ? 'transparent' : '#fef2f2' }}>
+                                                            <td style={{ textAlign: 'center' }}>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    checked={item.IsPass}
+                                                                    onChange={(e) => handleChecklistChange(item.CriteriaID, 'IsPass', e.target.checked)}
+                                                                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: item.IsPass ? '#16a34a' : 'initial' }}
+                                                                />
+                                                            </td>
+                                                            <td style={{ fontWeight: 500 }}>{item.CheckItem}</td>
+                                                            <td style={{ color: '#64748b', fontSize: 13 }}>{item.StandardRequirement}</td>
+                                                            <td>
+                                                                <input 
+                                                                    type="text" 
+                                                                    placeholder="ระบุค่า"
+                                                                    value={item.ActualValue}
+                                                                    onChange={(e) => handleChecklistChange(item.CriteriaID, 'ActualValue', e.target.value)}
+                                                                    style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}
+                                                                />
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        )}
+
+                                        <div style={{ marginTop: 20 }}>
+                                            <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 6 }}>หมายเหตุรวม (ข้อติชม/สรุปผล):</label>
+                                            <textarea 
+                                                rows={3} 
+                                                value={inspectNotes}
+                                                onChange={e => setInspectNotes(e.target.value)}
+                                                placeholder="ความเห็นจากเจ้าหน้าที่ QC..."
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, resize: 'vertical' }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 12, background: '#fff' }}>
+                                <button className="btn-secondary" onClick={() => setInspectingRequest(null)}>ยกเลิก</button>
+                                <button className="btn-danger" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => handleInspectSubmit('ไม่ผ่าน')}>
+                                    ❌ ไม่ผ่าน (Reject)
+                                </button>
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#16a34a', borderColor: '#16a34a' }} onClick={() => handleInspectSubmit('ผ่าน')}>
+                                    ✅ ผ่าน QC (Approve)
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}

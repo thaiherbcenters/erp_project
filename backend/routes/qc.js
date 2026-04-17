@@ -95,7 +95,7 @@ router.post('/requests', async (req, res) => {
 // Update a production QC Request (QC performing the inspection)
 router.put('/requests/:id', async (req, res) => {
     try {
-        const { result_status, inspector, inspectedAt, notes } = req.body;
+        const { result_status, inspector, inspectedAt, notes, checklist } = req.body;
         const requestID = req.params.id;
         
         const pool = await poolPromise;
@@ -118,6 +118,24 @@ router.put('/requests/:id', async (req, res) => {
         if (result.rowsAffected[0] === 0) {
             return res.status(404).json({ message: 'QC Request not found' });
         }
+
+        // --- Save checklist results if provided ---
+        if (checklist && Array.isArray(checklist) && checklist.length > 0) {
+            for (const item of checklist) {
+                // Ignore if missing CriteriaID
+                if (!item.CriteriaID) continue;
+                await pool.request()
+                    .input('ReferenceID', sql.VarChar, requestID)
+                    .input('CriteriaID', sql.Int, item.CriteriaID)
+                    .input('IsPass', sql.Bit, item.IsPass ? 1 : 0)
+                    .input('ActualValue', sql.NVarChar, item.ActualValue || '')
+                    .query(`
+                        INSERT INTO QC_Results (ReferenceID, CriteriaID, IsPass, ActualValue)
+                        VALUES (@ReferenceID, @CriteriaID, @IsPass, @ActualValue)
+                    `);
+            }
+        }
+
         res.json(result.recordset[0]);
     } catch (err) {
         console.error('Error updating qc request:', err);
@@ -129,6 +147,48 @@ router.put('/requests/:id', async (req, res) => {
 // ==========================================
 // QC DEFECT / NCR MODULE
 // ==========================================
+// Get QC Criteria based on category and stage
+router.get('/criteria', async (req, res) => {
+    try {
+        const { category, stage } = req.query;
+        let productCat = category || 'All';
+        const qcStage = stage || 'Incoming';
+
+        // Simplify category matching based on keyword
+        if (productCat.includes('ยาดม')) productCat = 'ยาดม';
+        else if (productCat.includes('ครีม') || productCat.includes('ยาหม่อง')) productCat = 'ครีม';
+        else if (productCat.includes('น้ำมัน')) productCat = 'น้ำมันนวด';
+
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('Category', sql.NVarChar, productCat)
+            .input('QCStage', sql.VarChar, qcStage)
+            .query(`
+                SELECT * FROM QC_Criteria 
+                WHERE (ProductCategory = @Category OR ProductCategory = 'All')
+                  AND QCStage = @QCStage
+                ORDER BY CriteriaID ASC
+            `);
+        
+        // If no specific criteria, return 'All' category for this stage
+        if (result.recordset.length === 0) {
+             const fallback = await pool.request()
+                .input('QCStage', sql.VarChar, qcStage)
+                .query(`
+                    SELECT * FROM QC_Criteria 
+                    WHERE ProductCategory = 'All' AND QCStage = @QCStage
+                    ORDER BY CriteriaID ASC
+                `);
+             return res.json(fallback.recordset);
+        }
+
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching qc criteria:', err);
+        res.status(500).json({ message: 'Error fetching qc criteria' });
+    }
+});
+
 router.get('/defect', async (req, res) => {
     try {
         const pool = await poolPromise;

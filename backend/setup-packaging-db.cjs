@@ -16,13 +16,15 @@ async function createPackagingTables() {
                     PackType NVARCHAR(100),
                     Line VARCHAR(100),
                     Qty INT,
-                    PackedQty INT,
+                    PackedQty INT DEFAULT 0,
                     Assignee NVARCHAR(100),
                     DueDate DATE,
                     Status NVARCHAR(50), -- 'รอบรรจุ', 'กำลังบรรจุ', 'บรรจุเสร็จ', 'รอ QC Final', 'QC ผ่าน', 'ส่งมอบแล้ว'
                     Destination NVARCHAR(50), -- 'คลัง', 'จัดส่ง OEM'
                     Customer NVARCHAR(255),
                     Note NVARCHAR(MAX),
+                    ProductionTaskID VARCHAR(50) NULL, -- Link back to Production_Tasks.TaskID
+                    JobOrderID VARCHAR(50) NULL,        -- Link to Job Order
                     CreatedAt DATETIME DEFAULT GETDATE(),
                     UpdatedAt DATETIME DEFAULT GETDATE()
                 )

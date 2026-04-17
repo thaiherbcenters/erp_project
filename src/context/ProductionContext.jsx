@@ -102,13 +102,14 @@ export function ProductionProvider({ children }) {
     }, [fetchQcRequests]);
 
     // ── QC submits result ──
-    const submitQcResult = useCallback(async (requestId, result, inspector, notes) => {
+    const submitQcResult = useCallback(async (requestId, result, inspector, notes, checklist = []) => {
         const now = new Date().toISOString();
         const payload = {
             result_status: result,
             inspector: inspector || 'system',
             inspectedAt: now,
             notes: notes || '',
+            checklist: checklist
         };
 
         try {
@@ -133,6 +134,8 @@ export function ProductionProvider({ children }) {
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ status: nextStatus })
                             });
+                            // Refresh production tasks to sync the stepper UI since backend advanced it
+                            await fetchTasks();
                         } catch (pkgErr) {
                             console.error('Failed to update packaging task after QC:', pkgErr);
                         }

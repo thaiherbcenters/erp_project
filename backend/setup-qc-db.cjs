@@ -110,9 +110,42 @@ async function createQcTables() {
             END
         `);
 
+        // 5. QC_Criteria (Master)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='QC_Criteria' AND xtype='U')
+            BEGIN
+                CREATE TABLE QC_Criteria (
+                    CriteriaID INT IDENTITY(1,1) PRIMARY KEY,
+                    ProductCategory NVARCHAR(100),
+                    QCStage VARCHAR(50), 
+                    CheckItem NVARCHAR(255),
+                    StandardRequirement NVARCHAR(255),
+                    IsRequired BIT DEFAULT 1,
+                    CreatedAt DATETIME DEFAULT GETDATE()
+                )
+                PRINT 'Table QC_Criteria created successfully.';
+            END
+        `);
+
+        // 6. QC_Results (Transaction)
+        await pool.request().query(`
+            IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='QC_Results' AND xtype='U')
+            BEGIN
+                CREATE TABLE QC_Results (
+                    ResultID INT IDENTITY(1,1) PRIMARY KEY,
+                    ReferenceID VARCHAR(50), 
+                    CriteriaID INT,
+                    IsPass BIT,
+                    ActualValue NVARCHAR(255),
+                    Note NVARCHAR(MAX),
+                    CreatedAt DATETIME DEFAULT GETDATE()
+                )
+                PRINT 'Table QC_Results created successfully.';
+            END
+        `);
+
         console.log('✅ QC database setup completed.');
         process.exit(0);
-
     } catch (error) {
         console.error('❌ Error setting up QC database:', error);
         process.exit(1);
