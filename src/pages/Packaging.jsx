@@ -307,10 +307,9 @@ export default function Packaging() {
                     {/* Footer Actions */}
                     <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
                         {o.status === 'บรรจุเสร็จ' && (
-                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-                                onClick={() => handleSendToQC(o)}>
-                                <Send size={14} /> ส่ง QC Final ตรวจสอบ
-                            </button>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#7c3aed', fontWeight: 600, fontSize: 13, background: '#f5f3ff', padding: '8px 14px', borderRadius: 8 }}>
+                                <ShieldCheck size={14} /> ✅ ส่ง QC Final อัตโนมัติแล้ว
+                            </span>
                         )}
                         {o.status === 'QC ผ่าน' && o.destination === 'คลัง' && (
                             <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#4338ca' }}
@@ -484,23 +483,7 @@ export default function Packaging() {
                     </div>
                 )}
 
-                {/* ── Flow Indicator ── */}
-                <div className="card" style={{ padding: '14px 20px', marginBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 13, fontWeight: 500 }}>
-                        <span style={{ color: '#71717a' }}>🔄 Flow:</span>
-                        <span className="badge badge-danger" style={{ fontSize: 11 }}>รอบรรจุ</span>
-                        <span style={{ color: '#d4d4d8' }}>→</span>
-                        <span className="badge badge-warning" style={{ fontSize: 11 }}>กำลังบรรจุ</span>
-                        <span style={{ color: '#d4d4d8' }}>→</span>
-                        <span className="badge badge-info" style={{ fontSize: 11 }}>บรรจุเสร็จ</span>
-                        <span style={{ color: '#d4d4d8' }}>→</span>
-                        <span className="badge badge-purple" style={{ fontSize: 11 }}>รอ QC Final</span>
-                        <span style={{ color: '#d4d4d8' }}>→</span>
-                        <span className="badge badge-success" style={{ fontSize: 11 }}>QC ผ่าน</span>
-                        <span style={{ color: '#d4d4d8' }}>→</span>
-                        <span className="badge badge-muted" style={{ fontSize: 11 }}>ส่งมอบ</span>
-                    </div>
-                </div>
+
 
                 {/* ── Active Tasks (Kanban Board) ── */}
                 {loading ? null : (
@@ -581,7 +564,7 @@ export default function Packaging() {
                                     ))}
                                 </select>
                             </div>
-                            <button className="btn-primary"><Plus size={16} /> สร้างคำสั่งบรรจุ</button>
+
                         </div>
 
                         {/* ── Orders Table ── */}
@@ -650,10 +633,7 @@ export default function Packaging() {
                                                             <Eye size={14} />
                                                         </button>
                                                         {order.status === 'บรรจุเสร็จ' && (
-                                                            <button className="btn-sm btn-primary" title="ส่ง QC Final"
-                                                                onClick={() => handleSendToQC(order)}>
-                                                                <Send size={14} /> QC
-                                                            </button>
+                                                            <span style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600 }}>✅ รอ QC</span>
                                                         )}
                                                     </div>
                                                 </td>

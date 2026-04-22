@@ -43,6 +43,10 @@ export default function Operator() {
     const [logForm, setLogForm] = useState({ producedQty: '', defectQty: '', notes: '' });
     const [isSubmittingLog, setIsSubmittingLog] = useState(false);
 
+    // ── Production Qty Modal (ถามยอดผลิตก่อนกดผ่านขั้นตอน) ──
+    const [qtyModal, setQtyModal] = useState({ open: false, taskId: null, taskName: '', expectedQty: 0, currentProduced: 0 });
+    const [qtyForm, setQtyForm] = useState({ producedQty: '', defectQty: '0', notes: '' });
+
     useEffect(() => {
         if (selectedTask) {
             fetch(`${API_BASE}/production/tasks/${selectedTask.id}/logs`)
@@ -106,6 +110,21 @@ export default function Operator() {
         const nextStep = PRODUCTION_STEPS[currentIdx + 1];
         if (!nextStep) return;
 
+        // ถ้าอยู่ขั้นตอนการผลิต (production_1 หรือ production_2) → ต้องกรอกยอดผลิตก่อน
+        if (task.currentStep === 'production_1' || task.currentStep === 'production_2') {
+            setQtyModal({
+                open: true,
+                taskId: task.id,
+                taskName: `${task.batchNo} — ${task.formulaName}`,
+                expectedQty: task.expectedQty,
+                currentProduced: task.producedQty,
+                currentStep: task.currentStep,
+                nextStepKey: nextStep.key
+            });
+            setQtyForm({ producedQty: '', defectQty: '0', notes: '' });
+            return;
+        }
+
         // If next step is QC, advance AND auto-send QC request
         if (nextStep.key === 'qc_inprocess' || nextStep.key === 'qc_final') {
             advanceTaskStep(taskId);
@@ -117,6 +136,46 @@ export default function Operator() {
         } else {
             advanceTaskStep(taskId);
         }
+    };
+
+    // ── Submit production qty then advance ──
+    const handleQtySubmitAndAdvance = async () => {
+        const produced = parseInt(qtyForm.producedQty);
+        const defect = parseInt(qtyForm.defectQty) || 0;
+        if (!produced || produced <= 0) {
+            alert('กรุณากรอกจำนวนที่ผลิตได้จริง');
+            return;
+        }
+        if (produced > qtyModal.expectedQty) {
+            if (!window.confirm(`ยอดผลิต (${produced}) มากกว่าเป้าหมาย (${qtyModal.expectedQty}) ต้องการดำเนินการต่อหรือไม่?`)) return;
+        }
+
+        // 1. บันทึกยอดผลิต
+        const logRes = await addProductionLog(qtyModal.taskId, {
+            producedQty: produced,
+            defectQty: defect,
+            notes: qtyForm.notes || `บันทึกยอดจากขั้นตอน ${qtyModal.currentStep}`,
+            operatorId: user?.username || 'operator'
+        });
+
+        if (!logRes.success) {
+            alert('บันทึกยอดไม่สำเร็จ: ' + logRes.message);
+            return;
+        }
+
+        // 2. เลื่อนขั้นตอน
+        const task = tasks.find(t => t.id === qtyModal.taskId);
+        if (qtyModal.nextStepKey === 'qc_inprocess' || qtyModal.nextStepKey === 'qc_final') {
+            advanceTaskStep(qtyModal.taskId);
+            setTimeout(() => {
+                const updatedTask = { ...task, currentStep: qtyModal.nextStepKey };
+                sendQcRequest(updatedTask, qtyModal.nextStepKey);
+            }, 100);
+        } else {
+            advanceTaskStep(qtyModal.taskId);
+        }
+
+        setQtyModal({ open: false, taskId: null, taskName: '', expectedQty: 0, currentProduced: 0 });
     };
 
     const getStatusBadge = (status) => {
@@ -383,7 +442,7 @@ export default function Operator() {
     // 1. งานของฉัน (My Tasks)
     // ══════════════════════════════════════════════════════════════════
     const renderDashboard = () => {
-        const currentActive = tasks.filter(t => t.status === 'กำลังทำ');
+        const currentActive = tasks.filter(t => t.status === 'กำลังทำ').sort((a, b) => a.batchNo.localeCompare(b.batchNo));
 
         return (
             <div className="operator-dashboard">
@@ -452,10 +511,8 @@ export default function Operator() {
                                         <div className="op-active-actions">
                                             {waitingQc ? (
                                                 <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
-                                            ) : needsSendQc ? (
-                                                <button className="op-btn op-btn-qc" onClick={() => sendQcRequest(task, task.currentStep)}>
-                                                    <Send size={14} /> ส่งคำขอ QC
-                                                </button>
+                                            ) : isQcStep ? (
+                                                <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
                                             ) : task.currentStep === 'packaging' ? (
                                                 <span className="op-waiting-label" style={{ color: '#8b5cf6', background: '#f5f3ff' }}>📦 รอแผนกบรรจุภัณฑ์...</span>
                                             ) : !isLastStep && !isQcStep ? (
@@ -494,7 +551,7 @@ export default function Operator() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {tasks.filter(t => t.status !== 'เสร็จสิ้น').map(task => {
+                                    {tasks.filter(t => t.status !== 'เสร็จสิ้น').sort((a, b) => a.batchNo.localeCompare(b.batchNo)).map(task => {
                                         const stepObj = PRODUCTION_STEPS.find(s => s.key === task.currentStep);
                                         const waitingQc = isWaitingForQc(task);
                                         return (
@@ -628,6 +685,90 @@ export default function Operator() {
             {currentTab === 'operator_dashboard' && renderDashboard()}
             {currentTab === 'operator_history' && renderHistory()}
             {renderTaskModal()}
+
+            {/* ── Production Qty Modal ── */}
+            {qtyModal.open && (
+                <div className="rnd-modal-overlay" onClick={() => setQtyModal({ ...qtyModal, open: false })}>
+                    <div className="rnd-modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="rnd-modal-header">
+                            <div>
+                                <h2>📝 บันทึกยอดผลิต</h2>
+                                <div className="rnd-modal-meta">
+                                    <span style={{ color: '#7b7bf5', fontWeight: 600 }}>{qtyModal.taskName}</span>
+                                </div>
+                            </div>
+                            <button className="rnd-modal-close" onClick={() => setQtyModal({ ...qtyModal, open: false })}>
+                                <XCircle size={22} />
+                            </button>
+                        </div>
+                        <div className="rnd-modal-body">
+                            <div style={{ background: '#fef3c7', borderRadius: 10, padding: 14, marginBottom: 16, fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <AlertTriangle size={18} />
+                                <span>กรุณากรอกจำนวนที่ผลิตได้จริงก่อนไปขั้นตอนถัดไป</span>
+                            </div>
+                            <div className="rnd-modal-info-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                <div className="rnd-modal-info-item" style={{ background: '#f0ebff', borderRadius: 10, padding: 14 }}>
+                                    <label style={{ fontWeight: 700, color: '#7b7bf5' }}>เป้าหมาย</label>
+                                    <span style={{ fontSize: 24, fontWeight: 800, color: '#5b21b6' }}>{qtyModal.expectedQty?.toLocaleString()}</span>
+                                </div>
+                                <div className="rnd-modal-info-item" style={{ background: '#ecfdf5', borderRadius: 10, padding: 14 }}>
+                                    <label style={{ fontWeight: 700, color: '#059669' }}>ผลิตแล้ว (สะสม)</label>
+                                    <span style={{ fontSize: 24, fontWeight: 800, color: '#059669' }}>{qtyModal.currentProduced?.toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <div style={{ marginTop: 16 }}>
+                                <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, display: 'block' }}>
+                                    จำนวนที่ผลิตได้ (รอบนี้) <span style={{ color: '#ef4444' }}>*</span>
+                                </label>
+                                <input
+                                    type="number" min="1" autoFocus
+                                    style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '2px solid #c4b5fd', fontSize: 20, fontWeight: 700, color: '#5b21b6', boxSizing: 'border-box' }}
+                                    value={qtyForm.producedQty}
+                                    onChange={(e) => setQtyForm({ ...qtyForm, producedQty: e.target.value })}
+                                    placeholder={`เป้าหมาย: ${qtyModal.expectedQty}`}
+                                />
+                            </div>
+                            <div style={{ marginTop: 12 }}>
+                                <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, display: 'block' }}>
+                                    ของเสีย (ถ้ามี)
+                                </label>
+                                <input
+                                    type="number" min="0"
+                                    style={{ width: '100%', padding: '10px 16px', borderRadius: 10, border: '1.5px solid #fca5a5', fontSize: 16, fontWeight: 600, color: '#dc2626', boxSizing: 'border-box' }}
+                                    value={qtyForm.defectQty}
+                                    onChange={(e) => setQtyForm({ ...qtyForm, defectQty: e.target.value })}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <div style={{ marginTop: 12 }}>
+                                <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, display: 'block' }}>หมายเหตุ</label>
+                                <input
+                                    type="text"
+                                    style={{ width: '100%', padding: '10px 16px', borderRadius: 10, border: '1.5px solid #e5e7eb', fontSize: 14, boxSizing: 'border-box' }}
+                                    value={qtyForm.notes}
+                                    onChange={(e) => setQtyForm({ ...qtyForm, notes: e.target.value })}
+                                    placeholder="เช่น เร็วกว่าคาด, วัตถุดิบมีปัญหา"
+                                />
+                            </div>
+                            <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+                                <button
+                                    className="btn-primary"
+                                    style={{ flex: 1, padding: 14, fontSize: 16, fontWeight: 700, borderRadius: 10 }}
+                                    onClick={handleQtySubmitAndAdvance}
+                                >
+                                    ✅ บันทึกและไปขั้นตอนถัดไป
+                                </button>
+                                <button
+                                    style={{ padding: '14px 20px', fontSize: 14, borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}
+                                    onClick={() => setQtyModal({ ...qtyModal, open: false })}
+                                >
+                                    ยกเลิก
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

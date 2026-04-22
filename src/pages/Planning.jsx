@@ -676,7 +676,7 @@ export default function Planning() {
                                     onChange={(e) => setCreateForm({...createForm, productionType: e.target.value})}
                                 >
                                     <option value="ผลิตตามแผน">ผลิตตามแผน (MTS)</option>
-                                    <option value="ผลิตตามออเดอร์">ผลิตตามออเดอร์ (MTO)</option>
+                                    <option value="ผลิตตามออเดอร์">ผลิตตามออเดอร์ (OEM)</option>
                                     <option value="ผลิตเร่งด่วน">ผลิตเร่งด่วน (Urgent)</option>
                                     <option value="ผลิตทดสอบ">ผลิตทดสอบ (Trial Run)</option>
                                 </select>

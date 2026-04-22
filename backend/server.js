@@ -32,6 +32,8 @@ const productionRoutes = require('./routes/production');
 const plannerRoutes = require('./routes/planner');
 const rndRoutes = require('./routes/rnd');
 const packagingRoutes = require('./routes/packaging');
+const stockRoutes = require('./routes/stock');
+const shippingRoutes = require('./routes/shipping');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -52,6 +54,8 @@ app.use('/api/production', productionRoutes);
 app.use('/api/planner', plannerRoutes);
 app.use('/api/rnd', rndRoutes);
 app.use('/api/packaging', packagingRoutes);
+app.use('/api/stock', stockRoutes);
+app.use('/api/shipping', shippingRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

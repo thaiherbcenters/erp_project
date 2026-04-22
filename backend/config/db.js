@@ -10,6 +10,7 @@ const config = {
     options: {
         trustServerCertificate: true, // Keep true if using self-signed cert on local network 10.0.0.x
         encrypt: true, // Security fix: encrypt traffic to true
+        useUTC: false, // Fix timezone issue (+7 hrs double offset)
     },
     connectionTimeout: 10000,
 };
