@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 
+// Helper to format date in local timezone to prevent UTC timezone shifts
+const formatDateLocal = (dateObj) => {
+    if (!dateObj) return null;
+    // If it's a string, parse it first
+    if (typeof dateObj === 'string') dateObj = new Date(dateObj);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+
 // ==========================================
 // PACKAGING TASKS MODULE
 // ==========================================
@@ -36,7 +48,7 @@ router.get('/tasks', async (req, res) => {
             packed: row.PackedQty || 0,
             defectQty: row.DefectQty || 0,
             assignee: row.Assignee || '-',
-            dueDate: row.DueDate ? new Date(row.DueDate).toISOString().split('T')[0] : null,
+            dueDate: row.DueDate ? formatDateLocal(row.DueDate) : null,
             status: row.Status || 'รอบรรจุ',
             destination: row.Destination || 'คลัง',
             customer: row.Customer || null,
@@ -266,142 +278,6 @@ router.put('/tasks/:id/status', async (req, res) => {
         // QC ผ่าน or ส่งมอบ: advance production stepper to stock (เสร็จสิ้น)
         if (status === 'QC ผ่าน' || status === 'ส่งมอบแล้ว') {
             await syncProductionStep('stock', 'เสร็จสิ้น', true);
-
-            // --- Auto-receive into Stock (คลังสินค้า) ---
-            try {
-                const prodTaskId = updatedTask.ProductionTaskID;
-                const batchNo = updatedTask.BatchNo;
-                const productName = updatedTask.Product;
-
-                // Get produced qty from Production_Tasks
-                let goodQty = updatedTask.PackedQty || 0;
-                let defectQty = 0;
-                if (prodTaskId) {
-                    const prodData = await pool.request()
-                        .input('ProdTaskID', sql.VarChar, prodTaskId)
-                        .query('SELECT ProducedQty, DefectQty, JobOrderID FROM Production_Tasks WHERE TaskID = @ProdTaskID');
-                    if (prodData.recordset.length > 0) {
-                        const pd = prodData.recordset[0];
-                        goodQty = (pd.ProducedQty || 0) - (pd.DefectQty || 0);
-                        // Fallback: ถ้า ProducedQty = 0 ใช้ PackedQty จาก Packaging
-                        if (goodQty <= 0 && updatedTask.PackedQty > 0) {
-                            goodQty = updatedTask.PackedQty;
-                        }
-                        defectQty = pd.DefectQty || 0;
-
-                        // Check if OEM (ผลิตตามออเดอร์) → ไม่เข้าคลัง
-                        let isOEM = false;
-                        if (pd.JobOrderID) {
-                            const plannerRes = await pool.request()
-                                .input('PlannerID', sql.VarChar, pd.JobOrderID)
-                                .query('SELECT Notes FROM Planner WHERE PlannerID = @PlannerID');
-                            if (plannerRes.recordset.length > 0) {
-                                isOEM = (plannerRes.recordset[0].Notes || '').includes('ผลิตตามออเดอร์');
-                            }
-                        }
-
-                        if (isOEM) {
-                            // OEM → บันทึก log เป็น "ส่งตรง" แต่ไม่เพิ่มยอดคลัง
-                            await pool.request()
-                                .input('ItemID', sql.VarChar, 'OEM-DIRECT')
-                                .input('Type', sql.VarChar, 'OUT')
-                                .input('Quantity', sql.Int, goodQty)
-                                .input('RefNo', sql.VarChar, batchNo)
-                                .input('RefType', sql.VarChar, 'oem_direct')
-                                .input('ProductName', sql.NVarChar, productName)
-                                .input('Notes', sql.NVarChar, `OEM ส่งตรงให้ลูกค้า — Batch: ${batchNo} (${goodQty} ชิ้น)`)
-                                .input('CreatedBy', sql.VarChar, 'system')
-                                .query(`INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
-                                        VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)`);
-
-                            // --- Auto-create Shipping Order for OEM ---
-                            const shipId = `SHP-${Date.now().toString().slice(-6)}`;
-                            const plannerNotes = plannerRes.recordset[0]?.Notes || '';
-                            const custMatch = plannerNotes.match(/ลูกค้า:\s*(.+?)(?:\s*\||$)/);
-                            const poMatch = plannerNotes.match(/PO:\s*(.+?)(?:\s*\||$)/);
-
-                            // Get priority & dueDate from Planner
-                            const plannerDetail = await pool.request()
-                                .input('PlannerID2', sql.VarChar, pd.JobOrderID)
-                                .query('SELECT Priority, DueDate FROM Planner WHERE PlannerID = @PlannerID2');
-                            const planInfo = plannerDetail.recordset[0] || {};
-
-                            await pool.request()
-                                .input('ShipmentID', sql.VarChar, shipId)
-                                .input('ShipBatchNo', sql.VarChar, batchNo)
-                                .input('ShipJobOrderID', sql.VarChar, pd.JobOrderID)
-                                .input('ShipProdTaskID', sql.VarChar, prodTaskId)
-                                .input('ShipProductName', sql.NVarChar, productName)
-                                .input('ShipQty', sql.Int, goodQty)
-                                .input('ShipCustomerName', sql.NVarChar, custMatch ? custMatch[1].trim() : '')
-                                .input('ShipCustomerPO', sql.NVarChar, poMatch ? poMatch[1].trim() : '')
-                                .input('ShipPriority', sql.NVarChar, planInfo.Priority || 'ปกติ')
-                                .input('ShipDueDate', sql.Date, planInfo.DueDate || null)
-                                .input('ShipNotes', sql.NVarChar, `OEM จากการผลิต Batch: ${batchNo}`)
-                                .query(`INSERT INTO Shipping_Orders (ShipmentID, BatchNo, JobOrderID, ProductionTaskID, ProductName, Quantity, CustomerName, CustomerPO, Status, Type, Priority, DueDate, Notes)
-                                        VALUES (@ShipmentID, @ShipBatchNo, @ShipJobOrderID, @ShipProdTaskID, @ShipProductName, @ShipQty, @ShipCustomerName, @ShipCustomerPO, N'รอจัดส่ง', 'oem', @ShipPriority, @ShipDueDate, @ShipNotes)`);
-
-                            console.log(`🚚 Shipping created: ${shipId} for OEM Batch ${batchNo}`);
-                        } else {
-                            // MTS → เข้าคลังจริง
-                            const existingCheck = await pool.request()
-                                .input('ProductName', sql.NVarChar, productName)
-                                .query('SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName');
-
-                            let stockItemId;
-                            if (existingCheck.recordset.length > 0) {
-                                stockItemId = existingCheck.recordset[0].ItemID;
-                                await pool.request()
-                                    .input('ItemID', sql.VarChar, stockItemId)
-                                    .input('AddQty', sql.Int, goodQty)
-                                    .query('UPDATE Stock_Items SET Quantity = Quantity + @AddQty, UpdatedAt = GETDATE() WHERE ItemID = @ItemID');
-                            } else {
-                                stockItemId = `STK-${Date.now().toString().slice(-6)}`;
-                                await pool.request()
-                                    .input('ItemID', sql.VarChar, stockItemId)
-                                    .input('ProductName', sql.NVarChar, productName)
-                                    .input('Quantity', sql.Int, goodQty)
-                                    .query('INSERT INTO Stock_Items (ItemID, ProductName, Quantity) VALUES (@ItemID, @ProductName, @Quantity)');
-                            }
-
-                            await pool.request()
-                                .input('ItemID', sql.VarChar, stockItemId)
-                                .input('Type', sql.VarChar, 'IN')
-                                .input('Quantity', sql.Int, goodQty)
-                                .input('RefNo', sql.VarChar, batchNo)
-                                .input('RefType', sql.VarChar, 'production')
-                                .input('ProductName', sql.NVarChar, productName)
-                                .input('Notes', sql.NVarChar, `รับเข้าจากการผลิต Batch: ${batchNo} (ผลิตได้ ${goodQty + defectQty}, ของเสีย ${defectQty}, เข้าคลัง ${goodQty})`)
-                                .input('CreatedBy', sql.VarChar, 'system')
-                                .query(`INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
-                                        VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)`);
-
-                            console.log(`✅ Stock received: ${productName} x${goodQty} from Batch ${batchNo}`);
-                        }
-                    }
-                }
-            } catch (stockErr) {
-                console.error('❌ Error auto-receiving stock:', stockErr);
-            }
-
-            // --- Auto-update Planner status to 'เสร็จสิ้น' ---
-            try {
-                const prodTaskId = updatedTask.ProductionTaskID;
-                if (prodTaskId) {
-                    const prodRes = await pool.request()
-                        .input('ProdTaskID', sql.VarChar, prodTaskId)
-                        .query('SELECT JobOrderID FROM Production_Tasks WHERE TaskID = @ProdTaskID');
-                    if (prodRes.recordset.length > 0 && prodRes.recordset[0].JobOrderID) {
-                        const jobId = prodRes.recordset[0].JobOrderID;
-                        await pool.request()
-                            .input('PlannerID', sql.VarChar, jobId)
-                            .query(`UPDATE Planner SET Status = N'เสร็จสิ้น' WHERE PlannerID = @PlannerID`);
-                        console.log(`✅ Planner ${jobId} → เสร็จสิ้น`);
-                    }
-                }
-            } catch (planErr) {
-                console.error('❌ Error updating planner status:', planErr);
-            }
         }
         
         res.json(updatedTask);

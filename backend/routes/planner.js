@@ -22,7 +22,12 @@ router.get('/', async (req, res) => {
                     SELECT SUM(pt.ProducedQty) 
                     FROM Production_Tasks pt 
                     WHERE pt.JobOrderID = p.PlannerID
-                ), 0) AS TotalProduced
+                ), 0) AS TotalProduced,
+                ISNULL((
+                    SELECT TOP 1 1 
+                    FROM Production_Tasks pt 
+                    WHERE pt.JobOrderID = p.PlannerID AND pt.CurrentStep != 'pending'
+                ), 0) AS HasStarted
             FROM Planner p
             ORDER BY p.CreatedAt DESC
         `);
@@ -36,6 +41,20 @@ router.get('/', async (req, res) => {
             }
             if (progress > 100) progress = 100;
 
+            let finalStatus = job.Status;
+            if (finalStatus === 'กำลังผลิต' && job.HasStarted === 0) {
+                finalStatus = 'รอเริ่มงาน';
+            }
+
+            // Helper to format date in local timezone to prevent UTC timezone shifts
+            const formatDateLocal = (dateObj) => {
+                if (!dateObj) return null;
+                const year = dateObj.getFullYear();
+                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
             return {
                 id: job.PlannerID,
                 formulaId: job.FormulaID,
@@ -44,10 +63,10 @@ router.get('/', async (req, res) => {
                 batchSize: job.BatchSize,
                 totalQty: job.TotalQty,
                 unit: job.Unit,
-                status: job.Status,
+                status: finalStatus,
                 priority: job.Priority,
-                planDate: job.PlanDate ? job.PlanDate.toISOString().split('T')[0] : null,
-                dueDate: job.DueDate ? job.DueDate.toISOString().split('T')[0] : null,
+                planDate: formatDateLocal(job.PlanDate),
+                dueDate: formatDateLocal(job.DueDate),
                 assignedLine: job.AssignedLine,
                 notes: job.Notes,
                 createdBy: job.CreatedBy,
@@ -190,9 +209,9 @@ router.post('/:id/release', async (req, res) => {
                     .input('ExpectedQty', sql.Int, job.BatchSize)
                     .input('ProducedQty', sql.Int, 0)
                     .input('DefectQty', sql.Int, 0)
-                    .input('Status', sql.NVarChar, 'กำลังทำ')
-                    .input('CurrentStep', sql.VarChar, 'production_1')
-                    .input('StepTimesJSON', sql.NVarChar, JSON.stringify({ 'production_1': new Date().toISOString().split('T')[0] + ' 08:00' }))
+                    .input('Status', sql.NVarChar, 'รอเริ่มงาน')
+                    .input('CurrentStep', sql.VarChar, 'pending')
+                    .input('StepTimesJSON', sql.NVarChar, JSON.stringify({ 'pending': new Date().toISOString().split('T')[0] + ' 08:00' }))
                     .input('WorkerID', sql.VarChar, 'system')
                     .query(`
                         INSERT INTO Production_Tasks (

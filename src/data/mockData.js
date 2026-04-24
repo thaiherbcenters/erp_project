@@ -477,7 +477,12 @@ export const ALL_PAGES = [
         sections: [
           { id: 'packaging_main_stats', name: 'สถิติการบรรจุ' },
           { id: 'packaging_main_orders', name: 'คำสั่งบรรจุ' },
-          { id: 'packaging_main_materials', name: 'วัสดุบรรจุภัณฑ์' },
+        ],
+      },
+      {
+        id: 'packaging_materials', name: 'วัสดุบรรจุภัณฑ์',
+        sections: [
+          { id: 'packaging_materials_table', name: 'ตารางวัสดุคงเหลือ' },
         ],
       },
     ],

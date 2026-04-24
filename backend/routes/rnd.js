@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 
+// Helper to format date in local timezone to prevent UTC timezone shifts
+const formatDateLocal = (dateObj) => {
+    if (!dateObj) return null;
+    // If it's a string, parse it first
+    if (typeof dateObj === 'string') dateObj = new Date(dateObj);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+
 // =====================================================================
 // GET /api/rnd/formulas — สูตรทั้งหมด (พร้อม ingredients)
 // =====================================================================
@@ -23,13 +35,13 @@ router.get('/formulas', async (req, res) => {
             description: f.Description,
             instructions: f.InstructionsJSON ? JSON.parse(f.InstructionsJSON) : [],
             createdBy: f.CreatedBy,
-            createdDate: f.CreatedDate ? f.CreatedDate.toISOString().split('T')[0] : null,
+            createdDate: formatDateLocal(f.CreatedDate),
             approvedBy: f.ApprovedBy,
-            approvedDate: f.ApprovedDate ? f.ApprovedDate.toISOString().split('T')[0] : null,
+            approvedDate: formatDateLocal(f.ApprovedDate),
             qcApprovedBy: f.QcApprovedBy,
-            qcApprovedDate: f.QcApprovedDate ? f.QcApprovedDate.toISOString().split('T')[0] : null,
+            qcApprovedDate: formatDateLocal(f.QcApprovedDate),
             pharmApprovedBy: f.PharmApprovedBy,
-            pharmApprovedDate: f.PharmApprovedDate ? f.PharmApprovedDate.toISOString().split('T')[0] : null,
+            pharmApprovedDate: formatDateLocal(f.PharmApprovedDate),
             ingredients: ingredientsRes.recordset
                 .filter(i => i.FormulaID === f.FormulaID)
                 .map(i => ({
@@ -78,9 +90,9 @@ router.get('/formulas/:id', async (req, res) => {
             description: f.Description,
             instructions: f.InstructionsJSON ? JSON.parse(f.InstructionsJSON) : [],
             createdBy: f.CreatedBy,
-            createdDate: f.CreatedDate ? f.CreatedDate.toISOString().split('T')[0] : null,
+            createdDate: formatDateLocal(f.CreatedDate),
             approvedBy: f.ApprovedBy,
-            approvedDate: f.ApprovedDate ? f.ApprovedDate.toISOString().split('T')[0] : null,
+            approvedDate: formatDateLocal(f.ApprovedDate),
             ingredients: iRes.recordset.map(i => ({
                 materialId: i.MaterialID,
                 name: i.MaterialName,
@@ -193,8 +205,8 @@ router.get('/projects', async (req, res) => {
             name: p.Name,
             category: p.Category,
             researcher: p.Researcher,
-            startDate: p.StartDate ? p.StartDate.toISOString().split('T')[0] : null,
-            targetDate: p.TargetDate ? p.TargetDate.toISOString().split('T')[0] : null,
+            startDate: formatDateLocal(p.StartDate),
+            targetDate: formatDateLocal(p.TargetDate),
             phase: p.Phase,
             progress: p.Progress,
             status: p.Status,
@@ -219,7 +231,7 @@ router.get('/experiments', async (req, res) => {
             code: e.Code,
             projectCode: e.ProjectCode,
             name: e.Name,
-            date: e.ExperimentDate ? e.ExperimentDate.toISOString().split('T')[0] : null,
+            date: formatDateLocal(e.ExperimentDate),
             result: e.Result,
             note: e.Note,
         }));
@@ -464,7 +476,7 @@ router.get('/formula-tests/:formulaId', async (req, res) => {
             .input('FormulaID', sql.VarChar, req.params.formulaId)
             .query('SELECT * FROM RnD_Formula_Tests WHERE FormulaID=@FormulaID ORDER BY CreatedAt DESC');
         res.json(result.recordset.map(t => ({
-            id: t.TestID, formulaId: t.FormulaID, testDate: t.TestDate ? t.TestDate.toISOString().split('T')[0] : null,
+            id: t.TestID, formulaId: t.FormulaID, testDate: formatDateLocal(t.TestDate),
             testedBy: t.TestedBy, pH: t.pH, viscosity: t.Viscosity, color: t.Color, smell: t.Smell,
             stability: t.Stability, microbial: t.Microbial, overallResult: t.OverallResult, notes: t.Notes,
         })));
@@ -485,7 +497,7 @@ router.get('/formula-tests', async (req, res) => {
         `);
         res.json(result.recordset.map(t => ({
             id: t.TestID, formulaId: t.FormulaID, formulaName: t.FormulaName, formulaStatus: t.FormulaStatus,
-            testDate: t.TestDate ? t.TestDate.toISOString().split('T')[0] : null,
+            testDate: formatDateLocal(t.TestDate),
             testedBy: t.TestedBy, pH: t.pH, viscosity: t.Viscosity, color: t.Color, smell: t.Smell,
             stability: t.Stability, microbial: t.Microbial, overallResult: t.OverallResult, notes: t.Notes,
         })));

@@ -46,14 +46,19 @@ export function RnDProvider({ children }) {
         }
     }, []);
 
-    const fetchAll = useCallback(async () => {
-        setLoading(true);
+    const fetchAll = useCallback(async (showLoading = false) => {
+        if (showLoading) setLoading(true);
         await Promise.all([fetchFormulas(), fetchMaterials(), fetchProjects(), fetchExperiments()]);
         setLoading(false);
     }, [fetchFormulas, fetchMaterials, fetchProjects, fetchExperiments]);
 
     useEffect(() => {
-        fetchAll();
+        fetchAll(true); // ครั้งแรกแสดง loading
+        // Auto-polling ทุก 5 วินาที (ไม่แสดง loading)
+        const interval = setInterval(() => {
+            fetchAll(false);
+        }, 5000);
+        return () => clearInterval(interval);
     }, [fetchAll]);
 
     const createFormula = useCallback(async (formulaData) => {

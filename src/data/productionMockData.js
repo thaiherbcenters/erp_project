@@ -303,6 +303,7 @@ export const MOCK_JOB_ORDERS = [
 // =============================================================================
 // ใช้ระบุว่างานแต่ละชิ้นอยู่ที่ขั้นตอนไหน
 export const PRODUCTION_STEPS = [
+    { key: 'pending',        label: 'รอเริ่มงาน',           shortLabel: 'Pending',        icon: 'Timer',       description: 'ยังไม่เริ่มดำเนินการ' },
     { key: 'production_1',   label: 'ผลิตขั้นตอนที่ 1',    shortLabel: 'In Progress 1',  icon: 'Play',        description: 'เตรียมวัตถุดิบ / ผสม / ขึ้นรูป' },
     { key: 'qc_inprocess',   label: 'QC In-Process',       shortLabel: 'QC ระหว่างผลิต', icon: 'SearchCheck', description: 'ตรวจสอบระหว่างการผลิต' },
     { key: 'production_2',   label: 'ผลิตขั้นตอนที่ 2',    shortLabel: 'In Progress 2',  icon: 'Repeat',      description: 'ดำเนินการผลิตต่อ / ปรับปรุง' },

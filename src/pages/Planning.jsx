@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { usePlanner } from '../context/PlannerContext';
 import { useRnD } from '../context/RnDContext';
+import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 import './Planning.css';
 
@@ -33,6 +34,7 @@ export default function Planning() {
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
     const { jobs, loading, releaseJobOrder, createJob } = usePlanner();
     const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS } = useRnD();
+    const { showAlert, showConfirm } = useAlert();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
@@ -84,14 +86,14 @@ export default function Planning() {
 
     // Submit create form
     const handleCreateSubmit = async () => {
-        if (!createForm.formulaId) return alert('กรุณาเลือกสูตรการผลิต');
-        if (!createForm.batchQty || createForm.batchQty < 1) return alert('กรุณาระบุจำนวน Batch');
-        if (!createForm.dueDate) return alert('กรุณาระบุวันกำหนดเสร็จ');
+        if (!createForm.formulaId) return showAlert('ข้อมูลไม่ครบ', 'กรุณาเลือกสูตรการผลิต', 'warning');
+        if (!createForm.batchQty || createForm.batchQty < 1) return showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุจำนวน Batch', 'warning');
+        if (!createForm.dueDate) return showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุวันกำหนดเสร็จ', 'warning');
         setIsCreating(true);
         const res = await createJob(createForm);
         setIsCreating(false);
         if (res.success) {
-            alert('สร้างใบสั่งผลิตสำเร็จ!');
+            await showAlert('สำเร็จ', 'สร้างใบสั่งผลิตสำเร็จ!', 'success');
             setShowCreateModal(false);
             setCreateForm({
                 formulaId: '', formulaName: '', batchQty: 1, batchSize: 0, totalQty: 0, unit: '',
@@ -99,20 +101,21 @@ export default function Planning() {
                 assignedLine: 'Line A', notes: '', customerName: '', customerPO: '', productionType: 'ผลิตตามแผน',
             });
         } else {
-            alert('สร้างไม่สำเร็จ: ' + res.message);
+            showAlert('เกิดข้อผิดพลาด', 'สร้างไม่สำเร็จ: ' + res.message, 'error');
         }
     };
 
     // ── Stats ──
     const totalJobs = jobs.length;
     const inProgressJobs = jobs.filter(j => j.status === 'กำลังผลิต').length;
-    const waitingJobs = jobs.filter(j => j.status === 'รอผลิต').length;
+    const waitingJobs = jobs.filter(j => j.status === 'รอผลิต' || j.status === 'รอเริ่มงาน').length;
     const completedJobs = jobs.filter(j => j.status === 'เสร็จสิ้น').length;
 
     const getStatusBadge = (status) => {
         switch (status) {
             case 'กำลังผลิต': return 'status-warning';
-            case 'รอผลิต': return 'status-gray';
+            case 'รอผลิต': return 'status-info';
+            case 'รอเริ่มงาน': return 'status-primary'; // A bluish-purple badge
             case 'เสร็จสิ้น': return 'status-success';
             default: return 'status-gray';
         }
@@ -121,8 +124,17 @@ export default function Planning() {
     const getPriorityBadge = (priority) => {
         switch (priority) {
             case 'สูง': return 'badge-danger';
-            case 'ปกติ': return 'badge-neutral';
+            case 'ปกติ': return 'badge-success';
             case 'ต่ำ': return 'badge-info';
+            default: return 'badge-neutral';
+        }
+    };
+
+    const getLineBadge = (line) => {
+        switch (line) {
+            case 'Line A': return 'badge-info';
+            case 'Line B': return 'badge-warning';
+            case 'Line C': return 'badge-success';
             default: return 'badge-neutral';
         }
     };
@@ -199,9 +211,9 @@ export default function Planning() {
                                 <tr><td colSpan="6" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูล...</td></tr>
                             ) : jobs.slice(0, 3).map(job => (
                                 <tr key={job.id}>
-                                    <td className="text-bold">{job.id}</td>
+                                    <td className="text-bold" style={{ whiteSpace: 'nowrap' }}>{job.id}</td>
                                     <td>{job.formulaName}</td>
-                                    <td>{job.totalQty.toLocaleString()} {job.unit}</td>
+                                    <td style={{ whiteSpace: 'nowrap' }}>{job.totalQty.toLocaleString()} {job.unit}</td>
                                     <td><span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span></td>
                                     <td>
                                         <div className="progress-container">
@@ -209,7 +221,7 @@ export default function Planning() {
                                             <span className="progress-text">{job.progress}%</span>
                                         </div>
                                     </td>
-                                    <td>{job.dueDate}</td>
+                                    <td style={{ whiteSpace: 'nowrap' }}>{job.dueDate}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -223,16 +235,17 @@ export default function Planning() {
     // 2. ใบสั่งผลิต (Job Order List)
     // ══════════════════════════════════════════════════════════════════
     const handleReleaseJob = async (jobId) => {
-        if (!window.confirm(`ยืนยันการส่งใบสั่งผลิต ${jobId} ให้ฝ่ายผลิต?\nระบบจะทำการตั้งคิวงานใหม่ทันที`)) return;
+        const ok = await showConfirm('ยืนยันการส่งงาน', `ยืนยันการส่งใบสั่งผลิต ${jobId} ให้ฝ่ายผลิต?\nระบบจะทำการตั้งคิวงานใหม่ทันที`, 'info');
+        if (!ok) return;
         const res = await releaseJobOrder(jobId);
         if (res.success) {
-            alert('ส่งงานให้ฝ่ายผลิตเรียบร้อยแล้ว! สามารถดูคิวงานได้ที่หน้าฝ่ายผลิต');
+            showAlert('สำเร็จ', 'ส่งงานให้ฝ่ายผลิตเรียบร้อยแล้ว! สามารถดูคิวงานได้ที่หน้าฝ่ายผลิต', 'success');
         } else {
-            alert('เกิดข้อผิดพลาด: ' + res.message);
+            showAlert('เกิดข้อผิดพลาด', res.message, 'error');
         }
     };
     const renderPlanList = () => {
-        const statuses = ['ทั้งหมด', 'รอผลิต', 'กำลังผลิต', 'เสร็จสิ้น'];
+        const statuses = ['ทั้งหมด', 'รอผลิต', 'รอเริ่มงาน', 'กำลังผลิต', 'เสร็จสิ้น'];
         const filtered = jobs.filter(j => {
             const matchSearch = j.formulaName.includes(searchTerm) || j.id.includes(searchTerm);
             const matchStatus = statusFilter === 'ทั้งหมด' || j.status === statusFilter;
@@ -289,15 +302,15 @@ export default function Planning() {
                             <tbody>
                                 {filtered.map(job => (
                                     <tr key={job.id}>
-                                        <td className="text-bold">{job.id}</td>
-                                        <td><span className="plan-formula-ref">{job.formulaId}</span></td>
+                                        <td className="text-bold" style={{ whiteSpace: 'nowrap' }}>{job.id}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}><span className="plan-formula-ref">{job.formulaId}</span></td>
                                         <td>{job.formulaName}</td>
-                                        <td>{job.batchQty} batch</td>
-                                        <td style={{ fontWeight: 600 }}>{job.totalQty.toLocaleString()} {job.unit}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{job.batchQty} batch</td>
+                                        <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{job.totalQty.toLocaleString()} {job.unit}</td>
                                         <td><span className={`badge ${getPriorityBadge(job.priority)}`}>{job.priority}</span></td>
-                                        <td><span className="badge badge-neutral">{job.assignedLine}</span></td>
-                                        <td>{job.planDate}</td>
-                                        <td>{job.dueDate}</td>
+                                        <td><span className={`badge ${getLineBadge(job.assignedLine)}`}>{job.assignedLine}</span></td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{job.planDate}</td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>{job.dueDate}</td>
                                         <td><span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span></td>
                                         <td>
                                             <div className="progress-container">
@@ -306,17 +319,19 @@ export default function Planning() {
                                             </div>
                                         </td>
                                         <td>
-                                            <button className="btn-sm" onClick={() => setSelectedJob(job)}><Eye size={14} /></button>
-                                            {job.status === 'รอผลิต' && (
-                                                <button 
-                                                    className="btn-sm" 
-                                                    style={{ background: '#e0e7ff', color: '#4338ca', marginLeft: 4 }} 
-                                                    title="ปล่อยให้ฝ่ายผลิต" 
-                                                    onClick={() => handleReleaseJob(job.id)}
-                                                >
-                                                    <Play size={14} />
-                                                </button>
-                                            )}
+                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                <button className="btn-sm" onClick={() => setSelectedJob(job)}><Eye size={14} /></button>
+                                                {job.status === 'รอผลิต' && (
+                                                    <button 
+                                                        className="btn-sm" 
+                                                        style={{ background: '#e0e7ff', color: '#4338ca' }} 
+                                                        title="ปล่อยให้ฝ่ายผลิต" 
+                                                        onClick={() => handleReleaseJob(job.id)}
+                                                    >
+                                                        <Play size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -460,7 +475,7 @@ export default function Planning() {
                                 <div className="plan-timeline-bar"
                                     style={{
                                         width: `${Math.max(job.progress, 10)}%`,
-                                        background: job.status === 'รอผลิต' ? '#e2e8f0' : 'linear-gradient(90deg, #7b7bf5, #a78bfa)'
+                                        background: (job.status === 'รอผลิต' || job.status === 'รอเริ่มงาน') ? '#e2e8f0' : 'linear-gradient(90deg, #7b7bf5, #a78bfa)'
                                     }}>
                                     <span>{job.progress}%</span>
                                 </div>
@@ -512,7 +527,7 @@ export default function Planning() {
                             <div className="rnd-modal-meta">
                                 <span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span>
                                 <span className={`badge ${getPriorityBadge(job.priority)}`}>ความสำคัญ: {job.priority}</span>
-                                <span className="badge badge-neutral">{job.assignedLine}</span>
+                                <span className={`badge ${getLineBadge(job.assignedLine)}`}>{job.assignedLine}</span>
                             </div>
                         </div>
                         <button className="rnd-modal-close" onClick={() => setSelectedJob(null)}><XCircle size={22} /></button>

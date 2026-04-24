@@ -67,10 +67,15 @@ export function ProductionProvider({ children }) {
         }
     }, []);
 
-    // Load data initially
+    // Load data initially + auto-polling ทุก 10 วินาที
     useEffect(() => {
         fetchTasks();
         fetchQcRequests();
+        const interval = setInterval(() => {
+            fetchTasks();
+            fetchQcRequests();
+        }, 5000);
+        return () => clearInterval(interval);
     }, [fetchQcRequests, fetchTasks]);
 
     // ── Production sends QC Request ──

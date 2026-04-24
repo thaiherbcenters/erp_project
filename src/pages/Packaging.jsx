@@ -653,8 +653,20 @@ export default function Packaging() {
                     </>
                 )}
 
-                {/* ── Packaging Materials ── */}
-                {hasSectionPermission('packaging_main_materials') && (
+            </div>
+        );
+    };
+    // ══════════════════════════════════════════════════════════════
+    // Materials Dashboard
+    // ══════════════════════════════════════════════════════════════
+    const renderMaterials = () => {
+        return (
+            <div className="packaging-materials">
+                <div className="page-title">
+                    <h1>🧱 วัสดุบรรจุภัณฑ์</h1>
+                    <p>จัดการข้อมูลวัสดุบรรจุภัณฑ์และสต็อกคงเหลือ</p>
+                </div>
+                {hasSectionPermission('packaging_materials_table') && (
                     <div className="card table-card" style={{ marginTop: '20px' }}>
                         <h3 className="card-title">🧱 วัสดุบรรจุภัณฑ์คงเหลือ</h3>
                         <table className="data-table">
@@ -704,6 +716,7 @@ export default function Packaging() {
     return (
         <div className="page-container packaging-page page-enter">
             {currentTab === 'packaging_main' && renderPackaging()}
+            {currentTab === 'packaging_materials' && renderMaterials()}
             {renderDetailModal()}
             {renderProgressModal()}
         </div>

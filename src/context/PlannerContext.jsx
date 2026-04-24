@@ -7,9 +7,9 @@ export function PlannerProvider({ children }) {
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    const fetchJobs = useCallback(async () => {
+    const fetchJobs = useCallback(async (showLoading = false) => {
         try {
-            setLoading(true);
+            if (showLoading) setLoading(true);
             const res = await fetch(`${API_BASE}/planner`);
             if (res.ok) {
                 const data = await res.json();
@@ -23,7 +23,12 @@ export function PlannerProvider({ children }) {
     }, []);
 
     useEffect(() => {
-        fetchJobs();
+        fetchJobs(true); // ครั้งแรกแสดง loading
+        // Auto-polling ทุก 5 วินาที (ไม่แสดง loading)
+        const interval = setInterval(() => {
+            fetchJobs(false);
+        }, 5000);
+        return () => clearInterval(interval);
     }, [fetchJobs]);
 
     const updateJobStatus = useCallback(async (jobId, status) => {

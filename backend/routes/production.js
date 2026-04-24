@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 
+// Helper to format date in local timezone to prevent UTC timezone shifts
+const formatDateLocal = (dateObj) => {
+    if (!dateObj) return null;
+    // If it's a string, parse it first
+    if (typeof dateObj === 'string') dateObj = new Date(dateObj);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+
 // ==========================================
 // PRODUCTION TASKS MODULE
 // ==========================================
@@ -139,94 +151,6 @@ router.put('/tasks/:id/advance', async (req, res) => {
         }
         // -----------------------------------------------------------------------------
 
-        // --- Integration: Auto-receive into Stock when reaching 'stock' step ---
-        if (currentStep === 'stock') {
-            try {
-                const taskResult3 = await pool.request()
-                    .input('ProdTaskID', sql.VarChar, taskId)
-                    .query('SELECT TaskID, JobOrderID, BatchNo, FormulaName, ProducedQty, DefectQty FROM Production_Tasks WHERE TaskID = @ProdTaskID');
-
-                if (taskResult3.recordset.length > 0) {
-                    const taskData = taskResult3.recordset[0];
-                    const goodQty = (taskData.ProducedQty || 0) - (taskData.DefectQty || 0);
-
-                    // Check production type from Planner notes (OEM = ผลิตตามออเดอร์)
-                    let isOEM = false;
-                    if (taskData.JobOrderID) {
-                        const plannerRes = await pool.request()
-                            .input('PlannerID', sql.VarChar, taskData.JobOrderID)
-                            .query('SELECT Notes FROM Planner WHERE PlannerID = @PlannerID');
-                        if (plannerRes.recordset.length > 0) {
-                            const notes = plannerRes.recordset[0].Notes || '';
-                            isOEM = notes.includes('ผลิตตามออเดอร์');
-                        }
-                    }
-
-                    if (isOEM) {
-                        // OEM → ไม่เข้าคลังเรา บันทึก log ว่า "ส่งออกตรง (OEM)"
-                        console.log(`📦 OEM Order: Batch ${taskData.BatchNo} → ส่งตรงให้ลูกค้า (ไม่เข้าคลัง)`);
-                        // สร้าง Stock Log เพื่อเป็นประวัติ (แต่ไม่เพิ่มยอดในคลัง)
-                        await pool.request()
-                            .input('ItemID', sql.VarChar, 'OEM-DIRECT')
-                            .input('Type', sql.VarChar, 'OUT')
-                            .input('Quantity', sql.Int, goodQty)
-                            .input('RefNo', sql.VarChar, taskData.BatchNo)
-                            .input('RefType', sql.VarChar, 'oem_direct')
-                            .input('ProductName', sql.NVarChar, taskData.FormulaName)
-                            .input('Notes', sql.NVarChar, `OEM ส่งตรงให้ลูกค้า — Batch: ${taskData.BatchNo} (${goodQty} ชิ้น)`)
-                            .input('CreatedBy', sql.VarChar, 'system')
-                            .query(`
-                                INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
-                                VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)
-                            `);
-                    } else {
-                        // MTS (ผลิตตามแผน) → เข้าคลังจริง
-                        // Check if product already exists
-                        const existingCheck = await pool.request()
-                            .input('ProductName', sql.NVarChar, taskData.FormulaName)
-                            .query('SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName');
-
-                        let stockItemId;
-                        if (existingCheck.recordset.length > 0) {
-                            stockItemId = existingCheck.recordset[0].ItemID;
-                            await pool.request()
-                                .input('ItemID', sql.VarChar, stockItemId)
-                                .input('AddQty', sql.Int, goodQty)
-                                .query('UPDATE Stock_Items SET Quantity = Quantity + @AddQty, UpdatedAt = GETDATE() WHERE ItemID = @ItemID');
-                        } else {
-                            stockItemId = `STK-${Date.now().toString().slice(-6)}`;
-                            await pool.request()
-                                .input('ItemID', sql.VarChar, stockItemId)
-                                .input('ProductName', sql.NVarChar, taskData.FormulaName)
-                                .input('Quantity', sql.Int, goodQty)
-                                .query(`
-                                    INSERT INTO Stock_Items (ItemID, ProductName, Quantity)
-                                    VALUES (@ItemID, @ProductName, @Quantity)
-                                `);
-                        }
-
-                        // Create stock log
-                        await pool.request()
-                            .input('ItemID', sql.VarChar, stockItemId)
-                            .input('Type', sql.VarChar, 'IN')
-                            .input('Quantity', sql.Int, goodQty)
-                            .input('RefNo', sql.VarChar, taskData.BatchNo)
-                            .input('RefType', sql.VarChar, 'production')
-                            .input('ProductName', sql.NVarChar, taskData.FormulaName)
-                            .input('Notes', sql.NVarChar, `รับเข้าจากการผลิต Batch: ${taskData.BatchNo} (ผลิตได้ ${taskData.ProducedQty}, ของเสีย ${taskData.DefectQty}, เข้าคลัง ${goodQty})`)
-                            .input('CreatedBy', sql.VarChar, 'system')
-                            .query(`
-                                INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
-                                VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)
-                            `);
-
-                        console.log(`✅ Stock received: ${taskData.FormulaName} x${goodQty} from Batch ${taskData.BatchNo}`);
-                    }
-                }
-            } catch (stockErr) {
-                console.error('❌ Error auto-receiving stock:', stockErr);
-            }
-        }
         // -----------------------------------------------------------------------------
 
         res.json(result.recordset[0]);

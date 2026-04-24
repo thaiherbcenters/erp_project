@@ -124,6 +124,12 @@
     border: 1px solid #fde68a;
 }
 
+.status-info {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
 .status-gray {
     background: var(--bg);
     color: var(--text-secondary);

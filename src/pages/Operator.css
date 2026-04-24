@@ -643,3 +643,208 @@
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(123, 123, 245, 0.1);
 }
+
+/* ===========================================================================
+   JOB ORDER GROUPED LAYOUT — Tasks grouped by Job Order
+   =========================================================================== */
+
+.op-jo-group-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 14px;
+}
+
+/* Group Card */
+.op-jo-group-card {
+    background: linear-gradient(135deg, #f0ebff 0%, #ffffff 100%);
+    border: 1px solid #ddd6fe;
+    border-radius: 14px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 4px 12px rgba(123, 123, 245, 0.05);
+    position: relative;
+    overflow: hidden;
+}
+
+.op-jo-group-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 4px; height: 100%;
+    background: #7b7bf5;
+}
+
+.op-jo-group-card.op-jo-group-qc {
+    background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+    border-color: #fdba74;
+    animation: opQcCardPulse 2s ease-in-out infinite;
+}
+.op-jo-group-card.op-jo-group-qc::before {
+    background: #f97316;
+}
+
+/* Group Info */
+.op-jo-group-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.op-jo-group-id {
+    display: inline-block;
+    background: #7b7bf5;
+    color: #fff;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    align-self: flex-start;
+}
+.op-jo-group-qc .op-jo-group-id {
+    background: #f97316;
+}
+
+.op-jo-group-product {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: 4px;
+}
+
+.op-jo-group-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.op-jo-group-qty {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Group Progress Bar */
+.op-jo-group-progress {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.op-jo-group-progress-bar {
+    flex: 1;
+    height: 10px;
+    background: rgba(0,0,0,0.08);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.op-jo-group-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #059669, #34d399);
+    border-radius: 5px;
+    transition: width 0.5s ease;
+}
+
+.op-jo-group-progress-text {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+/* Batch Rows inside group */
+.op-jo-group-batches {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.op-jo-batch-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 8px;
+    padding: 8px 14px;
+    transition: all 0.15s;
+}
+
+.op-jo-batch-row:hover {
+    background: rgba(255,255,255,0.95);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.op-jo-batch-row.op-jo-batch-qc {
+    border-color: #fdba74;
+    background: rgba(255, 247, 237, 0.6);
+}
+
+.op-jo-batch-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 200px;
+}
+
+.op-jo-batch-no {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    font-family: 'Fira Code', 'Consolas', monospace;
+}
+
+.op-jo-batch-progress {
+    flex: 1;
+}
+
+.op-jo-batch-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Table Group (in "All Tasks" section) */
+.op-table-group {
+    margin-bottom: 16px;
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.op-table-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border-light);
+    flex-wrap: wrap;
+}
+
+.op-table-group .data-table {
+    border: none;
+    margin: 0;
+}
+
+.op-table-group .data-table thead tr {
+    background: #f1f5f9;
+}
+
+/* Packaging status badge */
+.op-status-pkg {
+    background: #f5f3ff;
+    color: #7c3aed;
+    border: 1px solid #ddd6fe;
+}

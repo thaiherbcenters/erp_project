@@ -8,6 +8,18 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 
+// Helper to format date in local timezone to prevent UTC timezone shifts
+const formatDateLocal = (dateObj) => {
+    if (!dateObj) return null;
+    // If it's a string, parse it first
+    if (typeof dateObj === 'string') dateObj = new Date(dateObj);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+
 // ============================================================
 // 1. GET /api/leave-requests — ดึงข้อมูลใบลา
 // ============================================================

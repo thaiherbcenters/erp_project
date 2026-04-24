@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 
+// Helper to format date in local timezone to prevent UTC timezone shifts
+const formatDateLocal = (dateObj) => {
+    if (!dateObj) return null;
+    // If it's a string, parse it first
+    if (typeof dateObj === 'string') dateObj = new Date(dateObj);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+
 // ==========================================
 // QC INCOMING MODULE
 // ==========================================
@@ -227,8 +239,10 @@ router.put('/requests/:id', async (req, res) => {
                                 .query('SELECT ProducedQty, DefectQty, JobOrderID FROM Production_Tasks WHERE TaskID = @ProdTaskID');
                             if (pdRes.recordset.length > 0) {
                                 const pd = pdRes.recordset[0];
-                                const calcQty = (pd.ProducedQty || 0) - (pd.DefectQty || 0);
-                                if (calcQty > 0) goodQty = calcQty;
+                                // Use PackedQty if available and valid, otherwise fallback to ProducedQty (which is already the good quantity)
+                                if (goodQty <= 0 && pd.ProducedQty > 0) {
+                                    goodQty = pd.ProducedQty;
+                                }
                                 defectQty = pd.DefectQty || 0;
                                 jobOrderID = pd.JobOrderID || '';
                             }

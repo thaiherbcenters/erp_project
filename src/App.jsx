@@ -31,6 +31,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProductionProvider } from './context/ProductionContext';
 import { PlannerProvider } from './context/PlannerContext';
+import { AlertProvider } from './components/CustomAlert';
 
 // Components
 import Layout from './components/Layout';
@@ -59,6 +60,7 @@ import { RnDProvider } from './context/RnDContext';
 
 function App() {
   return (
+    <AlertProvider>
     <AuthProvider>
       <ProductionProvider>
         <PlannerProvider>
@@ -140,6 +142,7 @@ function App() {
         </PlannerProvider>
       </ProductionProvider>
     </AuthProvider>
+    </AlertProvider>
   );
 }
 

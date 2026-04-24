@@ -14,12 +14,14 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
+import { usePlanner } from '../context/PlannerContext';
 import API_BASE from '../config';
 import {
     CheckSquare, Play, CheckCircle, Search,
     Clock, Package, AlertTriangle, Activity, ClipboardList,
     Timer, TrendingUp, Repeat, ShieldCheck, Warehouse,
-    SearchCheck, ChevronRight, Eye, XCircle, Send, Plus, Save
+    SearchCheck, ChevronRight, Eye, XCircle, Send, Plus, Save,
+    Calendar, Tag, Star
 } from 'lucide-react';
 import { PRODUCTION_STEPS } from '../data/productionMockData';
 import './PageCommon.css';
@@ -33,12 +35,14 @@ const STEP_ICONS = {
 export default function Operator() {
     const { user, getVisibleSubPages, hasSectionPermission } = useAuth();
     const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
+    const { jobs } = usePlanner();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('operator');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedTask, setSelectedTask] = useState(null);
+    const [expandedJobOrder, setExpandedJobOrder] = useState(null);
     const [selectedTaskLogs, setSelectedTaskLogs] = useState([]);
     const [logForm, setLogForm] = useState({ producedQty: '', defectQty: '', notes: '' });
     const [isSubmittingLog, setIsSubmittingLog] = useState(false);
@@ -444,14 +448,37 @@ export default function Operator() {
     const renderDashboard = () => {
         const currentActive = tasks.filter(t => t.status === 'กำลังทำ').sort((a, b) => a.batchNo.localeCompare(b.batchNo));
 
+        // Group tasks by Job Order ID
+        const groupByJobOrder = (taskList) => {
+            const groups = {};
+            taskList.forEach(task => {
+                const joId = task.jobOrderId || 'ไม่ระบุ';
+                if (!groups[joId]) {
+                    groups[joId] = {
+                        jobOrderId: joId,
+                        formulaName: task.formulaName,
+                        line: task.line,
+                        process: task.process,
+                        tasks: []
+                    };
+                }
+                groups[joId].tasks.push(task);
+            });
+            return Object.values(groups);
+        };
+
+        const activeGroups = groupByJobOrder(currentActive);
+        const allPendingTasks = tasks.filter(t => t.status !== 'เสร็จสิ้น');
+        const allGroups = groupByJobOrder(allPendingTasks);
+
         return (
             <div className="operator-dashboard">
                 <div className="page-title">
-                    <h1>งานของฉัน — Production Operator</h1>
-                    <p>รายการงานที่ได้รับจาก Planner</p>
+                    <h1>{expandedJobOrder ? 'การผลิต' : 'งานของฉัน — Production Operator'}</h1>
+                    <p>{expandedJobOrder ? `รายละเอียดและขั้นตอนการผลิตสำหรับใบสั่ง: ${expandedJobOrder}` : 'รายการงานที่ได้รับจาก Planner'}</p>
                 </div>
 
-                {hasSectionPermission('operator_dashboard_status') && (
+                {!expandedJobOrder && hasSectionPermission('operator_dashboard_status') && (
                     <div className="summary-row">
                         <div className="card summary-card">
                             <div className="summary-icon" style={{ background: '#fff8e1', color: '#f9a825' }}><Activity size={20} /></div>
@@ -472,121 +499,212 @@ export default function Operator() {
                     </div>
                 )}
 
-                {/* ── Active Tasks with Stepper ── */}
-                {currentActive.length > 0 && (
+                {/* ── Active Tasks Section ── */}
+                {allGroups.length > 0 && (
                     <div className="op-active-section">
-                        <h3 className="op-section-title"><Timer size={16} className="op-pulse" /> งานที่กำลังทำอยู่ตอนนี้</h3>
-                        <div className="op-active-grid">
-                            {currentActive.map(task => {
-                                const currentStepObj = PRODUCTION_STEPS.find(s => s.key === task.currentStep);
-                                const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
-                                const isLastStep = currentIdx >= PRODUCTION_STEPS.length - 1;
-                                const isQcStep = task.currentStep === 'qc_inprocess' || task.currentStep === 'qc_final';
-                                const waitingQc = isWaitingForQc(task);
-                                const needsSendQc = isQcStep && !hasQcRequest(task);
+                        {!expandedJobOrder ? (
+                            <>
+                                <h3 className="op-section-title"><Timer size={16} className="op-pulse" /> ใบสั่งผลิตที่รอเริ่มงานหรือกำลังทำ (เลือกเพื่อดู Batch)</h3>
+                                <div className="op-jo-group-list">
+                                    {allGroups.map(group => {
+                                        const totalExpected = group.tasks.reduce((s, t) => s + t.expectedQty, 0);
+                                        const totalProducedGroup = group.tasks.reduce((s, t) => s + t.producedQty, 0);
+                                        const progressPct = totalExpected > 0 ? Math.round((totalProducedGroup / totalExpected) * 100) : 0;
+                                        const hasQcWaiting = group.tasks.some(t => isWaitingForQc(t));
+                                        const job = jobs?.find(j => j.id === group.jobOrderId);
+                                        
+                                        return (
+                                            <div 
+                                                key={group.jobOrderId} 
+                                                className={`op-jo-group-card ${hasQcWaiting ? 'op-jo-group-qc' : ''}`}
+                                                style={{ cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'translateY(-2px)' } }}
+                                                onClick={() => setExpandedJobOrder(group.jobOrderId)}
+                                            >
+                                                <div className="op-jo-group-header">
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                        <span className="op-jo-group-id">{group.jobOrderId}</span>
+                                                        {job?.priority && (
+                                                            <span className={`badge ${job.priority === 'สูง' ? 'badge-error' : 'badge-neutral'}`} style={{ fontSize: 11 }}>
+                                                                <Star size={10} style={{ marginRight: 2, verticalAlign: 'middle' }}/> ความสำคัญ: {job.priority}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="op-jo-group-product">{group.formulaName}</div>
+                                                    
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                                                            <Tag size={13} />
+                                                            <span>ประเภท: {job?.productionType || 'ผลิตตามแผน (MTS)'}</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                                                            <Calendar size={13} />
+                                                            <span>เริ่ม: <strong style={{ color: 'var(--text)' }}>{job?.planDate ? new Date(job.planDate).toLocaleDateString('th-TH') : '-'}</strong></span>
+                                                            <span style={{ margin: '0 4px' }}>|</span>
+                                                            <span>เสร็จ: <strong style={{ color: 'var(--text)' }}>{job?.dueDate ? new Date(job.dueDate).toLocaleDateString('th-TH') : '-'}</strong></span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12, color: 'var(--text-secondary)' }}>
+                                                            <Activity size={13} />
+                                                            <span>สายการผลิต: <strong style={{ color: 'var(--primary)' }}>{group.line}</strong></span>
+                                                            <span style={{ margin: '0 4px' }}>|</span>
+                                                            <span>จำนวน: <strong style={{ color: 'var(--text)' }}>{group.tasks.length} Batch</strong></span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {hasQcWaiting && (
+                                                        <div style={{ marginTop: 4 }}>
+                                                            <span className="badge badge-warning">⏳ มีงานรอ QC ตรวจสอบ</span>
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                return (
-                                    <div key={task.id} className={`op-active-card ${waitingQc ? 'op-active-card-qc' : ''}`}>
-                                        <div className="op-active-top">
-                                            <div>
-                                                <span className="op-active-batch">{task.batchNo}</span>
-                                                <span className="op-active-job">← {task.jobOrderId}</span>
+                                                <div className="op-jo-group-qty">
+                                                    <span>เป้าหมายรวม:</span>
+                                                    <span style={{ color: 'var(--primary)', fontSize: 16 }}>{totalExpected.toLocaleString()}</span>
+                                                </div>
                                             </div>
-                                            <span className={`op-status-badge ${waitingQc ? 'op-status-qc' : task.currentStep === 'packaging' ? 'op-status-pkg' : 'op-status-active'}`}>
-                                                {waitingQc ? '⏳ รอ QC' : task.currentStep === 'packaging' ? '📦 รอ Pack' : currentStepObj?.shortLabel}
-                                            </span>
-                                        </div>
-                                        <div className="op-active-product">{task.formulaName}</div>
-                                        <div className="op-active-process">{task.process} • {task.line}</div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                    <h3 className="op-section-title" style={{ margin: 0 }}>
+                                        <Timer size={16} className="op-pulse" /> รายละเอียดใบสั่งผลิต: <span style={{ color: 'var(--primary)', marginLeft: 6 }}>{expandedJobOrder}</span>
+                                    </h3>
+                                    <button className="op-btn" onClick={() => setExpandedJobOrder(null)} style={{ background: '#f1f5f9', color: '#475569' }}>
+                                        ← กลับไปหน้ารวม
+                                    </button>
+                                </div>
+                                <div className="op-active-grid">
+                                    {allPendingTasks.filter(t => (t.jobOrderId || 'ไม่ระบุ') === expandedJobOrder).map(task => {
+                                        const currentStepObj = PRODUCTION_STEPS.find(s => s.key === task.currentStep);
+                                        const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
+                                        const isLastStep = currentIdx >= PRODUCTION_STEPS.length - 1;
+                                        const isQcStep = task.currentStep === 'qc_inprocess' || task.currentStep === 'qc_final';
+                                        const waitingQc = isWaitingForQc(task);
 
-                                        <WorkflowStepper task={task} compact={true} />
+                                        return (
+                                            <div key={task.id} className={`op-active-card ${waitingQc ? 'op-active-card-qc' : ''}`}>
+                                                <div className="op-active-top">
+                                                    <div>
+                                                        <span className="op-active-batch">{task.batchNo}</span>
+                                                        <span className="op-active-job">← {task.jobOrderId}</span>
+                                                    </div>
+                                                    <span className={`op-status-badge ${waitingQc ? 'op-status-qc' : task.currentStep === 'packaging' ? 'op-status-pkg' : 'op-status-active'}`}>
+                                                        {waitingQc ? '⏳ รอ QC' : task.currentStep === 'packaging' ? '📦 รอ Pack' : currentStepObj?.shortLabel}
+                                                    </span>
+                                                </div>
+                                                <div className="op-active-product">{task.formulaName}</div>
+                                                <div className="op-active-process">{task.process} • {task.line}</div>
 
-                                        <div className="op-active-progress">
-                                            <div className="op-active-progress-bar">
-                                                <div className="op-active-progress-fill" style={{ width: `${(task.producedQty / task.expectedQty) * 100}%` }}></div>
+                                                <WorkflowStepper task={task} compact={true} />
+
+                                                <div className="op-active-progress">
+                                                    <div className="op-active-progress-bar">
+                                                        <div className="op-active-progress-fill" style={{ width: `${(task.producedQty / task.expectedQty) * 100}%` }}></div>
+                                                    </div>
+                                                    <span className="op-active-progress-text">{task.producedQty} / {task.expectedQty}</span>
+                                                </div>
+
+                                                <div className="op-active-actions">
+                                                    {waitingQc ? (
+                                                        <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
+                                                    ) : isQcStep ? (
+                                                        <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
+                                                    ) : task.currentStep === 'packaging' ? (
+                                                        <span className="op-waiting-label" style={{ color: '#8b5cf6', background: '#f5f3ff' }}>📦 รอแผนกบรรจุภัณฑ์...</span>
+                                                    ) : task.currentStep === 'pending' ? (
+                                                        <button className="op-btn op-btn-start" style={{ background: '#10b981', color: 'white', borderColor: '#059669' }} onClick={() => startTask(task.id)}>
+                                                            <Play size={14} /> เริ่มดำเนินการ
+                                                        </button>
+                                                    ) : !isLastStep && !isQcStep ? (
+                                                        <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
+                                                            <ChevronRight size={14} /> ขั้นตอนถัดไป
+                                                        </button>
+                                                    ) : null}
+                                                    <button className="op-btn op-btn-detail" onClick={() => setSelectedTask(task)}>
+                                                        <Eye size={14} /> รายละเอียด
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <span className="op-active-progress-text">{task.producedQty} / {task.expectedQty}</span>
-                                        </div>
-
-                                        <div className="op-active-actions">
-                                            {waitingQc ? (
-                                                <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
-                                            ) : isQcStep ? (
-                                                <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
-                                            ) : task.currentStep === 'packaging' ? (
-                                                <span className="op-waiting-label" style={{ color: '#8b5cf6', background: '#f5f3ff' }}>📦 รอแผนกบรรจุภัณฑ์...</span>
-                                            ) : !isLastStep && !isQcStep ? (
-                                                <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
-                                                    <ChevronRight size={14} /> ขั้นตอนถัดไป
-                                                </button>
-                                            ) : null}
-                                            <button className="op-btn op-btn-detail" onClick={() => setSelectedTask(task)}>
-                                                <Eye size={14} /> รายละเอียด
-                                            </button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
 
-                {/* ── All Tasks Table ── */}
-                {hasSectionPermission('operator_dashboard_tasks') && (
+                {/* ── All Tasks Table (Grouped) ── */}
+                {!expandedJobOrder && hasSectionPermission('operator_dashboard_tasks') && (
                     <div className="card" style={{ marginTop: 16 }}>
-                        <h3 className="op-section-title"><ClipboardList size={16} /> รายการงานทั้งหมด</h3>
+                        <h3 className="op-section-title"><ClipboardList size={16} /> รายการงานทั้งหมด (จัดกลุ่มตามใบสั่งผลิต)</h3>
                         <div className="table-card" style={{ marginTop: 8 }}>
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>รหัสงาน</th>
-                                        <th>ใบสั่งผลิต</th>
-                                        <th>ผลิตภัณฑ์</th>
-                                        <th>Batch No.</th>
-                                        <th>ขั้นตอนปัจจุบัน</th>
-                                        <th>เป้าหมาย</th>
-                                        <th>ทำได้แล้ว</th>
-                                        <th>สถานะ</th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {tasks.filter(t => t.status !== 'เสร็จสิ้น').sort((a, b) => a.batchNo.localeCompare(b.batchNo)).map(task => {
-                                        const stepObj = PRODUCTION_STEPS.find(s => s.key === task.currentStep);
-                                        const waitingQc = isWaitingForQc(task);
-                                        return (
-                                            <tr key={task.id} className={waitingQc ? 'op-row-qc-waiting' : ''}>
-                                                <td className="text-bold">{task.id}</td>
-                                                <td><span className="op-jo-ref">{task.jobOrderId}</span></td>
-                                                <td>{task.formulaName}</td>
-                                                <td><span className="badge badge-neutral">{task.batchNo}</span></td>
-                                                <td>
-                                                    <span className={`op-step-badge ${waitingQc ? 'op-step-badge-qc' : ''}`}>
-                                                        {waitingQc ? '⏳ รอ QC ตรวจ' : stepObj?.shortLabel || '—'}
-                                                    </span>
-                                                </td>
-                                                <td>{task.expectedQty.toLocaleString()}</td>
-                                                <td>
-                                                    <div className="progress-container">
-                                                        <div className="progress-bar" style={{ width: `${(task.producedQty / task.expectedQty) * 100}%`, backgroundColor: 'var(--primary)' }}></div>
-                                                        <span className="progress-text">{task.producedQty} / {task.expectedQty}</span>
-                                                    </div>
-                                                </td>
-                                                <td><span className={`op-status-badge ${getStatusBadge(task.status)}`}>{task.status}</span></td>
-                                                <td>
-                                                    <button className="btn-sm" onClick={() => setSelectedTask(task)}><Eye size={14} /></button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                            {allGroups.map(group => {
+                                const totalExpected = group.tasks.reduce((s, t) => s + t.expectedQty, 0);
+                                const totalProducedGroup = group.tasks.reduce((s, t) => s + t.producedQty, 0);
+
+                                return (
+                                    <div key={group.jobOrderId} className="op-table-group">
+                                        <div className="op-table-group-header">
+                                            <span className="op-jo-ref" style={{ fontSize: 13, padding: '3px 10px' }}>{group.jobOrderId}</span>
+                                            <span style={{ fontWeight: 600, color: 'var(--text)' }}>{group.formulaName}</span>
+                                            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{group.tasks.length} batch • {group.line}</span>
+                                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', marginLeft: 'auto' }}>
+                                                {totalProducedGroup.toLocaleString()} / {totalExpected.toLocaleString()}
+                                            </span>
+                                        </div>
+                                        <table className="data-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Batch No.</th>
+                                                    <th>ขั้นตอนปัจจุบัน</th>
+                                                    <th>เป้าหมาย</th>
+                                                    <th>ทำได้แล้ว</th>
+                                                    <th>สถานะ</th>
+                                                    <th></th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {group.tasks.sort((a, b) => a.batchNo.localeCompare(b.batchNo)).map(task => {
+                                                    const stepObj = PRODUCTION_STEPS.find(s => s.key === task.currentStep);
+                                                    const waitingQc = isWaitingForQc(task);
+                                                    return (
+                                                        <tr key={task.id} className={waitingQc ? 'op-row-qc-waiting' : ''}>
+                                                            <td><span className="badge badge-neutral">{task.batchNo}</span></td>
+                                                            <td>
+                                                                <span className={`op-step-badge ${waitingQc ? 'op-step-badge-qc' : ''}`}>
+                                                                    {waitingQc ? '⏳ รอ QC ตรวจ' : stepObj?.shortLabel || '—'}
+                                                                </span>
+                                                            </td>
+                                                            <td>{task.expectedQty.toLocaleString()}</td>
+                                                            <td>
+                                                                <div className="progress-container">
+                                                                    <div className="progress-bar" style={{ width: `${(task.producedQty / task.expectedQty) * 100}%`, backgroundColor: 'var(--primary)' }}></div>
+                                                                    <span className="progress-text">{task.producedQty} / {task.expectedQty}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td><span className={`op-status-badge ${getStatusBadge(task.status)}`}>{task.status}</span></td>
+                                                            <td><button className="btn-sm" onClick={() => setSelectedTask(task)}><Eye size={14} /></button></td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                );
+                            })}
+                            {allGroups.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>ยังไม่มีงานที่รอดำเนินการ</div>
+                            )}
                         </div>
                     </div>
                 )}
             </div>
         );
     };
+
 
     // ══════════════════════════════════════════════════════════════════
     // 2. ประวัติการผลิต
