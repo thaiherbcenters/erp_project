@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_CUSTOMERS, MOCK_QUOTATIONS, MOCK_SALES_ORDERS } from '../data/mockData';
+import QuotationForm from '../components/QuotationForm';
 import './PageCommon.css';
 
 export default function Sales() {
@@ -28,6 +29,10 @@ export default function Sales() {
     const [customerSearch, setCustomerSearch] = useState('');
     const [quotationSearch, setQuotationSearch] = useState('');
     const [orderSearch, setOrderSearch] = useState('');
+
+    // ── State: การแสดงฟอร์ม ──
+    const [showQuotationForm, setShowQuotationForm] = useState(false);
+    const [localQuotations, setLocalQuotations] = useState(MOCK_QUOTATIONS);
 
     // ── คำนวณสถิติ Dashboard ──
     const totalRevenue = MOCK_SALES_ORDERS.reduce((sum, o) => sum + o.total, 0);
@@ -42,7 +47,7 @@ export default function Sales() {
         c.type.toLowerCase().includes(customerSearch.toLowerCase())
     );
 
-    const filteredQuotations = MOCK_QUOTATIONS.filter((q) =>
+    const filteredQuotations = localQuotations.filter((q) =>
         q.number.toLowerCase().includes(quotationSearch.toLowerCase()) ||
         q.customer.toLowerCase().includes(quotationSearch.toLowerCase())
     );
@@ -186,59 +191,69 @@ export default function Sales() {
 
             {/* ── Tab: Quotation ── */}
             {(activeTab === 'sales_quotation' && hasSubPermission('sales_quotation')) && (
-                <div className="subpage-content" key="sales_quotation">
-                    {hasSectionPermission('sales_quotation_search') && (
-                        <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์เลขที่ใบเสนอราคา..."
-                                    value={quotationSearch}
-                                    onChange={(e) => setQuotationSearch(e.target.value)}
-                                />
+                showQuotationForm ? (
+                    <QuotationForm 
+                        onBack={() => setShowQuotationForm(false)} 
+                        onSave={(newQ) => {
+                            setLocalQuotations(prev => [newQ, ...prev]);
+                            setShowQuotationForm(false);
+                        }}
+                    />
+                ) : (
+                    <div className="subpage-content" key="sales_quotation">
+                        {hasSectionPermission('sales_quotation_search') && (
+                            <div className="toolbar">
+                                <div className="search-box">
+                                    <span>ค้นหา</span>
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่ใบเสนอราคา..."
+                                        value={quotationSearch}
+                                        onChange={(e) => setQuotationSearch(e.target.value)}
+                                    />
+                                </div>
+                                <button className="btn-primary" onClick={() => setShowQuotationForm(true)}>+ สร้างใบเสนอราคา</button>
                             </div>
-                            <button className="btn-primary">+ สร้างใบเสนอราคา</button>
-                        </div>
-                    )}
+                        )}
 
-                    {hasSectionPermission('sales_quotation_table') && (
-                        <div className="table-card card">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>ลำดับ</th>
-                                        <th>เลขที่</th>
-                                        <th>ลูกค้า</th>
-                                        <th>รายการ</th>
-                                        <th>ยอดรวม (บาท)</th>
-                                        <th>วันที่</th>
-                                        <th>ใช้ได้ถึง</th>
-                                        <th>สถานะ</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredQuotations.map((q) => (
-                                        <tr key={q.id}>
-                                            <td>{q.id}</td>
-                                            <td className="text-bold">{q.number}</td>
-                                            <td>{q.customer}</td>
-                                            <td>{q.items} รายการ</td>
-                                            <td>{q.total.toLocaleString()}</td>
-                                            <td>{q.date}</td>
-                                            <td>{q.validUntil}</td>
-                                            <td>
-                                                <span className={`badge ${getQuotationStatusClass(q.status)}`}>
-                                                    {q.status}
-                                                </span>
-                                            </td>
+                        {hasSectionPermission('sales_quotation_table') && (
+                            <div className="table-card card">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ลำดับ</th>
+                                            <th>เลขที่</th>
+                                            <th>ลูกค้า</th>
+                                            <th>รายการ</th>
+                                            <th>ยอดรวม (บาท)</th>
+                                            <th>วันที่</th>
+                                            <th>ใช้ได้ถึง</th>
+                                            <th>สถานะ</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
+                                    </thead>
+                                    <tbody>
+                                        {filteredQuotations.map((q, idx) => (
+                                            <tr key={q.id}>
+                                                <td>{idx + 1}</td>
+                                                <td className="text-bold">{q.number}</td>
+                                                <td>{q.customer}</td>
+                                                <td>{q.items} รายการ</td>
+                                                <td>{q.total.toLocaleString()}</td>
+                                                <td>{q.date}</td>
+                                                <td>{q.validUntil}</td>
+                                                <td>
+                                                    <span className={`badge ${getQuotationStatusClass(q.status)}`}>
+                                                        {q.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )
             )}
 
             {/* ── Tab: Sales Order ── */}
