@@ -377,11 +377,28 @@ export default function Stock() {
         );
     };
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'stock_data': return 'ยอดคงเหลือสินค้า (Inventory Data)';
+            case 'stock_logs': return 'ประวัติเข้า-ออก (Stock Logs)';
+            default: return 'คลังสินค้า (Inventory)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (activeTab) {
+            case 'stock_data': return 'ตรวจสอบยอดคงเหลือ สถานะ และรายละเอียดของสินค้าในคลัง';
+            case 'stock_logs': return 'ประวัติและรายละเอียดการรับเข้าหรือเบิกจ่ายสินค้า';
+            default: return 'ข้อมูลสินค้าคงคลัง และประวัติรายการเข้า-ออก';
+        }
+    };
+
     return (
-        <div className="page-content">
-            <div className="page-title">
-                <h1>คลังสินค้า (Inventory)</h1>
-                <p>ข้อมูลสินค้าคงคลัง และประวัติรายการเข้า-ออก</p>
+        <div className="page-container stock-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
             </div>
 
             {/* ── Tab: Data STOCK ── */}

@@ -87,11 +87,32 @@ export default function Accounts() {
         { name: 'ภาษีมูลค่าเพิ่ม', type: 'ภาษี', date: '2026-02-28', status: 'พร้อม' },
     ];
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'accounts_dashboard': return 'ภาพรวมบัญชี';
+            case 'accounts_ar': return 'ลูกหนี้การค้า (AR)';
+            case 'accounts_ap': return 'เจ้าหนี้การค้า (AP)';
+            case 'accounts_reports': return 'รายงานบัญชี';
+            default: return 'บัญชี';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (activeTab) {
+            case 'accounts_dashboard': return 'ภาพรวมลูกหนี้ เจ้าหนี้ และกำไรขาดทุน';
+            case 'accounts_ar': return 'จัดการข้อมูลลูกหนี้การค้าและการรับชำระเงิน';
+            case 'accounts_ap': return 'จัดการข้อมูลเจ้าหนี้การค้าและการจ่ายชำระเงิน';
+            case 'accounts_reports': return 'รายงานงบการเงินและเอกสารทางบัญชี';
+            default: return 'จัดการลูกหนี้ เจ้าหนี้ และรายงานการเงิน';
+        }
+    };
+
     return (
-        <div className="page-content">
-            <div className="page-title">
-                <h1>บัญชี</h1>
-                <p>จัดการลูกหนี้ เจ้าหนี้ และรายงานการเงิน</p>
+        <div className="page-container accounts-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
             </div>
 
             {/* ── Tab: Accounts Dashboard ── */}

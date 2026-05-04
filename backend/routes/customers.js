@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const sql = require('mssql');
+const { sql, poolPromise } = require('../config/db');
+const { generateSequence, getMonthPrefix } = require('../utils/sequence');
 
 // 1. Get all customers
 router.get('/', async (req, res) => {
@@ -53,11 +54,13 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Missing required fields (name, typeId)' });
         }
 
-        const pool = await sql.connect();
+        const pool = await poolPromise;
+        const finalCode = code || await generateSequence(pool, 'Customer', 'CustomerCode', `CUST-${getMonthPrefix()}`, 3);
+
         const result = await pool.request()
             .input('tid', sql.Int, typeId)
             .input('sid', sql.Int, statusId || 1) // default 1 (ใช้งาน)
-            .input('code', sql.NVarChar, code || `CUST-${Date.now().toString().slice(-4)}`) // Auto code
+            .input('code', sql.NVarChar, finalCode)
             .input('name', sql.NVarChar, name)
             .input('phone', sql.NVarChar, phone)
             .input('email', sql.NVarChar, email)

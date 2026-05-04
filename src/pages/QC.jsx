@@ -30,6 +30,7 @@ export default function QC() {
     const [searchDefect, setSearchDefect] = useState('');
     const [inspectingRequest, setInspectingRequest] = useState(null);
     const [inspectNotes, setInspectNotes] = useState('');
+    const [rejectDialog, setRejectDialog] = useState({ open: false, request: null });
 
     // QC/Lab Formula Testing
     const { formulas, fetchFormulaTests, submitFormulaTest } = useRnD();
@@ -169,12 +170,18 @@ export default function QC() {
         }
     };
 
-    const handleInspectSubmit = (finalResult) => {
+    const handleInspectSubmit = (finalResult, disposition = null) => {
         if (!inspectingRequest) return;
-        submitQcResult(inspectingRequest.id, finalResult, 'qc_user', inspectNotes, checklistData);
+        submitQcResult(inspectingRequest.id, finalResult, 'qc_user', inspectNotes, checklistData, disposition);
         setInspectingRequest(null);
         setChecklistData([]);
         setInspectNotes('');
+        setRejectDialog({ open: false, request: null });
+    };
+
+    const handleRejectClick = () => {
+        // Show disposition dialog
+        setRejectDialog({ open: true, request: inspectingRequest });
     };
 
     const handleChecklistChange = (criteriaId, field, value) => {
@@ -298,14 +305,74 @@ export default function QC() {
                                 )}
                             </div>
                             
-                            <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 12, background: '#fff' }}>
+                            <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 12, background: '#f8fafc', borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }}>
                                 <button className="btn-secondary" onClick={() => setInspectingRequest(null)}>ยกเลิก</button>
-                                <button className="btn-danger" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => handleInspectSubmit('ไม่ผ่าน')}>
-                                    ❌ ไม่ผ่าน (Reject)
+                                <button className="btn-danger" onClick={handleRejectClick}>
+                                    ❌ ไม่ผ่าน
                                 </button>
-                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#16a34a', borderColor: '#16a34a' }} onClick={() => handleInspectSubmit('ผ่าน')}>
+                                <button className="btn-primary" onClick={() => handleInspectSubmit('ผ่าน')}>
                                     ✅ ผ่าน QC (Approve)
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Reject Disposition Dialog ── */}
+                {rejectDialog.open && (
+                    <div className="pkg-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setRejectDialog({ open: false, request: null })}>
+                        <div className="pkg-modal" style={{ maxWidth: 520, borderTop: '4px solid var(--danger)' }} onClick={e => e.stopPropagation()}>
+                            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb' }}>
+                                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#dc2626' }}>⚠️ QC ไม่ผ่าน — เลือกวิธีจัดการ</h2>
+                                <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>
+                                    {rejectDialog.request?.batchNo} — {rejectDialog.request?.formulaName}
+                                </p>
+                            </div>
+                            <div style={{ padding: '20px 24px' }}>
+                                <p style={{ fontSize: 14, color: '#374151', marginBottom: 16, fontWeight: 500 }}>
+                                    กรุณาเลือกวิธีจัดการตามมาตรฐาน GMP:
+                                </p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    {/* Rework Option */}
+                                    <button
+                                        onClick={() => handleInspectSubmit('ไม่ผ่าน', 'rework')}
+                                        style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px',
+                                            border: '2px solid #fde68a', borderRadius: 10, background: '#fffbeb',
+                                            cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s'
+                                        }}
+                                        onMouseOver={e => { e.currentTarget.style.borderColor = '#f59e0b'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                                        onMouseOut={e => { e.currentTarget.style.borderColor = '#fde68a'; e.currentTarget.style.transform = 'none'; }}
+                                    >
+                                        <div style={{ fontSize: 28, lineHeight: 1 }}>🔁</div>
+                                        <div>
+                                            <div style={{ fontSize: 15, fontWeight: 700, color: '#92400e' }}>Rework — ส่งกลับแก้ไข</div>
+                                            <div style={{ fontSize: 12, color: '#a16207', marginTop: 4 }}>ย้อนขั้นตอนกลับไปผลิตใหม่ ให้ Operator แก้ไขปัญหาแล้วส่ง QC อีกครั้ง</div>
+                                            <div style={{ fontSize: 11, color: '#b45309', marginTop: 6, fontStyle: 'italic' }}>ระบบจะสร้าง NCR อัตโนมัติ</div>
+                                        </div>
+                                    </button>
+                                    {/* Reject Option */}
+                                    <button
+                                        onClick={() => handleInspectSubmit('ไม่ผ่าน', 'reject')}
+                                        style={{
+                                            display: 'flex', alignItems: 'flex-start', gap: 14, padding: '16px 18px',
+                                            border: '2px solid #fecaca', borderRadius: 10, background: '#fef2f2',
+                                            cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s'
+                                        }}
+                                        onMouseOver={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                                        onMouseOut={e => { e.currentTarget.style.borderColor = '#fecaca'; e.currentTarget.style.transform = 'none'; }}
+                                    >
+                                        <div style={{ fontSize: 28, lineHeight: 1 }}>🗑️</div>
+                                        <div>
+                                            <div style={{ fontSize: 15, fontWeight: 700, color: '#991b1b' }}>Reject — คัดทิ้งทั้ง Batch</div>
+                                            <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 4 }}>ของเสียถาวร ไม่สามารถแก้ไขได้ ปิดงาน Batch นี้และบันทึกเป็นของเสีย</div>
+                                            <div style={{ fontSize: 11, color: '#dc2626', marginTop: 6, fontStyle: 'italic' }}>⚠️ การกระทำนี้ไม่สามารถย้อนกลับได้ + สร้าง NCR อัตโนมัติ</div>
+                                        </div>
+                                    </button>
+                                </div>
+                                <div style={{ marginTop: 16, textAlign: 'right' }}>
+                                    <button className="btn-secondary" onClick={() => setRejectDialog({ open: false, request: null })}>ยกเลิก</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -353,11 +420,38 @@ export default function QC() {
         );
     };
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'qc_dashboard': return 'ตรวจสอบคุณภาพ (QC)';
+            case 'qc_incoming': return 'ตรวจรับวัตถุดิบ (Incoming QC)';
+            case 'qc_inprocess': return 'ตรวจสอบระหว่างผลิต (In-Process QC)';
+            case 'qc_final': return 'ตรวจสอบขั้นสุดท้าย (Final QC)';
+            case 'qc_defect': return 'แจ้งปัญหาและของเสีย (NCR)';
+            case 'qc_formula_lab': return '🧪 QC/Lab ทดสอบสูตร';
+            case 'qc_reports': return 'รายงานและการวิเคราะห์คุณภาพ';
+            default: return 'ตรวจสอบคุณภาพ (QC)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (activeTab) {
+            case 'qc_dashboard': return 'ภาพรวมและติดตามผลการตรวจสอบคุณภาพสินค้าทั้งหมด';
+            case 'qc_incoming': return 'ตรวจสอบคุณภาพวัตถุดิบและบรรจุภัณฑ์ที่รับเข้า';
+            case 'qc_inprocess': return 'ตรวจสอบคุณภาพสินค้าระหว่างกระบวนการผลิต';
+            case 'qc_final': return 'ตรวจสอบคุณภาพสินค้าขั้นสุดท้ายก่อนส่งเข้าคลัง';
+            case 'qc_defect': return 'จัดการรายงานสินค้าที่ไม่ได้มาตรฐาน (Non-Conformance Report)';
+            case 'qc_formula_lab': return 'ทดสอบสูตรผลิตภัณฑ์จาก R&D — กรอกผลตรวจ pH, สี, กลิ่น, ความหนืด แล้วส่งผลกลับ';
+            case 'qc_reports': return 'สรุปและวิเคราะห์ผลการดำเนินการตรวจสอบคุณภาพ';
+            default: return 'จัดการและติดตามผลการตรวจสอบคุณภาพสินค้า';
+        }
+    };
+
     return (
-        <div className="page-content">
-            <div className="page-title">
-                <h1>ตรวจสอบคุณภาพ (QC)</h1>
-                <p>จัดการและติดตามผลการตรวจสอบคุณภาพสินค้า</p>
+        <div className="page-container qc-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
             </div>
 
             {/* ── Dashboard ── */}
@@ -533,10 +627,6 @@ export default function QC() {
             {/* ── QC/Lab Formula Testing ── */}
             {(activeTab === 'qc_formula_lab' && hasSubPermission('qc_formula_lab')) && (
                 <div className="subpage-content" key="qc_formula_lab">
-                    <div className="page-title">
-                        <h1>🧪 QC/Lab ทดสอบสูตร</h1>
-                        <p>ทดสอบสูตรผลิตภัณฑ์จาก R&D — กรอกผลตรวจ pH, สี, กลิ่น, ความหนืด แล้วส่งผลกลับ</p>
-                    </div>
 
                     {/* สูตรรอทดสอบ */}
                     {pendingFormulas.length > 0 && (

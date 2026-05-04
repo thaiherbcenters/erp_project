@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { getDatePrefix, getShortDatePrefix } = require('../utils/sequence');
 
 // Get all planner jobs
 router.get('/', async (req, res) => {
@@ -126,11 +127,17 @@ router.post('/', async (req, res) => {
         
         const pool = await poolPromise;
         
-        // Generate new ID (JO-YYYY-XXX)
-        // For simplicity, just count
-        const countRes = await pool.request().query("SELECT COUNT(*) as cnt FROM Planner WHERE PlannerID LIKE 'JO-2026-%'");
+        // Generate new ID (JO-YYYYMMDD-XXX) — same format as SO
+        const today = new Date();
+        const dateStr = today.getFullYear().toString() +
+            (today.getMonth() + 1).toString().padStart(2, '0') +
+            today.getDate().toString().padStart(2, '0');
+        const prefix = `JO-${dateStr}`;
+        const countRes = await pool.request()
+            .input('prefix', sql.VarChar, `${prefix}-%`)
+            .query("SELECT COUNT(*) as cnt FROM Planner WHERE PlannerID LIKE @prefix");
         const newNum = countRes.recordset[0].cnt + 1;
-        const newId = `JO-2026-${newNum.toString().padStart(3, '0')}`;
+        const newId = `${prefix}-${newNum.toString().padStart(3, '0')}`;
         
         const result = await pool.request()
             .input('PlannerID', sql.VarChar, newId)
@@ -189,15 +196,35 @@ router.post('/:id/release', async (req, res) => {
         
         // 2. Generate Production_Tasks
         const batchQty = job.BatchQty;
-        const timestamp = Date.now().toString().slice(-6);
+        const formulaCode = job.FormulaID ? job.FormulaID.replace(/[^A-Za-z0-9]/g, '') : 'UNK';
+        const shortDate = getShortDatePrefix();
+        const fullDate = getDatePrefix();
+        
+        const bPrefix = `B${shortDate}-${formulaCode}`;
+        const ptPrefix = `PT-${fullDate}`;
+        
+        // Get counts BEFORE transaction to avoid locking issues / duplicates
+        const countRes = await pool.request()
+            .input('bPrefix', sql.NVarChar, `${bPrefix}-%`)
+            .input('ptPrefix', sql.NVarChar, `${ptPrefix}-%`)
+            .query(`
+                SELECT 
+                    (SELECT COUNT(*) FROM Production_Tasks WHERE BatchNo LIKE @bPrefix) as bCount,
+                    (SELECT COUNT(*) FROM Production_Tasks WHERE TaskID LIKE @ptPrefix) as ptCount
+            `);
+            
+        let bSeq = countRes.recordset[0].bCount;
+        let ptSeq = countRes.recordset[0].ptCount;
         
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         
         try {
             for (let i = 0; i < batchQty; i++) {
-                const taskId = `PT-${Date.now()}-${i}`;
-                const batchNo = `B26-${timestamp}-${i+1}`;
+                bSeq++;
+                ptSeq++;
+                const taskId = `${ptPrefix}-${String(ptSeq).padStart(3, '0')}`;
+                const batchNo = `${bPrefix}-${String(bSeq).padStart(2, '0')}`;
                 
                 await new sql.Request(transaction)
                     .input('TaskID', sql.VarChar, taskId)

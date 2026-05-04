@@ -8,6 +8,7 @@ import {
     MoreVertical, Edit3, Grid, List, Home,
     ArrowLeft, Info
 } from 'lucide-react';
+import { useAlert } from '../components/CustomAlert';
 import './DocumentLibrary.css';
 import API_BASE from '../config';
 
@@ -18,6 +19,7 @@ export default function DocumentLibrary({ hasPermission }) {
         return <div className="doc-no-access">ไม่มีสิทธิ์เข้าถึงหน้านี้</div>;
 
     const { currentUser, getUserPermissions } = useAuth();
+    const { showAlert, showConfirm } = useAlert();
 
     // Navigation state
     const [currentFolderId, setCurrentFolderId] = useState(null);
@@ -176,7 +178,7 @@ export default function DocumentLibrary({ hasPermission }) {
             setNewFolderName('');
             fetchContents(currentFolderId);
         } catch (err) {
-            alert(`Error: ${err.message}`);
+            showAlert('เกิดข้อผิดพลาด', `Error: ${err.message}`, 'error');
         } finally {
             setIsCreatingFolder(false);
         }
@@ -198,19 +200,20 @@ export default function DocumentLibrary({ hasPermission }) {
             setRenameName('');
             fetchContents(currentFolderId);
         } catch (err) {
-            alert(`Error: ${err.message}`);
+            showAlert('เกิดข้อผิดพลาด', `Error: ${err.message}`, 'error');
         }
     };
 
     const handleDeleteFolder = async (folder) => {
-        if (!window.confirm(`ลบโฟลเดอร์ "${folder.folder_name}" ?`)) return;
+        const ok = await showConfirm('ยืนยันการลบ', `ลบโฟลเดอร์ "${folder.folder_name}" ?`, 'warning');
+        if (!ok) return;
         try {
             const res = await fetch(`${LIBRARY_API}/folders/${folder.id}?user=${currentUser?.username}`, { method: 'DELETE' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
             fetchContents(currentFolderId);
         } catch (err) {
-            alert(`Error: ${err.message}`);
+            showAlert('เกิดข้อผิดพลาด', `Error: ${err.message}`, 'error');
         }
     };
 
@@ -223,7 +226,10 @@ export default function DocumentLibrary({ hasPermission }) {
 
     const handleUploadSubmit = async (e) => {
         e.preventDefault();
-        if (!uploadFile) return alert('กรุณาเลือกไฟล์');
+        if (!uploadFile) {
+            showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกไฟล์', 'warning');
+            return;
+        }
         setIsUploading(true);
         const formData = new FormData();
         formData.append('file', uploadFile);
@@ -240,21 +246,22 @@ export default function DocumentLibrary({ hasPermission }) {
             setUploadDesc('');
             fetchContents(currentFolderId);
         } catch (err) {
-            alert(`Error: ${err.message}`);
+            showAlert('เกิดข้อผิดพลาด', `Error: ${err.message}`, 'error');
         } finally {
             setIsUploading(false);
         }
     };
 
     const handleDeleteFile = async (id, name) => {
-        if (!window.confirm(`ลบไฟล์ "${name}" ?`)) return;
+        const ok = await showConfirm('ยืนยันการลบ', `ลบไฟล์ "${name}" ?`, 'warning');
+        if (!ok) return;
         try {
             const res = await fetch(`${LIBRARY_API}/${id}?user=${currentUser?.username}`, { method: 'DELETE' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message);
             fetchContents(currentFolderId);
         } catch (err) {
-            alert(`Error: ${err.message}`);
+            showAlert('เกิดข้อผิดพลาด', `Error: ${err.message}`, 'error');
         }
     };
 

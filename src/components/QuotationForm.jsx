@@ -1,25 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Printer, ArrowLeft, Plus, Trash2, FileText, CheckCircle } from 'lucide-react';
+import { useAlert } from '../components/CustomAlert';
 import '../pages/PageCommon.css';
 
 const styles = `
 .q-form-wrapper {
-    font-family: 'Sarabun', sans-serif;
+    font-family: 'Inter', 'Sarabun', sans-serif;
     background: transparent;
     padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;
 }
 
 .q-container {
-    background: white;
-    border-radius: 12px;
-    border: 1px solid #cbd5e1;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
-    padding: 30px;
     width: 100%;
-    max-width: 1000px;
     animation: slideUp 0.3s ease-out;
 }
 
@@ -29,61 +21,107 @@ const styles = `
 }
 
 .q-header {
-    margin-bottom: 30px;
+    margin-bottom: 24px;
 }
 
 .q-header h1 {
-    color: #1e293b;
-    font-size: 24px;
+    color: var(--text, #1e293b);
+    font-size: 22px;
     font-weight: 600;
-    margin-bottom: 8px;
-    margin-top: 0;
+    margin: 0 0 4px;
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
 .q-header p {
-    color: #64748b;
-    font-size: 14px;
+    color: var(--text-secondary, #475569);
+    font-size: 13px;
     margin: 0;
 }
 
 .q-back-btn {
-    background: #f1f5f9;
-    color: #475569;
-    padding: 10px 16px;
-    border: none;
-    border-radius: 8px;
-    font-size: 14px;
+    background: #ffffff;
+    color: var(--primary, #4f46e5);
+    padding: 8px 16px;
+    border: 1px solid var(--primary-light, #818cf8);
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 500;
-    font-family: 'Sarabun', sans-serif;
+    font-family: inherit;
     cursor: pointer;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
     transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 .q-back-btn:hover {
-    background: #e2e8f0;
+    background: #eef2ff;
+    border-color: var(--primary, #4f46e5);
 }
 
-.form-group {
+/* ===== Section Card ===== */
+.q-section {
+    background: var(--bg-white, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.q-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-light, #f1f5f9);
+}
+
+.q-section-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg, #f8fafc);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    color: var(--primary, #4f46e5);
+    flex-shrink: 0;
+}
+
+.q-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text, #1e293b);
+    margin: 0;
+}
+
+.q-section-desc {
+    font-size: 12px;
+    color: var(--text-muted, #94a3b8);
+    margin: 2px 0 0;
+}
+
+/* ===== Form Controls ===== */
+.form-group {
+    margin-bottom: 16px;
 }
 
 .form-group label {
     display: block;
-    color: #475569;
+    color: var(--text-secondary, #475569);
     font-weight: 500;
-    margin-bottom: 8px;
-    font-size: 14px;
+    margin-bottom: 6px;
+    font-size: 13px;
 }
 
 .form-group label .required {
-    color: #ef4444;
+    color: var(--danger, #ef4444);
     margin-left: 3px;
 }
 
@@ -91,89 +129,89 @@ const styles = `
 .form-group select,
 .form-group textarea {
     width: 100%;
-    padding: 10px 14px;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    font-size: 14px;
-    font-family: 'Sarabun', sans-serif;
-    transition: all 0.2s ease;
-    background: white;
+    padding: 8px 12px;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    background: var(--bg-white, #fff);
+    color: var(--text, #1e293b);
 }
 
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: var(--primary, #4f46e5);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.08);
 }
 
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 15px;
+    gap: 14px;
 }
 
 /* Products Section */
 .product-item {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 15px;
-    margin-bottom: 12px;
-    transition: all 0.2s ease;
+    background: var(--bg-white, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 6px;
+    padding: 14px;
+    margin-bottom: 10px;
+    transition: border-color 0.15s;
 }
 
 .product-item:hover {
-    border-color: #3b82f6;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.05);
+    border-color: var(--primary-light, #818cf8);
 }
 
 .product-row {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: 10px;
     flex-wrap: wrap;
 }
 
 .product-pic {
     flex: 1;
-    min-width: 120px;
+    min-width: 110px;
     margin-bottom: 0 !important;
 }
 
 .product-input {
     flex: 2;
-    min-width: 250px;
+    min-width: 240px;
     margin-bottom: 0 !important;
 }
 
 .qty-group, .price-group {
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: white;
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    padding: 2px 10px 2px 4px;
+    gap: 6px;
+    background: var(--bg-white, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 6px;
+    padding: 2px 8px 2px 4px;
     flex: 1;
-    transition: all 0.2s ease;
+    transition: border-color 0.15s;
 }
 
 .qty-group:focus-within, .price-group:focus-within {
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: var(--primary, #4f46e5);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.08);
 }
 
-.qty-group { min-width: 120px; }
-.price-group { min-width: 140px; }
+.qty-group { min-width: 110px; }
+.price-group { min-width: 130px; }
 
 .product-qty,
 .product-price {
     width: 100%;
-    padding: 8px;
+    padding: 7px;
     border: none !important;
-    font-size: 14px;
+    font-size: 13px;
     text-align: right;
     background: transparent !important;
 }
@@ -184,39 +222,39 @@ const styles = `
 }
 
 .qty-label {
-    color: #64748b;
-    font-size: 14px;
+    color: var(--text-muted, #94a3b8);
+    font-size: 12px;
     white-space: nowrap;
 }
 
 .row-amount {
     flex: 1;
-    min-width: 100px;
+    min-width: 90px;
     text-align: right;
     font-weight: 600;
-    color: #3b82f6;
+    color: var(--primary, #4f46e5);
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    font-size: 14px;
-    min-height: 40px;
+    font-size: 13px;
+    min-height: 36px;
 }
 
 .remove-product-btn {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border: none;
-    background: #fee2e2;
-    color: #ef4444;
+    background: #fef2f2;
+    color: var(--danger, #ef4444);
     border-radius: 6px;
-    font-size: 18px;
+    font-size: 16px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    margin-top: 5px;
+    margin-top: 4px;
 }
 
 .remove-product-btn:hover {
@@ -225,67 +263,60 @@ const styles = `
 
 .add-product-btn {
     width: 100%;
-    padding: 10px;
+    padding: 8px;
     background: transparent;
-    color: #3b82f6;
-    border: 1px dashed #3b82f6;
-    border-radius: 8px;
-    font-size: 14px;
+    color: var(--primary, #4f46e5);
+    border: 1px dashed var(--primary-light, #818cf8);
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 500;
-    font-family: 'Sarabun', sans-serif;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    margin-bottom: 20px;
+    gap: 6px;
+    margin-top: 10px;
 }
 
 .add-product-btn:hover {
-    background: #eff6ff;
+    background: #eef2ff;
 }
 
 /* Payment Summary */
 .payment-summary {
-    background: #f8fafc;
-    border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    padding: 20px;
-    margin: 20px 0;
+    margin: 0;
+    padding: 0;
 }
 
 .payment-summary h3 {
-    color: #1e293b;
-    margin-bottom: 15px;
-    font-size: 16px;
-    margin-top: 0;
+    display: none;
 }
 
 .payment-row {
     display: flex;
     justify-content: space-between;
     padding: 10px 0;
-    border-bottom: 1px dashed #cbd5e1;
+    border-bottom: 1px solid var(--border-light, #f1f5f9);
     align-items: center;
 }
 
-.payment-row .label { color: #475569; }
-.payment-row .value { font-weight: 600; color: #1e293b; }
+.payment-row .label { color: var(--text-secondary, #475569); font-size: 13px; }
+.payment-row .value { font-weight: 600; color: var(--text, #1e293b); font-size: 13px; }
 
 .submit-btn {
     width: 100%;
-    padding: 12px 16px;
-    background: #3b82f6;
-    color: white;
+    padding: 10px 16px;
+    background: var(--primary, #4f46e5);
+    color: #fff;
     border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 500;
-    font-family: 'Sarabun', sans-serif;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.2s ease;
-    margin-top: 10px;
+    transition: background-color 0.15s;
     flex: 2;
     display: flex;
     justify-content: center;
@@ -294,34 +325,32 @@ const styles = `
 }
 
 .submit-btn:hover {
-    background: #2563eb;
-    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+    background: var(--primary-dark, #3730a3);
 }
 
 .submit-btn:disabled {
-    background: #94a3b8;
+    background: var(--text-muted, #94a3b8);
     cursor: not-allowed;
-    box-shadow: none;
 }
 
 .print-btn {
-    background: white;
-    color: #475569;
-    border: 1px solid #cbd5e1;
-    padding: 12px 16px;
-    border-radius: 8px;
-    font-size: 16px;
+    background: var(--bg-white, #fff);
+    color: var(--text-secondary, #475569);
+    border: 1px solid var(--border, #e2e8f0);
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 14px;
     font-weight: 500;
-    font-family: 'Sarabun', sans-serif;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s;
     flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 8px;
 }
-.print-btn:hover { background: #f1f5f9; }
+.print-btn:hover { background: var(--bg, #f8fafc); }
 
 @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
@@ -454,13 +483,14 @@ const PROMO_ITEMS = {
     "ยาสเปรย์ผสมกระดูกไก่ดำ": { qty: 14, price: 71 }
 };
 
-export default function QuotationForm({ onBack, onSave }) {
+export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHistory }) {
+    const { showConfirm, showAlert } = useAlert();
     const [status, setStatus] = useState(null);
 
     const [formData, setFormData] = useState({
         docType: 'quotation_thc', // quotation_thc, quotation_psf, quotation_elt
         billStatus: 'ktb',
-        billNo: 'QT-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 1000)).padStart(3, '0'),
+        billNo: `QT${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-001`,
         billDate: new Date().toISOString().split('T')[0],
         customerName: '',
         address: '',
@@ -509,13 +539,84 @@ export default function QuotationForm({ onBack, onSave }) {
         }
     }, [formData.notes]);
 
+    // Fetch existing quotation for editing
+    useEffect(() => {
+        if (editId) {
+            const fetchQuotation = async () => {
+                try {
+                    const isHistoryEdit = String(editId).startsWith('history-');
+                    const targetId = isHistoryEdit ? editId.split('-')[1] : editId;
+                    const endpoint = isHistoryEdit ? `/api/quotations/history/${targetId}` : `/api/quotations/${targetId}`;
+                    const res = await fetch(`http://localhost:5000${endpoint}`);
+                    const json = await res.json();
+                    if (json.success) {
+                        const data = json.data;
+                        
+                        setFormData({
+                            docType: data.DocType || 'quotation_thc',
+                            billStatus: data.BankAccount || 'ktb',
+                            billNo: data.QuotationNo || '',
+                            billDate: data.BillDate ? data.BillDate.split('T')[0] : '',
+                            customerName: data.CustomerName || '',
+                            address: data.Address || '',
+                            phone: data.Phone || '',
+                            taxId: data.TaxID || '',
+                            discountPercent: data.DiscountPercent || 0,
+                            vatRate: data.VatRate || 0,
+                            shippingCost: data.ShippingCost || 0,
+                            depositPercent: data.DepositPercent || '0',
+                            customDepositAmount: data.DepositPercent === 'custom' ? data.DepositAmount : 0,
+                            signer: data.Signer || '',
+                            notes: data.Notes || '',
+                            showDiscountInPrint: data.ShowDiscountInPrint,
+                            showVatInPrint: data.ShowVatInPrint,
+                            showDepositInPrint: data.ShowDepositInPrint
+                        });
+
+                        if (data.items && data.items.length > 0) {
+                            setItems(data.items.map(item => ({
+                                id: item.ItemID,
+                                name: item.ItemName,
+                                qty: item.Qty,
+                                price: item.Price,
+                                amount: item.Amount,
+                                isPromo: item.IsPromo,
+                                promoMultiplier: item.PromoMultiplier,
+                                image: item.ImageURL || '',
+                                showDropdown: false
+                            })));
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error fetching quotation for edit:', err);
+                }
+            };
+            fetchQuotation();
+        }
+    }, [editId]);
+
     const [items, setItems] = useState([
         { id: 1, name: '', qty: '', price: '', isPromo: false, promoMultiplier: 1, showDropdown: false }
     ]);
 
     const handleFormChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+        setFormData(prev => {
+            const nextData = { ...prev, [name]: type === 'checkbox' ? checked : value };
+            
+            // Auto-select bank logic
+            if (name === 'docType') {
+                if (value === 'quotation_psf') {
+                    nextData.billStatus = 'kbank';
+                } else if (value === 'quotation_thc' || value === 'quotation_elt') {
+                    if (prev.billStatus === 'kbank') {
+                        nextData.billStatus = 'ktb';
+                    }
+                }
+            }
+            
+            return nextData;
+        });
     };
 
     const addItem = () => {
@@ -577,7 +678,12 @@ export default function QuotationForm({ onBack, onSave }) {
     };
 
     // การคำนวณยอดเงิน
-    const subTotal = items.reduce((sum, item) => sum + (parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0), 0);
+    const subTotal = items.reduce((sum, item) => {
+        if (item.isPromo) {
+            return sum + (1000 * (parseInt(item.promoMultiplier) || 1));
+        }
+        return sum + ((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0));
+    }, 0);
     const discountAmount = subTotal * (parseFloat(formData.discountPercent) || 0) / 100;
     const afterDiscount = subTotal - discountAmount;
     const vatAmount = afterDiscount * (parseFloat(formData.vatRate) || 0) / 100;
@@ -609,21 +715,21 @@ export default function QuotationForm({ onBack, onSave }) {
         compAddr1 = 'เลขที่ 6/8 หมู่ที่ 2 แขวง/ตำบล ไทรม้า เขต/อำเภอเมืองนนทบุรี';
         compAddr2 = 'จ.นนทบุรี รหัสไปรษณีย์ 11000 โทร:063-898-9895';
         compTax = 'เลขผู้เสียภาษี: 0125563029289';
-        compLogo = 'https://lh3.googleusercontent.com/d/1whvhHEM2J53JvI5Irg-bMec-LoPXVEaZ';
+        compLogo = '/images/logos/logo-elt.png';
     } else if (isPsf) {
         compNameTH = 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด (สำนักงานใหญ่)';
         compNameEN = '';
         compAddr1 = 'เลขที่ 12 ซอยนนทบุรี 11/3 ต.บางกระสอ อ.เมืองนนทบุรี จ.นนทบุรี 11000';
         compAddr2 = '';
         compTax = 'เลขประจำตัวผู้เสียภาษี 0125566026612';
-        compLogo = 'https://lh3.googleusercontent.com/d/1FPtYXftp6xTLvFYz2rvM_iQeh4EEkzj8';
+        compLogo = '/images/logos/logo-psf.png';
     } else {
         compNameTH = 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์ (สำนักงานใหญ่)';
         compNameEN = 'Thai Herb Centers(THC)Community Enterprise (HEAD OFFICE)';
         compAddr1 = '6/10 หมู่ที่ 2 ต.ไทรม้า อ.เมืองนนทบุรี จ.นนทบุรี 11000';
         compAddr2 = '6/10 Moo 2 Sai Ma subdistrict,Mueang Nonthaburi District,Nonthabui Province,Thailand 11000';
         compTax = 'โทร:083-9799389 / เลขประจำตัวผู้เสียภาษี 099-200438186-0';
-        compLogo = 'https://lh3.googleusercontent.com/d/10lptwep_aBvzXnQUHFAyS8cou2nrYyKK';
+        compLogo = '/images/logos/logo-thc.png';
     }
 
     const formatDate = (dateStr) => {
@@ -636,24 +742,81 @@ export default function QuotationForm({ onBack, onSave }) {
         window.print();
     };
 
-    const handleSave = (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
+
+        const ok = await showConfirm('ยืนยันการบันทึก', 'คุณต้องการบันทึกใบเสนอราคานี้ใช่หรือไม่?', 'info');
+        if (!ok) return;
+
         setStatus('saving');
-        setTimeout(() => {
-            setStatus('success');
-            const newQuotation = {
-                id: formData.billNo,
-                number: formData.billNo,
-                customer: formData.customerName,
-                items: items.filter(i => i.name).length,
-                total: grandTotal,
-                date: formatDate(formData.billDate),
-                validUntil: formatDate(new Date(new Date(formData.billDate).getTime() + 30*24*60*60*1000)),
-                status: 'ร่าง'
-            };
-            if (onSave) onSave(newQuotation);
-            setTimeout(() => setStatus(null), 3000);
-        }, 800);
+
+        const payload = {
+            quotationNo: formData.billNo,
+            docType: formData.docType,
+            bankAccount: formData.billStatus,
+            customerName: formData.customerName,
+            address: formData.address,
+            phone: formData.phone,
+            taxId: formData.taxId,
+            billDate: formData.billDate,
+            validUntil: new Date(new Date(formData.billDate).getTime() + 30*24*60*60*1000).toISOString().split('T')[0],
+            subTotal: subTotal,
+            discountPercent: formData.discountPercent,
+            discountAmount: discountAmount,
+            afterDiscount: afterDiscount,
+            vatRate: formData.vatRate,
+            vatAmount: vatAmount,
+            shippingCost: formData.shippingCost,
+            grandTotal: grandTotal,
+            depositPercent: formData.depositPercent,
+            depositAmount: depositAmount,
+            remainingAmount: remainingAmount,
+            signer: formData.signer,
+            notes: formData.notes,
+            showDiscountInPrint: formData.showDiscountInPrint,
+            showVatInPrint: formData.showVatInPrint,
+            showDepositInPrint: formData.showDepositInPrint,
+            showShippingInPrint: true,
+            status: editId ? undefined : 'พร้อมใช้', // Keep existing status if editing
+            items: items.filter(i => i.name).map(i => ({
+                name: i.name,
+                qty: i.qty,
+                price: i.price,
+                amount: i.isPromo ? 1000 * i.promoMultiplier : i.qty * i.price,
+                isPromo: i.isPromo,
+                promoMultiplier: i.promoMultiplier,
+                imageURL: i.image || i.imageURL
+            }))
+        };
+
+        try {
+            const url = editId ? `http://localhost:5000/api/quotations/${editId}` : 'http://localhost:5000/api/quotations';
+            const method = editId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const json = await res.json();
+            if (json.success) {
+                setStatus('success');
+                showAlert('สำเร็จ', 'บันทึกข้อมูลใบเสนอราคาเรียบร้อยแล้ว', 'success');
+                setTimeout(() => {
+                    if (onSave) onSave();
+                    setStatus(null);
+                }, 1000);
+            } else {
+                console.error('Save failed:', json.message);
+                setStatus('error');
+                showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้: ' + (json.message || 'Unknown error'), 'error');
+            }
+        } catch (err) {
+            console.error('Error saving quotation:', err);
+            setStatus('error');
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
+        }
     };
 
     const validItemsCount = items.filter(it => it.name).length;
@@ -668,72 +831,174 @@ export default function QuotationForm({ onBack, onSave }) {
     return (
         <div className="q-form-wrapper">
             <style>{styles}</style>
-            <div className="q-container">
-                <div style={{ marginBottom: '20px' }}>
-                    <button className="q-back-btn" onClick={onBack}>
+            
+            {viewOnly && (
+                <>
+                    <style>{`
+                        @media screen {
+                            .q-form-wrapper > *:not(#q-print-container):not(.view-only-controls):not(style) { 
+                                display: none !important; 
+                            }
+                            #q-print-container { 
+                                display: block !important; 
+                                position: static !important;
+                                width: 210mm; 
+                                min-height: 297mm; 
+                                margin: 0 auto; 
+                                background: white; 
+                                padding: 10mm;
+                                box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                                color: black;
+                                font-family: 'Sarabun', sans-serif;
+                                font-size: 11pt;
+                                line-height: 1.2;
+                            }
+                            /* ── Color classes ── */
+                            #q-print-container .print-color-green { color: #27ae60 !important; }
+                            #q-print-container .print-color-red { color: red !important; }
+                            #q-print-container .print-color-blue { color: #2980b9 !important; }
+                            #q-print-container .print-bg-gray {
+                                background-color: #e6e6e6 !important;
+                            }
+                            /* ── Notes container color fix ── */
+                            #q-print-container .print-notes-container span[style*="color:red"],
+                            #q-print-container .print-notes-container span[style*="color: red"],
+                            #q-print-container .print-notes-container div[style*="color:red"],
+                            #q-print-container .print-notes-container div[style*="color: red"] {
+                                color: red !important;
+                            }
+                            /* ── Header table ── */
+                            #q-print-container .print-header-table { width: 100%; border-collapse: collapse; border: none; margin-bottom: 0; }
+                            #q-print-container .print-header-table td { border: none; }
+                            /* ── Info table ── */
+                            #q-print-container .print-info-table {
+                                width: 100%; border-collapse: collapse; border: 1px solid black; border-top: none;
+                                margin-bottom: 0; table-layout: fixed;
+                            }
+                            #q-print-container .print-info-table td { border-bottom: none; padding: 4px 8px; word-wrap: break-word; font-weight: 300; font-size: 10pt; }
+                            /* ── Products table ── */
+                            #q-print-container .print-products-table { width: 100%; border-collapse: collapse; border: 1px solid black; border-top: none; table-layout: fixed; }
+                            #q-print-container .print-products-table th { border: 1px solid black; text-align: center; padding: 4px 2px; font-size: 10pt; }
+                            #q-print-container .print-products-table td { border: 1px solid black; text-align: center; padding: 2px 4px; font-size: 10pt; font-weight: 300; word-wrap: break-word; }
+                            /* ── Footer table ── */
+                            #q-print-container .print-footer-table { width: 100%; border-collapse: collapse; border: 1px solid black; border-top: none; table-layout: fixed; }
+                            #q-print-container .print-footer-table td { padding: 2px 4px; font-size: 10pt; }
+                            /* ── Signature table ── */
+                            #q-print-container .print-signature-table { width: 100%; border-collapse: collapse; border: 1px solid black; border-top: none; }
+                        }
+                    `}</style>
+                    <div className="view-only-controls" style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px', padding: '10px', background: '#f8fafc', borderRadius: '8px' }}>
+                        <button className="btn-back-text" type="button" onClick={onBack}>
+                            <ArrowLeft size={16} /> กลับไปหน้ารายการ
+                        </button>
+                        <button className="btn-primary" type="button" onClick={handlePrint}>
+                            <Printer size={16} /> พิมพ์ใบเสนอราคา
+                        </button>
+                    </div>
+                    {isHistory && (
+                        <div className="view-only-controls" style={{ backgroundColor: '#fffbeb', color: '#b45309', padding: '12px 16px', borderRadius: '8px', border: '1px solid #fde68a', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '500', justifyContent: 'center' }}>
+                            🕒 นี่คือเอกสารเวอร์ชั่นเก่าสำหรับดูประวัติ (ไม่สามารถแก้ไขได้)
+                        </div>
+                    )}
+                </>
+            )}
+
+            <div className="q-container" style={{ display: viewOnly ? 'none' : 'block' }}>
+                <div style={{ marginBottom: '16px' }}>
+                    <button className="btn-back-text" onClick={onBack}>
                         <ArrowLeft size={16} /> กลับหน้าหลัก
                     </button>
                 </div>
                 
                 <div className="q-header">
-                    <h1><FileText size={28} color="#3b82f6" /> ฟอร์มออกใบเสนอราคา</h1>
+                    <h1><FileText size={22} color="#4f46e5" /> ฟอร์มออกใบเสนอราคา</h1>
                     <p>กรุณากรอกข้อมูลให้ครบถ้วนเพื่อออกใบเสนอราคาและเชื่อมต่อกับ Sales Order</p>
                 </div>
 
                 <form onSubmit={handleSave}>
-                    <div className="form-row" style={{ backgroundColor: '#f1f5f9', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #e2e8f0' }}>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label>ประเภทเอกสาร <span className="required">*</span></label>
-                            <select name="docType" value={formData.docType} onChange={handleFormChange} required>
-                                <option value="quotation_thc">ใบเสนอราคา (Quotation) - THC</option>
-                                <option value="quotation_psf">ใบเสนอราคา (Quotation) - PSF</option>
-                                <option value="quotation_elt">ใบเสนอราคา (Quotation) - ELT</option>
-                            </select>
+                    {/* ===== Section 1: ข้อมูลเอกสาร ===== */}
+                    <div className="q-section">
+                        <div className="q-section-header">
+                            <div className="q-section-icon"><FileText size={18} /></div>
+                            <div>
+                                <div className="q-section-title">ข้อมูลเอกสาร</div>
+                                <div className="q-section-desc">เลือกประเภทเอกสาร บัญชีธนาคาร และเลขที่เอกสาร</div>
+                            </div>
                         </div>
-                        <div className="form-group" style={{ marginBottom: 0 }}>
-                            <label>บัญชีธนาคาร (บริษัทรับเงิน) <span className="required">*</span></label>
-                            <select name="billStatus" value={formData.billStatus} onChange={handleFormChange} required>
-                                <option value="ktb">ธนาคารกรุงไทย (016-074423-7)</option>
-                                <option value="scb">ธนาคารไทยพาณิชย์ (3652680393)</option>
-                            </select>
+                        <div className="form-row">
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>ประเภทเอกสาร <span className="required">*</span></label>
+                                <select name="docType" value={formData.docType} onChange={handleFormChange} required>
+                                    <option value="quotation_thc">ใบเสนอราคา (Quotation) - THC</option>
+                                    <option value="quotation_psf">ใบเสนอราคา (Quotation) - PSF</option>
+                                    <option value="quotation_elt">ใบเสนอราคา (Quotation) - ELT</option>
+                                </select>
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>บัญชีธนาคาร (บริษัทรับเงิน) <span className="required">*</span></label>
+                                <select name="billStatus" value={formData.billStatus} onChange={handleFormChange} required>
+                                    {(formData.docType === 'quotation_thc' || formData.docType === 'quotation_elt') && (
+                                        <>
+                                            <option value="ktb">ธนาคารกรุงไทย (016-074423-7)</option>
+                                            <option value="scb">ธนาคารไทยพาณิชย์ (3652680393)</option>
+                                        </>
+                                    )}
+                                    {formData.docType === 'quotation_psf' && (
+                                        <option value="kbank">ธนาคารกสิกรไทย (201-3-35956-6)</option>
+                                    )}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="form-row" style={{ marginTop: '14px' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>เลขที่ / No. <span className="required">*</span></label>
+                                <input type="text" name="billNo" value={formData.billNo} onChange={handleFormChange} required />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>วันที่ / Date <span className="required">*</span></label>
+                                <input type="date" name="billDate" value={formData.billDate} onChange={handleFormChange} required />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="form-row">
+                    {/* ===== Section 2: ข้อมูลลูกค้า ===== */}
+                    <div className="q-section">
+                        <div className="q-section-header">
+                            <div className="q-section-icon"><span style={{ fontSize: '16px' }}>👤</span></div>
+                            <div>
+                                <div className="q-section-title">ข้อมูลลูกค้า</div>
+                                <div className="q-section-desc">ชื่อ ที่อยู่ เบอร์โทร และเลขผู้เสียภาษีของลูกค้า</div>
+                            </div>
+                        </div>
                         <div className="form-group">
-                            <label>เลขที่ / No. <span className="required">*</span></label>
-                            <input type="text" name="billNo" value={formData.billNo} onChange={handleFormChange} required />
+                            <label>ชื่อลูกค้า / บริษัท <span className="required">*</span></label>
+                            <input type="text" name="customerName" placeholder="กรอกชื่อลูกค้าหรือบริษัท" value={formData.customerName} onChange={handleFormChange} required />
                         </div>
                         <div className="form-group">
-                            <label>วันที่ / Date <span className="required">*</span></label>
-                            <input type="date" name="billDate" value={formData.billDate} onChange={handleFormChange} required />
+                            <label>ที่อยู่ <span className="required">*</span></label>
+                            <textarea name="address" placeholder="กรอกที่อยู่ลูกค้า" rows="2" value={formData.address} onChange={handleFormChange} required></textarea>
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>เบอร์โทร <span className="required">*</span></label>
+                                <input type="tel" name="phone" placeholder="กรอกเบอร์โทร" value={formData.phone} onChange={handleFormChange} required />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>เลขประจำตัวผู้เสียภาษี</label>
+                                <input type="text" name="taxId" placeholder="เลข 13 หลัก (ถ้ามี)" value={formData.taxId} onChange={handleFormChange} />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="form-group">
-                        <label>ชื่อลูกค้า / บริษัท <span className="required">*</span></label>
-                        <input type="text" name="customerName" placeholder="กรอกชื่อลูกค้าหรือบริษัท" value={formData.customerName} onChange={handleFormChange} required />
-                    </div>
-
-                    <div className="form-group">
-                        <label>ที่อยู่ <span className="required">*</span></label>
-                        <textarea name="address" placeholder="กรอกที่อยู่ลูกค้า" rows="2" value={formData.address} onChange={handleFormChange} required></textarea>
-                    </div>
-
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label>เบอร์โทร <span className="required">*</span></label>
-                            <input type="tel" name="phone" placeholder="กรอกเบอร์โทร" value={formData.phone} onChange={handleFormChange} required />
+                    {/* ===== Section 3: รายการสินค้า ===== */}
+                    <div className="q-section">
+                        <div className="q-section-header">
+                            <div className="q-section-icon"><span style={{ fontSize: '16px' }}>📦</span></div>
+                            <div>
+                                <div className="q-section-title">รายการสินค้า</div>
+                                <div className="q-section-desc">เพิ่มรายการสินค้าหรือเลือกจากรายการโปรโมชั่น</div>
+                            </div>
                         </div>
-                        <div className="form-group">
-                            <label>เลขประจำตัวผู้เสียภาษี</label>
-                            <input type="text" name="taxId" placeholder="เลข 13 หลัก (ถ้ามี)" value={formData.taxId} onChange={handleFormChange} />
-                        </div>
-                    </div>
-
-                    <div className="form-group" style={{ marginTop: '10px' }}>
-                        <label>รายการสินค้า <span className="required">*</span></label>
-                    </div>
 
                     <div className="products-container">
                         {items.map((item) => (
@@ -812,7 +1077,12 @@ export default function QuotationForm({ onBack, onSave }) {
                                         <span className="qty-label">บาท</span>
                                     </div>
                                     <div className="row-amount">
-                                        <span>{((parseFloat(item.qty)||0)*(parseFloat(item.price)||0)).toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>&nbsp;<span style={{ fontSize: '12px', color: '#64748b' }}>บาท</span>
+                                        <span>{
+                                            (item.isPromo 
+                                                ? (1000 * (parseInt(item.promoMultiplier) || 1)) 
+                                                : ((parseFloat(item.qty)||0)*(parseFloat(item.price)||0))
+                                            ).toLocaleString('th-TH', {minimumFractionDigits: 2})
+                                        }</span>&nbsp;<span style={{ fontSize: '12px', color: '#64748b' }}>บาท</span>
                                     </div>
                                     <button type="button" className="remove-product-btn" onClick={() => removeItem(item.id)} title="ลบรายการนี้">
                                         <Trash2 size={16} />
@@ -823,133 +1093,154 @@ export default function QuotationForm({ onBack, onSave }) {
                     </div>
 
                     <button type="button" className="add-product-btn" onClick={addItem}>
-                        <Plus size={16} /> เพิ่มรายการสินค้า
+                        <Plus size={14} /> เพิ่มรายการสินค้า
                     </button>
+                    </div>{/* end q-section 3 */}
 
-                    {/* Payment Summary */}
-                    <div className="payment-summary">
-                        <h3>สรุปยอดเงิน</h3>
-                        <div className="payment-row">
-                            <span className="label">รวมราคา / Sub Total</span>
-                            <span className="value">{subTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                        </div>
-                        <div className="payment-row" style={{ alignItems: 'center', borderBottom: 'none', paddingBottom: '0' }}>
-                            <span className="label" style={{ display: 'flex', alignItems: 'center' }}>
-                                ส่วนลด / Discount &nbsp;
-                            </span>
-                            <span className="value" style={{ display: 'flex', alignItems: 'center' }}>
-                                <select name="discountPercent" value={formData.discountPercent} onChange={handleFormChange} style={{ width: '70px', textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px' }}>
-                                    {[...Array(101)].map((_, i) => <option key={i} value={i}>{i}</option>)}
-                                </select> <span style={{ margin: '0 10px 0 5px' }}>%</span>
-                                <span style={{ width: '80px', textAlign: 'right', color: '#ef4444' }}>{discountAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                            </span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingBottom: '10px', fontSize: '13px', borderBottom: '1px dashed #cbd5e1' }}>
-                            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 'normal', color: '#64748b' }}>
-                                <input type="checkbox" name="showDiscountInPrint" checked={formData.showDiscountInPrint} onChange={handleFormChange} style={{ width: '14px', height: '14px', margin: 0 }} />
-                                แสดงยอดส่วนลดลงในเอกสาร
-                            </label>
-                        </div>
-
-                        <div className="payment-row">
-                            <span className="label">คงเหลือ / Balance</span>
-                            <span className="value">{afterDiscount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                        </div>
-
-                        <div className="payment-row" style={{ alignItems: 'center', borderBottom: 'none', paddingBottom: '0' }}>
-                            <span className="label" style={{ display: 'flex', alignItems: 'center' }}>
-                                ภาษีมูลค่าเพิ่ม (VAT) &nbsp;
-                                <select name="vatRate" value={formData.vatRate} onChange={handleFormChange} style={{ padding: '4px', width: '80px', fontSize: '14px', marginLeft: '10px', border: '1px solid #cbd5e1', borderRadius: '6px' }}>
-                                    <option value="0">0%</option>
-                                    <option value="7">7%</option>
-                                </select>
-                            </span>
-                            <span className="value">{vatAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', paddingBottom: '10px', fontSize: '13px', borderBottom: '1px dashed #cbd5e1' }}>
-                            <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: 'normal', color: '#64748b' }}>
-                                <input type="checkbox" name="showVatInPrint" checked={formData.showVatInPrint} onChange={handleFormChange} style={{ width: '14px', height: '14px', margin: 0 }} />
-                                แสดงภาษีมูลค่าเพิ่มลงในเอกสาร
-                            </label>
-                        </div>
-
-                        <div className="payment-row" style={{ alignItems: 'center', borderBottom: 'none', paddingBottom: '0' }}>
-                            <span className="label" style={{ display: 'flex', alignItems: 'center' }}>
-                                ค่าจัดส่ง / Shipping Cost &nbsp;
-                            </span>
-                            <span className="value" style={{ display: 'flex', alignItems: 'center' }}>
-                                <input type="number" name="shippingCost" value={formData.shippingCost} onChange={handleFormChange} style={{ width: '80px', textAlign: 'right', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px' }} min="0" />
-                                <span style={{ marginLeft: '5px' }}>บาท</span>
-                            </span>
-                        </div>
-                        
-                        <div className="payment-row" style={{ borderBottom: 'none', fontWeight: 700, fontSize: '18px', color: '#3b82f6', margin: '15px 0 5px 0' }}>
-                            <span className="label" style={{ color: '#1e293b' }}>ยอดเงินสุทธิ / Grand Total</span>
-                            <span className="value" style={{ color: '#3b82f6' }}>{grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                        </div>
-
-                        {depositAmount > 0 && (
-                            <>
-                                <div className="payment-row" style={{ borderTop: '1px dashed #cbd5e1', marginTop: '5px', paddingTop: '10px', fontWeight: 600, fontSize: '14px', color: '#1e293b' }}>
-                                    <span className="label" style={{ color: '#475569' }}>ยอดชำระมัดจำ {formData.depositPercent !== 'custom' && formData.depositPercent !== '0' ? `(${formData.depositPercent}%)` : ''}</span>
-                                    <span className="value" style={{ color: '#f59e0b' }}>{depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                                </div>
-                                <div className="payment-row" style={{ display: 'flex', fontWeight: 600, fontSize: '14px', color: '#1e293b', borderBottom: 'none' }}>
-                                    <span className="label" style={{ color: '#475569' }}>ยอดคงเหลือ</span>
-                                    <span className="value" style={{ color: '#10b981' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                                </div>
-                            </>
-                        )}
-                    </div>
-
-                    <div className="form-row">
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>ผู้เสนอราคา / ผู้วางบิล (ลายเซ็น)</label>
-                            <select name="signer" value={formData.signer} onChange={handleFormChange}>
-                                <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                                <option value="jutharat">จุฑารัตน์ วงค์คำเหลา</option>
-                            </select>
-                        </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span>เงื่อนไขการหักมัดจำ</span>
-                                <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '13px', fontWeight: 'normal', color: '#64748b', margin: 0 }}>
-                                    <input type="checkbox" name="showDepositInPrint" checked={formData.showDepositInPrint} onChange={handleFormChange} style={{ width: '14px', height: '14px', margin: 0, cursor: 'pointer' }} />
-                                    แสดงในพิมพ์
-                                </label>
-                            </label>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <select name="depositPercent" value={formData.depositPercent} onChange={handleFormChange} style={{ flex: 1 }}>
-                                    <option value="0">-- ไม่มีมัดจำ --</option>
-                                    <option value="30">มัดจำ 30%</option>
-                                    <option value="40">มัดจำ 40%</option>
-                                    <option value="50">มัดจำ 50%</option>
-                                    <option value="custom">ระบุเอง</option>
-                                </select>
-                                {formData.depositPercent === 'custom' && (
-                                    <input type="number" name="customDepositAmount" placeholder="ระบุเงิน" value={formData.customDepositAmount} onChange={handleFormChange} style={{ flex: 1 }} min="0" />
-                                )}
+                    {/* ===== Section 4: สรุปยอดเงิน ===== */}
+                    <div className="q-section">
+                        <div className="q-section-header">
+                            <div className="q-section-icon"><span style={{ fontSize: '16px' }}>💰</span></div>
+                            <div>
+                                <div className="q-section-title">สรุปยอดเงิน</div>
+                                <div className="q-section-desc">ส่วนลด ภาษี ค่าจัดส่ง และยอดรวมสุทธิ</div>
                             </div>
                         </div>
+                        <div className="payment-summary">
+                            {/* Sub Total */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                <span style={{ color: '#475569', fontSize: '13px' }}>รวมราคา / Sub Total</span>
+                                <span style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b' }}>{subTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            </div>
+
+                            {/* Discount */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: '#475569', fontSize: '13px' }}>ส่วนลด</span>
+                                    <select name="discountPercent" value={formData.discountPercent} onChange={handleFormChange} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px' }}>
+                                        {[...Array(101)].map((_, i) => <option key={i} value={i}>{i}%</option>)}
+                                    </select>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#94a3b8', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                        <input type="checkbox" name="showDiscountInPrint" checked={formData.showDiscountInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0 }} />
+                                        แสดงในบิล
+                                    </label>
+                                </div>
+                                <span style={{ fontWeight: 600, fontSize: '14px', color: '#ef4444' }}>{discountAmount > 0 ? '-' : ''}{discountAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            </div>
+
+                            {/* After Discount (show only when discount > 0) */}
+                            {discountAmount > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                    <span style={{ color: '#475569', fontSize: '13px' }}>คงเหลือหลังหักส่วนลด</span>
+                                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b' }}>{afterDiscount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                                </div>
+                            )}
+
+                            {/* VAT */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: '#475569', fontSize: '13px' }}>ภาษีมูลค่าเพิ่ม (VAT)</span>
+                                    <select name="vatRate" value={formData.vatRate} onChange={handleFormChange} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px' }}>
+                                        <option value="0">0%</option>
+                                        <option value="7">7%</option>
+                                    </select>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#94a3b8', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                        <input type="checkbox" name="showVatInPrint" checked={formData.showVatInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0 }} />
+                                        แสดงในบิล
+                                    </label>
+                                </div>
+                                <span style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b' }}>{vatAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            </div>
+
+                            {/* Shipping */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '2px solid #e2e8f0' }}>
+                                <span style={{ color: '#475569', fontSize: '13px' }}>ค่าจัดส่ง / Shipping</span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <input type="number" name="shippingCost" value={formData.shippingCost} onChange={handleFormChange} style={{ width: '80px', textAlign: 'right', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '13px' }} min="0" />
+                                    <span style={{ fontSize: '13px', color: '#475569' }}>บาท</span>
+                                </div>
+                            </div>
+
+                            {/* Grand Total */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0 6px' }}>
+                                <span style={{ fontWeight: 700, fontSize: '15px', color: '#1e293b' }}>ยอดเงินสุทธิ / Grand Total</span>
+                                <span style={{ fontWeight: 700, fontSize: '18px', color: '#4f46e5' }}>{grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            </div>
+
+                            {/* Deposit */}
+                            {depositAmount > 0 && (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderTop: '1px solid #f1f5f9' }}>
+                                        <span style={{ fontSize: '13px', color: '#475569' }}>ยอดชำระมัดจำ {formData.depositPercent !== 'custom' && formData.depositPercent !== '0' ? `(${formData.depositPercent}%)` : ''}</span>
+                                        <span style={{ fontWeight: 600, fontSize: '13px', color: '#f59e0b' }}>{depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
+                                        <span style={{ fontSize: '13px', color: '#475569' }}>ยอดคงเหลือที่ต้องชำระ</span>
+                                        <span style={{ fontWeight: 600, fontSize: '13px', color: '#10b981' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="form-group">
-                        <label>หมายเหตุ (ข้อความนี้จะแสดงท้ายบิล สามารถแก้ไขข้อความได้เลย)</label>
-                        <div 
-                            contentEditable 
-                            suppressContentEditableWarning={true}
-                            onBlur={(e) => setFormData(prev => ({ ...prev, notes: e.target.innerHTML }))}
-                            style={{ border: '1px solid #cbd5e1', borderRadius: '8px', padding: '15px', minHeight: '100px', background: 'white', fontSize: '14px', outline: 'none' }}
-                            dangerouslySetInnerHTML={{ __html: formData.notes }}
-                        />
+                    {/* ===== Section 5: ตั้งค่าเอกสาร ===== */}
+                    <div className="q-section">
+                        <div className="q-section-header">
+                            <div className="q-section-icon"><span style={{ fontSize: '16px' }}>⚙️</span></div>
+                            <div>
+                                <div className="q-section-title">ตั้งค่าเอกสาร</div>
+                                <div className="q-section-desc">ลายเซ็น เงื่อนไขมัดจำ และหมายเหตุท้ายเอกสาร</div>
+                            </div>
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group" style={{ flex: 1 }}>
+                                <label>ผู้เสนอราคา / ผู้วางบิล (ลายเซ็น)</label>
+                                <select name="signer" value={formData.signer} onChange={handleFormChange}>
+                                    <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                    <option value="jutharat">จุฑารัตน์ วงค์คำเหลา</option>
+                                </select>
+                            </div>
+                            <div className="form-group" style={{ flex: 1 }}>
+                                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span>เงื่อนไขการหักมัดจำ</span>
+                                    <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 'normal', color: '#94a3b8', margin: 0 }}>
+                                        <input type="checkbox" name="showDepositInPrint" checked={formData.showDepositInPrint} onChange={handleFormChange} style={{ width: '14px', height: '14px', margin: 0, cursor: 'pointer' }} />
+                                        แสดงในพิมพ์
+                                    </label>
+                                </label>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <select name="depositPercent" value={formData.depositPercent} onChange={handleFormChange} style={{ flex: 1 }}>
+                                        <option value="0">-- ไม่มีมัดจำ --</option>
+                                        <option value="30">มัดจำ 30%</option>
+                                        <option value="40">มัดจำ 40%</option>
+                                        <option value="50">มัดจำ 50%</option>
+                                        <option value="custom">ระบุเอง</option>
+                                    </select>
+                                    {formData.depositPercent === 'custom' && (
+                                        <input type="number" name="customDepositAmount" placeholder="ระบุเงิน" value={formData.customDepositAmount} onChange={handleFormChange} style={{ flex: 1 }} min="0" />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="form-group" style={{ marginBottom: 0 }}>
+                            <label>หมายเหตุ (ข้อความนี้จะแสดงท้ายบิล สามารถแก้ไขข้อความได้เลย)</label>
+                            <div 
+                                contentEditable 
+                                suppressContentEditableWarning={true}
+                                onBlur={(e) => setFormData(prev => ({ ...prev, notes: e.target.innerHTML }))}
+                                style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '12px', minHeight: '80px', background: 'white', fontSize: '13px', outline: 'none' }}
+                                dangerouslySetInnerHTML={{ __html: formData.notes }}
+                            />
+                        </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '15px', marginTop: '15px' }}>
+                    {/* ===== Action Buttons ===== */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
                         <button className="print-btn" type="button" onClick={handlePrint}>
-                            <Printer size={20} /> พิมพ์บิล
+                            <Printer size={18} /> พิมพ์บิล
                         </button>
-                        <button type="submit" className="submit-btn" disabled={status === 'saving'}>
-                            {status === 'saving' ? 'กำลังบันทึก...' : <><Save size={20} /> บันทึกข้อมูล</>}
+                        <button type="submit" className="submit-btn" disabled={status === 'saving'} style={status === 'error' ? {backgroundColor: '#ef4444'} : {}}>
+                            {status === 'saving' ? 'กำลังบันทึก...' : status === 'error' ? 'บันทึกไม่สำเร็จ (ลองใหม่)' : <><Save size={18} /> บันทึกข้อมูล</>}
                         </button>
                     </div>
                 </form>
@@ -972,7 +1263,7 @@ export default function QuotationForm({ onBack, onSave }) {
                                     <tbody>
                                         <tr>
                                             <td colSpan="2" style={{ textAlign: 'center', border: 'none', padding: '5px', position: 'relative', right: '60px' }}>
-                                                <div className={isElt ? "print-color-blue" : "print-color-green"} style={{ color: isElt ? '#2980b9' : '#27ae60', fontWeight: 'bold', fontSize: '16pt' }}>{compNameTH}</div>
+                                                <div className="print-color-green" style={{ color: '#27ae60', fontWeight: 'bold', fontSize: '16pt' }}>{compNameTH}</div>
                                                 {compNameEN && <div style={{ fontSize: '11pt', marginTop: '3px' }}>{compNameEN}</div>}
                                                 <div style={{ fontSize: '11pt', marginTop: '3px' }}>{compAddr1}</div>
                                                 {compAddr2 && <div style={{ fontSize: '10pt' }}>{compAddr2}</div>}
@@ -1059,7 +1350,12 @@ export default function QuotationForm({ onBack, onSave }) {
                                 <td style={{ border: '1px solid black', textAlign: 'left', padding: '2px 8px' }}>{item.name}</td>
                                 <td style={{ border: '1px solid black', textAlign: 'center', padding: '2px 4px' }}>{item.qty}</td>
                                 <td style={{ border: '1px solid black', textAlign: 'right', padding: '2px 8px' }}>{(parseFloat(item.price)||0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
-                                <td style={{ border: '1px solid black', textAlign: 'right', padding: '2px 8px' }}>{((parseFloat(item.qty)||0)*(parseFloat(item.price)||0)).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+                                <td style={{ border: '1px solid black', textAlign: 'right', padding: '2px 8px' }}>{
+                                    (item.isPromo 
+                                        ? (1000 * (parseInt(item.promoMultiplier) || 1)) 
+                                        : ((parseFloat(item.qty)||0)*(parseFloat(item.price)||0))
+                                    ).toLocaleString('th-TH', {minimumFractionDigits: 2})
+                                }</td>
                             </tr>
                         ))}
                         {items.filter(it => it.name).length === 0 && (
@@ -1074,22 +1370,30 @@ export default function QuotationForm({ onBack, onSave }) {
                     <tbody>
                         <tr>
                             <td rowSpan={
-                                (formData.showDiscountInPrint && discountAmount > 0 ? 1 : 0) +
+                                (formData.showDiscountInPrint && discountAmount > 0 ? 2 : 0) +
                                 (formData.showVatInPrint && vatAmount > 0 ? 1 : 0) +
                                 (shipping > 0 ? 1 : 0) + 
                                 (formData.showDepositInPrint && depositAmount > 0 ? 2 : 0) + 1
-                            } style={{ width: '60%', verticalAlign: 'top', padding: '5px', borderRight: '1px solid black', borderBottom: '1px solid black', position: 'relative' }}>
-                                <div className="print-color-red" style={{ color: 'red', fontSize: '10pt', fontWeight: 'bold' }}>ช่องทางการชำระเงิน :</div>
-                                <div style={{ border: '2px dashed black', borderRadius: '10px', padding: '20px 10px', width: '90%', margin: '15px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
-                                    {formData.billStatus === 'ktb' ? (
-                                        <img src="https://lh3.googleusercontent.com/d/11-qyC7VD7yoIc8MDL0s8JF5ZREKloMGH" style={{ width: '75px', maxHeight: '75px', objectFit: 'contain', flexShrink: 0 }} alt="ktb" />
-                                    ) : (
-                                        <img src="https://lh3.googleusercontent.com/d/11BqJ8f830_Q0qFqH_gNfN0j_bO2O8H1R" style={{ width: '75px', maxHeight: '75px', objectFit: 'contain', flexShrink: 0 }} alt="scb" />
+                            } style={{ width: '60%', verticalAlign: 'middle', padding: '5px', borderRight: '1px solid black', borderBottom: '1px solid black', position: 'relative' }}>
+                                <div className="print-color-red" style={{ position: 'absolute', top: '5px', left: '5px', color: 'red', fontSize: '10pt', fontWeight: 'bold' }}>ช่องทางการชำระเงิน :</div>
+                                <div style={{ border: '2px dashed black', borderRadius: '10px', padding: '20px 10px', width: '90%', margin: '20px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+                                    {formData.billStatus === 'ktb' && (
+                                        <img src="/images/banks/bank-ktb.png" style={{ width: '75px', maxHeight: '75px', objectFit: 'contain', flexShrink: 0 }} alt="ktb" />
+                                    )}
+                                    {formData.billStatus === 'scb' && (
+                                        <img src="/images/banks/bank-scb.png" style={{ width: '75px', maxHeight: '75px', objectFit: 'contain', flexShrink: 0 }} alt="scb" />
+                                    )}
+                                    {formData.billStatus === 'kbank' && (
+                                        <img src="/images/banks/bank-kbank.png" style={{ width: '75px', maxHeight: '75px', objectFit: 'contain', flexShrink: 0 }} alt="kbank" />
                                     )}
                                     <div style={{ textAlign: 'left', fontWeight: 'bold', lineHeight: 1.1 }}>
-                                        <span style={{ fontSize: '16pt' }}>{formData.billStatus === 'ktb' ? 'ธนาคารกรุงไทย' : 'ธนาคารกสิกรไทย'}</span><br/>
+                                        <span style={{ fontSize: '16pt' }}>
+                                            {formData.billStatus === 'ktb' ? 'ธนาคารกรุงไทย' : (formData.billStatus === 'scb' ? 'ธนาคารไทยพาณิชย์' : 'ธนาคารกสิกรไทย')}
+                                        </span><br/>
                                         <span style={{ fontSize: '12pt' }}>{isElt ? 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด' : (isPsf ? 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด' : 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์')}</span><br/>
-                                        <span className="print-color-blue" style={{ fontSize: '20pt', color: '#2980b9' }}>{formData.billStatus === 'ktb' ? '016-074423-7' : '201-3-35956-6'}</span>
+                                        <span className="print-color-blue" style={{ fontSize: '20pt', color: '#2980b9' }}>
+                                            {formData.billStatus === 'ktb' ? '016-074423-7' : (formData.billStatus === 'scb' ? '3652680393' : '201-3-35956-6')}
+                                        </span>
                                     </div>
                                 </div>
                             </td>
@@ -1102,14 +1406,24 @@ export default function QuotationForm({ onBack, onSave }) {
                         </tr>
                         
                         {formData.showDiscountInPrint && discountAmount > 0 && (
-                            <tr>
-                                <td className="print-color-red" style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', borderRight: '1px solid black', color: 'red', padding: '5px' }}>
-                                    หักส่วนลด<br/><span style={{ fontSize: '10pt', fontWeight: 'normal' }}>DISCOUNT</span>
-                                </td>
-                                <td className="print-color-red" style={{ textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', color: 'red', padding: '5px' }}>
-                                    <span style={{ fontWeight: 'normal' }}>{discountAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
-                                </td>
-                            </tr>
+                            <React.Fragment>
+                                <tr>
+                                    <td className="print-color-red" style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', borderRight: '1px solid black', color: 'red', padding: '5px' }}>
+                                        หักส่วนลด {formData.discountPercent}%<br/><span className="print-color-red" style={{ fontSize: '10pt', fontWeight: 'normal', color: 'red' }}>DISCOUNT</span>
+                                    </td>
+                                    <td className="print-color-red" style={{ textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', color: 'red', padding: '5px' }}>
+                                        <span className="print-color-red" style={{ fontWeight: 'normal', color: 'red' }}>{discountAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', borderRight: '1px solid black', padding: '5px' }}>
+                                        จำนวนเงินหลังหักส่วนลด<br/><span style={{ fontSize: '10pt', fontWeight: 'normal' }}>AFTER DISCOUNT</span>
+                                    </td>
+                                    <td style={{ textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', padding: '5px' }}>
+                                        <span style={{ fontWeight: 'normal' }}>{afterDiscount.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
+                                    </td>
+                                </tr>
+                            </React.Fragment>
                         )}
                         
                         {formData.showVatInPrint && vatAmount > 0 && (
@@ -1137,19 +1451,19 @@ export default function QuotationForm({ onBack, onSave }) {
                         {formData.showDepositInPrint && depositAmount > 0 && (
                             <>
                             <tr>
-                                <td style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderRight: '1px solid black', borderBottom: '1px solid black', padding: '5px', color: 'red' }}>
-                                    ยอดชำระมัดจำ {formData.depositPercent !== 'custom' ? `(${formData.depositPercent}%)` : ''}<br/><span style={{ fontSize: '10pt', fontWeight: 'normal' }}>DEPOSIT</span>
+                                <td className="print-color-red" style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderRight: '1px solid black', borderBottom: '1px solid black', padding: '5px', color: 'red' }}>
+                                    ยอดชำระมัดจำ {formData.depositPercent !== 'custom' ? `(${formData.depositPercent}%)` : ''}<br/><span className="print-color-red" style={{ fontSize: '10pt', fontWeight: 'normal', color: 'red' }}>DEPOSIT</span>
                                 </td>
-                                <td style={{ textAlign: 'right', fontWeight: 'bold', borderBottom: '1px solid black', padding: '5px', paddingRight: '10px', color: 'red' }}>
-                                    {depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}
+                                <td className="print-color-red" style={{ textAlign: 'right', fontWeight: 'normal', borderBottom: '1px solid black', padding: '5px', paddingRight: '10px', color: 'red' }}>
+                                    <span className="print-color-red" style={{ fontWeight: 'normal', color: 'red' }}>{depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
                                 </td>
                             </tr>
                             <tr>
-                                <td style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderRight: '1px solid black', borderBottom: '1px solid black', padding: '5px', color: 'red' }}>
-                                    ยอดคงเหลือที่ต้องชำระ<br/><span style={{ fontSize: '10pt', fontWeight: 'normal' }}>REMAINING BALANCE</span>
+                                <td className="print-color-red" style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderRight: '1px solid black', borderBottom: '1px solid black', padding: '5px', color: 'red' }}>
+                                    ยอดคงเหลือที่ต้องชำระ<br/><span className="print-color-red" style={{ fontSize: '10pt', fontWeight: 'normal', color: 'red' }}>REMAINING BALANCE</span>
                                 </td>
-                                <td style={{ textAlign: 'right', fontWeight: 'bold', borderBottom: '1px solid black', padding: '5px', paddingRight: '10px', color: 'red' }}>
-                                    {remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}
+                                <td className="print-color-red" style={{ textAlign: 'right', fontWeight: 'normal', borderBottom: '1px solid black', padding: '5px', paddingRight: '10px', color: 'red' }}>
+                                    <span className="print-color-red" style={{ fontWeight: 'normal', color: 'red' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
                                 </td>
                             </tr>
                             </>
@@ -1188,7 +1502,7 @@ export default function QuotationForm({ onBack, onSave }) {
                     <div style={{ textAlign: 'center', fontSize: '10pt' }}>
                         <div style={{ height: '30px', position: 'relative' }}>
                             {formData.signer === 'jutharat' && (
-                                <img src="https://lh3.googleusercontent.com/d/1ps5SyMaGMCwKLGFonra1eOKUK-I5cCrL" style={{ maxHeight: '40px', position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)' }} alt="signature" />
+                                <img src="/images/signatures/sign-jutharat.png" style={{ maxHeight: '40px', position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)' }} alt="signature" />
                             )}
                         </div>
                         <div>({formData.signer === 'jutharat' ? '....................................................' : '..................................................'})</div>

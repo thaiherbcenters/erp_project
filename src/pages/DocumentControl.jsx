@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../components/CustomAlert';
 import {
     FileText,
     FileCog,
@@ -103,6 +104,7 @@ class DocErrorBoundary extends React.Component {
 // =============================================================================
 export default function DocumentControl() {
     const { hasSectionPermission, getVisibleSubPages, currentUser, getUserPermissions } = useAuth();
+    const { showAlert, showConfirm } = useAlert();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -220,12 +222,33 @@ export default function DocumentControl() {
         }
     };
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'document_dashboard': return 'ภาพรวมระบบควบคุมเอกสาร';
+            case 'document_list': return 'ทะเบียนเอกสาร (Document List)';
+            case 'document_request': return 'ใบคำร้องเอกสาร (DAR)';
+            case 'document_customers': return 'เอกสารลูกค้า (Customer Documents)';
+            default: return 'ระบบควบคุมเอกสาร';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (activeTab) {
+            case 'document_dashboard': return 'ภาพรวมสถานะเอกสารและใบคำร้องทั้งหมด';
+            case 'document_list': return 'จัดการโครงสร้างเอกสาร ISO, SOP, WI, และ Form';
+            case 'document_request': return 'ระบบร้องขอจัดทำ แก้ไข หรือยกเลิกเอกสาร';
+            case 'document_customers': return 'จัดการเอกสารภายนอกและเอกสารจากลูกค้า';
+            default: return 'จัดการโครงสร้างเอกสาร ISO, SOP, WI, Form และใบคำร้องเอกสาร (DAR)';
+        }
+    };
+
     return (
-        <div className="page-content">
+        <div className="page-container document-page page-enter">
             {activeTab !== 'document_library' && (
-                <div className="page-title">
-                    <h1>ระบบควบคุมเอกสาร</h1>
-                    <p>จัดการโครงสร้างเอกสาร ISO, SOP, WI, Form และใบคำร้องเอกสาร (DAR)</p>
+                <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                    <h1>{getPageTitle()}</h1>
+                    <p>{getPageDesc()}</p>
                 </div>
             )}
             <DocErrorBoundary key={activeTab}>
@@ -761,15 +784,16 @@ function DocumentList({ hasPermission, documents, standards, isLoading, error })
                                                 className="doc-action-btn doc-action-btn-danger"
                                                 title="ลบเอกสาร"
                                                 onClick={async () => {
-                                                    if (!window.confirm(`ต้องการลบเอกสาร "${doc.id} - ${doc.name}" หรือไม่?\n\nการลบจะลบทั้งข้อมูลในระบบและไฟล์เอกสารจริง`)) return;
+                                                    const ok = await showConfirm('ยืนยันการลบ', `ต้องการลบเอกสาร "${doc.id} - ${doc.name}" หรือไม่?\n\nการลบจะลบทั้งข้อมูลในระบบและไฟล์เอกสารจริง`, 'warning');
+                                                    if (!ok) return;
                                                     try {
                                                         const res = await fetch(`${API_BASE}/documents/${doc.id}?user=${currentUser?.username || 'Unknown'}`, { method: 'DELETE' });
                                                         const data = await res.json();
                                                         if (!res.ok) throw new Error(data.message || 'ลบไม่สำเร็จ');
-                                                        alert('ลบเอกสารสำเร็จ');
+                                                        showAlert('สำเร็จ', 'ลบเอกสารสำเร็จ', 'success');
                                                         window.location.reload();
                                                     } catch (err) {
-                                                        alert(`เกิดข้อผิดพลาด: ${err.message}`);
+                                                        showAlert('เกิดข้อผิดพลาด', `เกิดข้อผิดพลาด: ${err.message}`, 'error');
                                                     }
                                                 }}
                                             >
@@ -1645,7 +1669,7 @@ function FormFillPage({ doc, onBack }) {
             {/* ── Header ── */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button onClick={onBack} className="doc-action-btn" style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }} title="กลับ">
+                    <button onClick={onBack} className="btn-back" title="กลับ">
                         <ArrowLeft size={18} />
                     </button>
                     <div>
@@ -2576,7 +2600,7 @@ function RevisionFormPage({ parentSub, onBack, currentUser, navigate }) {
             {/* ── Header ── */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button onClick={onBack} className="doc-action-btn" style={{ width: '34px', height: '34px', borderRadius: '6px', background: 'var(--bg)', border: '1px solid var(--border)' }} title="กลับ">
+                    <button onClick={onBack} className="btn-back" title="กลับ">
                         <ArrowLeft size={16} />
                     </button>
                     <div>

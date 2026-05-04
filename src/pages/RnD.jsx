@@ -19,10 +19,12 @@ import {
     Edit, Trash2, ArrowRight, DollarSign, Shield
 } from 'lucide-react';
 import { useRnD } from '../context/RnDContext';
+import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 import './RnD.css';
 
 export default function RnD() {
+    const { showAlert, showConfirm } = useAlert();
     const { getVisibleSubPages, hasSectionPermission } = useAuth();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('rnd');
@@ -142,7 +144,8 @@ export default function RnD() {
     };
 
     const handleDeleteFormula = async (id, name) => {
-        if (!window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบสูตร ${id} (${name})? ข้อมูลนี้จะไม่สามารถกู้คืนได้`)) return;
+        const ok = await showConfirm('ยืนยันการลบ', `คุณแน่ใจหรือไม่ว่าต้องการลบสูตร ${id} (${name})? ข้อมูลนี้จะไม่สามารถกู้คืนได้`, 'warning');
+        if (!ok) return;
         setSaving(true);
         const res = await deleteFormula(id);
         setSaving(false);
@@ -188,10 +191,6 @@ export default function RnD() {
     // ══════════════════════════════════════════════════════════════════
     const renderDashboard = () => (
         <div className="rnd-dashboard">
-            <div className="page-title">
-                <h1>R&D Dashboard</h1>
-                <p>ภาพรวมสูตรผลิตภัณฑ์และโครงการวิจัย</p>
-            </div>
 
             {hasSectionPermission('rnd_dashboard_stats') && (
                 <div className="summary-row">
@@ -280,10 +279,6 @@ export default function RnD() {
 
         return (
             <div className="rnd-formulas">
-                <div className="page-title">
-                    <h1>สูตรการผลิต (BOM)</h1>
-                    <p>จัดการสูตรผลิตภัณฑ์ วัตถุดิบ และวิธีการผลิต</p>
-                </div>
 
                 <div className="toolbar">
                     <div className="toolbar-left">
@@ -363,10 +358,6 @@ export default function RnD() {
 
         return (
             <div className="rnd-projects">
-                <div className="page-title">
-                    <h1>โครงการวิจัยและพัฒนา</h1>
-                    <p>จัดการโครงการวิจัยผลิตภัณฑ์สมุนไพร</p>
-                </div>
 
                 <div className="toolbar">
                     <div className="toolbar-left">
@@ -782,10 +773,6 @@ export default function RnD() {
         
         return (
             <div className="rnd-pharmacist">
-                <div className="page-title">
-                    <h1>เภสัชกร</h1>
-                    <p>ตรวจสอบความถูกต้องของสูตรตามกฎหมายและอนุมัติการผลิต</p>
-                </div>
 
                 {pendingFormulas.length > 0 && (
                     <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #7c3aed' }}>
@@ -843,8 +830,33 @@ export default function RnD() {
         return <div className="page-container"><p className="no-permission">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p></div>;
     }
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (currentTab) {
+            case 'rnd_dashboard': return 'R&D Dashboard';
+            case 'rnd_formulas': return 'สูตรการผลิต (BOM)';
+            case 'rnd_projects': return 'โครงการวิจัยและพัฒนา';
+            case 'rnd_pharmacist': return 'เภสัชกร (Pharmacist)';
+            default: return 'วิจัยและพัฒนา (R&D)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (currentTab) {
+            case 'rnd_dashboard': return 'ภาพรวมสูตรผลิตภัณฑ์และโครงการวิจัย';
+            case 'rnd_formulas': return 'จัดการสูตรผลิตภัณฑ์ วัตถุดิบ และวิธีการผลิต';
+            case 'rnd_projects': return 'จัดการโครงการวิจัยผลิตภัณฑ์สมุนไพร';
+            case 'rnd_pharmacist': return 'ตรวจสอบความถูกต้องของสูตรตามกฎหมายและอนุมัติการผลิต';
+            default: return 'จัดการข้อมูลการวิจัยและพัฒนาผลิตภัณฑ์';
+        }
+    };
+
     return (
         <div className="page-container rnd-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
+            </div>
             {currentTab === 'rnd_dashboard' && renderDashboard()}
             {currentTab === 'rnd_formulas' && renderFormulas()}
             {currentTab === 'rnd_projects' && renderProjects()}

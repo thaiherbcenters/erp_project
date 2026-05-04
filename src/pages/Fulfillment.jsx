@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight, Printer, Phone } from 'lucide-react';
 import './PageCommon.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
@@ -65,6 +65,105 @@ export default function Fulfillment() {
         return new Date(d).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
     };
 
+    // ── Print Shipping Label (A6 sticker 10x15cm) ──
+    const printShippingLabel = (order) => {
+        const o = order;
+        const win = window.open('', '_blank', 'width=450,height=650');
+        win.document.write(`
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>ฉลากจัดส่ง ${o.ShipmentID}</title>
+<style>
+  @page { size: 100mm 150mm; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Sarabun', 'Noto Sans Thai', sans-serif; width: 100mm; height: 150mm; padding: 4mm; font-size: 10px; color: #111; }
+  .label { width: 100%; height: 100%; border: 2px solid #000; border-radius: 3mm; overflow: hidden; display: flex; flex-direction: column; }
+  .header { background: #1a1a1a; color: #fff; padding: 3mm 4mm; display: flex; justify-content: space-between; align-items: center; }
+  .header .brand { font-size: 14px; font-weight: 800; letter-spacing: 0.5px; }
+  .header .ship-id { font-size: 11px; font-weight: 600; background: #fff; color: #000; padding: 1mm 3mm; border-radius: 2mm; }
+  .section { padding: 3mm 4mm; border-bottom: 1.5px dashed #999; }
+  .section:last-child { border-bottom: none; }
+  .section-title { font-size: 8px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 1.5mm; }
+  .recipient { flex: 1; }
+  .recipient .name { font-size: 16px; font-weight: 800; margin-bottom: 2mm; }
+  .recipient .address { font-size: 11px; line-height: 1.6; margin-bottom: 2mm; color: #333; }
+  .recipient .phone { font-size: 12px; font-weight: 700; }
+  .product-box { background: #f5f5f5; }
+  .product-row { display: flex; justify-content: space-between; align-items: center; }
+  .product-name { font-size: 12px; font-weight: 700; flex: 1; }
+  .product-qty { font-size: 20px; font-weight: 900; color: #000; text-align: right; min-width: 25mm; }
+  .product-qty span { font-size: 10px; font-weight: 400; color: #666; }
+  .refs { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm; }
+  .ref-item { font-size: 9px; }
+  .ref-item .lbl { color: #888; }
+  .ref-item .val { font-weight: 700; color: #000; }
+  .barcode-area { text-align: center; padding: 2.5mm 4mm; background: #fff; }
+  .barcode-text { font-size: 18px; font-weight: 900; letter-spacing: 3px; font-family: 'Courier New', monospace; }
+  .barcode-sub { font-size: 7px; color: #999; margin-top: 1mm; }
+  .sender { background: #fafafa; }
+  .sender-info { font-size: 9px; line-height: 1.5; color: #555; }
+  .sender-name { font-weight: 700; font-size: 10px; color: #000; }
+  .footer { background: #1a1a1a; color: #fff; padding: 2mm 4mm; text-align: center; font-size: 8px; }
+  @media print {
+    body { width: 100mm; height: 150mm; }
+    .no-print { display: none; }
+  }
+</style></head><body>
+<div class="label">
+  <div class="header">
+    <div class="brand">THAIHERB</div>
+    <div class="ship-id">${o.ShipmentID}</div>
+  </div>
+
+  <div class="section recipient">
+    <div class="section-title">ผู้รับ / Recipient</div>
+    <div class="name">${o.CustomerName || '-'}</div>
+    <div class="address">${o.ShippingAddress || o.CustomerPO || 'ไม่ระบุที่อยู่'}</div>
+    ${o.CustomerPhone ? `<div class="phone">${o.CustomerPhone}</div>` : ''}
+  </div>
+
+  <div class="section product-box">
+    <div class="section-title">สินค้า / Product</div>
+    <div class="product-row">
+      <div class="product-name">${o.ProductName}</div>
+      <div class="product-qty">${o.Quantity?.toLocaleString()} <span>ชิ้น</span></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">อ้างอิง / Reference</div>
+    <div class="refs">
+      <div class="ref-item"><span class="lbl">Batch:</span> <span class="val">${o.BatchNo || '-'}</span></div>
+      <div class="ref-item"><span class="lbl">JO:</span> <span class="val">${o.JobOrderID || '-'}</span></div>
+      <div class="ref-item"><span class="lbl">PO:</span> <span class="val">${o.CustomerPO || '-'}</span></div>
+      <div class="ref-item"><span class="lbl">กำหนดส่ง:</span> <span class="val">${o.DueDate ? new Date(o.DueDate).toLocaleDateString('th-TH') : '-'}</span></div>
+    </div>
+  </div>
+
+  <div class="barcode-area">
+    <div class="barcode-text">${o.ShipmentID}</div>
+    <div class="barcode-sub">Scan to track shipment</div>
+  </div>
+
+  <div class="section sender">
+    <div class="section-title">ผู้ส่ง / Sender</div>
+    <div class="sender-info">
+      <div class="sender-name">บริษัท ไทยเฮิร์บเซ็นเตอร์ จำกัด</div>
+      <div>โรงงานผลิต สมุนไพรไทย</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    พิมพ์เมื่อ: ${new Date().toLocaleString('th-TH')} | OEM Shipment
+  </div>
+</div>
+
+<div class="no-print" style="text-align:center; margin-top:8px;">
+  <button onclick="window.print()" style="padding:8px 24px; font-size:14px; font-weight:700; background:#0d9488; color:#fff; border:none; border-radius:8px; cursor:pointer;">🖨️ พิมพ์ฉลาก</button>
+</div>
+</body></html>`);
+        win.document.close();
+    };
+
     const getStatusBadge = (status) => {
         switch (status) {
             case 'รอจัดส่ง': return 'badge-warning';
@@ -94,10 +193,6 @@ export default function Fulfillment() {
 
     const renderDashboard = () => (
         <div className="fulfillment-dashboard">
-            <div className="page-title">
-                <h1>🚚 Shipping Dashboard</h1>
-                <p>ภาพรวมและสถานะการจัดส่งสินค้า OEM ให้ลูกค้า</p>
-            </div>
 
             <div className="stats-grid">
                 <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
@@ -180,10 +275,6 @@ export default function Fulfillment() {
 
     const renderOrders = () => (
         <div className="fulfillment-orders">
-            <div className="page-title" style={{ marginBottom: 16 }}>
-                <h1>📦 รายการจัดส่ง OEM</h1>
-                <p>จัดการการจัดส่งสินค้า OEM ที่ผลิตเสร็จจากโรงงาน</p>
-            </div>
 
             <div className="card table-card">
                 {loading ? (
@@ -315,6 +406,18 @@ export default function Fulfillment() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
                                 <div><span style={{ color: '#6b7280' }}>ชื่อลูกค้า:</span> <strong>{o.CustomerName || '-'}</strong></div>
                                 <div><span style={{ color: '#6b7280' }}>PO ลูกค้า:</span> <strong>{o.CustomerPO || '-'}</strong></div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                    <Phone size={13} style={{ color: '#6b7280' }} />
+                                    <span style={{ color: '#6b7280' }}>เบอร์โทร:</span> <strong>{o.CustomerPhone || '-'}</strong>
+                                </div>
+                            </div>
+                            {/* ที่อยู่จัดส่ง */}
+                            <div style={{ marginTop: 10, padding: '10px 12px', background: '#f3e8ff', borderRadius: 8, border: '1px solid #d8b4fe' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                    <MapPin size={14} style={{ color: '#7c3aed' }} />
+                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#7c3aed' }}>ที่อยู่จัดส่ง</span>
+                                </div>
+                                <p style={{ fontSize: 13, margin: 0, lineHeight: 1.6, color: '#374151' }}>{o.ShippingAddress || 'ยังไม่ระบุที่อยู่จัดส่ง'}</p>
                             </div>
                         </div>
 
@@ -347,8 +450,15 @@ export default function Fulfillment() {
                         </div>
 
                         {/* Quick Actions */}
-                        {o.Status !== 'ส่งมอบแล้ว' && (
-                            <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
+                            <button 
+                                className="btn-sm" 
+                                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', fontWeight: 600, borderRadius: 8, cursor: 'pointer' }}
+                                onClick={() => printShippingLabel(o)}
+                            >
+                                <Printer size={16} /> พิมพ์ฉลากจัดส่ง (A6)
+                            </button>
+                            <div style={{ display: 'flex', gap: 8 }}>
                                 {o.Status === 'รอจัดส่ง' && (
                                     <button className="btn-primary" style={{ background: '#0d9488', borderColor: '#0d9488', display: 'flex', alignItems: 'center', gap: 6 }}
                                         onClick={() => { updateStatus(o.ShipmentID, 'กำลังจัดส่ง'); close(); }}>
@@ -362,15 +472,36 @@ export default function Fulfillment() {
                                     </button>
                                 )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>
         );
     };
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (currentTab) {
+            case 'fulfillment_dashboard': return '🚚 Shipping Dashboard';
+            case 'fulfillment_orders': return '📦 รายการจัดส่ง OEM';
+            default: return 'จัดส่งสินค้า (Fulfillment)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (currentTab) {
+            case 'fulfillment_dashboard': return 'ภาพรวมและสถานะการจัดส่งสินค้า OEM ให้ลูกค้า';
+            case 'fulfillment_orders': return 'จัดการการจัดส่งสินค้า OEM ที่ผลิตเสร็จจากโรงงาน';
+            default: return 'จัดการการจัดส่งสินค้าและคลังสินค้า OEM';
+        }
+    };
+
     return (
-        <div className="page-container page-enter">
+        <div className="page-container fulfillment-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
+            </div>
             {currentTab === 'fulfillment_dashboard' && renderDashboard()}
             {currentTab === 'fulfillment_orders' && renderOrders()}
             {renderDetailModal()}

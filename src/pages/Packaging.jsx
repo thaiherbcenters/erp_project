@@ -452,10 +452,6 @@ export default function Packaging() {
     const renderPackaging = () => {
         return (
             <div className="packaging-main">
-                <div className="page-title">
-                    <h1>📦 Packaging (บรรจุภัณฑ์)</h1>
-                    <p>จัดการงานบรรจุภัณฑ์และติดตามสถานะการบรรจุ → ส่ง QC Final</p>
-                </div>
 
                 {/* ── Summary Cards ── */}
                 {hasSectionPermission('packaging_main_stats') && (
@@ -662,10 +658,6 @@ export default function Packaging() {
     const renderMaterials = () => {
         return (
             <div className="packaging-materials">
-                <div className="page-title">
-                    <h1>🧱 วัสดุบรรจุภัณฑ์</h1>
-                    <p>จัดการข้อมูลวัสดุบรรจุภัณฑ์และสต็อกคงเหลือ</p>
-                </div>
                 {hasSectionPermission('packaging_materials_table') && (
                     <div className="card table-card" style={{ marginTop: '20px' }}>
                         <h3 className="card-title">🧱 วัสดุบรรจุภัณฑ์คงเหลือ</h3>
@@ -713,8 +705,29 @@ export default function Packaging() {
         return <div className="page-container"><p className="no-permission">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p></div>;
     }
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (currentTab) {
+            case 'packaging_main': return '📦 Packaging (บรรจุภัณฑ์)';
+            case 'packaging_materials': return '🧱 วัสดุบรรจุภัณฑ์';
+            default: return 'บรรจุภัณฑ์ (Packaging)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (currentTab) {
+            case 'packaging_main': return 'จัดการงานบรรจุภัณฑ์และติดตามสถานะการบรรจุ → ส่ง QC Final';
+            case 'packaging_materials': return 'จัดการข้อมูลวัสดุบรรจุภัณฑ์และสต็อกคงเหลือ';
+            default: return 'จัดการการบรรจุภัณฑ์';
+        }
+    };
+
     return (
         <div className="page-container packaging-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
+            </div>
             {currentTab === 'packaging_main' && renderPackaging()}
             {currentTab === 'packaging_materials' && renderMaterials()}
             {renderDetailModal()}

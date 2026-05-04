@@ -15,6 +15,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
 import { usePlanner } from '../context/PlannerContext';
+import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import {
     CheckSquare, Play, CheckCircle, Search,
@@ -35,6 +36,7 @@ const STEP_ICONS = {
 export default function Operator() {
     const { user, getVisibleSubPages, hasSectionPermission } = useAuth();
     const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
+    const { showAlert, showConfirm } = useAlert();
     const { jobs } = usePlanner();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('operator');
@@ -83,7 +85,7 @@ export default function Operator() {
                 .then(res => res.json())
                 .then(data => setSelectedTaskLogs(data));
         } else {
-            alert('บันทึกไม่สำเร็จ: ' + res.message);
+            showAlert('เกิดข้อผิดพลาด', 'บันทึกไม่สำเร็จ: ' + res.message, 'error');
         }
     };
 
@@ -144,14 +146,17 @@ export default function Operator() {
 
     // ── Submit production qty then advance ──
     const handleQtySubmitAndAdvance = async () => {
-        const produced = parseInt(qtyForm.producedQty);
+        const producedStr = qtyForm.producedQty;
+        const produced = producedStr === '' ? NaN : parseInt(producedStr);
         const defect = parseInt(qtyForm.defectQty) || 0;
-        if (!produced || produced <= 0) {
-            alert('กรุณากรอกจำนวนที่ผลิตได้จริง');
+        
+        if (isNaN(produced) || produced < 0 || (qtyModal.currentProduced === 0 && produced === 0)) {
+            showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณากรอกจำนวนที่ผลิตได้จริง (หากเป็นการแก้ไข Rework สามารถกรอก 0 ได้)', 'warning');
             return;
         }
         if (produced > qtyModal.expectedQty) {
-            if (!window.confirm(`ยอดผลิต (${produced}) มากกว่าเป้าหมาย (${qtyModal.expectedQty}) ต้องการดำเนินการต่อหรือไม่?`)) return;
+            const ok = await showConfirm('ยืนยันยอดผลิตเกิน', `ยอดผลิต (${produced}) มากกว่าเป้าหมาย (${qtyModal.expectedQty}) ต้องการดำเนินการต่อหรือไม่?`, 'warning');
+            if (!ok) return;
         }
 
         // 1. บันทึกยอดผลิต
@@ -163,7 +168,7 @@ export default function Operator() {
         });
 
         if (!logRes.success) {
-            alert('บันทึกยอดไม่สำเร็จ: ' + logRes.message);
+            showAlert('เกิดข้อผิดพลาด', 'บันทึกยอดไม่สำเร็จ: ' + logRes.message, 'error');
             return;
         }
 
@@ -206,7 +211,30 @@ export default function Operator() {
                     const isQcStep = step.key === 'qc_inprocess' || step.key === 'qc_final';
                     const isQcWaiting = isCurrent && isQcStep && waitingQc;
                     const StepIcon = STEP_ICONS[step.icon] || CheckCircle;
-                    const time = task.stepTimes?.[step.key];
+                    let time = task.stepTimes?.[step.key];
+                    if (time) {
+                        try {
+                            let safeTime = time;
+                            if (typeof time === 'string') {
+                                if (time.includes(' ') && !time.includes('Z')) {
+                                    safeTime = time.replace(' ', 'T') + 'Z';
+                                } else if (!time.includes('Z') && time.includes('T')) {
+                                    safeTime = time + 'Z';
+                                }
+                            }
+                            const d = new Date(safeTime);
+                            if (!isNaN(d)) {
+                                const yyyy = d.getFullYear();
+                                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                const dd = String(d.getDate()).padStart(2, '0');
+                                const hh = String(d.getHours()).padStart(2, '0');
+                                const mins = String(d.getMinutes()).padStart(2, '0');
+                                time = `${dd}/${mm}/${yyyy}\n${hh}:${mins}`;
+                            } else if (typeof time === 'string') {
+                                time = time.replace('T', '\n').substring(0, 16);
+                            }
+                        } catch(e) {}
+                    }
 
                     return (
                         <div key={step.key} className="op-step-wrapper">
@@ -473,10 +501,6 @@ export default function Operator() {
 
         return (
             <div className="operator-dashboard">
-                <div className="page-title">
-                    <h1>{expandedJobOrder ? 'การผลิต' : 'งานของฉัน — Production Operator'}</h1>
-                    <p>{expandedJobOrder ? `รายละเอียดและขั้นตอนการผลิตสำหรับใบสั่ง: ${expandedJobOrder}` : 'รายการงานที่ได้รับจาก Planner'}</p>
-                </div>
 
                 {!expandedJobOrder && hasSectionPermission('operator_dashboard_status') && (
                     <div className="summary-row">
@@ -568,13 +592,13 @@ export default function Operator() {
                             </>
                         ) : (
                             <>
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                                    <button className="btn-back-text" onClick={() => setExpandedJobOrder(null)}>
+                                        <span>←</span> กลับไปหน้ารวม
+                                    </button>
                                     <h3 className="op-section-title" style={{ margin: 0 }}>
                                         <Timer size={16} className="op-pulse" /> รายละเอียดใบสั่งผลิต: <span style={{ color: 'var(--primary)', marginLeft: 6 }}>{expandedJobOrder}</span>
                                     </h3>
-                                    <button className="op-btn" onClick={() => setExpandedJobOrder(null)} style={{ background: '#f1f5f9', color: '#475569' }}>
-                                        ← กลับไปหน้ารวม
-                                    </button>
                                 </div>
                                 <div className="op-active-grid">
                                     {allPendingTasks.filter(t => (t.jobOrderId || 'ไม่ระบุ') === expandedJobOrder).map(task => {
@@ -606,6 +630,32 @@ export default function Operator() {
                                                     </div>
                                                     <span className="op-active-progress-text">{task.producedQty} / {task.expectedQty}</span>
                                                 </div>
+
+                                                {/* QC Rejection Warning Banner */}
+                                                {(() => {
+                                                    const failedQc = qcRequests.filter(r => r.taskId === task.id && r.status === 'ไม่ผ่าน').slice(-1)[0];
+                                                    if (failedQc && !waitingQc && (task.currentStep === 'production_1' || task.currentStep === 'production_2')) {
+                                                        return (
+                                                            <div style={{
+                                                                background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 8,
+                                                                padding: '10px 14px', margin: '8px 0 4px', fontSize: 12
+                                                            }}>
+                                                                <div style={{ fontWeight: 700, color: '#dc2626', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                    ⚠️ QC ไม่ผ่าน — ส่งกลับแก้ไข (Rework)
+                                                                </div>
+                                                                {failedQc.notes && (
+                                                                    <div style={{ color: '#991b1b', fontStyle: 'italic' }}>
+                                                                        💬 หมายเหตุ QC: "{failedQc.notes}"
+                                                                    </div>
+                                                                )}
+                                                                <div style={{ color: '#b91c1c', marginTop: 4, fontSize: 11 }}>
+                                                                    กรุณาแก้ไขปัญหาแล้วกด "ขั้นตอนถัดไป" เพื่อส่ง QC ใหม่
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
 
                                                 <div className="op-active-actions">
                                                     {waitingQc ? (
@@ -709,6 +759,28 @@ export default function Operator() {
     // ══════════════════════════════════════════════════════════════════
     // 2. ประวัติการผลิต
     // ══════════════════════════════════════════════════════════════════
+    const formatDateTime = (dateStr) => {
+        if (!dateStr) return '—';
+        try {
+            let safeDateStr = dateStr;
+            if (typeof dateStr === 'string') {
+                if (dateStr.includes(' ') && !dateStr.includes('Z')) {
+                    safeDateStr = dateStr.replace(' ', 'T') + 'Z';
+                } else if (!dateStr.includes('Z') && dateStr.includes('T')) {
+                    safeDateStr = dateStr + 'Z';
+                }
+            }
+            const d = new Date(safeDateStr);
+            if (isNaN(d)) return dateStr;
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mins = String(d.getMinutes()).padStart(2, '0');
+            return `${dd}/${mm}/${yyyy} ${hh}:${mins}`;
+        } catch(e) { return dateStr; }
+    };
+
     const renderHistory = () => {
         const completed = tasks.filter(t => t.status === 'เสร็จสิ้น');
         const filtered = completed.filter(t =>
@@ -720,10 +792,6 @@ export default function Operator() {
 
         return (
             <div className="operator-history">
-                <div className="page-title">
-                    <h1>ประวัติการผลิต</h1>
-                    <p>บันทึกผลการผลิตที่ดำเนินการเสร็จสิ้นแล้ว</p>
-                </div>
                 <div className="summary-row">
                     <div className="card summary-card">
                         <div className="summary-icon" style={{ background: '#ecfdf5', color: '#059669' }}><CheckCircle size={20} /></div>
@@ -778,7 +846,7 @@ export default function Operator() {
                                             <td>
                                                 <span className={`badge ${parseFloat(rate) >= 99 ? 'badge-success' : parseFloat(rate) >= 95 ? 'badge-warning' : 'badge-danger'}`}>{rate}%</span>
                                             </td>
-                                            <td style={{ fontSize: 11 }}>{task.startTime}<br />{task.endTime || '—'}</td>
+                                            <td style={{ fontSize: 11 }}>{formatDateTime(task.startTime)}<br />{formatDateTime(task.endTime)}</td>
                                             <td><button className="btn-sm" onClick={() => setSelectedTask(task)}><Eye size={14} /></button></td>
                                         </tr>
                                     );
@@ -798,8 +866,29 @@ export default function Operator() {
         return <div className="page-container"><p className="no-permission">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p></div>;
     }
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (currentTab) {
+            case 'operator_dashboard': return expandedJobOrder ? 'การผลิต' : 'งานของฉัน — Production Operator';
+            case 'operator_history': return 'ประวัติการผลิต';
+            default: return 'ฝ่ายผลิต (Production)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (currentTab) {
+            case 'operator_dashboard': return expandedJobOrder ? `รายละเอียดและขั้นตอนการผลิตสำหรับใบสั่ง: ${expandedJobOrder}` : 'รายการงานที่ได้รับจาก Planner';
+            case 'operator_history': return 'บันทึกผลการผลิตที่ดำเนินการเสร็จสิ้นแล้ว';
+            default: return 'จัดการและดำเนินการผลิตตามใบสั่งผลิต';
+        }
+    };
+
     return (
         <div className="page-container operator-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
+            </div>
             {currentTab === 'operator_dashboard' && renderDashboard()}
             {currentTab === 'operator_history' && renderHistory()}
             {renderTaskModal()}
@@ -822,7 +911,7 @@ export default function Operator() {
                         <div className="rnd-modal-body">
                             <div style={{ background: '#fef3c7', borderRadius: 10, padding: 14, marginBottom: 16, fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <AlertTriangle size={18} />
-                                <span>กรุณากรอกจำนวนที่ผลิตได้จริงก่อนไปขั้นตอนถัดไป</span>
+                                <span>{qtyModal.currentProduced > 0 ? "กรุณากรอกจำนวนที่ผลิตเพิ่ม (หากเป็นการ Rework แก้ไขของเดิม ให้ใส่ 0)" : "กรุณากรอกจำนวนที่ผลิตได้จริงก่อนไปขั้นตอนถัดไป"}</span>
                             </div>
                             <div className="rnd-modal-info-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                                 <div className="rnd-modal-info-item" style={{ background: '#f0ebff', borderRadius: 10, padding: 14 }}>
@@ -837,9 +926,10 @@ export default function Operator() {
                             <div style={{ marginTop: 16 }}>
                                 <label style={{ fontWeight: 700, fontSize: 14, marginBottom: 6, display: 'block' }}>
                                     จำนวนที่ผลิตได้ (รอบนี้) <span style={{ color: '#ef4444' }}>*</span>
+                                    {qtyModal.currentProduced > 0 && <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400, marginLeft: 8 }}>(ใส่ 0 ได้หากเป็นการ Rework)</span>}
                                 </label>
                                 <input
-                                    type="number" min="1" autoFocus
+                                    type="number" min="0" autoFocus
                                     style={{ width: '100%', padding: '12px 16px', borderRadius: 10, border: '2px solid #c4b5fd', fontSize: 20, fontWeight: 700, color: '#5b21b6', boxSizing: 'border-box' }}
                                     value={qtyForm.producedQty}
                                     onChange={(e) => setQtyForm({ ...qtyForm, producedQty: e.target.value })}

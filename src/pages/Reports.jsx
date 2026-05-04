@@ -29,11 +29,28 @@ export default function Reports() {
         { name: 'รายรับรายไตรมาส', type: 'การขาย', date: '2026-01-15', status: 'พร้อม' },
     ];
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'reports_create': return 'สร้างรายงาน (Create Report)';
+            case 'reports_list': return 'รายงานทั้งหมด (All Reports)';
+            default: return 'รายงาน';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (activeTab) {
+            case 'reports_create': return 'สร้างและดึงข้อมูลรายงานใหม่จากระบบตามเงื่อนไขที่ต้องการ';
+            case 'reports_list': return 'รายการรายงานที่ถูกสร้างและบันทึกไว้ในระบบ';
+            default: return 'รายงานและสรุปข้อมูลต่างๆ';
+        }
+    };
+
     return (
-        <div className="page-content">
-            <div className="page-title">
-                <h1>รายงาน</h1>
-                <p>รายงานและสรุปข้อมูลต่างๆ</p>
+        <div className="page-container reports-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
             </div>
 
             {/* ── Tab: สร้างรายงาน ── */}

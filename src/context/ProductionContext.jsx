@@ -107,14 +107,15 @@ export function ProductionProvider({ children }) {
     }, [fetchQcRequests]);
 
     // ── QC submits result ──
-    const submitQcResult = useCallback(async (requestId, result, inspector, notes, checklist = []) => {
+    const submitQcResult = useCallback(async (requestId, result, inspector, notes, checklist = [], disposition = null) => {
         const now = new Date().toISOString();
         const payload = {
             result_status: result,
             inspector: inspector || 'system',
             inspectedAt: now,
             notes: notes || '',
-            checklist: checklist
+            checklist: checklist,
+            disposition: disposition || null
         };
 
         try {
@@ -127,25 +128,51 @@ export function ProductionProvider({ children }) {
                 // Refresh list
                 await fetchQcRequests();
 
-                // If passed, advance production step or update packaging
+                // Find the request to get taskId info
                 const request = qcRequests.find(r => r.id === requestId);
                 if (request && request.taskId) {
                     if (request.taskId.startsWith('PKG-')) {
-                        // Map QC results directly to Packaging task status
-                        const nextStatus = result === 'ผ่าน' ? 'QC ผ่าน' : 'บรรจุเสร็จ'; // If failed, send back to 'บรรจุเสร็จ' to repack
+                        // Packaging QC flow
+                        const nextStatus = result === 'ผ่าน' ? 'QC ผ่าน' : 'บรรจุเสร็จ';
                         try {
                             await fetch(`${API_BASE}/packaging/tasks/${request.taskId}/status`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ status: nextStatus })
                             });
-                            // Refresh production tasks to sync the stepper UI since backend advanced it
                             await fetchTasks();
                         } catch (pkgErr) {
                             console.error('Failed to update packaging task after QC:', pkgErr);
                         }
                     } else if (result === 'ผ่าน') {
+                        // QC passed → advance to next step
                         advanceTaskStep(request.taskId);
+                    } else if (result === 'ไม่ผ่าน') {
+                        // QC failed → handle based on disposition
+                        if (disposition === 'reject') {
+                            // Reject → mark task as rejected
+                            await rejectTask(request.taskId);
+                        } else {
+                            // Rework (default) → revert to previous production step
+                            await revertTaskStep(request.taskId, request.type);
+                        }
+                        // Auto-create NCR
+                        try {
+                            await fetch(`${API_BASE}/qc/defect`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    ncrNumber: `NCR-${Date.now().toString().slice(-8)}`,
+                                    refLot: request.batchNo,
+                                    itemName: request.formulaName,
+                                    issueDescription: notes || 'QC ไม่ผ่าน',
+                                    actionTaken: disposition === 'reject' ? 'คัดทิ้ง (Reject)' : 'ส่งกลับแก้ไข (Rework)',
+                                    status: disposition === 'reject' ? 'ดำเนินการแล้ว' : 'รอดำเนินการ'
+                                })
+                            });
+                        } catch (ncrErr) {
+                            console.error('Failed to auto-create NCR:', ncrErr);
+                        }
                     }
                 }
             }
@@ -153,6 +180,59 @@ export function ProductionProvider({ children }) {
             console.error('Failed to submit QC result:', err);
         }
     }, [qcRequests, fetchQcRequests]);
+
+    // ── Revert task to previous production step (Rework) ──
+    const revertTaskStep = useCallback(async (taskId, qcType) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        // Determine which step to revert to
+        const revertTo = qcType === 'qc_inprocess' ? 'production_1' : 'production_2';
+        const now = new Date().toISOString();
+
+        const payload = {
+            currentStep: revertTo,
+            stepTimes: { ...task.stepTimes, [`${revertTo}_rework`]: now },
+            status: 'กำลังทำ',
+            endTime: null
+        };
+
+        try {
+            await fetch(`${API_BASE}/production/tasks/${taskId}/advance`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            fetchTasks();
+        } catch (err) {
+            console.error('Failed to revert task step:', err);
+        }
+    }, [tasks, fetchTasks]);
+
+    // ── Reject task permanently ──
+    const rejectTask = useCallback(async (taskId) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const now = new Date().toISOString();
+        const payload = {
+            currentStep: task.currentStep,
+            stepTimes: { ...task.stepTimes, rejected: now },
+            status: 'เสร็จสิ้น',
+            endTime: now
+        };
+
+        try {
+            await fetch(`${API_BASE}/production/tasks/${taskId}/advance`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            fetchTasks();
+        } catch (err) {
+            console.error('Failed to reject task:', err);
+        }
+    }, [tasks, fetchTasks]);
 
     // ── Advance task to next step ──
     const advanceTaskStep = useCallback(async (taskId) => {

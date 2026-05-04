@@ -13,14 +13,15 @@
  * =============================================================================
  */
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     Search, Plus, Filter, CalendarDays, PieChart, Activity,
     CheckCircle, Wrench, Package, ClipboardList, AlertTriangle,
-    ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock, Play
+    ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock, Play, ShoppingCart
 } from 'lucide-react';
+import API_BASE from '../config';
 import { usePlanner } from '../context/PlannerContext';
 import { useRnD } from '../context/RnDContext';
 import { useAlert } from '../components/CustomAlert';
@@ -38,6 +39,7 @@ export default function Planning() {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
+    const [soFilter, setSOFilter] = useState('');
     const [selectedJob, setSelectedJob] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
@@ -57,6 +59,385 @@ export default function Planning() {
         customerPO: '',
         productionType: 'ผลิตตามแผน',
     });
+
+    const [pendingSalesOrders, setPendingSalesOrders] = useState([]);
+    const [loadingSOs, setLoadingSOs] = useState(false);
+    const [viewingSODetail, setViewingSODetail] = useState(null);
+    const [showSODetailModal, setShowSODetailModal] = useState(false);
+
+    useEffect(() => {
+        if (currentTab === 'planning_overview') {
+            fetchPendingSalesOrders();
+        }
+    }, [currentTab]);
+
+    const fetchPendingSalesOrders = async () => {
+        setLoadingSOs(true);
+        try {
+            const res = await fetch(`${API_BASE}/sales-orders`);
+            const json = await res.json();
+            if (json.success) {
+                const pending = json.data.filter(so => so.Status === 'ส่ง Planner แล้ว');
+                setPendingSalesOrders(pending);
+            }
+        } catch (err) {
+            console.error('Error fetching sales orders:', err);
+        } finally {
+            setLoadingSOs(false);
+        }
+    };
+
+    const handleCreateFromSO = async (so) => {
+        try {
+            const res = await fetch(`${API_BASE}/sales-orders/${so.SalesOrderID}`);
+            const json = await res.json();
+            if (json.success) {
+                const approvedFormulas = MOCK_FORMULAS.filter(f => f.status === 'อนุมัติ');
+                const itemsWithMapping = (json.data.items || []).map(item => {
+                    // Try auto-match formula by name
+                    const matched = approvedFormulas.find(f => f.name === item.ItemName);
+                    // Check if a JO already exists for this SO + item
+                    const alreadyCreated = jobs.some(j => 
+                        j.notes && j.notes.includes(`SO: ${so.SalesOrderNo}`) && j.notes.includes(`สินค้า: ${item.ItemName}`)
+                    );
+                    return {
+                        ...item,
+                        selectedFormulaId: matched ? matched.id : '',
+                        priority: 'ปกติ',
+                        assignedLine: 'Line A',
+                        planDate: new Date().toISOString().split('T')[0],
+                        notes: '',
+                        created: alreadyCreated,
+                    };
+                });
+                setSOPlanData({
+                    soId: so.SalesOrderID,
+                    soNo: so.SalesOrderNo,
+                    customerName: so.CustomerName,
+                    customerPO: so.CustomerPONumber || '',
+                    deliveryDate: so.DeliveryDate,
+                    items: itemsWithMapping,
+                });
+                setShowSOPlanModal(true);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    // ── SO Planning Modal State ──
+    const [showSOPlanModal, setShowSOPlanModal] = useState(false);
+    const [soPlanData, setSOPlanData] = useState(null);
+    const [creatingItemIdx, setCreatingItemIdx] = useState(-1);
+
+    // Store SO items for showing in create modal (legacy - keep for normal create)
+    const [createFromSOData, setCreateFromSOData] = useState(null);
+
+    const handleCreateJobFromSOItem = async (itemIdx) => {
+        if (!soPlanData) return;
+        const item = soPlanData.items[itemIdx];
+        if (!item.selectedFormulaId) {
+            return showAlert('ข้อมูลไม่ครบ', `กรุณาเลือกสูตรการผลิตสำหรับ "${item.ItemName}"`, 'warning');
+        }
+        const formula = MOCK_FORMULAS.find(f => f.id === item.selectedFormulaId);
+        if (!formula) return;
+
+        const bSize = formula.batchSize > 0 ? formula.batchSize : 1;
+        // OEM: ผลิตพอดีจำนวนสั่ง (ไม่ปัดขึ้นเป็น batch)
+        const scaleFactor = item.Qty / bSize;
+
+        setCreatingItemIdx(itemIdx);
+        const userNotes = item.notes ? item.notes.trim() : '';
+        const autoNote = `OEM — อ้างอิงจาก SO: ${soPlanData.soNo} | สินค้า: ${item.ItemName} | สเกล: ${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก`;
+        const finalNotes = userNotes ? `${autoNote} | ${userNotes}` : autoNote;
+        const jobData = {
+            formulaId: formula.id,
+            formulaName: formula.name,
+            batchQty: 1,
+            batchSize: item.Qty, // ผลิตพอดีจำนวนสั่ง
+            totalQty: item.Qty,
+            unit: formula.unit,
+            priority: item.priority,
+            planDate: item.planDate || new Date().toISOString().split('T')[0],
+            dueDate: soPlanData.deliveryDate ? new Date(soPlanData.deliveryDate).toISOString().split('T')[0] : '',
+            assignedLine: item.assignedLine,
+            notes: finalNotes,
+            customerName: soPlanData.customerName,
+            customerPO: soPlanData.customerPO,
+            productionType: 'ผลิตตามออร์เดอร์ (OEM)',
+        };
+
+        const res = await createJob(jobData);
+        setCreatingItemIdx(-1);
+
+        if (res.success) {
+            setSOPlanData(prev => ({
+                ...prev,
+                items: prev.items.map((it, idx) => idx === itemIdx ? { ...it, created: true } : it)
+            }));
+            showAlert('สำเร็จ', `สร้างใบสั่งผลิต "${item.ItemName}" จำนวน ${Number(item.Qty).toLocaleString()} ${formula.unit} (สเกล ${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก) สำเร็จ!`, 'success');
+        } else {
+            showAlert('เกิดข้อผิดพลาด', res.message, 'error');
+        }
+    };
+
+    const handleSOItemFormulaChange = (itemIdx, formulaId) => {
+        setSOPlanData(prev => ({
+            ...prev,
+            items: prev.items.map((it, idx) => idx === itemIdx ? { ...it, selectedFormulaId: formulaId } : it)
+        }));
+    };
+
+    const handleSOItemFieldChange = (itemIdx, field, value) => {
+        setSOPlanData(prev => ({
+            ...prev,
+            items: prev.items.map((it, idx) => idx === itemIdx ? { ...it, [field]: value } : it)
+        }));
+    };
+
+    const renderSOPlanModal = () => {
+        if (!showSOPlanModal || !soPlanData) return null;
+        const approvedFormulas = MOCK_FORMULAS.filter(f => f.status === 'อนุมัติ');
+        const allCreated = soPlanData.items.every(it => it.created);
+
+        return (
+            <div className="rnd-modal-overlay" onClick={() => setShowSOPlanModal(false)}>
+                <div className="rnd-modal" style={{ maxWidth: 850 }} onClick={(e) => e.stopPropagation()}>
+                    <div className="rnd-modal-header">
+                        <div>
+                            <h2>📋 จัดทำแผนผลิตจาก {soPlanData.soNo}</h2>
+                            <div className="rnd-modal-meta" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                <span className="badge badge-primary">MTO — ผลิตตามคำสั่งซื้อ</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ลูกค้า: <strong>{soPlanData.customerName}</strong></span>
+                                {soPlanData.deliveryDate && (
+                                    <span style={{ fontSize: 12, color: '#dc2626' }}>กำหนดส่ง: <strong>{new Date(soPlanData.deliveryDate).toLocaleDateString('th-TH')}</strong></span>
+                                )}
+                            </div>
+                        </div>
+                        <button className="rnd-modal-close" onClick={() => setShowSOPlanModal(false)}><XCircle size={22} /></button>
+                    </div>
+                    <div className="rnd-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                        <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px' }}>
+                            เลือกสูตรการผลิตให้แต่ละรายการสินค้า แล้วกด "สร้างใบสั่งผลิต" ทีละรายการ (1 สินค้า = 1 ใบสั่งผลิต)
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {soPlanData.items.map((item, idx) => {
+                                const matchedFormula = MOCK_FORMULAS.find(f => f.id === item.selectedFormulaId);
+                                const bSize = matchedFormula && matchedFormula.batchSize > 0 ? matchedFormula.batchSize : 0;
+
+                                return (
+                                    <div key={idx} style={{
+                                        border: item.created ? '1.5px solid #22c55e' : '1.5px solid var(--border)',
+                                        borderRadius: 10,
+                                        padding: 14,
+                                        background: item.created ? '#f0fdf4' : 'var(--card-bg)',
+                                        opacity: item.created ? 0.7 : 1,
+                                        transition: 'all 0.3s'
+                                    }}>
+                                        {/* Row 1: Item info */}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{ background: 'var(--primary)', color: '#fff', borderRadius: '50%', width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{idx + 1}</span>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: 14 }}>{item.ItemName}</div>
+                                                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>จำนวนที่ต้องผลิต: <strong style={{ color: 'var(--primary)' }}>{Number(item.Qty || 0).toLocaleString('th-TH')} {item.Unit || 'ชิ้น'}</strong></div>
+                                                </div>
+                                            </div>
+                                            {item.created && (
+                                                <span className="badge badge-success" style={{ fontSize: 11 }}>✅ สร้างแล้ว</span>
+                                            )}
+                                        </div>
+
+                                        {/* Row 2: Formula select + Details */}
+                                        {!item.created && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                {/* สูตรการผลิต */}
+                                                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                                                    <div style={{ flex: 1, minWidth: 200 }}>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>สูตรการผลิต <span style={{ color: '#ef4444' }}>*</span></label>
+                                                        <select
+                                                            style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 13 }}
+                                                            value={item.selectedFormulaId}
+                                                            onChange={(e) => handleSOItemFormulaChange(idx, e.target.value)}
+                                                        >
+                                                            <option value="">-- เลือกสูตร --</option>
+                                                            {approvedFormulas.map(f => (
+                                                                <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize.toLocaleString()} {f.unit}/batch)</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    {matchedFormula && (
+                                                        <div style={{ fontSize: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '6px 10px', minWidth: 180 }}>
+                                                            <div style={{ color: '#92400e', fontWeight: 600, marginBottom: 2 }}>OEM — ผลิตพอดีจำนวนสั่ง</div>
+                                                            <div style={{ color: '#78716c' }}>สูตรอ้างอิง: <strong>{bSize.toLocaleString()} {matchedFormula.unit}/batch</strong></div>
+                                                            <div style={{ color: '#78716c' }}>สเกลวัตถุดิบ: <strong style={{ color: '#0369a1' }}>{bSize > 0 ? ((item.Qty / bSize) * 100).toFixed(1) : 0}%</strong> ของสูตรหลัก</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* รายละเอียดการวางแผน */}
+                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                                                    <div>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>ประเภทการผลิต</label>
+                                                        <div style={{ padding: '7px 10px', borderRadius: 6, border: '1.5px solid #fde68a', fontSize: 12, fontWeight: 600, color: '#92400e', background: '#fffbeb', textAlign: 'center' }}>
+                                                            ผลิตตามออร์เดอร์ (OEM)
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>ความสำคัญ <span style={{ color: '#ef4444' }}>*</span></label>
+                                                        <select
+                                                            style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12 }}
+                                                            value={item.priority}
+                                                            onChange={(e) => handleSOItemFieldChange(idx, 'priority', e.target.value)}
+                                                        >
+                                                            <option value="ต่ำ">ต่ำ</option>
+                                                            <option value="ปกติ">ปกติ</option>
+                                                            <option value="สูง">สูง (ด่วน)</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>วันเริ่มผลิต</label>
+                                                        <input
+                                                            type="date"
+                                                            style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, boxSizing: 'border-box' }}
+                                                            value={item.planDate}
+                                                            onChange={(e) => handleSOItemFieldChange(idx, 'planDate', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>สายการผลิต</label>
+                                                        <select
+                                                            style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12 }}
+                                                            value={item.assignedLine}
+                                                            onChange={(e) => handleSOItemFieldChange(idx, 'assignedLine', e.target.value)}
+                                                        >
+                                                            <option value="Line A">Line A (สายหลัก)</option>
+                                                            <option value="Line B">Line B (สายรอง)</option>
+                                                            <option value="Line C">Line C (สารเคมี)</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* หมายเหตุ + ปุ่มสร้าง */}
+                                                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+                                                    <div style={{ flex: 1 }}>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>ข้อมูลเพิ่มเติม / หมายเหตุ</label>
+                                                        <input
+                                                            type="text"
+                                                            style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, boxSizing: 'border-box' }}
+                                                            placeholder="เช่น ติดฉลากภาษาอังกฤษ, ห่อพิเศษ"
+                                                            value={item.notes || ''}
+                                                            onChange={(e) => handleSOItemFieldChange(idx, 'notes', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        className="btn-primary"
+                                                        style={{ padding: '8px 16px', fontSize: 12, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                                                        onClick={() => handleCreateJobFromSOItem(idx)}
+                                                        disabled={creatingItemIdx === idx}
+                                                    >
+                                                        {creatingItemIdx === idx ? '⏳ กำลังสร้าง...' : '📝 สร้างใบสั่งผลิต'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {allCreated && (
+                            <div style={{ textAlign: 'center', padding: '20px 0', color: '#22c55e', fontWeight: 600, fontSize: 15 }}>
+                                🎉 สร้างใบสั่งผลิตครบทุกรายการแล้ว!
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const handleViewSODetail = async (soId) => {
+        try {
+            const res = await fetch(`${API_BASE}/sales-orders/${soId}`);
+            const json = await res.json();
+            if (json.success) {
+                setViewingSODetail(json.data);
+                setShowSODetailModal(true);
+            }
+        } catch (err) {
+            console.error('Error fetching SO detail:', err);
+        }
+    };
+
+    const renderSODetailModal = () => {
+        if (!showSODetailModal || !viewingSODetail) return null;
+        const so = viewingSODetail;
+        return (
+            <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                <div className="card" style={{ width: '90%', maxWidth: 650, maxHeight: '85vh', overflowY: 'auto', padding: 24, animation: 'slideUp 0.25s ease-out' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>📄 รายละเอียด {so.SalesOrderNo}</h2>
+                        <button onClick={() => setShowSODetailModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18 }}>✖</button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px', marginBottom: 20, fontSize: 13 }}>
+                        <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>ชื่อลูกค้า</div>
+                            <div style={{ fontWeight: 500 }}>{so.CustomerName || '-'}</div>
+                        </div>
+                        <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>อ้างอิง QT</div>
+                            <div style={{ fontWeight: 500 }}>{so.QuotationNo || '-'}</div>
+                        </div>
+                        <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>PO ลูกค้า</div>
+                            <div style={{ fontWeight: 500 }}>{so.CustomerPONumber || '-'}</div>
+                        </div>
+                        <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>โทรศัพท์</div>
+                            <div style={{ fontWeight: 500 }}>{so.Phone || '-'}</div>
+                        </div>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>ที่อยู่</div>
+                            <div style={{ fontWeight: 500 }}>{so.Address || '-'}</div>
+                        </div>
+                        <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>วันที่สั่งซื้อ</div>
+                            <div style={{ fontWeight: 500 }}>{so.OrderDate ? new Date(so.OrderDate).toLocaleDateString('th-TH') : '-'}</div>
+                        </div>
+                        <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 2 }}>กำหนดส่งมอบ</div>
+                            <div style={{ fontWeight: 500, color: so.DeliveryDate ? '#dc2626' : 'var(--text)' }}>{so.DeliveryDate ? new Date(so.DeliveryDate).toLocaleDateString('th-TH') : '-'}</div>
+                        </div>
+                    </div>
+
+                    <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 10px', borderBottom: '1px solid var(--border-light)', paddingBottom: 8 }}>📦 รายการสินค้าที่ต้องผลิต</h3>
+                    <table className="data-table" style={{ fontSize: 12, marginBottom: 16 }}>
+                        <thead>
+                            <tr>
+                                <th style={{ width: 40 }}>#</th>
+                                <th>ชื่อสินค้า</th>
+                                <th style={{ textAlign: 'right' }}>จำนวน</th>
+                                <th>หน่วย</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {(so.items || []).map((item, idx) => (
+                                <tr key={idx}>
+                                    <td>{idx + 1}</td>
+                                    <td style={{ fontWeight: 500 }}>{item.ItemName}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--primary)' }}>{Number(item.Qty || 0).toLocaleString('th-TH')}</td>
+                                    <td>{item.Unit || 'ชิ้น'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
 
     // Handle formula selection in create form
     const handleFormulaSelect = (formulaId) => {
@@ -144,10 +525,6 @@ export default function Planning() {
     // ══════════════════════════════════════════════════════════════════
     const renderOverview = () => (
         <div className="planning-overview">
-            <div className="page-title">
-                <h1>Planning Overview</h1>
-                <p>ภาพรวมการวางแผนการผลิต — ข้อมูลสูตรจาก R&D</p>
-            </div>
 
             {hasSectionPermission('planning_overview_stats') && (
                 <div className="summary-row">
@@ -169,6 +546,58 @@ export default function Planning() {
                     </div>
                 </div>
             )}
+
+            {/* คำสั่งซื้อที่รอวางแผน (Sales Orders) */}
+            <div className="card" style={{ marginBottom: 16 }}>
+                <h3 className="plan-card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0284c7', margin: '0 0 4px' }}>
+                    <ShoppingCart size={16} /> คำสั่งซื้อที่รอวางแผน (Pending Sales Orders)
+                </h3>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>ออเดอร์จากฝ่ายขายที่รอการจัดทำแผนผลิต (ใบสั่งผลิต)</p>
+                <div className="table-card">
+                    <table className="data-table">
+                        <thead>
+                            <tr>
+                                <th>เลขที่ SO</th>
+                                <th>ลูกค้า / อ้างอิง PO</th>
+                                <th>กำหนดส่งมอบ</th>
+                                <th style={{ textAlign: 'center' }}>จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {loadingSOs ? (
+                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลคำสั่งซื้อ...</td></tr>
+                            ) : pendingSalesOrders.length === 0 ? (
+                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีคำสั่งซื้อที่รอวางแผนในขณะนี้ 🎉</td></tr>
+                            ) : pendingSalesOrders.map(so => (
+                                <tr key={so.SalesOrderID}>
+                                    <td className="text-bold" style={{ color: 'var(--primary)' }}>{so.SalesOrderNo}</td>
+                                    <td>
+                                        <div>{so.CustomerName}</div>
+                                        {so.CustomerPONumber && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>PO: {so.CustomerPONumber}</div>}
+                                    </td>
+                                    <td>{so.DeliveryDate ? new Date(so.DeliveryDate).toLocaleDateString('th-TH') : 'ไม่ระบุ'}</td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+                                            <button 
+                                                className="doc-action-btn" title="ดูรายละเอียด"
+                                                onClick={() => handleViewSODetail(so.SalesOrderID)}
+                                            >
+                                                <Eye size={15} />
+                                            </button>
+                                            <button 
+                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#e0f2fe', color: '#0369a1', border: 'none', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
+                                                onClick={() => handleCreateFromSO(so)}
+                                            >
+                                                <ClipboardList size={14} /> จัดทำแผนผลิต
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             {/* สูตรที่พร้อมใช้งาน (จาก R&D) */}
             <div className="card" style={{ marginBottom: 16 }}>
@@ -246,18 +675,26 @@ export default function Planning() {
     };
     const renderPlanList = () => {
         const statuses = ['ทั้งหมด', 'รอผลิต', 'รอเริ่มงาน', 'กำลังผลิต', 'เสร็จสิ้น'];
+
+        // Extract SO references from job notes
+        const extractSO = (notes) => {
+            if (!notes) return null;
+            const match = notes.match(/SO:\s*(SO-[\d-]+)/);
+            return match ? match[1] : null;
+        };
+
+        // Build unique SO list for filter
+        const soList = [...new Set(jobs.map(j => extractSO(j.notes)).filter(Boolean))].sort();
+
         const filtered = jobs.filter(j => {
-            const matchSearch = j.formulaName.includes(searchTerm) || j.id.includes(searchTerm);
+            const matchSearch = j.formulaName.includes(searchTerm) || j.id.includes(searchTerm) || (j.notes && j.notes.includes(searchTerm));
             const matchStatus = statusFilter === 'ทั้งหมด' || j.status === statusFilter;
-            return matchSearch && matchStatus;
+            const matchSO = !soFilter || extractSO(j.notes) === soFilter;
+            return matchSearch && matchStatus && matchSO;
         });
 
         return (
             <div className="planning-list">
-                <div className="page-title">
-                    <h1>ใบสั่งผลิต (Job Order)</h1>
-                    <p>สร้างและจัดการใบสั่งผลิตโดยอ้างอิงสูตรจาก R&D</p>
-                </div>
 
                 <div className="toolbar">
                     <div className="toolbar-left">
@@ -274,6 +711,18 @@ export default function Planning() {
                                 </button>
                             ))}
                         </div>
+                        {soList.length > 0 && (
+                            <select 
+                                value={soFilter} 
+                                onChange={(e) => setSOFilter(e.target.value)}
+                                style={{ padding: '6px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, color: soFilter ? '#0369a1' : 'var(--text-muted)', background: soFilter ? '#e0f2fe' : 'var(--card-bg)' }}
+                            >
+                                <option value="">ทุก SO</option>
+                                {soList.map(so => (
+                                    <option key={so} value={so}>{so}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                     {hasSectionPermission('planning_list_action') && (
                         <button className="btn-primary" onClick={() => setShowCreateModal(true)}><Plus size={16} /> สร้างใบสั่งผลิต</button>
@@ -286,13 +735,12 @@ export default function Planning() {
                             <thead>
                                 <tr>
                                     <th>เลขที่</th>
+                                    <th>อ้างอิง SO</th>
                                     <th>สูตร (จาก R&D)</th>
                                     <th>ผลิตภัณฑ์</th>
-                                    <th>จำนวน Batch</th>
                                     <th>จำนวนรวม</th>
                                     <th>ความสำคัญ</th>
                                     <th>ไลน์ผลิต</th>
-                                    <th>วันที่ผลิต</th>
                                     <th>กำหนดเสร็จ</th>
                                     <th>สถานะ</th>
                                     <th>Progress</th>
@@ -300,41 +748,55 @@ export default function Planning() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map(job => (
-                                    <tr key={job.id}>
-                                        <td className="text-bold" style={{ whiteSpace: 'nowrap' }}>{job.id}</td>
-                                        <td style={{ whiteSpace: 'nowrap' }}><span className="plan-formula-ref">{job.formulaId}</span></td>
-                                        <td>{job.formulaName}</td>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{job.batchQty} batch</td>
-                                        <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{job.totalQty.toLocaleString()} {job.unit}</td>
-                                        <td><span className={`badge ${getPriorityBadge(job.priority)}`}>{job.priority}</span></td>
-                                        <td><span className={`badge ${getLineBadge(job.assignedLine)}`}>{job.assignedLine}</span></td>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{job.planDate}</td>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{job.dueDate}</td>
-                                        <td><span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span></td>
-                                        <td>
-                                            <div className="progress-container">
-                                                <div className="progress-bar" style={{ width: `${job.progress}%`, backgroundColor: job.status === 'เสร็จสิ้น' ? 'var(--success)' : 'var(--primary)' }}></div>
-                                                <span className="progress-text">{job.progress}%</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                                <button className="btn-sm" onClick={() => setSelectedJob(job)}><Eye size={14} /></button>
-                                                {job.status === 'รอผลิต' && (
-                                                    <button 
-                                                        className="btn-sm" 
-                                                        style={{ background: '#e0e7ff', color: '#4338ca' }} 
-                                                        title="ปล่อยให้ฝ่ายผลิต" 
-                                                        onClick={() => handleReleaseJob(job.id)}
+                                {filtered.map(job => {
+                                    const soRef = extractSO(job.notes);
+                                    return (
+                                        <tr key={job.id}>
+                                            <td className="text-bold" style={{ whiteSpace: 'nowrap' }}>{job.id}</td>
+                                            <td>
+                                                {soRef ? (
+                                                    <span 
+                                                        style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' }}
+                                                        onClick={() => setSOFilter(soRef)}
+                                                        title={`กรอง SO: ${soRef}`}
                                                     >
-                                                        <Play size={14} />
-                                                    </button>
+                                                        {soRef}
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
                                                 )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                            </td>
+                                            <td style={{ whiteSpace: 'nowrap' }}><span className="plan-formula-ref">{job.formulaId}</span></td>
+                                            <td>{job.formulaName}</td>
+                                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{job.totalQty.toLocaleString()} {job.unit}</td>
+                                            <td><span className={`badge ${getPriorityBadge(job.priority)}`}>{job.priority}</span></td>
+                                            <td><span className={`badge ${getLineBadge(job.assignedLine)}`}>{job.assignedLine}</span></td>
+                                            <td style={{ whiteSpace: 'nowrap' }}>{job.dueDate}</td>
+                                            <td><span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span></td>
+                                            <td>
+                                                <div className="progress-container">
+                                                    <div className="progress-bar" style={{ width: `${job.progress}%`, backgroundColor: job.status === 'เสร็จสิ้น' ? 'var(--success)' : 'var(--primary)' }}></div>
+                                                    <span className="progress-text">{job.progress}%</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                    <button className="btn-sm" onClick={() => setSelectedJob(job)}><Eye size={14} /></button>
+                                                    {job.status === 'รอผลิต' && (
+                                                        <button 
+                                                            className="btn-sm" 
+                                                            style={{ background: '#e0e7ff', color: '#4338ca' }} 
+                                                            title="ปล่อยให้ฝ่ายผลิต" 
+                                                            onClick={() => handleReleaseJob(job.id)}
+                                                        >
+                                                            <Play size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                                 {filtered.length === 0 && (
                                     <tr><td colSpan="12" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบข้อมูล</td></tr>
                                 )}
@@ -360,7 +822,10 @@ export default function Planning() {
 
             formula.ingredients.forEach(ing => {
                 const key = ing.materialId;
-                const requiredQty = ing.qty * job.batchQty;
+                // OEM scaling: use actual qty vs formula batch size
+                const isOEM = job.notes && job.notes.includes('MTO');
+                const scaleFactor = isOEM ? (job.totalQty / formula.batchSize) : job.batchQty;
+                const requiredQty = ing.qty * scaleFactor;
                 if (materialRequirements[key]) {
                     materialRequirements[key].requiredQty += requiredQty;
                     materialRequirements[key].jobs.push(job.id);
@@ -385,10 +850,6 @@ export default function Planning() {
 
         return (
             <div className="planning-materials">
-                <div className="page-title">
-                    <h1>ความต้องการวัตถุดิบ (BOM Explosion)</h1>
-                    <p>คำนวณวัตถุดิบรวมจากใบสั่งผลิตที่ยังดำเนินอยู่ ({activeJobs.length} ใบสั่ง)</p>
-                </div>
 
                 <div className="summary-row">
                     <div className="card summary-card">
@@ -457,10 +918,6 @@ export default function Planning() {
     // ══════════════════════════════════════════════════════════════════
     const renderGantt = () => (
         <div className="planning-gantt">
-            <div className="page-title">
-                <h1>Gantt Chart & Timeline</h1>
-                <p>แผนภูมิแสดงช่วงเวลาการผลิตแต่ละรายการ</p>
-            </div>
 
             <div className="card">
                 {/* Simple timeline bars */}
@@ -497,10 +954,6 @@ export default function Planning() {
     // ══════════════════════════════════════════════════════════════════
     const renderQCLink = () => (
         <div className="planning-qc">
-            <div className="page-title">
-                <h1>เชื่อมโยงผลการตรวจสอบคุณภาพ (QC)</h1>
-                <p>สถานะ QC ของแต่ละใบสั่งผลิต</p>
-            </div>
 
             <div className="card" style={{ textAlign: 'center', padding: 48 }}>
                 <CheckCircle size={48} style={{ color: 'var(--text-muted)', opacity: 0.3, marginBottom: 12 }} />
@@ -561,31 +1014,40 @@ export default function Planning() {
                         )}
 
                         {/* วัตถุดิบที่ต้องใช้สำหรับ Job นี้ */}
-                        {formula && (
-                            <div className="rnd-modal-section">
-                                <h4><Package size={16} /> วัตถุดิบที่ต้องใช้ (คำนวณจากสูตร × {job.batchQty} batch)</h4>
-                                <table className="data-table rnd-ingredients-table">
-                                    <thead>
-                                        <tr>
-                                            <th>วัตถุดิบ</th>
-                                            <th>ต่อ 1 Batch</th>
-                                            <th>รวม ({job.batchQty} Batch)</th>
-                                            <th>หน่วย</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {formula.ingredients.map((ing, idx) => (
-                                            <tr key={idx}>
-                                                <td>{ing.name}</td>
-                                                <td>{ing.qty}</td>
-                                                <td style={{ fontWeight: 700 }}>{(ing.qty * job.batchQty).toFixed(1)}</td>
-                                                <td>{ing.unit}</td>
+                        {formula && (() => {
+                            // OEM scaling: if totalQty differs from formula batchSize, scale ingredients proportionally
+                            const isOEM = job.notes && job.notes.includes('MTO');
+                            const scaleFactor = isOEM ? (job.totalQty / formula.batchSize) : job.batchQty;
+                            const scaleLabel = isOEM 
+                                ? `สเกลตามจำนวนสั่ง ${job.totalQty.toLocaleString()} ${job.unit} (${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก)`
+                                : `คำนวณจากสูตร × ${job.batchQty} batch`;
+
+                            return (
+                                <div className="rnd-modal-section">
+                                    <h4><Package size={16} /> วัตถุดิบที่ต้องใช้ ({scaleLabel})</h4>
+                                    <table className="data-table rnd-ingredients-table">
+                                        <thead>
+                                            <tr>
+                                                <th>วัตถุดิบ</th>
+                                                <th>ต่อ 1 Batch ({formula.batchSize.toLocaleString()} {formula.unit})</th>
+                                                <th>จำนวนที่ต้องใช้จริง</th>
+                                                <th>หน่วย</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                        </thead>
+                                        <tbody>
+                                            {formula.ingredients.map((ing, idx) => (
+                                                <tr key={idx}>
+                                                    <td>{ing.name}</td>
+                                                    <td style={{ color: 'var(--text-muted)' }}>{ing.qty}</td>
+                                                    <td style={{ fontWeight: 700, color: isOEM ? '#0369a1' : 'var(--text)' }}>{(ing.qty * scaleFactor).toFixed(2)}</td>
+                                                    <td>{ing.unit}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </div>
             </div>
@@ -601,7 +1063,7 @@ export default function Planning() {
         const selectedFormula = MOCK_FORMULAS.find(f => f.id === createForm.formulaId);
         
         return (
-            <div className="rnd-modal-overlay" onClick={() => setShowCreateModal(false)}>
+            <div className="rnd-modal-overlay" onClick={() => { setShowCreateModal(false); setCreateFromSOData(null); }}>
                 <div className="rnd-modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
                     <div className="rnd-modal-header">
                         <div>
@@ -610,9 +1072,41 @@ export default function Planning() {
                                 <span className="badge badge-primary">Production Plan</span>
                             </div>
                         </div>
-                        <button className="rnd-modal-close" onClick={() => setShowCreateModal(false)}><XCircle size={22} /></button>
+                        <button className="rnd-modal-close" onClick={() => { setShowCreateModal(false); setCreateFromSOData(null); }}><XCircle size={22} /></button>
                     </div>
                     <div className="rnd-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                        {/* ── SO Reference Info ── */}
+                        {createFromSOData && (
+                            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 14, marginBottom: 18 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontWeight: 600, fontSize: 14, color: '#0369a1' }}>
+                                    <ShoppingCart size={15} /> ข้อมูลจากคำสั่งซื้อ: {createFromSOData.soNo}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 12, marginBottom: 10 }}>
+                                    <div><span style={{ color: 'var(--text-muted)' }}>ลูกค้า:</span> <strong>{createFromSOData.customerName}</strong></div>
+                                    <div><span style={{ color: 'var(--text-muted)' }}>กำหนดส่ง:</span> <strong style={{ color: '#dc2626' }}>{createFromSOData.deliveryDate ? new Date(createFromSOData.deliveryDate).toLocaleDateString('th-TH') : '-'}</strong></div>
+                                </div>
+                                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '1px solid #bae6fd', color: '#0369a1' }}>
+                                            <th style={{ padding: '4px 6px', textAlign: 'left', width: 30 }}>#</th>
+                                            <th style={{ padding: '4px 6px', textAlign: 'left' }}>ชื่อสินค้า</th>
+                                            <th style={{ padding: '4px 6px', textAlign: 'right' }}>จำนวน</th>
+                                            <th style={{ padding: '4px 6px', textAlign: 'left' }}>หน่วย</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {createFromSOData.items.map((item, idx) => (
+                                            <tr key={idx} style={{ borderBottom: '1px solid #e0f2fe' }}>
+                                                <td style={{ padding: '4px 6px' }}>{idx + 1}</td>
+                                                <td style={{ padding: '4px 6px', fontWeight: 500 }}>{item.ItemName}</td>
+                                                <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: '#0369a1' }}>{Number(item.Qty || 0).toLocaleString('th-TH')}</td>
+                                                <td style={{ padding: '4px 6px' }}>{item.Unit || 'ชิ้น'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                         {/* ── Section 1: สูตรการผลิต ── */}
                         <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Beaker size={16} style={{ color: '#7b7bf5' }} /> เลือกสูตรการผลิต (จาก R&D)
@@ -691,7 +1185,7 @@ export default function Planning() {
                                     onChange={(e) => setCreateForm({...createForm, productionType: e.target.value})}
                                 >
                                     <option value="ผลิตตามแผน">ผลิตตามแผน (MTS)</option>
-                                    <option value="ผลิตตามออเดอร์">ผลิตตามออเดอร์ (OEM)</option>
+                                    <option value="ผลิตตามออร์เดอร์ (OEM)">ผลิตตามออร์เดอร์ (OEM)</option>
                                     <option value="ผลิตเร่งด่วน">ผลิตเร่งด่วน (Urgent)</option>
                                     <option value="ผลิตทดสอบ">ผลิตทดสอบ (Trial Run)</option>
                                 </select>
@@ -799,13 +1293,42 @@ export default function Planning() {
         return <div className="page-container"><p className="no-permission">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p></div>;
     }
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (currentTab) {
+            case 'planning_overview': return 'ภาพรวมการวางแผน (Planning Overview)';
+            case 'planning_list': return 'ใบสั่งผลิต (Job Order)';
+            case 'planning_materials': return 'ความต้องการวัตถุดิบ (BOM Explosion)';
+            case 'planning_gantt': return 'แผนภูมิการผลิต (Gantt Chart)';
+            case 'planning_qc': return 'เชื่อมโยงผลการตรวจสอบคุณภาพ (QC)';
+            default: return 'วางแผนการผลิต (Planning)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (currentTab) {
+            case 'planning_overview': return 'ภาพรวมการวางแผนการผลิต และข้อมูลสูตรที่พร้อมใช้งานจาก R&D';
+            case 'planning_list': return 'สร้างและจัดการใบสั่งผลิตโดยอ้างอิงสูตรจากฝ่ายวิจัยและพัฒนา';
+            case 'planning_materials': return `คำนวณวัตถุดิบรวมจากใบสั่งผลิตที่กำลังดำเนินการอยู่`;
+            case 'planning_gantt': return 'แผนภูมิแสดงกำหนดการและช่วงเวลาการผลิตแต่ละรายการ';
+            case 'planning_qc': return 'ตรวจสอบสถานะและเชื่อมโยงผล QC ของใบสั่งผลิตแต่ละใบ';
+            default: return 'จัดการและวางแผนการผลิต';
+        }
+    };
+
     return (
         <div className="page-container planning-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
+            </div>
             {currentTab === 'planning_overview' && renderOverview()}
             {currentTab === 'planning_list' && renderPlanList()}
             {currentTab === 'planning_materials' && renderMaterials()}
             {renderJobModal()}
             {renderCreateModal()}
+            {renderSODetailModal()}
+            {renderSOPlanModal()}
         </div>
     );
 }

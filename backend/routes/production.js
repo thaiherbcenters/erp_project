@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { generateSequence, getDatePrefix } = require('../utils/sequence');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -111,7 +112,7 @@ router.put('/tasks/:id/advance', async (req, res) => {
                 
                 if (taskResult2.recordset.length > 0) {
                     const taskData = taskResult2.recordset[0];
-                    const pkgId = `PKG-${Date.now().toString().slice(-6)}-${Math.floor(Math.random()*1000)}`;
+                    const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG-${getDatePrefix()}`, 3);
                     
                     // Check if already exists by BatchNo OR ProductionTaskID to prevent duplicate
                     const checkPkg = await pool.request()
@@ -123,6 +124,22 @@ router.put('/tasks/:id/advance', async (req, res) => {
                         `);
                         
                     if (checkPkg.recordset[0].cnt === 0) {
+                        // Check if this is an OEM order
+                        let pkgDestination = 'คลัง';
+                        if (taskData.JobOrderID) {
+                            try {
+                                const plannerCheck = await pool.request()
+                                    .input('PlannerIDCheck', sql.VarChar, taskData.JobOrderID)
+                                    .query('SELECT Notes FROM Planner WHERE PlannerID = @PlannerIDCheck');
+                                if (plannerCheck.recordset.length > 0) {
+                                    const pNotes = plannerCheck.recordset[0].Notes || '';
+                                    if (pNotes.includes('OEM') || pNotes.includes('ผลิตตามออร์เดอร์') || pNotes.includes('ผลิตตามออเดอร์') || pNotes.includes('ผลิตตามคำสั่งซื้อ')) {
+                                        pkgDestination = 'ส่งลูกค้า';
+                                    }
+                                }
+                            } catch(pe) { console.error('Error checking planner for OEM:', pe); }
+                        }
+
                         await pool.request()
                             .input('TaskID', sql.VarChar, pkgId)
                             .input('BatchNo', sql.VarChar, taskData.BatchNo)
@@ -131,7 +148,7 @@ router.put('/tasks/:id/advance', async (req, res) => {
                             .input('Qty', sql.Int, taskData.ExpectedQty || taskData.ProducedQty || 0)
                             .input('PackedQty', sql.Int, 0)
                             .input('Status', sql.NVarChar, 'รอบรรจุ')
-                            .input('Destination', sql.NVarChar, 'คลัง')
+                            .input('Destination', sql.NVarChar, pkgDestination)
                             .input('ProductionTaskID', sql.VarChar, taskId)
                             .input('JobOrderID', sql.VarChar, taskData.JobOrderID)
                             .query(`
@@ -139,7 +156,7 @@ router.put('/tasks/:id/advance', async (req, res) => {
                                 (TaskID, BatchNo, Product, Line, Qty, PackedQty, Status, Destination, ProductionTaskID, JobOrderID)
                                 VALUES (@TaskID, @BatchNo, @Product, @Line, @Qty, @PackedQty, @Status, @Destination, @ProductionTaskID, @JobOrderID)
                             `);
-                        console.log(`✅ Auto-created Packaging Task ${pkgId} for Production ${taskId} (Batch: ${taskData.BatchNo})`);
+                        console.log(`✅ Auto-created Packaging Task ${pkgId} for Production ${taskId} (Batch: ${taskData.BatchNo}, Destination: ${pkgDestination})`);
                     } else {
                         console.log(`ℹ️ Packaging task already exists for Batch ${taskData.BatchNo} or Production ${taskId}`);
                     }

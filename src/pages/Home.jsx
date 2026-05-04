@@ -38,11 +38,30 @@ export default function Home() {
         { action: 'รายงานประจำสัปดาห์', detail: 'สรุปยอดขายและสต็อก', time: '1 วันที่แล้ว' },
     ];
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'home_stats': return 'สถิติภาพรวม';
+            case 'home_activity': return 'กิจกรรมล่าสุด';
+            case 'home_actions': return 'ดำเนินการด่วน';
+            default: return 'หน้าหลัก';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (activeTab) {
+            case 'home_stats': return 'สรุปข้อมูลสถิติ ยอดขาย คำสั่งซื้อ และสินค้าคงคลัง';
+            case 'home_activity': return 'ประวัติการทำรายการต่างๆ ภายในระบบ ERP';
+            case 'home_actions': return 'ปุ่มทางลัดสำหรับเข้าถึงฟังก์ชันที่ใช้งานบ่อย';
+            default: return 'สรุปข้อมูลภาพรวมของระบบ';
+        }
+    };
+
     return (
-        <div className="page-home">
-            <div className="page-title">
-                <h1>ภาพรวม</h1>
-                <p>สรุปข้อมูลภาพรวมของระบบ</p>
+        <div className="page-container home-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
             </div>
 
             {/* ── Tab: สถิติภาพรวม ── */}

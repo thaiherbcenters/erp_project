@@ -16,6 +16,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../components/CustomAlert';
 import { ALL_PAGES } from '../data/mockData';
 import { ShieldCheck, Users, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, UserPlus, X, Trash2, Globe, Building2, User } from 'lucide-react';
 import './PermissionManager.css';
@@ -73,6 +74,7 @@ function ScopeChip({ value, onChange, small }) {
 
 export default function PermissionManager({ isEmbed = false }) {
     const { updatePermissions, updateSubPermission, updateSectionPermission, getUserPermissions, loadUserPermissions } = useAuth();
+    const { showAlert, showConfirm } = useAlert();
 
     // ── State ──
     const [users, setUsers] = useState([]);
@@ -149,9 +151,8 @@ export default function PermissionManager({ isEmbed = false }) {
 
     // ── Handle Delete User ──
     const handleDeleteUser = async (userId, userName) => {
-        if (!window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งาน "${userName}"?`)) {
-            return;
-        }
+        const ok = await showConfirm('ยืนยันการลบ', `คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งาน "${userName}"?`, 'warning');
+        if (!ok) return;
 
         try {
             const res = await fetch(`${API_BASE}/users/${userId}`, {
@@ -165,11 +166,11 @@ export default function PermissionManager({ isEmbed = false }) {
                 await fetchUsers();
             } else {
                 const data = await res.json();
-                alert(data.message || 'เกิดข้อผิดพลาดในการลบผู้ใช้งาน');
+                showAlert('เกิดข้อผิดพลาด', data.message || 'เกิดข้อผิดพลาดในการลบผู้ใช้งาน', 'error');
             }
         } catch (err) {
             console.error('Error deleting user:', err);
-            alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
         }
     };
 

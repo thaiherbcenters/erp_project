@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { generateSequence, getDatePrefix } = require('../utils/sequence');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -105,7 +106,7 @@ router.put('/tasks/:id/progress', async (req, res) => {
                 .query(`UPDATE Packaging_Tasks SET Status = N'รอ QC Final', UpdatedAt = GETDATE() WHERE TaskID = @TaskID`);
 
             // 2. Auto-create QC Request
-            const qcRequestId = `QCR-${Date.now()}`;
+            const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCR-${getDatePrefix()}`, 3);
             try {
                 await pool.request()
                     .input('RequestID', sql.VarChar, qcRequestId)
@@ -241,7 +242,7 @@ router.put('/tasks/:id/status', async (req, res) => {
         // บรรจุเสร็จ → Auto-send QC Final + sync production
         if (status === 'บรรจุเสร็จ') {
             // Auto-create QC Final request
-            const qcRequestId = `QCR-${Date.now()}`;
+            const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCR-${getDatePrefix()}`, 3);
             try {
                 await pool.request()
                     .input('RequestID', sql.VarChar, qcRequestId)

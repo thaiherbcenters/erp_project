@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { generateSequence, getDatePrefix } = require('../utils/sequence');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -257,7 +258,7 @@ router.put('/requests/:id', async (req, res) => {
                                 .query('SELECT Notes FROM Planner WHERE PlannerID = @PlannerID');
                             if (plannerRes.recordset.length > 0) {
                                 plannerNotes = plannerRes.recordset[0].Notes || '';
-                                isOEM = plannerNotes.includes('ผลิตตามออเดอร์');
+                                isOEM = plannerNotes.includes('OEM') || plannerNotes.includes('ผลิตตามออร์เดอร์') || plannerNotes.includes('ผลิตตามออเดอร์') || plannerNotes.includes('ผลิตตามคำสั่งซื้อ');
                             }
                         }
                         
@@ -276,7 +277,7 @@ router.put('/requests/:id', async (req, res) => {
                                         VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)`);
                             
                             // Create Shipping Order
-                            const shipId = `SHP-${Date.now().toString().slice(-6)}`;
+                            const shipId = await generateSequence(pool, 'Shipping_Orders', 'ShipmentID', `SHP-${getDatePrefix()}`, 3);
                             const custMatch = plannerNotes.match(/ลูกค้า:\s*(.+?)(?:\s*\||$)/);
                             const poMatch = plannerNotes.match(/PO:\s*(.+?)(?:\s*\||$)/);
                             const plannerDetail = await pool.request()
@@ -284,6 +285,24 @@ router.put('/requests/:id', async (req, res) => {
                                 .query('SELECT Priority, DueDate FROM Planner WHERE PlannerID = @PlannerID2');
                             const planInfo = plannerDetail.recordset[0] || {};
                             
+                            // Lookup shipping address + phone from the original SalesOrder
+                            let shipAddress = '';
+                            let shipPhone = '';
+                            const custName = custMatch ? custMatch[1].trim() : '';
+                            // Extract SO number from planner notes (format: "OEM — อ้างอิงจาก SO: SO-XXXX | ...")
+                            const soMatch = plannerNotes.match(/SO:\s*(SO-[\w-]+)/);
+                            if (soMatch) {
+                                try {
+                                    const soLookup = await pool.request()
+                                        .input('SONo', sql.NVarChar, soMatch[1])
+                                        .query('SELECT Address, Phone FROM SalesOrder WHERE SalesOrderNo = @SONo');
+                                    if (soLookup.recordset.length > 0) {
+                                        shipAddress = soLookup.recordset[0].Address || '';
+                                        shipPhone = soLookup.recordset[0].Phone || '';
+                                    }
+                                } catch(ce) { console.error('Error looking up SO address:', ce); }
+                            }
+
                             await pool.request()
                                 .input('ShipmentID', sql.VarChar, shipId)
                                 .input('ShipBatchNo', sql.VarChar, batchNo)
@@ -291,14 +310,16 @@ router.put('/requests/:id', async (req, res) => {
                                 .input('ShipProdTaskID', sql.VarChar, prodTaskId)
                                 .input('ShipProductName', sql.NVarChar, productName)
                                 .input('ShipQty', sql.Int, goodQty)
-                                .input('ShipCustomerName', sql.NVarChar, custMatch ? custMatch[1].trim() : '')
+                                .input('ShipCustomerName', sql.NVarChar, custName || '')
                                 .input('ShipCustomerPO', sql.NVarChar, poMatch ? poMatch[1].trim() : '')
                                 .input('ShipPriority', sql.NVarChar, planInfo.Priority || 'ปกติ')
                                 .input('ShipDueDate', sql.Date, planInfo.DueDate || null)
                                 .input('ShipNotes', sql.NVarChar, `OEM จากการผลิต Batch: ${batchNo}`)
-                                .query(`INSERT INTO Shipping_Orders (ShipmentID, BatchNo, JobOrderID, ProductionTaskID, ProductName, Quantity, CustomerName, CustomerPO, Status, Type, Priority, DueDate, Notes)
-                                        VALUES (@ShipmentID, @ShipBatchNo, @ShipJobOrderID, @ShipProdTaskID, @ShipProductName, @ShipQty, @ShipCustomerName, @ShipCustomerPO, N'รอจัดส่ง', 'oem', @ShipPriority, @ShipDueDate, @ShipNotes)`);
-                            console.log(`🚚 Shipping created: ${shipId} for OEM Batch ${batchNo}`);
+                                .input('ShipAddress', sql.NVarChar, shipAddress)
+                                .input('ShipPhone', sql.NVarChar, shipPhone)
+                                .query(`INSERT INTO Shipping_Orders (ShipmentID, BatchNo, JobOrderID, ProductionTaskID, ProductName, Quantity, CustomerName, CustomerPO, Status, Type, Priority, DueDate, Notes, ShippingAddress, CustomerPhone)
+                                        VALUES (@ShipmentID, @ShipBatchNo, @ShipJobOrderID, @ShipProdTaskID, @ShipProductName, @ShipQty, @ShipCustomerName, @ShipCustomerPO, N'รอจัดส่ง', 'oem', @ShipPriority, @ShipDueDate, @ShipNotes, @ShipAddress, @ShipPhone)`);
+                            console.log(`🚚 Shipping created: ${shipId} for OEM Batch ${batchNo} (Address: ${shipAddress ? 'Yes' : 'N/A'})`);
                         } else {
                             // MTS → เข้าคลังจริง
                             let itemId = '';
@@ -312,7 +333,7 @@ router.put('/requests/:id', async (req, res) => {
                                     .input('Qty', sql.Int, goodQty)
                                     .query('UPDATE Stock_Items SET Quantity = Quantity + @Qty, UpdatedAt = GETDATE() WHERE ItemID = @ItemID');
                             } else {
-                                itemId = `STK-${Date.now().toString().slice(-8)}`;
+                                itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK-${getDatePrefix()}`, 3);
                                 await pool.request()
                                     .input('ItemID', sql.VarChar, itemId)
                                     .input('ProductName', sql.NVarChar, productName)
@@ -405,6 +426,31 @@ router.get('/defect', async (req, res) => {
     } catch (err) {
         console.error('Error fetching qc defect:', err);
         res.status(500).json({ message: 'Error fetching qc defect' });
+    }
+});
+
+// Create new NCR (auto-created when QC rejects)
+router.post('/defect', async (req, res) => {
+    try {
+        const { ncrNumber, refLot, itemName, issueDescription, actionTaken, status } = req.body;
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('NcrNumber', sql.VarChar, ncrNumber)
+            .input('RefLot', sql.VarChar, refLot)
+            .input('ItemName', sql.NVarChar, itemName)
+            .input('IssueDescription', sql.NVarChar, issueDescription)
+            .input('ActionTaken', sql.NVarChar, actionTaken)
+            .input('Status', sql.NVarChar, status || 'รอดำเนินการ')
+            .query(`
+                INSERT INTO QC_Defect_NCR (NcrNumber, RefLot, ItemName, IssueDescription, ActionTaken, Status)
+                OUTPUT INSERTED.*
+                VALUES (@NcrNumber, @RefLot, @ItemName, @IssueDescription, @ActionTaken, @Status)
+            `);
+        console.log(`📋 NCR created: ${ncrNumber} — ${refLot} — ${actionTaken}`);
+        res.status(201).json(result.recordset[0]);
+    } catch (err) {
+        console.error('Error creating NCR:', err);
+        res.status(500).json({ message: 'Error creating NCR' });
     }
 });
 

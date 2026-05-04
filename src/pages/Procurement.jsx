@@ -84,11 +84,32 @@ export default function Procurement() {
         }
     };
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'procurement_dashboard': return 'ภาพรวมจัดซื้อ';
+            case 'procurement_pr': return 'ใบขอซื้อ (PR)';
+            case 'procurement_po': return 'ใบสั่งซื้อ (PO)';
+            case 'procurement_recv': return 'รับสินค้าเข้าคลัง';
+            default: return 'จัดซื้อ (Procurement)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (activeTab) {
+            case 'procurement_dashboard': return 'ภาพรวมยอดสั่งซื้อ จำนวน PR/PO และการรับสินค้า';
+            case 'procurement_pr': return 'จัดการคำขอซื้อสินค้าหรือวัตถุดิบ (Purchase Requisition)';
+            case 'procurement_po': return 'จัดการใบสั่งซื้อสินค้าและบริการ (Purchase Order)';
+            case 'procurement_recv': return 'บันทึกรายการรับสินค้าเข้าคลังจากซัพพลายเออร์';
+            default: return 'จัดการคำขอซื้อ สั่งซื้อ และรับสินค้า';
+        }
+    };
+
     return (
-        <div className="page-content">
-            <div className="page-title">
-                <h1>จัดซื้อ (Procurement)</h1>
-                <p>จัดการคำขอซื้อ สั่งซื้อ และรับสินค้า</p>
+        <div className="page-container procurement-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
             </div>
 
             {/* ── Tab: Procurement Dashboard ── */}

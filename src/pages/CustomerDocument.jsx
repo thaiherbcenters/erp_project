@@ -13,6 +13,7 @@ import {
     XCircle, Users, Plus, ArrowLeft, Search, Eye, Edit2, MapPin,
     Hash, Briefcase, MessageSquare, Factory, Store, Landmark, Package, Loader, Trash2
 } from 'lucide-react';
+import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 import './CustomerDocument.css';
 
@@ -25,6 +26,8 @@ const CUSTOMER_TYPES = [
 ];
 
 export default function CustomerDocument({ hasPermission }) {
+    const { showConfirm } = useAlert();
+
     if (!hasPermission('document_customers_form')) {
         return <div className="doc-no-access">ไม่มีสิทธิ์เข้าถึงหน้านี้</div>;
     }
@@ -152,8 +155,8 @@ export default function CustomerDocument({ hasPermission }) {
 
             {/* ── Back Header ── */}
             <div className="cust-back-header">
-                <button className="cust-back-btn" onClick={() => setViewMode('list')} title="ย้อนกลับ">
-                    <ArrowLeft size={20} />
+                <button className="btn-back" onClick={() => setViewMode('list')} title="ย้อนกลับ">
+                    <ArrowLeft size={18} />
                 </button>
                 <div className="cust-header-info">
                     <h2>
@@ -351,7 +354,10 @@ export default function CustomerDocument({ hasPermission }) {
                     </div>
                     <div className="actions-right">
                         <button type="button" className="cust-btn-clear"
-                            onClick={() => { if (window.confirm('คุณต้องการล้างข้อมูลในฟอร์มใช่หรือไม่?')) resetForm(); }}>
+                            onClick={async () => { 
+                                const ok = await showConfirm('ยืนยันการล้างข้อมูล', 'คุณต้องการล้างข้อมูลในฟอร์มใช่หรือไม่?', 'warning');
+                                if (ok) resetForm(); 
+                            }}>
                             <Trash2 size={16} /> ล้างข้อมูล
                         </button>
                         <button type="submit" className="btn-primary" disabled={status === 'saving'}

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { generateSequence, getDatePrefix } = require('../utils/sequence');
 
 // ==========================================
 // STOCK (INVENTORY) MODULE
@@ -85,6 +86,7 @@ router.post('/receive', async (req, res) => {
             }
         }
 
+        let itemId = null;
         if (existingItem) {
             // Update existing stock: add quantity
             await pool.request()
@@ -97,7 +99,7 @@ router.post('/receive', async (req, res) => {
                 `);
         } else {
             // Create new stock item
-            const itemId = `STK-${Date.now().toString().slice(-6)}`;
+            itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK-${getDatePrefix()}`, 3);
             await pool.request()
                 .input('ItemID', sql.VarChar, itemId)
                 .input('FormulaID', sql.VarChar, formulaId || null)
@@ -110,9 +112,12 @@ router.post('/receive', async (req, res) => {
                 `);
         }
 
+        // Note: the itemId for log generation uses the original itemId variable if created new
+        const logItemId = existingItem ? existingItem.ItemID : itemId;
+        
         // Always create a stock log entry
         await pool.request()
-            .input('ItemID', sql.VarChar, existingItem ? existingItem.ItemID : `STK-${Date.now().toString().slice(-6)}`)
+            .input('ItemID', sql.VarChar, logItemId)
             .input('Type', sql.VarChar, 'IN')
             .input('Quantity', sql.Int, quantity)
             .input('RefNo', sql.VarChar, batchNo || null)

@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useAlert } from '../components/CustomAlert';
 import {
     Users, UserPlus, Search, Eye, Pencil, Trash2, X, Printer,
     User, Briefcase, GraduationCap, CreditCard, Phone, ShieldCheck, Building2,
@@ -87,6 +88,7 @@ function getEmploymentBadge(type) {
 // EmployeeProfile Tab Component
 // =============================================================================
 function EmployeeProfileTab({ hasSectionPermission }) {
+    const { showAlert, showConfirm } = useAlert();
     const [employees, setEmployees] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [companies, setCompanies] = useState([]);
@@ -291,7 +293,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                     });
                     if (!avatarRes.ok) {
                         const errData = await avatarRes.json();
-                        alert(`บันทึกข้อมูลพนักงานสำเร็จ แต่มีปัญหาในการอัพโหลดรูป: ${errData.message}`);
+                        showAlert('แจ้งเตือน', `บันทึกข้อมูลพนักงานสำเร็จ แต่มีปัญหาในการอัพโหลดรูป: ${errData.message}`, 'warning');
                     }
                 }
 
@@ -309,19 +311,18 @@ function EmployeeProfileTab({ hasSectionPermission }) {
 
     // ── Delete ──
     const handleDelete = async (emp) => {
-        if (!window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบพนักงาน "${emp.first_name} ${emp.last_name}" (${emp.employee_code})?`)) {
-            return;
-        }
+        const ok = await showConfirm('ยืนยันการลบ', `คุณแน่ใจหรือไม่ว่าต้องการลบพนักงาน "${emp.first_name} ${emp.last_name}" (${emp.employee_code})?`, 'warning');
+        if (!ok) return;
         try {
             const res = await fetch(`${API_BASE}/employees/${emp.employee_id}`, { method: 'DELETE' });
             if (res.ok) {
                 await fetchEmployees();
             } else {
                 const data = await res.json();
-                alert(data.message || 'เกิดข้อผิดพลาดในการลบ');
+                showAlert('เกิดข้อผิดพลาด', data.message || 'เกิดข้อผิดพลาดในการลบ', 'error');
             }
         } catch (err) {
-            alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้', 'error');
         }
     };
 
@@ -836,6 +837,7 @@ function DetailItem({ label, value }) {
 // AttendanceTab Component — เวลาเข้า-ออกงาน (Database จริง)
 // =============================================================================
 function AttendanceTab({ hasSectionPermission }) {
+    const { showAlert, showConfirm } = useAlert();
     const [records, setRecords] = useState([]);
     const [employees, setEmployees] = useState([]);
     const [departments, setDepartments] = useState([]);
@@ -986,12 +988,13 @@ function AttendanceTab({ hasSectionPermission }) {
     };
 
     const handleDelete = async (rec) => {
-        if (!window.confirm(`ลบบันทึกเวลาของ ${rec.first_name} วันที่ ${fmtDate(rec.date)}?`)) return;
+        const ok = await showConfirm('ยืนยันการลบ', `ลบบันทึกเวลาของ ${rec.first_name} วันที่ ${fmtDate(rec.date)}?`, 'warning');
+        if (!ok) return;
         try {
             const res = await fetch(`${API_BASE}/attendance/${rec.attendance_id}`, { method: 'DELETE' });
             if (res.ok) { fetchAttendance(); fetchSummary(); }
-            else { const d = await res.json(); alert(d.message); }
-        } catch (err) { alert('เกิดข้อผิดพลาด'); }
+            else { const d = await res.json(); showAlert('เกิดข้อผิดพลาด', d.message, 'error'); }
+        } catch (err) { showAlert('เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการลบ', 'error'); }
     };
 
     // ── Leave Modal handlers ──
@@ -1728,11 +1731,34 @@ export default function HR() {
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'hr_dashboard';
 
+    // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
+    const getPageTitle = () => {
+        switch (activeTab) {
+            case 'hr_dashboard': return 'ภาพรวมบุคลากร';
+            case 'hr_attendance': return 'ลงเวลาทำงาน (Attendance)';
+            case 'hr_employees': return 'ข้อมูลพนักงาน (Employees)';
+            case 'hr_leave': return 'ข้อมูลการลางาน (Leave)';
+            case 'hr_payroll': return 'เงินเดือนและสวัสดิการ (Payroll)';
+            default: return 'บุคลากร (HR)';
+        }
+    };
+
+    const getPageDesc = () => {
+        switch (activeTab) {
+            case 'hr_dashboard': return 'ภาพรวมข้อมูลพนักงานและการมาทำงานวันนี้';
+            case 'hr_attendance': return 'ประวัติและข้อมูลการลงเวลาเข้า-ออกงานของพนักงาน';
+            case 'hr_employees': return 'จัดการข้อมูลประวัติและแฟ้มบุคคลของพนักงานทั้งหมด';
+            case 'hr_leave': return 'ระบบการลางานและอนุมัติวันหยุด';
+            case 'hr_payroll': return 'จัดการเงินเดือน ค่าล่วงเวลา และสวัสดิการพนักงาน';
+            default: return 'จัดการข้อมูลพนักงานและการมาทำงาน';
+        }
+    };
+
     return (
-        <div className="page-content">
-            <div className="page-title">
-                <h1>บุคลากร (Human Resources)</h1>
-                <p>จัดการข้อมูลพนักงานและการมาทำงาน</p>
+        <div className="page-container hr-page page-enter">
+            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
+                <h1>{getPageTitle()}</h1>
+                <p>{getPageDesc()}</p>
             </div>
 
             {/* ── Tab: HR Dashboard (Database จริง!) ── */}
