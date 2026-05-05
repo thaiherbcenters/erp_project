@@ -232,7 +232,9 @@ export default function Sales() {
                     <div className="summary-row">
                         {hasSectionPermission('sales_dashboard_revenue') && (
                             <div className="summary-card card">
-                                <div className="summary-icon">฿</div>
+                                <div className="summary-icon" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#16a34a' }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                </div>
                                 <div>
                                     <span className="summary-label">ยอดขายรวม</span>
                                     <span className="summary-value">฿{totalRevenue.toLocaleString()}</span>
@@ -241,7 +243,9 @@ export default function Sales() {
                         )}
                         {hasSectionPermission('sales_dashboard_orders') && (
                             <div className="summary-card card">
-                                <div className="summary-icon">📦</div>
+                                <div className="summary-icon" style={{ background: '#eff6ff', borderColor: '#bfdbfe', color: '#2563eb' }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                </div>
                                 <div>
                                     <span className="summary-label">คำสั่งซื้อ</span>
                                     <span className="summary-value">{totalOrders}</span>
@@ -250,7 +254,9 @@ export default function Sales() {
                         )}
                         {hasSectionPermission('sales_dashboard_customers') && (
                             <div className="summary-card card">
-                                <div className="summary-icon">👥</div>
+                                <div className="summary-icon" style={{ background: '#faf5ff', borderColor: '#e9d5ff', color: '#7c3aed' }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                </div>
                                 <div>
                                     <span className="summary-label">ลูกค้า</span>
                                     <span className="summary-value">{totalCustomers}</span>
@@ -259,7 +265,9 @@ export default function Sales() {
                         )}
                         {hasSectionPermission('sales_dashboard_quotations') && (
                             <div className="summary-card card">
-                                <div className="summary-icon">📄</div>
+                                <div className="summary-icon" style={{ background: '#fff7ed', borderColor: '#fed7aa', color: '#ea580c' }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                </div>
                                 <div>
                                     <span className="summary-label">ใบเสนอราคา</span>
                                     <span className="summary-value">{totalQuotations}</span>
@@ -267,63 +275,78 @@ export default function Sales() {
                             </div>
                         )}
                     </div>
-                </div>
-            )}
 
-            {/* ── Tab: Customer Management ── */}
-            {(activeTab === 'sales_customers' && hasSubPermission('sales_customers')) && (
-                <div className="subpage-content" key="sales_customers">
-                    {hasSectionPermission('sales_customers_search') && (
-                        <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์ชื่อลูกค้า..."
-                                    value={customerSearch}
-                                    onChange={(e) => setCustomerSearch(e.target.value)}
-                                />
+                    {/* Recent Activity Tables */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                        {/* Recent Sales Orders */}
+                        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>คำสั่งซื้อล่าสุด</span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sales Orders</span>
                             </div>
-                            <button className="btn-primary">+ เพิ่มลูกค้า</button>
-                        </div>
-                    )}
-
-                    {hasSectionPermission('sales_customers_table') && (
-                        <div className="table-card card">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>ลำดับ</th>
-                                        <th>ชื่อลูกค้า</th>
-                                        <th>ผู้ติดต่อ</th>
-                                        <th>โทรศัพท์</th>
-                                        <th>อีเมล</th>
-                                        <th>ประเภท</th>
-                                        <th>สถานะ</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredCustomers.map((c) => (
-                                        <tr key={c.id}>
-                                            <td>{c.id}</td>
-                                            <td className="text-bold">{c.name}</td>
-                                            <td>{c.contact}</td>
-                                            <td>{c.phone}</td>
-                                            <td>{c.email}</td>
-                                            <td>{c.type}</td>
-                                            <td>
-                                                <span className={`badge ${getCustomerStatusClass(c.status)}`}>
-                                                    {c.status}
-                                                </span>
-                                            </td>
+                            <div style={{ padding: '0' }}>
+                                <table className="data-table" style={{ minWidth: 'auto' }}>
+                                    <thead>
+                                        <tr>
+                                            <th>เลขที่ SO</th>
+                                            <th>ลูกค้า</th>
+                                            <th>ยอดรวม</th>
+                                            <th>สถานะ</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {localSalesOrders.slice(0, 5).map((o) => (
+                                            <tr key={o.SalesOrderNo || o.SalesOrderID}>
+                                                <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{o.SalesOrderNo}</td>
+                                                <td>{o.CustomerName}</td>
+                                                <td>฿{(o.GrandTotal || 0).toLocaleString()}</td>
+                                                <td><span className={`badge ${getOrderStatusClass(o.Status)}`}>{o.Status}</span></td>
+                                            </tr>
+                                        ))}
+                                        {localSalesOrders.length === 0 && (
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>ยังไม่มีข้อมูล</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    )}
+
+                        {/* Recent Quotations */}
+                        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>ใบเสนอราคาล่าสุด</span>
+                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Quotations</span>
+                            </div>
+                            <div style={{ padding: '0' }}>
+                                <table className="data-table" style={{ minWidth: 'auto' }}>
+                                    <thead>
+                                        <tr>
+                                            <th>เลขที่ QT</th>
+                                            <th>ลูกค้า</th>
+                                            <th>ยอดรวม</th>
+                                            <th>สถานะ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {localQuotations.slice(0, 5).map((q) => (
+                                            <tr key={q.QuotationNo || q.QuotationID}>
+                                                <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{q.QuotationNo}</td>
+                                                <td>{q.CustomerName}</td>
+                                                <td>฿{(q.GrandTotal || 0).toLocaleString()}</td>
+                                                <td><span className={`badge ${getQuotationStatusClass(q.Status)}`}>{q.Status}</span></td>
+                                            </tr>
+                                        ))}
+                                        {localQuotations.length === 0 && (
+                                            <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>ยังไม่มีข้อมูล</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
+
 
             {/* ── Tab: Quotation ── */}
             {(activeTab === 'sales_quotation' && hasSubPermission('sales_quotation')) && (

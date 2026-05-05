@@ -556,11 +556,9 @@ export default function QC() {
             {/* ── In-Process — NOW WITH PRODUCTION QC REQUESTS ── */}
             {(activeTab === 'qc_inprocess' && hasSubPermission('qc_inprocess')) && (
                 <div className="subpage-content" key="qc_inprocess">
-                    {renderProductionQcTable(qcInprocessRequests, 'qc_inprocess')}
-
                     {/* Production QC requests */}
                     {hasSectionPermission('qc_inprocess_search') && (
-                        <div className="toolbar" style={{ marginTop: 16 }}>
+                        <div className="toolbar">
                             <div className="search-box">
                                 <span>ค้นหา</span>
                                 <input type="text" placeholder="ค้นหาข้อมูล..." value={searchInprocess} onChange={(e) => setSearchInprocess(e.target.value)} />
@@ -568,22 +566,24 @@ export default function QC() {
                         </div>
                     )}
 
+                    {renderProductionQcTable(qcInprocessRequests, 'qc_inprocess')}
+
                 </div>
             )}
 
             {/* ── Final — NOW WITH PRODUCTION QC REQUESTS ── */}
             {(activeTab === 'qc_final' && hasSubPermission('qc_final')) && (
                 <div className="subpage-content" key="qc_final">
-                    {renderProductionQcTable(qcFinalRequests, 'qc_final')}
-
                     {hasSectionPermission('qc_final_search') && (
-                        <div className="toolbar" style={{ marginTop: 16 }}>
+                        <div className="toolbar">
                             <div className="search-box">
                                 <span>ค้นหา</span>
                                 <input type="text" placeholder="ค้นหาข้อมูล..." value={searchFinal} onChange={(e) => setSearchFinal(e.target.value)} />
                             </div>
                         </div>
                     )}
+
+                    {renderProductionQcTable(qcFinalRequests, 'qc_final')}
 
                 </div>
             )}

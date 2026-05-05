@@ -4,6 +4,41 @@ import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import '../pages/PageCommon.css';
 
+const PRODUCT_CATALOG = {
+    "ยาดมสมุนไพร": { price: 79 },
+    "ยาดมสมุนไพร จัมโบ้": { price: 490 },
+    "ยาหม่อง": { price: 59 },
+    "ยาน้ำมัน ขนาด 10 มล.": { price: 129 },
+    "ยาน้ำมัน ขนาด 5 มล.": { price: 69 },
+    "ยาน้ำมันสมุนไพร สูตรเย็น": { price: 199 },
+    "ยาน้ำมันสมุนไพร สูตรร้อน": { price: 199 },
+    "ยาสเปรย์ผสมกระดูกไก่ดำ": { price: 199 },
+    "แคปซูลขมิ้นชัน": { price: 129 },
+    "แคปซูลฟ้าทะลายโจร": { price: 159 },
+    "แคปซูลขิง": { price: 129 },
+    "แคปซูลมะขามแขก": { price: 129 },
+    "แคปซูลรางจืด": { price: 129 },
+    "แคปซูลมะระขี้นก": { price: 129 },
+    "แคปซูลตรีผลา": { price: 129 },
+    "แคปซูลเพชรสังฆาต": { price: 129 },
+    "แคปซูลประสะเจตพังคี": { price: 129 },
+    "แคปซูลสหัศธารา": { price: 129 },
+    "แคปซูลประสะมะแว้ง": { price: 129 },
+    "แคปซูลปราบชมพูทวีป": { price: 129 },
+    "ลูกประคบ": { price: 159 },
+    "ชาอัสสัม กล่อง": { price: '' },
+    "ชาอัสสัม ซอง": { price: 95 },
+    "ชากัญชาโสมขาว": { price: 95 },
+    "ชากัญชา": { price: 95 },
+    "น้ำผึ้ง": { price: '' },
+    "เทียนหอม Aromatic กลิ่น Rose": { price: 290 },
+    "เทียนหอม Aromatic กลิ่น Morning": { price: 290 },
+    "เทียนหอม Aromatic กลิ่น Thai": { price: 290 },
+    "น้ำมันหอมระเหย กลิ่น Rose": { price: 490 },
+    "น้ำมันหอมระเหย กลิ่น Morning": { price: 490 },
+    "น้ำมันหอมระเหย กลิ่น Thai": { price: 490 }
+};
+
 export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     const { showConfirm, showAlert } = useAlert();
     const [saving, setSaving] = useState(false);
@@ -145,7 +180,16 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     const addItem = () => setItems(prev => [...prev, { id: Date.now(), name: '', qty: '', unit: 'ชิ้น', price: '' }]);
     const removeItem = (id) => { if (items.length > 1) setItems(prev => prev.filter(i => i.id !== id)); };
     const handleItemChange = (id, field, value) => {
-        setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+        setItems(prev => prev.map(i => {
+            if (i.id === id) {
+                const updated = { ...i, [field]: value };
+                if (field === 'name' && PRODUCT_CATALOG[value] && PRODUCT_CATALOG[value].price !== '') {
+                    updated.price = PRODUCT_CATALOG[value].price;
+                }
+                return updated;
+            }
+            return i;
+        }));
     };
 
     // Calculations
@@ -468,7 +512,16 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                     <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, border: '1px solid var(--border)', borderRadius: 6, marginBottom: 10, background: 'var(--bg-white)' }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', minWidth: 24, paddingTop: 10 }}>{idx + 1}.</span>
                         <div style={{ flex: 3, minWidth: 200 }}>
-                            <input style={inputStyle} value={item.name} onChange={e => handleItemChange(item.id, 'name', e.target.value)} placeholder="ชื่อสินค้า" />
+                            <input 
+                                style={inputStyle} 
+                                value={item.name} 
+                                onChange={e => handleItemChange(item.id, 'name', e.target.value)} 
+                                placeholder="ชื่อสินค้า" 
+                                list={`products_list_${item.id}`}
+                            />
+                            <datalist id={`products_list_${item.id}`}>
+                                {Object.keys(PRODUCT_CATALOG).map(pName => <option key={pName} value={pName} />)}
+                            </datalist>
                         </div>
                         <div style={{ flex: 1, minWidth: 80 }}>
                             <input style={{ ...inputStyle, textAlign: 'right' }} type="number" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', e.target.value)} placeholder="จำนวน" />

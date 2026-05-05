@@ -472,15 +472,39 @@ function ThaiBaht(Number) {
     return bahtText;
 }
 
-const PROMO_ITEMS = {
-    "ยาดมสมุนไพร": { qty: 50, price: 20 },
-    "ยาหม่อง": { qty: 40, price: 25 },
-    "ยาดมสมุนไพร จัมโบ้": { qty: 5, price: 200 },
-    "ยาน้ำมัน ขนาด 10 มล.": { qty: 17, price: 59 },
-    "ยาน้ำมัน ขนาด 5 มล.": { qty: 25, price: 40 },
-    "ยาน้ำมันสมุนไพร สูตรเย็น": { qty: 14, price: 71 },
-    "ยาน้ำมันสมุนไพร สูตรร้อน": { qty: 14, price: 71 },
-    "ยาสเปรย์ผสมกระดูกไก่ดำ": { qty: 14, price: 71 }
+const PRODUCT_CATALOG = {
+    "ยาดมสมุนไพร": { price: 79, promo: { qty: 50, price: 20 } },
+    "ยาดมสมุนไพร จัมโบ้": { price: 490, promo: { qty: 5, price: 200 } },
+    "ยาหม่อง": { price: 59, promo: { qty: 40, price: 25 } },
+    "ยาน้ำมัน ขนาด 10 มล.": { price: 129, promo: { qty: 17, price: 59 } },
+    "ยาน้ำมัน ขนาด 5 มล.": { price: 69, promo: { qty: 25, price: 40 } },
+    "ยาน้ำมันสมุนไพร สูตรเย็น": { price: 199, promo: { qty: 14, price: 71 } },
+    "ยาน้ำมันสมุนไพร สูตรร้อน": { price: 199, promo: { qty: 14, price: 71 } },
+    "ยาสเปรย์ผสมกระดูกไก่ดำ": { price: 199, promo: { qty: 14, price: 71 } },
+    "แคปซูลขมิ้นชัน": { price: 129 },
+    "แคปซูลฟ้าทะลายโจร": { price: 159 },
+    "แคปซูลขิง": { price: 129 },
+    "แคปซูลมะขามแขก": { price: 129 },
+    "แคปซูลรางจืด": { price: 129 },
+    "แคปซูลมะระขี้นก": { price: 129 },
+    "แคปซูลตรีผลา": { price: 129 },
+    "แคปซูลเพชรสังฆาต": { price: 129 },
+    "แคปซูลประสะเจตพังคี": { price: 129 },
+    "แคปซูลสหัศธารา": { price: 129 },
+    "แคปซูลประสะมะแว้ง": { price: 129 },
+    "แคปซูลปราบชมพูทวีป": { price: 129 },
+    "ลูกประคบ": { price: 159 },
+    "ชาอัสสัม กล่อง": { price: '' },
+    "ชาอัสสัม ซอง": { price: 95 },
+    "ชากัญชาโสมขาว": { price: 95 },
+    "ชากัญชา": { price: 95 },
+    "น้ำผึ้ง": { price: '' },
+    "เทียนหอม Aromatic กลิ่น Rose": { price: 290 },
+    "เทียนหอม Aromatic กลิ่น Morning": { price: 290 },
+    "เทียนหอม Aromatic กลิ่น Thai": { price: 290 },
+    "น้ำมันหอมระเหย กลิ่น Rose": { price: 490 },
+    "น้ำมันหอมระเหย กลิ่น Morning": { price: 490 },
+    "น้ำมันหอมระเหย กลิ่น Thai": { price: 490 }
 };
 
 export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHistory }) {
@@ -492,7 +516,10 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         billStatus: 'ktb',
         billNo: `QT${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-001`,
         billDate: new Date().toISOString().split('T')[0],
+        customerTypeId: '',
         customerName: '',
+        contactPerson: '',
+        email: '',
         address: '',
         phone: '',
         taxId: '',
@@ -516,7 +543,9 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
 <div style="color:red; text-align: center; font-weight: bold;">**ราคานี้ยังไม่รวมค่าจัดส่ง**</div>`,
         showDiscountInPrint: false,
         showVatInPrint: false,
-        showDepositInPrint: true
+        showDepositInPrint: true,
+        designFee: 500,
+        showDesignFeeInPrint: false
     });
 
     useEffect(() => {
@@ -570,7 +599,9 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                             notes: data.Notes || '',
                             showDiscountInPrint: data.ShowDiscountInPrint,
                             showVatInPrint: data.ShowVatInPrint,
-                            showDepositInPrint: data.ShowDepositInPrint
+                            showDepositInPrint: data.ShowDepositInPrint,
+                            designFee: data.DesignFee !== undefined ? parseFloat(data.DesignFee) : 500,
+                            showDesignFeeInPrint: data.ShowDesignFeeInPrint !== undefined ? data.ShowDesignFeeInPrint : false
                         });
 
                         if (data.items && data.items.length > 0) {
@@ -635,26 +666,38 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                 const newItem = { ...item, [field]: value };
                 
                 if (field === 'name') {
-                    if (!PROMO_ITEMS[value]) {
+                    if (PRODUCT_CATALOG[value]) {
+                        if (newItem.isPromo && PRODUCT_CATALOG[value].promo) {
+                            const pData = PRODUCT_CATALOG[value].promo;
+                            newItem.qty = pData.qty * newItem.promoMultiplier;
+                            newItem.price = pData.price;
+                        } else {
+                            newItem.isPromo = false;
+                            newItem.promoMultiplier = 1;
+                            if (PRODUCT_CATALOG[value].price !== '') {
+                                newItem.price = PRODUCT_CATALOG[value].price;
+                            }
+                        }
+                    } else {
                         newItem.isPromo = false;
                         newItem.promoMultiplier = 1;
-                    } else if (newItem.isPromo) {
-                        const pData = PROMO_ITEMS[value];
-                        newItem.qty = pData.qty * newItem.promoMultiplier;
-                        newItem.price = pData.price;
                     }
                 } else if (field === 'isPromo') {
-                    if (value && PROMO_ITEMS[newItem.name]) {
-                        const pData = PROMO_ITEMS[newItem.name];
+                    if (value && PRODUCT_CATALOG[newItem.name] && PRODUCT_CATALOG[newItem.name].promo) {
+                        const pData = PRODUCT_CATALOG[newItem.name].promo;
                         newItem.qty = pData.qty * newItem.promoMultiplier;
                         newItem.price = pData.price;
                     } else {
                         newItem.qty = '';
-                        newItem.price = '';
+                        if (PRODUCT_CATALOG[newItem.name] && PRODUCT_CATALOG[newItem.name].price !== '') {
+                            newItem.price = PRODUCT_CATALOG[newItem.name].price;
+                        } else {
+                            newItem.price = '';
+                        }
                     }
                 } else if (field === 'promoMultiplier') {
-                    if (newItem.isPromo && PROMO_ITEMS[newItem.name]) {
-                        const pData = PROMO_ITEMS[newItem.name];
+                    if (newItem.isPromo && PRODUCT_CATALOG[newItem.name] && PRODUCT_CATALOG[newItem.name].promo) {
+                        const pData = PRODUCT_CATALOG[newItem.name].promo;
                         newItem.qty = pData.qty * parseInt(value, 10);
                         newItem.price = pData.price;
                     }
@@ -684,11 +727,12 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         }
         return sum + ((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0));
     }, 0);
-    const discountAmount = subTotal * (parseFloat(formData.discountPercent) || 0) / 100;
+    const discountAmount = formData.showDiscountInPrint ? (subTotal * (parseFloat(formData.discountPercent) || 0) / 100) : 0;
     const afterDiscount = subTotal - discountAmount;
-    const vatAmount = afterDiscount * (parseFloat(formData.vatRate) || 0) / 100;
+    const vatAmount = formData.showVatInPrint ? (afterDiscount * (parseFloat(formData.vatRate) || 0) / 100) : 0;
     const shipping = parseFloat(formData.shippingCost) || 0;
-    const grandTotal = afterDiscount + vatAmount + shipping;
+    const designFee = formData.showDesignFeeInPrint ? (parseFloat(formData.designFee) || 0) : 0;
+    const grandTotal = afterDiscount + vatAmount + shipping + designFee;
 
     let depositAmount = 0;
     if (formData.depositPercent === 'custom') {
@@ -748,13 +792,21 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         const ok = await showConfirm('ยืนยันการบันทึก', 'คุณต้องการบันทึกใบเสนอราคานี้ใช่หรือไม่?', 'info');
         if (!ok) return;
 
+        if (!formData.customerTypeId) {
+            showAlert('ข้อผิดพลาด', 'กรุณาระบุประเภทลูกค้าก่อนบันทึก', 'warning');
+            return;
+        }
+
         setStatus('saving');
 
         const payload = {
             quotationNo: formData.billNo,
             docType: formData.docType,
             bankAccount: formData.billStatus,
+            customerTypeId: formData.customerTypeId,
             customerName: formData.customerName,
+            contactPerson: formData.contactPerson,
+            email: formData.email,
             address: formData.address,
             phone: formData.phone,
             taxId: formData.taxId,
@@ -777,6 +829,8 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
             showVatInPrint: formData.showVatInPrint,
             showDepositInPrint: formData.showDepositInPrint,
             showShippingInPrint: true,
+            designFee: designFee,
+            showDesignFeeInPrint: formData.showDesignFeeInPrint,
             status: editId ? undefined : 'พร้อมใช้', // Keep existing status if editing
             items: items.filter(i => i.name).map(i => ({
                 name: i.name,
@@ -970,18 +1024,43 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 <div className="q-section-desc">ชื่อ ที่อยู่ เบอร์โทร และเลขผู้เสียภาษีของลูกค้า</div>
                             </div>
                         </div>
-                        <div className="form-group">
-                            <label>ชื่อลูกค้า / บริษัท <span className="required">*</span></label>
-                            <input type="text" name="customerName" placeholder="กรอกชื่อลูกค้าหรือบริษัท" value={formData.customerName} onChange={handleFormChange} required />
+                        <div className="form-row" style={{ gridTemplateColumns: '1.2fr 2fr 1.5fr' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>ประเภทลูกค้า <span className="required">*</span></label>
+                                <select 
+                                    name="customerTypeId" 
+                                    value={formData.customerTypeId} 
+                                    onChange={handleFormChange} 
+                                    required 
+                                >
+                                    <option value="">-- เลือกประเภท --</option>
+                                    <option value="1">ลูกค้า Retail (ขายปลีก)</option>
+                                    <option value="2">ลูกค้า OEM (รับจ้างผลิต)</option>
+                                    <option value="3">ลูกค้า Distributor (ตัวแทนจำหน่าย)</option>
+                                    <option value="4">ลูกค้า Government (รัฐ)</option>
+                                </select>
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>ชื่อลูกค้า / บริษัท <span className="required">*</span></label>
+                                <input type="text" name="customerName" placeholder="กรอกชื่อลูกค้าหรือบริษัท" value={formData.customerName} onChange={handleFormChange} required />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>ผู้ติดต่อ</label>
+                                <input type="text" name="contactPerson" placeholder="ชื่อผู้ติดต่อ (ถ้ามี)" value={formData.contactPerson} onChange={handleFormChange} />
+                            </div>
                         </div>
                         <div className="form-group">
                             <label>ที่อยู่ <span className="required">*</span></label>
                             <textarea name="address" placeholder="กรอกที่อยู่ลูกค้า" rows="2" value={formData.address} onChange={handleFormChange} required></textarea>
                         </div>
-                        <div className="form-row">
+                        <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
                             <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label>เบอร์โทร <span className="required">*</span></label>
                                 <input type="tel" name="phone" placeholder="กรอกเบอร์โทร" value={formData.phone} onChange={handleFormChange} required />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>อีเมล</label>
+                                <input type="email" name="email" placeholder="example@email.com" value={formData.email} onChange={handleFormChange} />
                             </div>
                             <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label>เลขประจำตัวผู้เสียภาษี</label>
@@ -1030,8 +1109,8 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                         
                                         {item.showDropdown && (
                                             <div style={{ position: 'absolute', top: '42px', left: 0, width: '100%', background: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', zIndex: 50, maxHeight: '200px', overflowY: 'auto', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                                                {Object.keys(PROMO_ITEMS)
-                                                    .filter(pName => PROMO_ITEMS[item.name] || pName.toLowerCase().includes((item.name || '').toLowerCase()))
+                                                {Object.keys(PRODUCT_CATALOG)
+                                                    .filter(pName => PRODUCT_CATALOG[item.name] || pName.toLowerCase().includes((item.name || '').toLowerCase()))
                                                     .map(pName => (
                                                         <div 
                                                             key={pName} 
@@ -1047,13 +1126,13 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                                         </div>
                                                     ))
                                                 }
-                                                {Object.keys(PROMO_ITEMS).filter(pName => !PROMO_ITEMS[item.name] && pName.toLowerCase().includes((item.name || '').toLowerCase())).length === 0 && !PROMO_ITEMS[item.name] && (
-                                                    <div style={{ padding: '8px 12px', fontSize: '14px', color: '#94a3b8', textAlign: 'center', backgroundColor: '#f8fafc' }}>ไม่พบรายการโปรโมชั่น</div>
+                                                {Object.keys(PRODUCT_CATALOG).filter(pName => !PRODUCT_CATALOG[item.name] && pName.toLowerCase().includes((item.name || '').toLowerCase())).length === 0 && !PRODUCT_CATALOG[item.name] && (
+                                                    <div style={{ padding: '8px 12px', fontSize: '14px', color: '#94a3b8', textAlign: 'center', backgroundColor: '#f8fafc' }}>ไม่พบรายการสินค้า</div>
                                                 )}
                                             </div>
                                         )}
 
-                                        {PROMO_ITEMS[item.name] && (
+                                        {PRODUCT_CATALOG[item.name] && PRODUCT_CATALOG[item.name].promo && (
                                             <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#d35400' }}>
                                                 <input type="checkbox" id={`promo_${item.id}`} checked={item.isPromo} onChange={(e) => handleItemChange(item.id, 'isPromo', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', padding: 0 }} />
                                                 <label htmlFor={`promo_${item.id}`} style={{ cursor: 'pointer', margin: 0, color: '#d35400', fontWeight: 'bold' }}>จัดโปรโมชั่น 1000 บาท</label>
@@ -1128,10 +1207,10 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 <span style={{ fontWeight: 600, fontSize: '14px', color: '#ef4444' }}>{discountAmount > 0 ? '-' : ''}{discountAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
                             </div>
 
-                            {/* After Discount (show only when discount > 0) */}
-                            {discountAmount > 0 && (
+                            {/* After Discount (show only when discount is checked) */}
+                            {formData.showDiscountInPrint && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
-                                    <span style={{ color: '#475569', fontSize: '13px' }}>คงเหลือหลังหักส่วนลด</span>
+                                    <span style={{ color: '#475569', fontSize: '13px' }}>คงเหลือ / Balance</span>
                                     <span style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b' }}>{afterDiscount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
                                 </div>
                             )}
@@ -1150,6 +1229,21 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                     </label>
                                 </div>
                                 <span style={{ fontWeight: 600, fontSize: '14px', color: '#1e293b' }}>{vatAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            </div>
+
+                            {/* Design Fee */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: '#475569', fontSize: '13px' }}>ค่าออกแบบ / Design Fee</span>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#94a3b8', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                        <input type="checkbox" name="showDesignFeeInPrint" checked={formData.showDesignFeeInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0 }} />
+                                        แสดงในบิล
+                                    </label>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <input type="number" name="designFee" value={formData.designFee} onChange={handleFormChange} style={{ width: '80px', textAlign: 'right', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '13px' }} min="0" />
+                                    <span style={{ fontSize: '13px', color: '#475569' }}>บาท</span>
+                                </div>
                             </div>
 
                             {/* Shipping */}
@@ -1373,6 +1467,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 (formData.showDiscountInPrint && discountAmount > 0 ? 2 : 0) +
                                 (formData.showVatInPrint && vatAmount > 0 ? 1 : 0) +
                                 (shipping > 0 ? 1 : 0) + 
+                                (formData.showDesignFeeInPrint && designFee > 0 ? 1 : 0) + 
                                 (formData.showDepositInPrint && depositAmount > 0 ? 2 : 0) + 1
                             } style={{ width: '60%', verticalAlign: 'middle', padding: '5px', borderRight: '1px solid black', borderBottom: '1px solid black', position: 'relative' }}>
                                 <div className="print-color-red" style={{ position: 'absolute', top: '5px', left: '5px', color: 'red', fontSize: '10pt', fontWeight: 'bold' }}>ช่องทางการชำระเงิน :</div>
@@ -1405,7 +1500,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                             </td>
                         </tr>
                         
-                        {formData.showDiscountInPrint && discountAmount > 0 && (
+                        {formData.showDiscountInPrint && (
                             <React.Fragment>
                                 <tr>
                                     <td className="print-color-red" style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', borderRight: '1px solid black', color: 'red', padding: '5px' }}>
@@ -1417,7 +1512,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 </tr>
                                 <tr>
                                     <td style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', borderRight: '1px solid black', padding: '5px' }}>
-                                        จำนวนเงินหลังหักส่วนลด<br/><span style={{ fontSize: '10pt', fontWeight: 'normal' }}>AFTER DISCOUNT</span>
+                                        คงเหลือ<br/><span style={{ fontSize: '10pt', fontWeight: 'normal' }}>BALANCE</span>
                                     </td>
                                     <td style={{ textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', padding: '5px' }}>
                                         <span style={{ fontWeight: 'normal' }}>{afterDiscount.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
@@ -1444,6 +1539,17 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 </td>
                                 <td style={{ textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', padding: '5px' }}>
                                     <span style={{ fontWeight: 'normal' }}>{shipping.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
+                                </td>
+                            </tr>
+                        )}
+
+                        {formData.showDesignFeeInPrint && designFee > 0 && (
+                            <tr>
+                                <td style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', borderRight: '1px solid black', padding: '5px' }}>
+                                    ค่าออกแบบ<br/><span style={{ fontSize: '10pt', fontWeight: 'normal' }}>DESIGN FEE</span>
+                                </td>
+                                <td style={{ textAlign: 'right', paddingRight: '10px', borderBottom: '1px solid black', padding: '5px' }}>
+                                    <span style={{ fontWeight: 'normal' }}>{designFee.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
                                 </td>
                             </tr>
                         )}

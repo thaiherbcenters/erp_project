@@ -153,6 +153,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     margin-top: auto;
     padding-top: 12px;
     border-top: 1px solid var(--border-light, #f1f5f9);

@@ -115,6 +115,12 @@ export const ALL_PAGES = [
     id: 'stock', name: 'คลังสินค้า', path: '/stock',
     subPages: [
       {
+        id: 'stock_dashboard', name: 'Stock Dashboard',
+        sections: [
+          { id: 'stock_dashboard_stats', name: 'สถิติภาพรวมคลังสินค้า' },
+        ],
+      },
+      {
         id: 'stock_data', name: 'Data STOCK',
         sections: [
           { id: 'stock_data_search', name: 'ค้นหาสินค้า' },
@@ -142,13 +148,6 @@ export const ALL_PAGES = [
           { id: 'sales_dashboard_orders', name: 'จำนวนคำสั่งซื้อ' },
           { id: 'sales_dashboard_customers', name: 'จำนวนลูกค้า' },
           { id: 'sales_dashboard_quotations', name: 'ใบเสนอราคา' },
-        ],
-      },
-      {
-        id: 'sales_customers', name: 'Customer Management',
-        sections: [
-          { id: 'sales_customers_search', name: 'ค้นหาลูกค้า' },
-          { id: 'sales_customers_table', name: 'ตารางลูกค้า' },
         ],
       },
       {

@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock } from 'lucide-react';
+import { Eye, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
 import API_BASE from '../config';
 import './PageCommon.css';
 
@@ -117,7 +117,7 @@ export default function Stock() {
 
         return (
             <div className="rnd-modal-overlay" onClick={() => { setSelectedItem(null); setDetail(null); }}>
-                <div className="rnd-modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+                <div className="rnd-modal" style={{ maxWidth: 900 }} onClick={(e) => e.stopPropagation()}>
                     {/* Header */}
                     <div className="rnd-modal-header">
                         <div>
@@ -380,6 +380,7 @@ export default function Stock() {
     // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
     const getPageTitle = () => {
         switch (activeTab) {
+            case 'stock_dashboard': return 'สถิติภาพรวมคลังสินค้า (Stock Dashboard)';
             case 'stock_data': return 'ยอดคงเหลือสินค้า (Inventory Data)';
             case 'stock_logs': return 'ประวัติเข้า-ออก (Stock Logs)';
             default: return 'คลังสินค้า (Inventory)';
@@ -388,6 +389,7 @@ export default function Stock() {
 
     const getPageDesc = () => {
         switch (activeTab) {
+            case 'stock_dashboard': return 'สรุปภาพรวมยอดคงเหลือและการเคลื่อนไหวของสินค้าในคลัง';
             case 'stock_data': return 'ตรวจสอบยอดคงเหลือ สถานะ และรายละเอียดของสินค้าในคลัง';
             case 'stock_logs': return 'ประวัติและรายละเอียดการรับเข้าหรือเบิกจ่ายสินค้า';
             default: return 'ข้อมูลสินค้าคงคลัง และประวัติรายการเข้า-ออก';
@@ -400,6 +402,55 @@ export default function Stock() {
                 <h1>{getPageTitle()}</h1>
                 <p>{getPageDesc()}</p>
             </div>
+
+            {/* ── Tab: Stock Dashboard ── */}
+            {(activeTab === 'stock_dashboard' && hasSubPermission('stock_dashboard')) && (
+                <div className="subpage-content" key="stock_dashboard">
+                    {hasSectionPermission('stock_dashboard_stats') && (
+                        <div className="dashboard-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+                            <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{ background: '#eff6ff', padding: '16px', borderRadius: '50%', color: '#3b82f6' }}>
+                                    <Package size={28} />
+                                </div>
+                                <div>
+                                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>จำนวนสินค้าทั้งหมด</div>
+                                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>{stockItems.length.toLocaleString()}</div>
+                                </div>
+                            </div>
+                            
+                            <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '50%', color: '#22c55e' }}>
+                                    <TrendingUp size={28} />
+                                </div>
+                                <div>
+                                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>ยอดรวมสินค้าคงคลัง (ชิ้น)</div>
+                                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#166534' }}>{stockItems.reduce((sum, item) => sum + (item.qty || 0), 0).toLocaleString()}</div>
+                                </div>
+                            </div>
+
+                            <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '50%', color: '#f59e0b' }}>
+                                    <AlertTriangle size={28} />
+                                </div>
+                                <div>
+                                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>สินค้าเหลือน้อย</div>
+                                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#b45309' }}>{stockItems.filter(i => i.status === 'สินค้าเหลือน้อย').length.toLocaleString()}</div>
+                                </div>
+                            </div>
+
+                            <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                <div style={{ background: '#fef2f2', padding: '16px', borderRadius: '50%', color: '#ef4444' }}>
+                                    <XCircle size={28} />
+                                </div>
+                                <div>
+                                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>สินค้าหมดสต็อก</div>
+                                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#991b1b' }}>{stockItems.filter(i => i.status === 'สินค้าหมด' || i.qty === 0).length.toLocaleString()}</div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ── Tab: Data STOCK ── */}
             {(activeTab === 'stock_data' && hasSubPermission('stock_data')) && (

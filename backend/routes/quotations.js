@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
-const { generateSequence, getDatePrefix } = require('../utils/sequence');
+const { generateSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
 
 // 1. Get all quotations (for table listing)
 router.get('/', async (req, res) => {
@@ -75,11 +75,12 @@ router.get('/:id', async (req, res) => {
 // 3. Create new quotation
 router.post('/', async (req, res) => {
     const { 
-        quotationNo, docType, bankAccount, customerName, address, phone, taxId, 
+        quotationNo, docType, bankAccount, customerTypeId, customerName, contactPerson, email, address, phone, taxId, 
         billDate, validUntil, subTotal, discountPercent, discountAmount, 
         afterDiscount, vatRate, vatAmount, shippingCost, grandTotal, 
         depositPercent, depositAmount, remainingAmount, signer, notes, 
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
+        designFee, showDesignFeeInPrint,
         status, items 
     } = req.body;
 
@@ -122,6 +123,8 @@ router.post('/', async (req, res) => {
         request.input('showVat', sql.Bit, showVatInPrint ? 1 : 0);
         request.input('showDeposit', sql.Bit, showDepositInPrint ? 1 : 0);
         request.input('showShipping', sql.Bit, showShippingInPrint ? 1 : 0);
+        request.input('designFee', sql.Decimal(18,2), designFee || 0);
+        request.input('showDesignFee', sql.Bit, showDesignFeeInPrint ? 1 : 0);
         request.input('status', sql.NVarChar, status || 'ร่าง');
 
         const headerResult = await request.query(`
@@ -129,14 +132,14 @@ router.post('/', async (req, res) => {
                 QuotationNo, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
-                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, Status
+                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status
             )
             OUTPUT INSERTED.QuotationID
             VALUES (
                 @quotationNo, @docType, @bankAccount, @customerName, @address, @phone, @taxId,
                 @billDate, @validUntil, @subTotal, @discountPercent, @discountAmount, @afterDiscount,
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
-                @remainingAmount, @signer, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @status
+                @remainingAmount, @signer, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status
             )
         `);
 
@@ -165,6 +168,44 @@ router.post('/', async (req, res) => {
         }
 
         await transaction.commit();
+
+        // ── Auto-Create Customer (Prospect) ──
+        // หลังจาก commit QT สำเร็จแล้ว ค่อยสร้างลูกค้า (ไม่ใช่ส่วนของ transaction เพราะถ้า customer ซ้ำไม่ควรทำให้ QT fail)
+        if (customerName && customerName.trim()) {
+            try {
+                const custCheck = await pool.request()
+                    .input('custName', sql.NVarChar, customerName.trim())
+                    .query(`SELECT CustomerID FROM Customer WHERE CustomerName = @custName`);
+
+                if (custCheck.recordset.length === 0) {
+                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Prospect
+                    const typeId = customerTypeId ? parseInt(customerTypeId) : 1;
+                    const prefix = typeId === 2 ? 'OEM' : 'CUST';
+                    const custCode = await generateSequence(pool, 'Customer', 'CustomerCode', `${prefix}-${getMonthPrefix()}`, 3);
+
+                    await pool.request()
+                        .input('tid', sql.Int, typeId)           // จาก dropdown หรือ 1 = Retail (default)
+                        .input('sid', sql.Int, 3)           // 3 = Prospect
+                        .input('code', sql.NVarChar, custCode)
+                        .input('name', sql.NVarChar, customerName.trim())
+                        .input('contact', sql.NVarChar, contactPerson || null)
+                        .input('email', sql.NVarChar, email || null)
+                        .input('phone', sql.NVarChar, phone || null)
+                        .input('address', sql.NVarChar, address || null)
+                        .input('tax', sql.NVarChar, taxId || null)
+                        .input('source', sql.NVarChar, 'quotation')
+                        .query(`
+                            INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Email, Phone, Address, TaxID, Source)
+                            VALUES (@tid, @sid, @code, @name, @contact, @email, @phone, @address, @tax, @source)
+                        `);
+                    console.log(`✅ Auto-created customer "${customerName}" as Prospect from QT`);
+                }
+            } catch (custErr) {
+                // ไม่ให้ customer error กระทบ QT response (QT บันทึกสำเร็จแล้ว)
+                console.error('⚠️ Auto-create customer warning:', custErr.message);
+            }
+        }
+
         res.status(201).json({ success: true, message: 'Quotation created successfully', quotationId });
 
     } catch (err) {
@@ -183,6 +224,7 @@ router.put('/:id', async (req, res) => {
         afterDiscount, vatRate, vatAmount, shippingCost, grandTotal, 
         depositPercent, depositAmount, remainingAmount, signer, notes, 
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
+        designFee, showDesignFeeInPrint,
         status, items 
     } = req.body;
 
@@ -223,6 +265,8 @@ router.put('/:id', async (req, res) => {
         request.input('showVat', sql.Bit, showVatInPrint ? 1 : 0);
         request.input('showDeposit', sql.Bit, showDepositInPrint ? 1 : 0);
         request.input('showShipping', sql.Bit, showShippingInPrint ? 1 : 0);
+        request.input('designFee', sql.Decimal(18,2), designFee || 0);
+        request.input('showDesignFee', sql.Bit, showDesignFeeInPrint ? 1 : 0);
         request.input('status', sql.NVarChar, status || 'ร่าง');
 
         // 1. Backup Current Version to History Table before modifying
@@ -233,14 +277,14 @@ router.put('/:id', async (req, res) => {
                 QuotationID, Revision, QuotationNo, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
-                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, Status, CreatedAt
+                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt
             )
             OUTPUT INSERTED.HistoryID
             SELECT 
                 QuotationID, Revision, QuotationNo, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
-                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, Status, CreatedAt
+                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt
             FROM Quotation
             WHERE QuotationID = @id
         `);
@@ -268,7 +312,7 @@ router.put('/:id', async (req, res) => {
                 VatRate = @vatRate, VatAmount = @vatAmount, ShippingCost = @shippingCost, GrandTotal = @grandTotal,
                 DepositPercent = @depositPercent, DepositAmount = @depositAmount, RemainingAmount = @remainingAmount,
                 Signer = @signer, Notes = @notes, ShowDiscountInPrint = @showDiscount, ShowVatInPrint = @showVat,
-                ShowDepositInPrint = @showDeposit, ShowShippingInPrint = @showShipping, Status = @status,
+                ShowDepositInPrint = @showDeposit, ShowShippingInPrint = @showShipping, DesignFee = @designFee, ShowDesignFeeInPrint = @showDesignFee, Status = @status,
                 Revision = Revision + 1,
                 UpdatedAt = GETDATE()
             WHERE QuotationID = @id

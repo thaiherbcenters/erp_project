@@ -179,6 +179,49 @@ router.post('/', async (req, res) => {
         }
 
         await transaction.commit();
+
+        // ── Auto-Upgrade Customer Status (Prospect → Active) ──
+        // เมื่อสร้าง SO = ลูกค้าตอบรับสั่งซื้อแล้ว → อัปเกรดเป็น Active
+        if (customerName && customerName.trim()) {
+            try {
+                const custCheck = await pool.request()
+                    .input('custName', sql.NVarChar, customerName.trim())
+                    .query(`SELECT CustomerID, CustomerStatusID FROM Customer WHERE CustomerName = @custName`);
+
+                if (custCheck.recordset.length > 0) {
+                    const cust = custCheck.recordset[0];
+                    // ถ้าสถานะเป็น Prospect (3) → อัปเกรดเป็น Active (1)
+                    if (cust.CustomerStatusID === 3) {
+                        await pool.request()
+                            .input('custId', sql.Int, cust.CustomerID)
+                            .query(`UPDATE Customer SET CustomerStatusID = 1 WHERE CustomerID = @custId`);
+                        console.log(`✅ Customer "${customerName}" upgraded from Prospect → Active (SO created)`);
+                    }
+                } else {
+                    // ลูกค้ายังไม่มี (กรณีสร้าง SO manual ไม่ผ่าน QT) → สร้างเป็น Active เลย
+                    const { generateSequence, getMonthPrefix } = require('../utils/sequence');
+                    const custCode = await generateSequence(pool, 'Customer', 'CustomerCode', `CUST-${getMonthPrefix()}`, 3);
+
+                    await pool.request()
+                        .input('tid', sql.Int, 1)           // 1 = Retail (default)
+                        .input('sid', sql.Int, 1)           // 1 = Active (ซื้อแล้ว)
+                        .input('code', sql.NVarChar, custCode)
+                        .input('name', sql.NVarChar, customerName.trim())
+                        .input('phone', sql.NVarChar, phone || null)
+                        .input('address', sql.NVarChar, address || null)
+                        .input('tax', sql.NVarChar, taxId || null)
+                        .input('source', sql.NVarChar, 'sales_order')
+                        .query(`
+                            INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, Phone, Address, TaxID, Source)
+                            VALUES (@tid, @sid, @code, @name, @phone, @address, @tax, @source)
+                        `);
+                    console.log(`✅ Auto-created customer "${customerName}" as Active from SO (manual)`);
+                }
+            } catch (custErr) {
+                console.error('⚠️ Auto-manage customer warning:', custErr.message);
+            }
+        }
+
         res.status(201).json({
             success: true,
             message: 'Sales Order created successfully',

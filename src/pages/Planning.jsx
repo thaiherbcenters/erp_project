@@ -69,7 +69,7 @@ export default function Planning() {
         if (currentTab === 'planning_overview') {
             fetchPendingSalesOrders();
         }
-    }, [currentTab]);
+    }, [currentTab, jobs]);
 
     const fetchPendingSalesOrders = async () => {
         setLoadingSOs(true);
@@ -77,7 +77,12 @@ export default function Planning() {
             const res = await fetch(`${API_BASE}/sales-orders`);
             const json = await res.json();
             if (json.success) {
-                const pending = json.data.filter(so => so.Status === 'ส่ง Planner แล้ว');
+                const pending = json.data.filter(so => {
+                    if (so.Status !== 'ส่ง Planner แล้ว') return false;
+                    // กรองออกถ้ามีการสร้าง JO จาก SO นี้ไปแล้ว
+                    const hasJob = jobs.some(j => j.notes && j.notes.includes(`SO: ${so.SalesOrderNo}`));
+                    return !hasJob;
+                });
                 setPendingSalesOrders(pending);
             }
         } catch (err) {
