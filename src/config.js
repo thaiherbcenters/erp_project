@@ -16,4 +16,33 @@
 
 const API_BASE = '/api';
 
+/**
+ * =============================================================================
+ * Global Fetch Interceptor (Security Patch)
+ * =============================================================================
+ * ดักจับทุกๆ การใช้ fetch() เพื่อแอบแนบ JWT Token ไปกับ Request Headers โดยอัตโนมัติ
+ * ทำให้ไม่ต้องไปไล่แก้โค้ด fetch ทั้ง 130+ จุดในแอปพลิเคชัน
+ */
+const originalFetch = window.fetch;
+window.fetch = async (resource, config = {}) => {
+    // อ่าน Token ปัจจุบันจาก localStorage
+    const token = localStorage.getItem('erp_token');
+    
+    // ตรวจสอบว่าเป็นการยิง API และมี Token ไหม
+    if (token && typeof resource === 'string' && resource.includes('/api')) {
+        // จัดการกรณี config.headers เป็น Header object หรือ Object ธรรมดา
+        if (config.headers instanceof Headers) {
+            config.headers.set('Authorization', `Bearer ${token}`);
+        } else {
+            config.headers = {
+                ...config.headers,
+                'Authorization': `Bearer ${token}`
+            };
+        }
+    }
+    
+    // ส่งต่อให้ fetch เดิมทำงานตามปกติ
+    return originalFetch(resource, config);
+};
+
 export default API_BASE;

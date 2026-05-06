@@ -27,6 +27,7 @@
  * =============================================================================
  */
 
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ProductionProvider } from './context/ProductionContext';
@@ -39,23 +40,23 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
 import Login from './pages/Login';
-import Home from './pages/Home';
-import Customer from './pages/Customer';
-import Stock from './pages/Stock';
-import Sales from './pages/Sales';
-import Accounts from './pages/Accounts';
-import Procurement from './pages/Procurement';
-import Reports from './pages/Reports';
-import QC from './pages/QC';
-import HR from './pages/HR';
-import Settings from './pages/Settings';
-import PermissionManager from './pages/PermissionManager';
-import Planning from './pages/Planning';
-import Operator from './pages/Operator';
-import RnD from './pages/RnD';
-import Packaging from './pages/Packaging';
-import Fulfillment from './pages/Fulfillment';
-import DocumentControl from './pages/DocumentControl';
+const Home = lazy(() => import('./pages/Home'));
+const Customer = lazy(() => import('./pages/Customer'));
+const Stock = lazy(() => import('./pages/Stock'));
+const Sales = lazy(() => import('./pages/Sales'));
+const Accounts = lazy(() => import('./pages/Accounts'));
+const Procurement = lazy(() => import('./pages/Procurement'));
+const Reports = lazy(() => import('./pages/Reports'));
+const QC = lazy(() => import('./pages/QC'));
+const HR = lazy(() => import('./pages/HR'));
+const Settings = lazy(() => import('./pages/Settings'));
+const PermissionManager = lazy(() => import('./pages/PermissionManager'));
+const Planning = lazy(() => import('./pages/Planning'));
+const Operator = lazy(() => import('./pages/Operator'));
+const RnD = lazy(() => import('./pages/RnD'));
+const Packaging = lazy(() => import('./pages/Packaging'));
+const Fulfillment = lazy(() => import('./pages/Fulfillment'));
+const DocumentControl = lazy(() => import('./pages/DocumentControl'));
 import { RnDProvider } from './context/RnDContext';
 
 function App() {
@@ -66,6 +67,11 @@ function App() {
         <PlannerProvider>
           <RnDProvider>
           <BrowserRouter>
+            <Suspense fallback={
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.2rem', color: '#666' }}>
+                <div className="spinner-border text-primary me-2" role="status"></div> กำลังโหลด...
+              </div>
+            }>
             <Routes>
               {/* ── หน้า Login (ไม่ต้องล็อกอิน) ── */}
               <Route path="/" element={<Login />} />
@@ -137,6 +143,7 @@ function App() {
               {/* ── Route ไม่ตรง → redirect กลับหน้า Login ── */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </Suspense>
           </BrowserRouter>
           </RnDProvider>
         </PlannerProvider>
