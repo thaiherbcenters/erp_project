@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Users, Building2, Wrench,
-    Search, Plus, Pencil, Trash2, KeyRound, X, UserPlus, ShieldCheck
+    Search, Plus, Pencil, Trash2, KeyRound, X, UserPlus, ShieldCheck, FileText
 } from 'lucide-react';
 import PermissionManager from './PermissionManager';
 import './Settings.css';
@@ -85,6 +85,9 @@ export default function Settings() {
                 <button className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`} onClick={() => setActiveTab('general')}>
                     <SettingsIcon size={16} /> ทั่วไป
                 </button>
+                <button className={`settings-tab ${activeTab === 'audit_logs' ? 'active' : ''}`} onClick={() => setActiveTab('audit_logs')}>
+                    <FileText size={16} /> ประวัติการใช้งาน
+                </button>
             </div>
 
             {/* Tab Content */}
@@ -93,6 +96,7 @@ export default function Settings() {
             {['roles', 'settings_roles'].includes(activeTab) && <RolesTab showToast={showToast} />}
             {activeTab === 'permissions' && <div className="settings-permissions-wrapper"><PermissionManager isEmbed={true} /></div>}
             {activeTab === 'general' && <GeneralTab />}
+            {activeTab === 'audit_logs' && <AuditLogTab />}
 
             {/* Toast */}
             {toast && <div className={`settings-toast ${toast.type}`}>{toast.message}</div>}
@@ -935,5 +939,240 @@ function RoleFormModal({ title, departments, role, onClose, onSave }) {
                 </div>
             </div>
         </div>
+    );
+}
+
+// =============================================================================
+// Audit Log Tab — ประวัติการใช้งานระบบ (Admin Only)
+// =============================================================================
+function AuditLogTab() {
+    const [logs, setLogs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [total, setTotal] = useState(0);
+    const [filters, setFilters] = useState({ username: '', action: '', module: '', from: '', to: '' });
+    const [detail, setDetail] = useState(null);
+
+    const loadLogs = useCallback(async () => {
+        setLoading(true);
+        try {
+            const params = new URLSearchParams({ page, limit: 30 });
+            if (filters.username) params.set('username', filters.username);
+            if (filters.action) params.set('action', filters.action);
+            if (filters.module) params.set('module', filters.module);
+            if (filters.from) params.set('from', filters.from);
+            if (filters.to) params.set('to', filters.to);
+
+            const res = await fetch(`${API}/audit-logs?${params}`);
+            const json = await res.json();
+            if (json.success) {
+                setLogs(json.data);
+                setTotalPages(json.pagination.totalPages);
+                setTotal(json.pagination.total);
+            }
+        } catch (err) {
+            console.error('Error loading audit logs:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [page, filters]);
+
+    useEffect(() => { loadLogs(); }, [loadLogs]);
+
+    const handleFilter = () => { setPage(1); loadLogs(); };
+    const handleClear = () => { setFilters({ username: '', action: '', module: '', from: '', to: '' }); setPage(1); };
+
+    const loadDetail = async (logId) => {
+        try {
+            const res = await fetch(`${API}/audit-logs/${logId}`);
+            const json = await res.json();
+            if (json.success) setDetail(json.data);
+        } catch (err) { console.error(err); }
+    };
+
+    const ACTION_COLORS = {
+        'LOGIN': '#10b981', 'LOGIN_FAILED': '#ef4444', 'LOGIN_BLOCKED': '#f97316',
+        'CREATE': '#3b82f6', 'UPDATE': '#f59e0b', 'DELETE': '#ef4444', 'LOGOUT': '#6b7280',
+    };
+
+    const formatDate = (d) => {
+        if (!d) return '—';
+        const dt = new Date(d);
+        return dt.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            + ' ' + dt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    return (
+        <>
+            {/* Filters */}
+            <div className="settings-toolbar" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                <div className="settings-search" style={{ minWidth: '160px' }}>
+                    <Search size={16} style={{ color: '#94a3b8' }} />
+                    <input placeholder="ค้นหา username..." value={filters.username}
+                        onChange={e => setFilters({ ...filters, username: e.target.value })}
+                        onKeyDown={e => e.key === 'Enter' && handleFilter()} />
+                </div>
+                <select className="settings-filter-select" value={filters.action}
+                    onChange={e => { setFilters({ ...filters, action: e.target.value }); setPage(1); }}>
+                    <option value="">ทุก Action</option>
+                    <option value="LOGIN">LOGIN</option>
+                    <option value="LOGIN_FAILED">LOGIN_FAILED</option>
+                    <option value="LOGIN_BLOCKED">LOGIN_BLOCKED</option>
+                    <option value="CREATE">CREATE</option>
+                    <option value="UPDATE">UPDATE</option>
+                    <option value="DELETE">DELETE</option>
+                </select>
+                <select className="settings-filter-select" value={filters.module}
+                    onChange={e => { setFilters({ ...filters, module: e.target.value }); setPage(1); }}>
+                    <option value="">ทุก Module</option>
+                    <option value="auth">auth</option>
+                    <option value="quotations">quotations</option>
+                    <option value="stock">stock</option>
+                    <option value="users">users</option>
+                </select>
+                <input type="date" className="settings-filter-date" value={filters.from}
+                    onChange={e => setFilters({ ...filters, from: e.target.value })} />
+                <span style={{ color: '#94a3b8', alignSelf: 'center' }}>ถึง</span>
+                <input type="date" className="settings-filter-date" value={filters.to}
+                    onChange={e => setFilters({ ...filters, to: e.target.value })} />
+                <button className="settings-add-btn" onClick={handleFilter} style={{ padding: '8px 16px' }}>
+                    <Search size={14} /> ค้นหา
+                </button>
+            </div>
+
+            {/* Summary */}
+            <div style={{ padding: '0 16px 8px', fontSize: '13px', color: '#64748b' }}>
+                พบทั้งหมด <strong>{total}</strong> รายการ — หน้า {page}/{totalPages || 1}
+            </div>
+
+            {/* Table */}
+            <div className="settings-table-wrap">
+                <table className="settings-table">
+                    <thead>
+                        <tr>
+                            <th style={{ width: 140 }}>เวลา</th>
+                            <th style={{ width: 100 }}>ผู้ใช้</th>
+                            <th style={{ width: 110 }}>Action</th>
+                            <th style={{ width: 100 }}>Module</th>
+                            <th>รายละเอียด</th>
+                            <th style={{ width: 110 }}>IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading ? (
+                            <tr><td colSpan={6}><div className="settings-empty"><p>กำลังโหลด...</p></div></td></tr>
+                        ) : logs.length === 0 ? (
+                            <tr><td colSpan={6}><div className="settings-empty"><p>ไม่พบข้อมูล</p></div></td></tr>
+                        ) : logs.map(log => (
+                            <tr key={log.log_id} onClick={() => loadDetail(log.log_id)}
+                                style={{ cursor: 'pointer' }}
+                                className="settings-table-row-hover">
+                                <td style={{ fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                                    {formatDate(log.created_at)}
+                                </td>
+                                <td>
+                                    <span style={{ fontWeight: 500 }}>{log.username}</span>
+                                </td>
+                                <td>
+                                    <span className="settings-badge" style={{
+                                        background: `${ACTION_COLORS[log.action] || '#6b7280'}18`,
+                                        color: ACTION_COLORS[log.action] || '#6b7280',
+                                        border: `1px solid ${ACTION_COLORS[log.action] || '#6b7280'}30`,
+                                        fontWeight: 600, fontSize: '11px'
+                                    }}>
+                                        {log.action}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span className="settings-badge settings-badge-dept" style={{ fontSize: '11px' }}>
+                                        {log.module}
+                                    </span>
+                                </td>
+                                <td style={{ fontSize: '13px', color: '#334155', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {log.description || '—'}
+                                </td>
+                                <td style={{ fontSize: '12px', color: '#94a3b8', fontFamily: 'monospace' }}>
+                                    {log.ip_address}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
+                    <button className="settings-btn-cancel" disabled={page <= 1}
+                        onClick={() => setPage(p => p - 1)} style={{ padding: '6px 14px', fontSize: '13px' }}>
+                        ← ก่อนหน้า
+                    </button>
+                    <span style={{ alignSelf: 'center', fontSize: '13px', color: '#64748b' }}>
+                        {page} / {totalPages}
+                    </span>
+                    <button className="settings-btn-cancel" disabled={page >= totalPages}
+                        onClick={() => setPage(p => p + 1)} style={{ padding: '6px 14px', fontSize: '13px' }}>
+                        ถัดไป →
+                    </button>
+                </div>
+            )}
+
+            {/* Detail Modal */}
+            {detail && (
+                <div className="settings-modal-backdrop" onClick={() => setDetail(null)}>
+                    <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+                        <div className="settings-modal-header">
+                            <h2>รายละเอียด Log #{detail.log_id}</h2>
+                            <button className="settings-modal-close" onClick={() => setDetail(null)}><X size={16} /></button>
+                        </div>
+                        <div className="settings-modal-body" style={{ maxHeight: 400, overflowY: 'auto' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: '8px 12px', fontSize: '13px' }}>
+                                <span style={{ color: '#64748b', fontWeight: 500 }}>เวลา</span>
+                                <span>{formatDate(detail.created_at)}</span>
+                                <span style={{ color: '#64748b', fontWeight: 500 }}>ผู้ใช้</span>
+                                <span><strong>{detail.username}</strong> (ID: {detail.user_id})</span>
+                                <span style={{ color: '#64748b', fontWeight: 500 }}>Action</span>
+                                <span><span className="settings-badge" style={{
+                                    background: `${ACTION_COLORS[detail.action] || '#6b7280'}18`,
+                                    color: ACTION_COLORS[detail.action] || '#6b7280',
+                                    fontWeight: 600
+                                }}>{detail.action}</span></span>
+                                <span style={{ color: '#64748b', fontWeight: 500 }}>Module</span>
+                                <span>{detail.module}</span>
+                                <span style={{ color: '#64748b', fontWeight: 500 }}>Target ID</span>
+                                <span>{detail.target_id || '—'}</span>
+                                <span style={{ color: '#64748b', fontWeight: 500 }}>คำอธิบาย</span>
+                                <span>{detail.description || '—'}</span>
+                                <span style={{ color: '#64748b', fontWeight: 500 }}>IP</span>
+                                <span style={{ fontFamily: 'monospace' }}>{detail.ip_address}</span>
+                                <span style={{ color: '#64748b', fontWeight: 500 }}>Device</span>
+                                <span style={{ fontSize: '11px', wordBreak: 'break-all', color: '#94a3b8' }}>{detail.user_agent}</span>
+                            </div>
+
+                            {detail.old_value && (
+                                <div style={{ marginTop: 16 }}>
+                                    <h4 style={{ fontSize: '13px', color: '#ef4444', marginBottom: 4 }}>📄 ข้อมูลเดิม (ก่อนแก้ไข/ลบ)</h4>
+                                    <pre style={{ background: '#fef2f2', padding: 12, borderRadius: 8, fontSize: '12px', overflow: 'auto', maxHeight: 150, border: '1px solid #fecaca' }}>
+                                        {typeof detail.old_value === 'object' ? JSON.stringify(detail.old_value, null, 2) : detail.old_value}
+                                    </pre>
+                                </div>
+                            )}
+                            {detail.new_value && (
+                                <div style={{ marginTop: 12 }}>
+                                    <h4 style={{ fontSize: '13px', color: '#10b981', marginBottom: 4 }}>📄 ข้อมูลใหม่ (หลังแก้ไข)</h4>
+                                    <pre style={{ background: '#f0fdf4', padding: 12, borderRadius: 8, fontSize: '12px', overflow: 'auto', maxHeight: 150, border: '1px solid #bbf7d0' }}>
+                                        {typeof detail.new_value === 'object' ? JSON.stringify(detail.new_value, null, 2) : detail.new_value}
+                                    </pre>
+                                </div>
+                            )}
+                        </div>
+                        <div className="settings-modal-footer">
+                            <button className="settings-btn-cancel" onClick={() => setDetail(null)}>ปิด</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 }

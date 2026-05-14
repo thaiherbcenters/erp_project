@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // ============================================================
 // GET /api/roles — ดึงตำแหน่งทั้งหมด (พร้อมแผนกที่ผูก)
@@ -48,7 +49,7 @@ router.get('/', async (req, res) => {
 // ============================================================
 // POST /api/roles — สร้างตำแหน่งใหม่
 // ============================================================
-router.post('/', async (req, res) => {
+router.post('/', authorizeRoles('admin'), async (req, res) => {
     try {
         const { role_code, role_name, dept_codes } = req.body;
 
@@ -97,7 +98,7 @@ router.post('/', async (req, res) => {
 // ============================================================
 // PUT /api/roles/:id — แก้ไขตำแหน่ง
 // ============================================================
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeRoles('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { role_name, is_active, dept_codes } = req.body;
@@ -158,7 +159,7 @@ router.put('/:id', async (req, res) => {
 // ============================================================
 // DELETE /api/roles/:id — ลบตำแหน่ง
 // ============================================================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeRoles('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const pool = await poolPromise;

@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -169,7 +170,7 @@ router.post('/', async (req, res) => {
 // ============================================================
 // 4. PUT /api/leave-requests/:id — อนุมัติ/ไม่อนุมัติใบลา
 // ============================================================
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeRoles('admin', 'executive', 'hr'), async (req, res) => {
     try {
         const { id } = req.params;
         const { status, approved_by } = req.body;

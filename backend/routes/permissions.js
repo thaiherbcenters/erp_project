@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // 1. GET /api/permissions/:userId — ดึงสิทธิ์ทั้งหมดของ user
 router.get('/:userId', async (req, res) => {
@@ -23,7 +24,7 @@ router.get('/:userId', async (req, res) => {
 });
 
 // 2. PUT /api/permissions/:userId — อัปเดตสิทธิ์ทั้งหมดของ user (แทนที่ทั้งชุด)
-router.put('/:userId', async (req, res) => {
+router.put('/:userId', authorizeRoles('admin'), async (req, res) => {
     try {
         const { userId } = req.params;
         const { permissions } = req.body; // array of { page_id, data_scope }

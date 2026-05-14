@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const userService = require('../services/userService');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // ============================================================
 // 1. GET /api/users — Fetch all users
@@ -16,9 +17,9 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================================
-// 2. POST /api/users — Create a new user
+// 2. POST /api/users — Create a new user (Admin Only)
 // ============================================================
-router.post('/', async (req, res) => {
+router.post('/', authorizeRoles('admin'), async (req, res) => {
     try {
         const newUser = await userService.createUser(req.body);
         res.status(201).json({ 
@@ -41,9 +42,9 @@ router.post('/', async (req, res) => {
 });
 
 // ============================================================
-// 3. PUT /api/users/:id — แก้ไขข้อมูล user
+// 3. PUT /api/users/:id — แก้ไขข้อมูล user (Admin Only)
 // ============================================================
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeRoles('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         await userService.updateUser(id, req.body);
@@ -57,9 +58,9 @@ router.put('/:id', async (req, res) => {
 });
 
 // ============================================================
-// 4. PUT /api/users/:id/password — Reset รหัสผ่าน
+// 4. PUT /api/users/:id/password — Reset รหัสผ่าน (Admin Only)
 // ============================================================
-router.put('/:id/password', async (req, res) => {
+router.put('/:id/password', authorizeRoles('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const { newPassword } = req.body;
@@ -74,9 +75,9 @@ router.put('/:id/password', async (req, res) => {
 });
 
 // ============================================================
-// 5. PUT /api/users/:id/toggle — เปิด/ปิดสถานะ user
+// 5. PUT /api/users/:id/toggle — เปิด/ปิดสถานะ user (Admin Only)
 // ============================================================
-router.put('/:id/toggle', async (req, res) => {
+router.put('/:id/toggle', authorizeRoles('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         const newStatus = await userService.toggleUserStatus(id);
@@ -93,9 +94,9 @@ router.put('/:id/toggle', async (req, res) => {
 });
 
 // ============================================================
-// 6. DELETE /api/users/:id — Delete a user
+// 6. DELETE /api/users/:id — Delete a user (Admin Only)
 // ============================================================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeRoles('admin'), async (req, res) => {
     try {
         const { id } = req.params;
         await userService.deleteUser(id);

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 const { generateSequence, getDatePrefix } = require('../utils/sequence');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -68,7 +69,7 @@ router.get('/tasks', async (req, res) => {
 });
 
 // Update task progress (PackedQty and DefectQty)
-router.put('/tasks/:id/progress', async (req, res) => {
+router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packaging', 'operator'), async (req, res) => {
     try {
         const { addedQty, defectQty } = req.body;
         const taskId = req.params.id;
@@ -156,7 +157,7 @@ router.put('/tasks/:id/progress', async (req, res) => {
 });
 
 // Update task status (e.g. ส่งไป QC, หรือ ส่งเข้าคลัง)
-router.put('/tasks/:id/status', async (req, res) => {
+router.put('/tasks/:id/status', authorizeRoles('admin', 'executive', 'packaging', 'operator'), async (req, res) => {
     try {
         const { status } = req.body;
         const taskId = req.params.id;

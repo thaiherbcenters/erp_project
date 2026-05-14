@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 const { generateSequence, getDatePrefix } = require('../utils/sequence');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -34,7 +35,7 @@ router.get('/incoming', async (req, res) => {
 });
 
 // Create new incoming qc
-router.post('/incoming', async (req, res) => {
+router.post('/incoming', authorizeRoles('admin', 'executive', 'qc'), async (req, res) => {
     try {
         const { lotNumber, itemName, supplierName, inspectorId, result_status, notes } = req.body;
         const pool = await poolPromise;
@@ -77,7 +78,7 @@ router.get('/requests', async (req, res) => {
 });
 
 // Create a new production QC Request
-router.post('/requests', async (req, res) => {
+router.post('/requests', authorizeRoles('admin', 'executive', 'qc', 'operator', 'planner'), async (req, res) => {
     try {
         const { requestID, taskID, jobOrderID, batchNo, formulaName, line, type, requestedAt, status } = req.body;
         const pool = await poolPromise;
@@ -106,7 +107,7 @@ router.post('/requests', async (req, res) => {
 });
 
 // Update a production QC Request (QC performing the inspection)
-router.put('/requests/:id', async (req, res) => {
+router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (req, res) => {
     try {
         const { result_status, inspector, inspectedAt, notes, checklist } = req.body;
         const requestID = req.params.id;
@@ -430,7 +431,7 @@ router.get('/defect', async (req, res) => {
 });
 
 // Create new NCR (auto-created when QC rejects)
-router.post('/defect', async (req, res) => {
+router.post('/defect', authorizeRoles('admin', 'executive', 'qc'), async (req, res) => {
     try {
         const { ncrNumber, refLot, itemName, issueDescription, actionTaken, status } = req.body;
         const pool = await poolPromise;

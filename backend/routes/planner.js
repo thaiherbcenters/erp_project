@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 const { getDatePrefix, getShortDatePrefix } = require('../utils/sequence');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Get all planner jobs
 router.get('/', async (req, res) => {
@@ -83,7 +84,7 @@ router.get('/', async (req, res) => {
 });
 
 // Update planner job status
-router.put('/:id/status', async (req, res) => {
+router.put('/:id/status', authorizeRoles('admin', 'executive', 'planner'), async (req, res) => {
     try {
         const id = req.params.id;
         const { status } = req.body;
@@ -111,7 +112,7 @@ router.put('/:id/status', async (req, res) => {
 });
 
 // Create new planner job
-router.post('/', async (req, res) => {
+router.post('/', authorizeRoles('admin', 'executive', 'planner'), async (req, res) => {
     try {
         const { 
             formulaId, formulaName, batchQty, batchSize, totalQty, unit, 
@@ -174,7 +175,7 @@ router.post('/', async (req, res) => {
 });
 
 // Release job order to production
-router.post('/:id/release', async (req, res) => {
+router.post('/:id/release', authorizeRoles('admin', 'executive', 'planner'), async (req, res) => {
     try {
         const id = req.params.id;
         const pool = await poolPromise;

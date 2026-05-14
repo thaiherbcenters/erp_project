@@ -3,6 +3,7 @@ const router = express.Router();
 const { poolPromise } = require('../config/db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { logAction } = require('../services/auditLog');
 
 router.post('/login', async (req, res) => {
     try {
@@ -20,24 +21,27 @@ router.post('/login', async (req, res) => {
         const user = result.recordset[0];
 
         if (!user) {
+            await logAction(req, 'LOGIN_FAILED', 'auth', null, `Login ล้มเหลว: ไม่พบ username "${username}"`);
             return res.status(401).json({ message: 'ผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง' });
         }
 
         if (!user.is_active) {
+            await logAction(req, 'LOGIN_BLOCKED', 'auth', user.user_id, `บัญชี "${username}" ถูกระงับ — พยายาม Login`);
             return res.status(403).json({ message: 'บัญชีนี้ถูกระงับการใช้งาน' });
         }
 
-        // Check password (In this setup, seed data might be plain text, so we handle both based on prefix)
+        // Check password (รองรับทั้งแบบเข้ารหัส bcrypt และรหัสผ่านเดิมที่เป็น plain text)
         let isMatch = false;
-        if (user.password_hash.startsWith('$2a$') || user.password_hash.startsWith('$2b$')) {
+        if (user.password_hash && (user.password_hash.startsWith('$2a$') || user.password_hash.startsWith('$2b$'))) {
             isMatch = await bcrypt.compare(password, user.password_hash);
         } else {
-             // For plain text backward compatibility (seed data)
+             // For plain text backward compatibility
             isMatch = password === user.password_hash;
         }
 
         if (!isMatch) {
-             return res.status(401).json({ message: 'ผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง' });
+            await logAction(req, 'LOGIN_FAILED', 'auth', user.user_id, `Login ล้มเหลว: รหัสผ่านไม่ถูกต้อง (${username})`);
+            return res.status(401).json({ message: 'ผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง' });
         }
 
         // Fetch permissions with data_scope
@@ -55,12 +59,14 @@ router.post('/login', async (req, res) => {
             permissions: permResult.recordset.map(p => ({ page_id: p.page_id, data_scope: p.data_scope || 'all' }))
         };
 
-        const secret = process.env.JWT_SECRET || 'THAIHERB_SECRET_KEY_2026_ERP';
         const token = jwt.sign(
             userData,
-            secret,
+            process.env.JWT_SECRET || 'THAIHERB_SECRET_KEY_2026_ERP',
             { expiresIn: '8h' }
         );
+
+        // Log การ Login สำเร็จ
+        await logAction(req, 'LOGIN', 'auth', user.user_id, `${username} เข้าสู่ระบบสำเร็จ`);
 
         res.json({
             message: 'เข้าสู่ระบบสำเร็จ',

@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -142,7 +143,7 @@ router.get('/', async (req, res) => {
 // ============================================================
 // 3. POST /api/attendance — บันทึกเวลาเข้า-ออกงาน
 // ============================================================
-router.post('/', async (req, res) => {
+router.post('/', authorizeRoles('admin', 'executive', 'hr'), async (req, res) => {
     try {
         const { employee_id, date, check_in, check_out, status, ot_hours, note } = req.body;
 
@@ -203,7 +204,7 @@ router.post('/', async (req, res) => {
 // ============================================================
 // 4. PUT /api/attendance/:id — แก้ไขข้อมูลเวลาทำงาน
 // ============================================================
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeRoles('admin', 'executive', 'hr'), async (req, res) => {
     try {
         const { id } = req.params;
         const { check_in, check_out, status, ot_hours, note } = req.body;
@@ -252,7 +253,7 @@ router.put('/:id', async (req, res) => {
 // ============================================================
 // 5. DELETE /api/attendance/:id — ลบข้อมูล
 // ============================================================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeRoles('admin', 'executive', 'hr'), async (req, res) => {
     try {
         const { id } = req.params;
         const pool = await poolPromise;

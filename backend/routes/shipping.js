@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // ==========================================
 // SHIPPING MODULE
@@ -46,7 +47,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update shipping status
-router.put('/:id/status', async (req, res) => {
+router.put('/:id/status', authorizeRoles('admin', 'executive', 'shipping', 'stock'), async (req, res) => {
     try {
         const { status, shippedBy, notes } = req.body;
         const pool = await poolPromise;

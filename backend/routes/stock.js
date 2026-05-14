@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 const { generateSequence, getDatePrefix } = require('../utils/sequence');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // ==========================================
 // STOCK (INVENTORY) MODULE
@@ -65,7 +66,7 @@ router.get('/logs', async (req, res) => {
 });
 
 // Receive stock from production (called automatically when task reaches "stock" step)
-router.post('/receive', async (req, res) => {
+router.post('/receive', authorizeRoles('admin', 'executive', 'stock', 'planner'), async (req, res) => {
     try {
         const { formulaId, productName, quantity, unit, batchNo, notes, createdBy } = req.body;
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
 const { poolPromise } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // ── Config: กำหนด user_id ของ approvers (ดึงจาก DB ตอนรัน) ──
 let APPROVER_STEP1_ID = null; // ณัฐกิตติ์ — ตัวแทนฝ่ายบริหาร
@@ -164,7 +165,7 @@ router.get('/pending/:userId', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // PUT /api/submissions/:id/approve — อนุมัติ
 // ═══════════════════════════════════════════════════════════════
-router.put('/:id/approve', async (req, res) => {
+router.put('/:id/approve', authorizeRoles('admin', 'executive', 'document_control'), async (req, res) => {
     try {
         const submissionId = parseInt(req.params.id);
         const { userId, comment } = req.body;
@@ -225,7 +226,7 @@ router.put('/:id/approve', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // PUT /api/submissions/:id/reject — ไม่อนุมัติ
 // ═══════════════════════════════════════════════════════════════
-router.put('/:id/reject', async (req, res) => {
+router.put('/:id/reject', authorizeRoles('admin', 'executive', 'document_control'), async (req, res) => {
     try {
         const submissionId = parseInt(req.params.id);
         const { userId, comment } = req.body;
@@ -286,7 +287,7 @@ router.put('/:id/reject', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════
 // PUT /api/submissions/:id/request-revision — ส่งกลับแก้ไข
 // ═══════════════════════════════════════════════════════════════
-router.put('/:id/request-revision', async (req, res) => {
+router.put('/:id/request-revision', authorizeRoles('admin', 'executive', 'document_control'), async (req, res) => {
     try {
         const submissionId = parseInt(req.params.id);
         const { userId, comment } = req.body;

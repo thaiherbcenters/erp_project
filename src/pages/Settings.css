@@ -101,6 +101,24 @@
     color: var(--text-primary, #1e293b);
 }
 
+.settings-filter-select,
+.settings-filter-date {
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    color: #1e293b;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.settings-filter-select:focus,
+.settings-filter-date:focus {
+    border-color: var(--primary, #6366f1);
+}
+
 .settings-add-btn {
     display: flex;
     align-items: center;

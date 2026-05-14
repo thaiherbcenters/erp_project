@@ -3,6 +3,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const { poolPromise, sql } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -257,7 +258,7 @@ router.get('/:action/:code', async (req, res) => {
 
 // อัปโหลดเอกสารใหม่ + บันทึก meta ลงตาราง Documents
 // รองรับ custom_filename สำหรับตั้งชื่อไฟล์ใหม่
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', authorizeRoles('admin', 'executive', 'document_control'), upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'กรุณาเลือกไฟล์เอกสาร' });
@@ -337,7 +338,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 // ลบเอกสาร — ลบทั้งข้อมูลในฐานข้อมูลและไฟล์จริงบนเซิร์ฟเวอร์
-router.delete('/:doc_code', async (req, res) => {
+router.delete('/:doc_code', authorizeRoles('admin', 'executive', 'document_control'), async (req, res) => {
     try {
         const { doc_code } = req.params;
         const deletedBy = req.query.user || 'Unknown';

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
 const { generateSequence, getMonthPrefix } = require('../utils/sequence');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // 1. Get all customers
 router.get('/', async (req, res) => {
@@ -83,7 +84,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // 5. Create new customer
-router.post('/', async (req, res) => {
+router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
     const { typeId, statusId, code, name, contactPerson, phone, email, address, taxId, source } = req.body;
     try {
         if (!name || !typeId) {
@@ -119,7 +120,7 @@ router.post('/', async (req, res) => {
 });
 
 // 6. Update customer
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
     const { typeId, statusId, name, contactPerson, phone, email, address, taxId } = req.body;
     try {
         const pool = await poolPromise;
@@ -152,7 +153,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // 7. Delete customer
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request()

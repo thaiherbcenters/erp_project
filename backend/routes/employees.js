@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const { poolPromise, sql } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // ============================================================
 // Setup multer for avatar uploads (E:\Documents\Avatars)
@@ -181,7 +182,7 @@ router.get('/:id', async (req, res) => {
 // ============================================================
 // 3. POST /api/employees — เพิ่มพนักงานใหม่
 // ============================================================
-router.post('/', async (req, res) => {
+router.post('/', authorizeRoles('admin', 'executive', 'hr'), async (req, res) => {
     try {
         const {
             prefix, first_name, last_name, nickname, gender,
@@ -275,7 +276,7 @@ router.post('/', async (req, res) => {
 // ============================================================
 // 4. PUT /api/employees/:id — แก้ไขข้อมูลพนักงาน
 // ============================================================
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeRoles('admin', 'executive', 'hr'), async (req, res) => {
     try {
         const { id } = req.params;
         const pool = await poolPromise;
@@ -350,7 +351,7 @@ router.put('/:id', async (req, res) => {
 // ============================================================
 // 5. DELETE /api/employees/:id — Soft delete พนักงาน
 // ============================================================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeRoles('admin', 'executive', 'hr'), async (req, res) => {
     try {
         const { id } = req.params;
         const pool = await poolPromise;
@@ -377,7 +378,7 @@ router.delete('/:id', async (req, res) => {
 // ============================================================
 // 6. POST /api/employees/:id/avatar — อัพโหลดรูปประจำตัว
 // ============================================================
-router.post('/:id/avatar', upload.single('avatar'), async (req, res) => {
+router.post('/:id/avatar', authorizeRoles('admin', 'executive', 'hr'), upload.single('avatar'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'กรุณาเลือกไฟล์รูปภาพ' });

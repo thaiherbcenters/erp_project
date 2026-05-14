@@ -39,6 +39,8 @@ export default function Sales() {
     // ── State: การแสดงฟอร์ม ──
     const [showQuotationForm, setShowQuotationForm] = useState(false);
     const [localQuotations, setLocalQuotations] = useState([]);
+    const [quotationPagination, setQuotationPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [appliedQuotationSearch, setAppliedQuotationSearch] = useState('');
     const [editingQuotationId, setEditingQuotationId] = useState(null);
     const [isViewOnly, setIsViewOnly] = useState(false);
     const [isHistoryView, setIsHistoryView] = useState(false); // To pass to form
@@ -51,17 +53,21 @@ export default function Sales() {
     const [editingSOId, setEditingSOId] = useState(null);
     const [isSOViewOnly, setIsSOViewOnly] = useState(false);
 
-    // ── Fetch ข้อมูล Quotations ──
+    // ── Fetch ข้อมูล Quotations (with Pagination) ──
     useEffect(() => {
         const fetchQuotations = async () => {
+            if (activeTab !== 'sales_quotation' && activeTab !== 'sales_dashboard') return;
             try {
-                const res = await fetch(`${API_BASE}/quotations`);
+                const res = await fetch(`${API_BASE}/quotations?page=${quotationPagination.page}&limit=${quotationPagination.limit}&search=${encodeURIComponent(appliedQuotationSearch)}`);
                 const json = await res.json();
-                if (json.success) setLocalQuotations(json.data);
+                if (json.success) {
+                    setLocalQuotations(json.data);
+                    if (json.pagination) setQuotationPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                }
             } catch (err) { console.error('Error fetching quotations:', err); }
         };
         fetchQuotations();
-    }, [showQuotationForm]);
+    }, [activeTab, quotationPagination.page, appliedQuotationSearch, showQuotationForm]);
 
     // ── Fetch ข้อมูล Sales Orders ──
     useEffect(() => {
@@ -151,12 +157,7 @@ export default function Sales() {
         c.type.toLowerCase().includes(customerSearch.toLowerCase())
     );
 
-    const filteredQuotations = localQuotations.filter((q) => {
-        const number = q.QuotationNo || q.number || '';
-        const customer = q.CustomerName || q.customer || '';
-        return number.toLowerCase().includes(quotationSearch.toLowerCase()) ||
-               customer.toLowerCase().includes(quotationSearch.toLowerCase());
-    });
+    const filteredQuotations = localQuotations;
 
     const filteredOrders = localSalesOrders.filter((o) => {
         const soNo = o.SalesOrderNo || '';
@@ -377,9 +378,23 @@ export default function Sales() {
                                         placeholder="พิมพ์เลขที่ใบเสนอราคา..."
                                         value={quotationSearch}
                                         onChange={(e) => setQuotationSearch(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                setQuotationPagination(prev => ({ ...prev, page: 1 }));
+                                                setAppliedQuotationSearch(quotationSearch);
+                                            }
+                                        }}
                                     />
+                                    <button className="btn-primary" onClick={() => {
+                                        setQuotationPagination(prev => ({ ...prev, page: 1 }));
+                                        setAppliedQuotationSearch(quotationSearch);
+                                    }}>ค้นหา</button>
                                 </div>
-                                <button className="btn-primary" onClick={() => setShowQuotationForm(true)}>+ สร้างใบเสนอราคา</button>
+                                <button className="btn-primary" onClick={() => {
+                                    setEditingQuotationId(null);
+                                    setIsViewOnly(false);
+                                    setShowQuotationForm(true);
+                                }}>+ สร้างใบเสนอราคา</button>
                             </div>
                         )}
 
@@ -462,6 +477,29 @@ export default function Sales() {
                                         ))}
                                     </tbody>
                                 </table>
+
+                                {/* Pagination Controls */}
+                                {quotationPagination.totalPages > 1 && (
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 20, padding: '10px 0' }}>
+                                        <button 
+                                            className="btn-outline" 
+                                            disabled={quotationPagination.page === 1}
+                                            onClick={() => setQuotationPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                        >
+                                            ก่อนหน้า
+                                        </button>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: '#4b5563' }}>
+                                            หน้า {quotationPagination.page} จาก {quotationPagination.totalPages}
+                                        </span>
+                                        <button 
+                                            className="btn-outline" 
+                                            disabled={quotationPagination.page === quotationPagination.totalPages}
+                                            onClick={() => setQuotationPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                        >
+                                            ถัดไป
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
 

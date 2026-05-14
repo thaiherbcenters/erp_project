@@ -2,19 +2,52 @@ const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
 const { generateSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
+const validate = require('../middleware/validate');
+const { createQuotationSchema, updateStatusSchema } = require('../validators/quotations');
+const { logAction } = require('../services/auditLog');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // 1. Get all quotations (for table listing)
 router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const result = await pool.request().query(`
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 50);
+        const search = req.query.search || '';
+        const offset = (page - 1) * limit;
+
+        let whereClause = '';
+        const request = pool.request();
+        if (search) {
+            whereClause = 'WHERE QuotationNo LIKE @search OR CustomerName LIKE @search OR Status LIKE @search';
+            request.input('search', sql.NVarChar, `%${search}%`);
+        }
+
+        const countResult = await request.query(`SELECT COUNT(*) as total FROM Quotation ${whereClause}`);
+        const total = countResult.recordset[0].total;
+
+        request.input('offset', sql.Int, offset);
+        request.input('limit', sql.Int, limit);
+
+        const result = await request.query(`
             SELECT 
                 QuotationID, QuotationNo, CustomerName, BillDate, ValidUntil, 
                 GrandTotal, Status, CreatedAt, Revision
             FROM Quotation
+            ${whereClause}
             ORDER BY QuotationID DESC
+            OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
         `);
-        res.json({ success: true, count: result.recordset.length, data: result.recordset });
+        res.json({ 
+            success: true, 
+            data: result.recordset,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     } catch (err) {
         console.error('Error fetching quotations:', err);
         res.status(500).json({ success: false, message: 'Failed to fetch quotations', error: err.message });
@@ -73,7 +106,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // 3. Create new quotation
-router.post('/', async (req, res) => {
+router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchema), async (req, res) => {
     const { 
         quotationNo, docType, bankAccount, customerTypeId, customerName, contactPerson, email, address, phone, taxId, 
         billDate, validUntil, subTotal, discountPercent, discountAmount, 
@@ -206,6 +239,10 @@ router.post('/', async (req, res) => {
             }
         }
 
+        // ✅ Audit Log: สร้างใบเสนอราคา
+        await logAction(req, 'CREATE', 'quotations', quotationId, 
+            `สร้างใบเสนอราคา ${finalQuotationNo} — ลูกค้า: ${customerName} — ยอดรวม: ${grandTotal}`);
+
         res.status(201).json({ success: true, message: 'Quotation created successfully', quotationId });
 
     } catch (err) {
@@ -216,7 +253,7 @@ router.post('/', async (req, res) => {
 });
 
 // 4. Update existing quotation
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSchema), async (req, res) => {
     const qid = req.params.id;
     const { 
         quotationNo, docType, bankAccount, customerName, address, phone, taxId, 
@@ -346,6 +383,11 @@ router.put('/:id', async (req, res) => {
         }
 
         await transaction.commit();
+
+        // ✅ Audit Log: แก้ไขใบเสนอราคา
+        await logAction(req, 'UPDATE', 'quotations', qid, 
+            `แก้ไขใบเสนอราคา ${quotationNo || qid} — ลูกค้า: ${customerName} — ยอดรวม: ${grandTotal}`);
+
         res.json({ success: true, message: 'Quotation updated successfully' });
 
     } catch (err) {
@@ -356,7 +398,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // 5. Update Status
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', authorizeRoles('admin', 'sales'), validate(updateStatusSchema), async (req, res) => {
     try {
         const pool = await poolPromise;
         await pool.request()
@@ -364,6 +406,10 @@ router.patch('/:id/status', async (req, res) => {
             .input('status', sql.NVarChar, req.body.status)
             .query(`UPDATE Quotation SET Status = @status, UpdatedAt = GETDATE() WHERE QuotationID = @id`);
         
+        // ✅ Audit Log: เปลี่ยนสถานะ
+        await logAction(req, 'UPDATE', 'quotations', req.params.id, 
+            `เปลี่ยนสถานะใบเสนอราคา #${req.params.id} → "${req.body.status}"`);
+
         res.json({ success: true, message: 'Status updated successfully' });
     } catch (err) {
         console.error('Error updating quotation status:', err);
@@ -372,13 +418,25 @@ router.patch('/:id/status', async (req, res) => {
 });
 
 // 6. Delete Quotation
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeRoles('admin', 'sales'), async (req, res) => {
     try {
         const pool = await poolPromise;
+
+        // ดึงข้อมูลเดิมก่อนลบ (เก็บหลักฐานใน Log)
+        const existing = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('SELECT QuotationNo, CustomerName, GrandTotal FROM Quotation WHERE QuotationID = @id');
+        const deleted = existing.recordset[0];
+
         await pool.request()
             .input('id', sql.Int, req.params.id)
-            .query(`DELETE FROM Quotation WHERE QuotationID = @id`);
-        // Note: QuotationItem will be deleted automatically due to ON DELETE CASCADE
+            .query('DELETE FROM Quotation WHERE QuotationID = @id');
+
+        // ✅ Audit Log: ลบใบเสนอราคา (เก็บข้อมูลที่ถูกลบไว้ด้วย)
+        await logAction(req, 'DELETE', 'quotations', req.params.id, 
+            `ลบใบเสนอราคา ${deleted?.QuotationNo || req.params.id} — ลูกค้า: ${deleted?.CustomerName}`,
+            deleted, null);
+
         res.json({ success: true, message: 'Quotation deleted successfully' });
     } catch (err) {
         console.error('Error deleting quotation:', err);

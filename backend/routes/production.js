@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 const { generateSequence, getDatePrefix } = require('../utils/sequence');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -67,7 +68,7 @@ router.get('/tasks', async (req, res) => {
 });
 
 // Update advance task step
-router.put('/tasks/:id/advance', async (req, res) => {
+router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner', 'operator'), async (req, res) => {
     try {
         const { currentStep, stepTimes, status, endTime } = req.body;
         const taskId = req.params.id;
@@ -178,7 +179,7 @@ router.put('/tasks/:id/advance', async (req, res) => {
 });
 
 // Start a pending task
-router.put('/tasks/:id/start', async (req, res) => {
+router.put('/tasks/:id/start', authorizeRoles('admin', 'executive', 'planner', 'operator'), async (req, res) => {
     try {
         const { currentStep, stepTimes, status, startTime } = req.body;
         const taskId = req.params.id;
@@ -236,7 +237,7 @@ router.get('/tasks/:id/logs', async (req, res) => {
 });
 
 // Add a new log and update the task's quantities
-router.post('/tasks/:id/log', async (req, res) => {
+router.post('/tasks/:id/log', authorizeRoles('admin', 'executive', 'operator'), async (req, res) => {
     try {
         const taskId = req.params.id;
         const { producedQty, defectQty, operatorId, notes } = req.body;

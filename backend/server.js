@@ -1,12 +1,32 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// ── Security Headers ──
+app.use(helmet());
+
+// ── CORS: อนุญาตเฉพาะ origin ที่กำหนดใน .env ──
+const allowedOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',')
+    : ['http://localhost:5173'];
+app.use(cors({
+    origin: (origin, callback) => {
+        // อนุญาต requests ที่ไม่มี origin (เช่น mobile apps, curl) หรือ origin ที่อยู่ใน whitelist
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
+
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
@@ -40,8 +60,18 @@ const stockRoutes = require('./routes/stock');
 const shippingRoutes = require('./routes/shipping');
 const quotationRoutes = require('./routes/quotations');
 const salesOrderRoutes = require('./routes/sales-orders');
+const auditLogRoutes = require('./routes/audit-logs');
 
-app.use('/api/auth', authRoutes);
+// ── Rate Limiting สำหรับ Login (ป้องกัน brute force) ──
+const loginLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 นาที
+    max: 5,                   // จำกัด 5 ครั้ง/นาที
+    message: { success: false, message: 'คุณพยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอ 1 นาที' },
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+app.use('/api/auth', loginLimiter, authRoutes);
 
 // Apply auth middleware to all subsequent API routes
 app.use(authMiddleware);
@@ -68,23 +98,54 @@ app.use('/api/stock', stockRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/quotations', quotationRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');
 });
 
+// ── Health Check (สำหรับ monitoring) ──
+app.get('/api/health', async (req, res) => {
+    try {
+        const { poolPromise } = require('./config/db');
+        const pool = await poolPromise;
+        await pool.request().query('SELECT 1');
+        res.json({ 
+            success: true, 
+            status: 'healthy', 
+            uptime: Math.floor(process.uptime()),
+            timestamp: new Date().toISOString()
+        });
+    } catch (err) {
+        res.status(503).json({ 
+            success: false, 
+            status: 'unhealthy', 
+            error: 'Database connection failed' 
+        });
+    }
+});
+
 // Global Error Handler for unexpected middleware errors (e.g., multer fs errors)
 app.use((err, req, res, next) => {
     console.error('Unhandled Server Error:', err);
+    // Production: ซ่อน error details จาก client
+    const isProduction = process.env.NODE_ENV === 'production';
     res.status(500).json({ 
         success: false, 
         message: 'Internal Server Error', 
-        error: err.message || err.toString() 
+        ...(isProduction ? {} : { error: err.message || err.toString() })
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server listening on port ${PORT}`);
-});
+// Initialize Background Cron Jobs
+const { initCronJobs } = require('./jobs/logCleanup');
+initCronJobs();
 
+// Export app สำหรับ testing (supertest) — ไม่ listen ถ้าถูก require จาก test
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`🚀 Server listening on port ${PORT}`);
+    });
+}
 
+module.exports = app;

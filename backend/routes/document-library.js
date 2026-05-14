@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const { poolPromise, sql } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Physical storage path for Document Library
 const LIBRARY_ROOT = process.env.DOCUMENT_RECORDS_ROOT || 'E:\\Documents\\records';
@@ -105,7 +106,7 @@ router.get('/folders/:id/path', async (req, res) => {
 });
 
 // POST /api/library/folders — Create a new folder
-router.post('/folders', async (req, res) => {
+router.post('/folders', authorizeRoles('admin', 'executive', 'document_control'), async (req, res) => {
     try {
         const { folder_name, parent_id, created_by } = req.body;
         if (!folder_name || !folder_name.trim()) {
@@ -142,7 +143,7 @@ router.post('/folders', async (req, res) => {
 });
 
 // PUT /api/library/folders/:id — Rename a folder
-router.put('/folders/:id', async (req, res) => {
+router.put('/folders/:id', authorizeRoles('admin', 'executive', 'document_control'), async (req, res) => {
     try {
         const { id } = req.params;
         const { folder_name } = req.body;
@@ -164,7 +165,7 @@ router.put('/folders/:id', async (req, res) => {
 });
 
 // DELETE /api/library/folders/:id — Delete a folder (must be empty)
-router.delete('/folders/:id', async (req, res) => {
+router.delete('/folders/:id', authorizeRoles('admin', 'executive', 'document_control'), async (req, res) => {
     try {
         const { id } = req.params;
         const deletedBy = req.query.user || 'Unknown User';
@@ -275,7 +276,7 @@ router.get('/', async (req, res) => {
 });
 
 // 2. POST /api/library/upload — Upload file (with optional folder_id)
-router.post('/upload', upload.single('file'), async (req, res) => {
+router.post('/upload', authorizeRoles('admin', 'executive', 'document_control'), upload.single('file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: 'กรุณาเลือกไฟล์' });
@@ -380,7 +381,7 @@ router.get('/action/:action/:id', async (req, res) => {
 });
 
 // 4. DELETE /api/library/:id — Delete document
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeRoles('admin', 'executive', 'document_control'), async (req, res) => {
     try {
         const { id } = req.params;
         const deletedBy = req.query.user || 'Unknown User';

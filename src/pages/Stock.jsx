@@ -20,8 +20,12 @@ export default function Stock() {
     // ── State ──
     const [searchStock, setSearchStock] = useState('');
     const [searchLogs, setSearchLogs] = useState('');
+    const [appliedSearchStock, setAppliedSearchStock] = useState('');
+    const [appliedSearchLogs, setAppliedSearchLogs] = useState('');
     const [stockItems, setStockItems] = useState([]);
     const [stockLogs, setStockLogs] = useState([]);
+    const [stockPagination, setStockPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [logsPagination, setLogsPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -30,17 +34,30 @@ export default function Stock() {
     const [logDetailLoading, setLogDetailLoading] = useState(false);
     const [logDetail, setLogDetail] = useState(null);
 
-    // ── Fetch real data from API ──
+    // ── Fetch real data from API (with Pagination & Search) ──
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [itemsRes, logsRes] = await Promise.all([
-                    fetch(`${API_BASE}/stock`),
-                    fetch(`${API_BASE}/stock/logs`)
-                ]);
-                if (itemsRes.ok) setStockItems(await itemsRes.json());
-                if (logsRes.ok) setStockLogs(await logsRes.json());
+                // Fetch Stock Data
+                if (activeTab === 'stock_data' || activeTab === 'stock_dashboard') {
+                    const res = await fetch(`${API_BASE}/stock?page=${stockPagination.page}&limit=${stockPagination.limit}&search=${encodeURIComponent(appliedSearchStock)}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        setStockItems(json.data || json); // Support both old and new formats
+                        if (json.pagination) setStockPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                    }
+                }
+                
+                // Fetch Stock Logs
+                if (activeTab === 'stock_logs' || activeTab === 'stock_dashboard') {
+                    const res = await fetch(`${API_BASE}/stock/logs?page=${logsPagination.page}&limit=${logsPagination.limit}&search=${encodeURIComponent(appliedSearchLogs)}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        setStockLogs(json.data || json);
+                        if (json.pagination) setLogsPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                    }
+                }
             } catch (err) {
                 console.error('Failed to fetch stock data:', err);
             } finally {
@@ -48,7 +65,7 @@ export default function Stock() {
             }
         };
         fetchData();
-    }, []);
+    }, [activeTab, stockPagination.page, logsPagination.page, appliedSearchStock, appliedSearchLogs]);
 
     // ── Fetch detail for selected item ──
     const openDetail = async (item) => {
@@ -84,16 +101,9 @@ export default function Stock() {
     };
 
     // ── กรองข้อมูลแต่ละ Tab ──
-    const filteredStock = stockItems.filter((item) =>
-        item.name.toLowerCase().includes(searchStock.toLowerCase()) ||
-        (item.category || '').toLowerCase().includes(searchStock.toLowerCase())
-    );
-
-    const filteredLogs = stockLogs.filter((log) =>
-        (log.item || '').toLowerCase().includes(searchLogs.toLowerCase()) ||
-        (log.ref || '').toLowerCase().includes(searchLogs.toLowerCase()) ||
-        (log.note || '').toLowerCase().includes(searchLogs.toLowerCase())
-    );
+    // Server-side filtering, so we just use the items directly
+    const filteredStock = stockItems;
+    const filteredLogs = stockLogs;
 
     // ── เลือก badge class ตามสถานะ ──
     const getStockStatusClass = (status) => {
@@ -464,7 +474,17 @@ export default function Stock() {
                                     placeholder="พิมพ์ชื่อสินค้าหรือหมวดหมู่..."
                                     value={searchStock}
                                     onChange={(e) => setSearchStock(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            setStockPagination(prev => ({ ...prev, page: 1 }));
+                                            setAppliedSearchStock(searchStock);
+                                        }
+                                    }}
                                 />
+                                <button className="btn-primary" onClick={() => {
+                                    setStockPagination(prev => ({ ...prev, page: 1 }));
+                                    setAppliedSearchStock(searchStock);
+                                }}>ค้นหา</button>
                             </div>
                         </div>
                     )}
@@ -518,6 +538,29 @@ export default function Stock() {
                                     </tbody>
                                 </table>
                             )}
+
+                            {/* Pagination Controls for Stock Data */}
+                            {!loading && stockPagination.totalPages > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 20, padding: '10px 0' }}>
+                                    <button 
+                                        className="btn-outline" 
+                                        disabled={stockPagination.page === 1}
+                                        onClick={() => setStockPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                    >
+                                        ก่อนหน้า
+                                    </button>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#4b5563' }}>
+                                        หน้า {stockPagination.page} จาก {stockPagination.totalPages}
+                                    </span>
+                                    <button 
+                                        className="btn-outline" 
+                                        disabled={stockPagination.page === stockPagination.totalPages}
+                                        onClick={() => setStockPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                    >
+                                        ถัดไป
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -535,7 +578,17 @@ export default function Stock() {
                                     placeholder="พิมพ์เลขที่อ้างอิง, ชื่อสินค้า หรือหมายเหตุ..."
                                     value={searchLogs}
                                     onChange={(e) => setSearchLogs(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            setLogsPagination(prev => ({ ...prev, page: 1 }));
+                                            setAppliedSearchLogs(searchLogs);
+                                        }
+                                    }}
                                 />
+                                <button className="btn-primary" onClick={() => {
+                                    setLogsPagination(prev => ({ ...prev, page: 1 }));
+                                    setAppliedSearchLogs(searchLogs);
+                                }}>ค้นหา</button>
                             </div>
                         </div>
                     )}
@@ -598,6 +651,29 @@ export default function Stock() {
                                         ))}
                                     </tbody>
                                 </table>
+                            )}
+
+                            {/* Pagination Controls for Stock Logs */}
+                            {!loading && logsPagination.totalPages > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 20, padding: '10px 0' }}>
+                                    <button 
+                                        className="btn-outline" 
+                                        disabled={logsPagination.page === 1}
+                                        onClick={() => setLogsPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                    >
+                                        ก่อนหน้า
+                                    </button>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#4b5563' }}>
+                                        หน้า {logsPagination.page} จาก {logsPagination.totalPages}
+                                    </span>
+                                    <button 
+                                        className="btn-outline" 
+                                        disabled={logsPagination.page === logsPagination.totalPages}
+                                        onClick={() => setLogsPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                    >
+                                        ถัดไป
+                                    </button>
+                                </div>
                             )}
                         </div>
                     )}

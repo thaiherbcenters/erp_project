@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -109,7 +110,7 @@ router.get('/formulas/:id', async (req, res) => {
 // =====================================================================
 // POST /api/rnd/formulas — สร้างสูตรใหม่
 // =====================================================================
-router.post('/formulas', async (req, res) => {
+router.post('/formulas', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const { name, category, version, batchSize, unit, shelfLife, description, instructions, ingredients, createdBy } = req.body;
         const pool = await poolPromise;
@@ -244,7 +245,7 @@ router.get('/experiments', async (req, res) => {
 // =====================================================================
 // PUT /api/rnd/formulas/:id — แก้ไขสูตร
 // =====================================================================
-router.put('/formulas/:id', async (req, res) => {
+router.put('/formulas/:id', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const { name, category, version, batchSize, unit, shelfLife, description, instructions, ingredients } = req.body;
         const pool = await poolPromise;
@@ -291,7 +292,7 @@ router.put('/formulas/:id', async (req, res) => {
 // =====================================================================
 // DELETE /api/rnd/formulas/:id — ลบสูตร
 // =====================================================================
-router.delete('/formulas/:id', async (req, res) => {
+router.delete('/formulas/:id', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const pool = await poolPromise;
         const transaction = new sql.Transaction(pool);
@@ -318,7 +319,7 @@ router.delete('/formulas/:id', async (req, res) => {
 // =====================================================================
 // PUT /api/rnd/formulas/:id/status — เปลี่ยนสถานะสูตร (Workflow)
 // =====================================================================
-router.put('/formulas/:id/status', async (req, res) => {
+router.put('/formulas/:id/status', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const { status, approvedBy } = req.body;
         const pool = await poolPromise;
@@ -345,7 +346,7 @@ router.put('/formulas/:id/status', async (req, res) => {
 // =====================================================================
 // POST /api/rnd/materials — สร้างวัตถุดิบ
 // =====================================================================
-router.post('/materials', async (req, res) => {
+router.post('/materials', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const { name, unit, stock, minStock, costPerUnit, category } = req.body;
         const pool = await poolPromise;
@@ -373,7 +374,7 @@ router.post('/materials', async (req, res) => {
 // =====================================================================
 // PUT /api/rnd/materials/:id — แก้ไขวัตถุดิบ
 // =====================================================================
-router.put('/materials/:id', async (req, res) => {
+router.put('/materials/:id', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const { name, unit, stock, minStock, costPerUnit, category } = req.body;
         const pool = await poolPromise;
@@ -396,7 +397,7 @@ router.put('/materials/:id', async (req, res) => {
 // =====================================================================
 // DELETE /api/rnd/materials/:id — ลบวัตถุดิบ
 // =====================================================================
-router.delete('/materials/:id', async (req, res) => {
+router.delete('/materials/:id', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const pool = await poolPromise;
         await pool.request()
@@ -412,7 +413,7 @@ router.delete('/materials/:id', async (req, res) => {
 // =====================================================================
 // POST /api/rnd/projects — สร้างโครงการวิจัย
 // =====================================================================
-router.post('/projects', async (req, res) => {
+router.post('/projects', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const { name, category, researcher, startDate, targetDate, phase, formulaRef } = req.body;
         const pool = await poolPromise;
@@ -443,7 +444,7 @@ router.post('/projects', async (req, res) => {
 // =====================================================================
 // POST /api/rnd/experiments — บันทึกผลทดลอง
 // =====================================================================
-router.post('/experiments', async (req, res) => {
+router.post('/experiments', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const { projectCode, name, date, result, note } = req.body;
         const pool = await poolPromise;
@@ -507,7 +508,7 @@ router.get('/formula-tests', async (req, res) => {
 // =====================================================================
 // POST /api/rnd/formula-tests — QC บันทึกผลทดสอบสูตร
 // =====================================================================
-router.post('/formula-tests', async (req, res) => {
+router.post('/formula-tests', authorizeRoles('admin', 'executive', 'rnd', 'qc'), async (req, res) => {
     try {
         const { formulaId, testedBy, pH, viscosity, color, smell, stability, microbial, overallResult, notes } = req.body;
         const pool = await poolPromise;
@@ -554,7 +555,7 @@ router.post('/formula-tests', async (req, res) => {
 // =====================================================================
 // PUT /api/rnd/formulas/:id/pharm-approve — เภสัชกรอนุมัติ
 // =====================================================================
-router.put('/formulas/:id/pharm-approve', async (req, res) => {
+router.put('/formulas/:id/pharm-approve', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
         const { approvedBy, approved } = req.body;
         const pool = await poolPromise;

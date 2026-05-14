@@ -11,6 +11,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
+const { authorizeRoles } = require('../middleware/authorize');
 
 // ── Helper: Generate SO Number ──
 const generateSONumber = async (pool) => {
@@ -84,7 +85,7 @@ router.get('/:id', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 3. POST /  — สร้าง SO ใหม่
 // ─────────────────────────────────────────────────────────────────────────────
-router.post('/', async (req, res) => {
+router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
     const {
         quotationId, quotationNo, docType,
         customerName, address, phone, taxId,
@@ -239,7 +240,7 @@ router.post('/', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. PUT /:id  — แก้ไข SO
 // ─────────────────────────────────────────────────────────────────────────────
-router.put('/:id', async (req, res) => {
+router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
     const soId = req.params.id;
     const {
         customerName, address, phone, taxId,
@@ -325,7 +326,7 @@ router.put('/:id', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 4.5 PATCH /:id/status  — อัปเดตสถานะ SO อย่างเดียว
 // ─────────────────────────────────────────────────────────────────────────────
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
     const { status } = req.body;
     if (!status) {
         return res.status(400).json({ success: false, message: 'Status is required' });
@@ -346,7 +347,7 @@ router.patch('/:id/status', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 5. DELETE /:id  — ลบ SO
 // ─────────────────────────────────────────────────────────────────────────────
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
     try {
         const pool = await poolPromise;
 
