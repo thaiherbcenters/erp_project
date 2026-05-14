@@ -763,7 +763,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
     } else if (isPsf) {
         compNameTH = 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด (สำนักงานใหญ่)';
         compNameEN = '';
-        compAddr1 = 'เลขที่ 12 ซอยนนทบุรี 11/3 ต.บางกระสอ อ.เมืองนนทบุรี จ.นนทบุรี 11000';
+        compAddr1 = 'เลขที่ 2/2 ซอยนนทบุรี 38 ต.ท่าทราย อ.เมืองนนทบุรี จ.นนทบุรี 11000';
         compAddr2 = '';
         compTax = 'เลขประจำตัวผู้เสียภาษี 0125566026612';
         compLogo = '/images/logos/logo-psf.png';
@@ -1442,7 +1442,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                     {item.image && <img src={item.image} style={{ maxWidth: imgSize, maxHeight: imgSize, objectFit: 'contain' }} alt="pic" />}
                                 </td>
                                 <td style={{ border: '1px solid black', textAlign: 'left', padding: '2px 8px' }}>{item.name}</td>
-                                <td style={{ border: '1px solid black', textAlign: 'center', padding: '2px 4px' }}>{item.qty}</td>
+                                <td style={{ border: '1px solid black', textAlign: 'center', padding: '2px 4px' }}>{item.qty ? Number(item.qty).toLocaleString('th-TH') : ''}</td>
                                 <td style={{ border: '1px solid black', textAlign: 'right', padding: '2px 8px' }}>{(parseFloat(item.price)||0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
                                 <td style={{ border: '1px solid black', textAlign: 'right', padding: '2px 8px' }}>{
                                     (item.isPromo 
