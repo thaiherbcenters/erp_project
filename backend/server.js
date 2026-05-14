@@ -12,17 +12,10 @@ const PORT = process.env.PORT || 5000;
 app.use(helmet());
 
 // ── CORS: อนุญาตเฉพาะ origin ที่กำหนดใน .env ──
-const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:5173'];
 app.use(cors({
     origin: (origin, callback) => {
-        // อนุญาต requests ที่ไม่มี origin (เช่น mobile apps, curl) หรือ origin ที่อยู่ใน whitelist
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
+        // อนุญาตทุก Origin เพื่อป้องกัน Error CORS 500 ในขณะที่เปิดจาก IP หรือ Domain ต่างๆ
+        callback(null, true);
     },
     credentials: true
 }));
