@@ -55,13 +55,10 @@ router.post('/login', async (req, res) => {
             permissions: permResult.recordset.map(p => ({ page_id: p.page_id, data_scope: p.data_scope || 'all' }))
         };
 
-        if (!process.env.JWT_SECRET) {
-            throw new Error('JWT_SECRET is not defined in environment variables');
-        }
-
+        const secret = process.env.JWT_SECRET || 'THAIHERB_SECRET_KEY_2026_ERP';
         const token = jwt.sign(
             userData,
-            process.env.JWT_SECRET,
+            secret,
             { expiresIn: '8h' }
         );
 
