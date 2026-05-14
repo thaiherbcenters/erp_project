@@ -613,6 +613,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 amount: item.Amount,
                                 isPromo: item.IsPromo,
                                 promoMultiplier: item.PromoMultiplier,
+                                basePromoName: item.ItemName,
                                 image: item.ImageURL || '',
                                 showDropdown: false
                             })));
@@ -627,7 +628,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
     }, [editId]);
 
     const [items, setItems] = useState([
-        { id: 1, name: '', qty: '', price: '', isPromo: false, promoMultiplier: 1, showDropdown: false }
+        { id: 1, name: '', basePromoName: '', qty: '', price: '', isPromo: false, promoMultiplier: 1, showDropdown: false }
     ]);
 
     const handleFormChange = (e) => {
@@ -651,7 +652,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
     };
 
     const addItem = () => {
-        setItems(prev => [...prev, { id: Date.now(), name: '', qty: '', price: '', isPromo: false, promoMultiplier: 1, showDropdown: false }]);
+        setItems(prev => [...prev, { id: Date.now(), name: '', basePromoName: '', qty: '', price: '', isPromo: false, promoMultiplier: 1, showDropdown: false }]);
     };
 
     const removeItem = (id) => {
@@ -667,6 +668,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                 
                 if (field === 'name') {
                     if (PRODUCT_CATALOG[value]) {
+                        newItem.basePromoName = value;
                         if (newItem.isPromo && PRODUCT_CATALOG[value].promo) {
                             const pData = PRODUCT_CATALOG[value].promo;
                             newItem.qty = pData.qty * newItem.promoMultiplier;
@@ -679,25 +681,26 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                             }
                         }
                     } else {
-                        newItem.isPromo = false;
-                        newItem.promoMultiplier = 1;
+                        // Don't reset isPromo if they are just editing the text!
                     }
                 } else if (field === 'isPromo') {
-                    if (value && PRODUCT_CATALOG[newItem.name] && PRODUCT_CATALOG[newItem.name].promo) {
-                        const pData = PRODUCT_CATALOG[newItem.name].promo;
+                    const baseName = newItem.basePromoName || newItem.name;
+                    if (value && PRODUCT_CATALOG[baseName] && PRODUCT_CATALOG[baseName].promo) {
+                        const pData = PRODUCT_CATALOG[baseName].promo;
                         newItem.qty = pData.qty * newItem.promoMultiplier;
                         newItem.price = pData.price;
                     } else {
                         newItem.qty = '';
-                        if (PRODUCT_CATALOG[newItem.name] && PRODUCT_CATALOG[newItem.name].price !== '') {
-                            newItem.price = PRODUCT_CATALOG[newItem.name].price;
+                        if (PRODUCT_CATALOG[baseName] && PRODUCT_CATALOG[baseName].price !== '') {
+                            newItem.price = PRODUCT_CATALOG[baseName].price;
                         } else {
                             newItem.price = '';
                         }
                     }
                 } else if (field === 'promoMultiplier') {
-                    if (newItem.isPromo && PRODUCT_CATALOG[newItem.name] && PRODUCT_CATALOG[newItem.name].promo) {
-                        const pData = PRODUCT_CATALOG[newItem.name].promo;
+                    const baseName = newItem.basePromoName || newItem.name;
+                    if (newItem.isPromo && PRODUCT_CATALOG[baseName] && PRODUCT_CATALOG[baseName].promo) {
+                        const pData = PRODUCT_CATALOG[baseName].promo;
                         newItem.qty = pData.qty * parseInt(value, 10);
                         newItem.price = pData.price;
                     }
@@ -1132,20 +1135,23 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                             </div>
                                         )}
 
-                                        {PRODUCT_CATALOG[item.name] && PRODUCT_CATALOG[item.name].promo && (
-                                            <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#d35400' }}>
-                                                <input type="checkbox" id={`promo_${item.id}`} checked={item.isPromo} onChange={(e) => handleItemChange(item.id, 'isPromo', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', padding: 0 }} />
-                                                <label htmlFor={`promo_${item.id}`} style={{ cursor: 'pointer', margin: 0, color: '#d35400', fontWeight: 'bold' }}>จัดโปรโมชั่น 1000 บาท</label>
-                                                
-                                                {item.isPromo && (
-                                                    <select value={item.promoMultiplier} onChange={(e) => handleItemChange(item.id, 'promoMultiplier', e.target.value)} style={{ padding: '2px 5px', borderRadius: '4px', border: '1px solid #ffb74d', color: '#d35400', width: 'auto' }}>
-                                                        {[1,2,3,4,5,6,7,8,9,10].map(n => (
-                                                            <option key={n} value={n}>{n} โปร</option>
-                                                        ))}
-                                                    </select>
-                                                )}
-                                            </div>
-                                        )}
+                                        {(() => {
+                                            const baseName = item.basePromoName || item.name;
+                                            return PRODUCT_CATALOG[baseName] && PRODUCT_CATALOG[baseName].promo && (
+                                                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#d35400' }}>
+                                                    <input type="checkbox" id={`promo_${item.id}`} checked={item.isPromo} onChange={(e) => handleItemChange(item.id, 'isPromo', e.target.checked)} style={{ width: '16px', height: '16px', cursor: 'pointer', padding: 0 }} />
+                                                    <label htmlFor={`promo_${item.id}`} style={{ cursor: 'pointer', margin: 0, color: '#d35400', fontWeight: 'bold' }}>จัดโปรโมชั่น 1000 บาท</label>
+                                                    
+                                                    {item.isPromo && (
+                                                        <select value={item.promoMultiplier} onChange={(e) => handleItemChange(item.id, 'promoMultiplier', e.target.value)} style={{ padding: '2px 5px', borderRadius: '4px', border: '1px solid #ffb74d', color: '#d35400', width: 'auto' }}>
+                                                            {[1,2,3,4,5,6,7,8,9,10].map(n => (
+                                                                <option key={n} value={n}>{n} โปร</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
                                     </div>
                                     <div className="qty-group">
                                         <input type="number" className="product-qty" placeholder="0" min="1" value={item.qty} onChange={(e) => handleItemChange(item.id, 'qty', e.target.value)} required readOnly={item.isPromo} style={{ backgroundColor: item.isPromo ? '#f1f5f9' : 'white' }} />
