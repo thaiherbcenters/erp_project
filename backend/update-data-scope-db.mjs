@@ -1,10 +1,12 @@
 import sql from 'mssql';
 
+import 'dotenv/config';
+
 const config = {
-    server: 'localhost',
-    database: 'ERP_THAIHERB',
-    user: 'erp_admin',
-    password: 'Erp@2026!',
+    server: process.env.DB_SERVER || 'localhost',
+    database: process.env.DB_NAME || 'ERP_THAIHERB',
+    user: process.env.DB_USER || 'erp_admin',
+    password: process.env.DB_PASSWORD || 'Erp@2026!',
     options: { trustServerCertificate: true, encrypt: false },
 };
 
