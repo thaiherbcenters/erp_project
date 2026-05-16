@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Printer, ArrowLeft, Plus, Trash2, FileText, CheckCircle } from 'lucide-react';
 import { useAlert } from '../components/CustomAlert';
+import { API_BASE } from '../config';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -575,8 +576,8 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                 try {
                     const isHistoryEdit = String(editId).startsWith('history-');
                     const targetId = isHistoryEdit ? editId.split('-')[1] : editId;
-                    const endpoint = isHistoryEdit ? `/api/quotations/history/${targetId}` : `/api/quotations/${targetId}`;
-                    const res = await fetch(`http://localhost:5000${endpoint}`);
+                    const endpoint = isHistoryEdit ? `/quotations/history/${targetId}` : `/quotations/${targetId}`;
+                    const res = await fetch(`${API_BASE}${endpoint}`);
                     const json = await res.json();
                     if (json.success) {
                         const data = json.data;
@@ -847,7 +848,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         };
 
         try {
-            const url = editId ? `http://localhost:5000/api/quotations/${editId}` : 'http://localhost:5000/api/quotations';
+            const url = editId ? `${API_BASE}/quotations/${editId}` : `${API_BASE}/quotations`;
             const method = editId ? 'PUT' : 'POST';
 
             const res = await fetch(url, {

@@ -48,7 +48,9 @@ const getDestBadge = (dest) => {
     return { bg: '#d1fae5', color: '#065f46', icon: <Truck size={12} /> };
 };
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import API_BASE from '../config';
+
+const API_URL = API_BASE;
 
 export default function Packaging() {
     const { getVisibleSubPages, hasSectionPermission } = useAuth();

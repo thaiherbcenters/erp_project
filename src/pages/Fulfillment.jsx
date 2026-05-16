@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight, Printer, Phone } from 'lucide-react';
 import './PageCommon.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+import API_BASE from '../config';
 
 export default function Fulfillment() {
     const { getVisibleSubPages, hasSectionPermission } = useAuth();
