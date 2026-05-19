@@ -233,8 +233,8 @@ export default function QC() {
 
                 {/* Inspect Modal Overlay */}
                 {inspectingRequest && inspectingRequest.type === type && (
-                    <div className="pkg-modal-overlay" onClick={() => setInspectingRequest(null)}>
-                        <div className="pkg-modal" style={{ maxWidth: 800, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                    <div className="rnd-modal-overlay" onClick={() => setInspectingRequest(null)}>
+                        <div className="rnd-modal" style={{ maxWidth: 800, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
                             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', background: '#f8fafc' }}>
                                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>🔍 แบบฟอร์มตรวจ QC ({inspectingRequest.type === 'qc_inprocess' ? 'In-Process' : 'Final'})</h2>
                                 <p style={{ margin: '4px 0 0', fontSize: 14, color: '#64748b' }}>
@@ -320,8 +320,8 @@ export default function QC() {
 
                 {/* ── Reject Disposition Dialog ── */}
                 {rejectDialog.open && (
-                    <div className="pkg-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setRejectDialog({ open: false, request: null })}>
-                        <div className="pkg-modal" style={{ maxWidth: 520, borderTop: '4px solid var(--danger)' }} onClick={e => e.stopPropagation()}>
+                    <div className="rnd-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setRejectDialog({ open: false, request: null })}>
+                        <div className="rnd-modal" style={{ maxWidth: 520, borderTop: '4px solid var(--danger)' }} onClick={e => e.stopPropagation()}>
                             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb' }}>
                                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#dc2626' }}>⚠️ QC ไม่ผ่าน — เลือกวิธีจัดการ</h2>
                                 <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>

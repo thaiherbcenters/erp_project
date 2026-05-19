@@ -24,6 +24,7 @@ import {
 import API_BASE from '../config';
 import { usePlanner } from '../context/PlannerContext';
 import { useRnD } from '../context/RnDContext';
+import { useProduction } from '../context/ProductionContext';
 import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 import './Planning.css';
@@ -35,6 +36,7 @@ export default function Planning() {
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
     const { jobs, loading, releaseJobOrder, createJob } = usePlanner();
     const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS } = useRnD();
+    const { qcRequests } = useProduction();
     const { showAlert, showConfirm } = useAlert();
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -528,8 +530,34 @@ export default function Planning() {
     // ══════════════════════════════════════════════════════════════════
     // 1. Planning Overview (Dashboard)
     // ══════════════════════════════════════════════════════════════════
-    const renderOverview = () => (
+    const renderOverview = () => {
+        const jobsWithRejectedQc = jobs.filter(j => {
+            const jobQcs = (qcRequests || []).filter(q => q.jobOrderId === j.id);
+            const latestQcs = {};
+            jobQcs.forEach(q => {
+                const key = `${q.taskId}_${q.type}`;
+                if (!latestQcs[key] || new Date(q.requestedAt) > new Date(latestQcs[key].requestedAt)) {
+                    latestQcs[key] = q;
+                }
+            });
+            return Object.values(latestQcs).some(q => q.status === 'ไม่ผ่าน');
+        });
+
+        return (
         <div className="planning-overview">
+
+            {jobsWithRejectedQc.length > 0 && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 16, marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                    <AlertTriangle size={24} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                        <h4 style={{ color: '#991b1b', margin: '0 0 6px', fontSize: 15, fontWeight: 700 }}>แจ้งเตือน: พบรายการผลิตที่ไม่ผ่าน QC</h4>
+                        <p style={{ color: '#b91c1c', margin: 0, fontSize: 13, lineHeight: 1.5 }}>
+                            มีใบสั่งผลิตจำนวน <strong>{jobsWithRejectedQc.length}</strong> รายการที่ฝ่ายผลิตถูกส่งกลับแก้ไข (Rework) หรือคัดทิ้ง (Reject) เนื่องจากไม่ผ่านการตรวจสอบคุณภาพ 
+                            กรุณาตรวจสอบตารางด้านล่างและประสานงานกับฝ่ายผลิต
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {hasSectionPermission('planning_overview_stats') && (
                 <div className="summary-row">
@@ -663,7 +691,8 @@ export default function Planning() {
                 </div>
             </div>
         </div>
-    );
+        );
+    };
 
     // ══════════════════════════════════════════════════════════════════
     // 2. ใบสั่งผลิต (Job Order List)
@@ -755,9 +784,33 @@ export default function Planning() {
                             <tbody>
                                 {filtered.map(job => {
                                     const soRef = extractSO(job.notes);
+                                    
+                                    // หา QC ล่าสุดของแต่ละ Task ใน Job นี้
+                                    const jobQcs = (qcRequests || []).filter(q => q.jobOrderId === job.id);
+                                    const latestQcs = {};
+                                    jobQcs.forEach(q => {
+                                        const key = `${q.taskId}_${q.type}`;
+                                        if (!latestQcs[key] || new Date(q.requestedAt) > new Date(latestQcs[key].requestedAt)) {
+                                            latestQcs[key] = q;
+                                        }
+                                    });
+                                    // ถ้ามีอย่างน้อย 1 Task ที่ผล QC ล่าสุดคือ 'ไม่ผ่าน' ถือว่า Job นี้ติดปัญหา
+                                    const hasRejected = Object.values(latestQcs).some(q => q.status === 'ไม่ผ่าน');
+                                    
+                                    // คำนวณ Status ที่จะแสดง
+                                    let displayStatus = job.status;
+                                    let badgeClass = getStatusBadge(job.status);
+                                    if (hasRejected && job.status !== 'เสร็จสิ้น') {
+                                        displayStatus = 'ติดปัญหา (QC)';
+                                        badgeClass = 'badge-danger';
+                                    }
+
                                     return (
-                                        <tr key={job.id}>
-                                            <td className="text-bold" style={{ whiteSpace: 'nowrap' }}>{job.id}</td>
+                                        <tr key={job.id} style={hasRejected ? { background: '#fef2f2' } : {}}>
+                                            <td className="text-bold" style={{ whiteSpace: 'nowrap', color: hasRejected ? '#dc2626' : 'inherit' }}>
+                                                {hasRejected && <AlertTriangle size={14} color="#dc2626" style={{ marginRight: 6, verticalAlign: 'text-bottom' }} />}
+                                                {job.id}
+                                            </td>
                                             <td>
                                                 {soRef ? (
                                                     <span 
@@ -777,10 +830,10 @@ export default function Planning() {
                                             <td><span className={`badge ${getPriorityBadge(job.priority)}`}>{job.priority}</span></td>
                                             <td><span className={`badge ${getLineBadge(job.assignedLine)}`}>{job.assignedLine}</span></td>
                                             <td style={{ whiteSpace: 'nowrap' }}>{job.dueDate}</td>
-                                            <td><span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span></td>
+                                            <td><span className={`status-badge ${badgeClass}`}>{displayStatus}</span></td>
                                             <td>
                                                 <div className="progress-container">
-                                                    <div className="progress-bar" style={{ width: `${job.progress}%`, backgroundColor: job.status === 'เสร็จสิ้น' ? 'var(--success)' : 'var(--primary)' }}></div>
+                                                    <div className="progress-bar" style={{ width: `${job.progress}%`, backgroundColor: job.status === 'เสร็จสิ้น' ? 'var(--success)' : hasRejected ? 'var(--danger)' : 'var(--primary)' }}></div>
                                                     <span className="progress-text">{job.progress}%</span>
                                                 </div>
                                             </td>
@@ -983,7 +1036,24 @@ export default function Planning() {
                         <div>
                             <h2>ใบสั่งผลิต {job.id}</h2>
                             <div className="rnd-modal-meta">
-                                <span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span>
+                                {(() => {
+                                    const jobQcs = (qcRequests || []).filter(q => q.jobOrderId === job.id);
+                                    const latestQcs = {};
+                                    jobQcs.forEach(q => {
+                                        const key = `${q.taskId}_${q.type}`;
+                                        if (!latestQcs[key] || new Date(q.requestedAt) > new Date(latestQcs[key].requestedAt)) {
+                                            latestQcs[key] = q;
+                                        }
+                                    });
+                                    const hasRejected = Object.values(latestQcs).some(q => q.status === 'ไม่ผ่าน');
+                                    let displayStatus = job.status;
+                                    let badgeClass = getStatusBadge(job.status);
+                                    if (hasRejected && job.status !== 'เสร็จสิ้น') {
+                                        displayStatus = 'ติดปัญหา (QC)';
+                                        badgeClass = 'badge-danger';
+                                    }
+                                    return <span className={`status-badge ${badgeClass}`}>{displayStatus}</span>;
+                                })()}
                                 <span className={`badge ${getPriorityBadge(job.priority)}`}>ความสำคัญ: {job.priority}</span>
                                 <span className={`badge ${getLineBadge(job.assignedLine)}`}>{job.assignedLine}</span>
                             </div>

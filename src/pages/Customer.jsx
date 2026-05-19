@@ -36,7 +36,7 @@ export default function Customer() {
         try {
             const res = await fetch(`${API_BASE}/customers`);
             const json = await res.json();
-            if (json.success) setCustomers(json.data);
+            if (json.success) setCustomers(json.data || []);
         } catch (err) { console.error('Error:', err); }
     };
 
@@ -192,9 +192,11 @@ export default function Customer() {
                                             <td><span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{c.CreatedDate ? new Date(c.CreatedDate).toLocaleDateString('th-TH') : '-'}</span></td>
                                             <td><span className={`badge ${getStatusClass(c.StatusName)}`}>{getStatusThai(c.StatusName)}</span></td>
                                             <td style={{ textAlign: 'center' }}>
-                                                <button className="doc-action-btn" title="ดูรายละเอียด" onClick={() => openView(c)}><Eye size={15} /></button>
-                                                <button className="doc-action-btn" title="แก้ไข" onClick={() => openEdit(c)}><Edit2 size={15} /></button>
-                                                <button className="doc-action-btn doc-action-btn-danger" title="ลบ" onClick={() => handleDelete(c)}><Trash2 size={15} /></button>
+                                                <div style={{ display: 'flex', justifyContent: 'center', gap: '0' }}>
+                                                    <button className="doc-action-btn" style={{ margin: 0 }} title="ดูรายละเอียด" onClick={() => openView(c)}><Eye size={15} /></button>
+                                                    <button className="doc-action-btn" style={{ margin: 0 }} title="แก้ไข" onClick={() => openEdit(c)}><Edit2 size={15} /></button>
+                                                    <button className="doc-action-btn doc-action-btn-danger" style={{ margin: 0 }} title="ลบ" onClick={() => handleDelete(c)}><Trash2 size={15} /></button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

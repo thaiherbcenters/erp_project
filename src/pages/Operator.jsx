@@ -191,6 +191,7 @@ export default function Operator() {
         switch (status) {
             case 'เสร็จสิ้น': return 'op-status-success';
             case 'กำลังทำ': return 'op-status-active';
+            case 'คัดทิ้ง': return 'op-status-rejected';
             default: return 'op-status-pending';
         }
     };
@@ -496,7 +497,7 @@ export default function Operator() {
         };
 
         const activeGroups = groupByJobOrder(currentActive);
-        const allPendingTasks = tasks.filter(t => t.status !== 'เสร็จสิ้น');
+        const allPendingTasks = tasks.filter(t => t.status !== 'เสร็จสิ้น' && t.status !== 'คัดทิ้ง');
         const allGroups = groupByJobOrder(allPendingTasks);
 
         return (
@@ -782,7 +783,7 @@ export default function Operator() {
     };
 
     const renderHistory = () => {
-        const completed = tasks.filter(t => t.status === 'เสร็จสิ้น');
+        const completed = tasks.filter(t => t.status === 'เสร็จสิ้น' || t.status === 'คัดทิ้ง');
         const filtered = completed.filter(t =>
             t.formulaName.includes(searchTerm) || t.jobOrderId.includes(searchTerm) || t.batchNo.includes(searchTerm)
         );
@@ -835,8 +836,11 @@ export default function Operator() {
                                 {filtered.map(task => {
                                     const rate = task.producedQty > 0 ? ((task.producedQty - task.defectQty) / task.producedQty * 100).toFixed(1) : '0.0';
                                     return (
-                                        <tr key={task.id}>
-                                            <td className="text-bold">{task.id}</td>
+                                        <tr key={task.id} style={task.status === 'คัดทิ้ง' ? { background: '#fef2f2' } : {}}>
+                                            <td className="text-bold">
+                                                {task.status === 'คัดทิ้ง' && <AlertTriangle size={14} color="#dc2626" style={{ marginRight: 6, verticalAlign: 'text-bottom' }} />}
+                                                <span style={{ color: task.status === 'คัดทิ้ง' ? '#dc2626' : 'inherit' }}>{task.id}</span>
+                                            </td>
                                             <td><span className="op-jo-ref">{task.jobOrderId}</span></td>
                                             <td>{task.formulaName}</td>
                                             <td><span className="badge badge-neutral">{task.batchNo}</span></td>

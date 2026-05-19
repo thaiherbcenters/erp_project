@@ -68,7 +68,7 @@ router.get('/tasks', async (req, res) => {
 });
 
 // Update advance task step
-router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner', 'operator'), async (req, res) => {
+router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner', 'operator', 'qc'), async (req, res) => {
     try {
         const { currentStep, stepTimes, status, endTime } = req.body;
         const taskId = req.params.id;

@@ -61,7 +61,7 @@ export default function Sales() {
                 const res = await fetch(`${API_BASE}/quotations?page=${quotationPagination.page}&limit=${quotationPagination.limit}&search=${encodeURIComponent(appliedQuotationSearch)}`);
                 const json = await res.json();
                 if (json.success) {
-                    setLocalQuotations(json.data);
+                    setLocalQuotations(json.data || []);
                     if (json.pagination) setQuotationPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
                 }
             } catch (err) { console.error('Error fetching quotations:', err); }
@@ -75,7 +75,7 @@ export default function Sales() {
             try {
                 const res = await fetch(`${API_BASE}/sales-orders`);
                 const json = await res.json();
-                if (json.success) setLocalSalesOrders(json.data);
+                if (json.success) setLocalSalesOrders(json.data || []);
             } catch (err) { console.error('Error fetching sales orders:', err); }
         };
         fetchSalesOrders();

@@ -106,6 +106,92 @@ export function ProductionProvider({ children }) {
         }
     }, [fetchQcRequests]);
 
+    // ── Revert task to previous production step (Rework) ──
+    const revertTaskStep = useCallback(async (taskId, qcType) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        // Determine which step to revert to
+        const revertTo = qcType === 'qc_inprocess' ? 'production_1' : 'production_2';
+        const now = new Date().toISOString();
+
+        const payload = {
+            currentStep: revertTo,
+            stepTimes: { ...task.stepTimes, [`${revertTo}_rework`]: now },
+            status: 'กำลังทำ',
+            endTime: null
+        };
+
+        try {
+            await fetch(`${API_BASE}/production/tasks/${taskId}/advance`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            fetchTasks();
+        } catch (err) {
+            console.error('Failed to revert task step:', err);
+        }
+    }, [tasks, fetchTasks]);
+
+    // ── Reject task permanently ──
+    const rejectTask = useCallback(async (taskId) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const now = new Date().toISOString();
+        const payload = {
+            currentStep: task.currentStep,
+            stepTimes: { ...task.stepTimes, rejected: now },
+            status: 'คัดทิ้ง',
+            endTime: now
+        };
+
+        try {
+            await fetch(`${API_BASE}/production/tasks/${taskId}/advance`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            fetchTasks();
+        } catch (err) {
+            console.error('Failed to reject task:', err);
+        }
+    }, [tasks, fetchTasks]);
+
+    // ── Advance task to next step ──
+    const advanceTaskStep = useCallback(async (taskId) => {
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
+        if (currentIdx >= PRODUCTION_STEPS.length - 1) return;
+        
+        const nextStep = PRODUCTION_STEPS[currentIdx + 1];
+        const now = new Date().toISOString();
+        const isFinished = nextStep.key === 'stock';
+
+        const payload = {
+            currentStep: nextStep.key,
+            stepTimes: { ...task.stepTimes, [nextStep.key]: now },
+            status: isFinished ? 'เสร็จสิ้น' : 'กำลังทำ',
+            endTime: isFinished ? now : null
+        };
+
+        try {
+            const res = await fetch(`${API_BASE}/production/tasks/${taskId}/advance`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                fetchTasks(); // refresh data automatically
+            }
+        } catch (err) {
+            console.error('Failed to advance task natively:', err);
+        }
+    }, [tasks, fetchTasks]);
+
     // ── QC submits result ──
     const submitQcResult = useCallback(async (requestId, result, inspector, notes, checklist = [], disposition = null) => {
         const now = new Date().toISOString();
@@ -179,93 +265,8 @@ export function ProductionProvider({ children }) {
         } catch (err) {
             console.error('Failed to submit QC result:', err);
         }
-    }, [qcRequests, fetchQcRequests]);
+    }, [qcRequests, fetchQcRequests, revertTaskStep, rejectTask, advanceTaskStep]);
 
-    // ── Revert task to previous production step (Rework) ──
-    const revertTaskStep = useCallback(async (taskId, qcType) => {
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) return;
-
-        // Determine which step to revert to
-        const revertTo = qcType === 'qc_inprocess' ? 'production_1' : 'production_2';
-        const now = new Date().toISOString();
-
-        const payload = {
-            currentStep: revertTo,
-            stepTimes: { ...task.stepTimes, [`${revertTo}_rework`]: now },
-            status: 'กำลังทำ',
-            endTime: null
-        };
-
-        try {
-            await fetch(`${API_BASE}/production/tasks/${taskId}/advance`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            fetchTasks();
-        } catch (err) {
-            console.error('Failed to revert task step:', err);
-        }
-    }, [tasks, fetchTasks]);
-
-    // ── Reject task permanently ──
-    const rejectTask = useCallback(async (taskId) => {
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) return;
-
-        const now = new Date().toISOString();
-        const payload = {
-            currentStep: task.currentStep,
-            stepTimes: { ...task.stepTimes, rejected: now },
-            status: 'เสร็จสิ้น',
-            endTime: now
-        };
-
-        try {
-            await fetch(`${API_BASE}/production/tasks/${taskId}/advance`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            fetchTasks();
-        } catch (err) {
-            console.error('Failed to reject task:', err);
-        }
-    }, [tasks, fetchTasks]);
-
-    // ── Advance task to next step ──
-    const advanceTaskStep = useCallback(async (taskId) => {
-        const task = tasks.find(t => t.id === taskId);
-        if (!task) return;
-
-        const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
-        if (currentIdx >= PRODUCTION_STEPS.length - 1) return;
-        
-        const nextStep = PRODUCTION_STEPS[currentIdx + 1];
-        const now = new Date().toISOString();
-        const isFinished = nextStep.key === 'stock';
-
-        const payload = {
-            currentStep: nextStep.key,
-            stepTimes: { ...task.stepTimes, [nextStep.key]: now },
-            status: isFinished ? 'เสร็จสิ้น' : 'กำลังทำ',
-            endTime: isFinished ? now : null
-        };
-
-        try {
-            const res = await fetch(`${API_BASE}/production/tasks/${taskId}/advance`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (res.ok) {
-                fetchTasks(); // refresh data automatically
-            }
-        } catch (err) {
-            console.error('Failed to advance task natively:', err);
-        }
-    }, [tasks, fetchTasks]);
 
     // ── Start a task ──
     const startTask = useCallback(async (taskId) => {
