@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ERP_THAIHERB - Database Tables Report</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Sarabun', 'Segoe UI', sans-serif;
+            background: #fff;
+            color: #1a1a2e;
+            padding: 40px 50px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Header */
+        .report-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #0f3460;
+        }
+        .report-header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: #0f3460;
+            margin-bottom: 4px;
+        }
+        .report-header .subtitle {
+            font-size: 15px;
+            color: #555;
+            font-weight: 400;
+        }
+        .report-header .meta {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* Summary Box */
+        .summary-box {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .summary-card {
+            background: #f0f4ff;
+            border: 1px solid #c8d6f0;
+            border-radius: 8px;
+            padding: 12px 24px;
+            text-align: center;
+            min-width: 120px;
+        }
+        .summary-card .number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #0f3460;
+        }
+        .summary-card .label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Section */
+        .section {
+            margin-bottom: 24px;
+            page-break-inside: avoid;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            padding: 8px 14px;
+            background: #0f3460;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .section-header .icon { font-size: 16px; }
+        .section-header .count {
+            margin-left: auto;
+            background: rgba(255,255,255,0.2);
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 4px;
+            font-size: 12.5px;
+        }
+        thead th {
+            background: #e8edf5;
+            color: #0f3460;
+            font-weight: 600;
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 2px solid #c8d6f0;
+            font-size: 12px;
+        }
+        tbody td {
+            padding: 7px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        tbody tr:nth-child(even) { background: #fafbfd; }
+        tbody tr:hover { background: #f0f4ff; }
+        .table-name {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-weight: 600;
+            color: #16213e;
+            font-size: 12.5px;
+        }
+        .file-name {
+            color: #666;
+            font-size: 11.5px;
+        }
+        .num-col {
+            width: 40px;
+            text-align: center;
+            color: #999;
+        }
+
+        /* Full A-Z List */
+        .az-section {
+            page-break-before: always;
+        }
+        .az-section .section-header {
+            background: #16213e;
+        }
+        .az-columns {
+            column-count: 3;
+            column-gap: 30px;
+            margin-top: 10px;
+        }
+        .az-columns .az-item {
+            padding: 5px 0;
+            border-bottom: 1px dotted #ddd;
+            break-inside: avoid;
+            display: flex;
+            gap: 8px;
+        }
+        .az-columns .az-num {
+            color: #999;
+            min-width: 24px;
+            text-align: right;
+            font-size: 11px;
+        }
+        .az-columns .az-name {
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 12px;
+            font-weight: 600;
+            color: #0f3460;
+        }
+
+        /* Footer */
+        .report-footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px solid #e0e0e0;
+            text-align: center;
+            font-size: 11px;
+            color: #aaa;
+        }
+        .note-box {
+            background: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 10px 16px;
+            margin: 20px 0;
+            border-radius: 0 6px 6px 0;
+            font-size: 12px;
+            color: #6d5d00;
+        }
+
+        @media print {
+            body { padding: 20px 30px; }
+            .section { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="report-header">
+        <h1>📋 ERP_THAIHERB — Database Tables Report</h1>
+        <div class="subtitle">รายการตารางฐานข้อมูลทั้งหมดที่ใช้ในระบบ ERP</div>
+        <div class="meta">สร้างเมื่อ: 30 พฤษภาคม 2569 &nbsp;|&nbsp; Database: ERP_THAIHERB (MSSQL)</div>
+    </div>
+
+    <!-- Summary -->
+    <div class="summary-box">
+        <div class="summary-card">
+            <div class="number">42</div>
+            <div class="label">Tables ทั้งหมด</div>
+        </div>
+        <div class="summary-card">
+            <div class="number">11</div>
+            <div class="label">โมดูล</div>
+        </div>
+        <div class="summary-card">
+            <div class="number">16</div>
+            <div class="label">Setup Files</div>
+        </div>
+    </div>
+
+    <!-- 1. Users & Permissions -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">👤</span> Users &amp; Permissions
+            <span class="count">2 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">1</td><td class="table-name">Users</td><td class="file-name">setup-db.mjs</td></tr>
+                <tr><td class="num-col">2</td><td class="table-name">UserPermissions</td><td class="file-name">setup-db.mjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 2. Organization -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">🏢</span> Organization
+            <span class="count">3 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">3</td><td class="table-name">Company</td><td class="file-name">setup-company-db.mjs</td></tr>
+                <tr><td class="num-col">4</td><td class="table-name">Departments</td><td class="file-name">create-departments.mjs</td></tr>
+                <tr><td class="num-col">5</td><td class="table-name">Roles</td><td class="file-name">create-roles.mjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 3. HR & Employees -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">👨‍💼</span> HR &amp; Employees
+            <span class="count">5 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">6</td><td class="table-name">Employees</td><td class="file-name">create-employees-table.mjs</td></tr>
+                <tr><td class="num-col">7</td><td class="table-name">RoleDepartments</td><td class="file-name">create-roles.mjs</td></tr>
+                <tr><td class="num-col">8</td><td class="table-name">Attendance</td><td class="file-name">create-attendance-tables.mjs</td></tr>
+                <tr><td class="num-col">9</td><td class="table-name">LeaveRequests</td><td class="file-name">create-attendance-tables.mjs</td></tr>
+                <tr><td class="num-col">10</td><td class="table-name">LeaveBalances</td><td class="file-name">create-attendance-tables.mjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 4. Customers -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">🧑‍🤝‍🧑</span> Customers
+            <span class="count">3 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">11</td><td class="table-name">Customer</td><td class="file-name">setup-customers-db.mjs</td></tr>
+                <tr><td class="num-col">12</td><td class="table-name">CustomerType</td><td class="file-name">setup-customers-db.mjs</td></tr>
+                <tr><td class="num-col">13</td><td class="table-name">CustomerStatus</td><td class="file-name">setup-customers-db.mjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 5. Sales & Quotation -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">💰</span> Sales &amp; Quotation
+            <span class="count">6 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">14</td><td class="table-name">Quotation</td><td class="file-name">setup-quotation-db.cjs</td></tr>
+                <tr><td class="num-col">15</td><td class="table-name">QuotationItem</td><td class="file-name">setup-quotation-db.cjs</td></tr>
+                <tr><td class="num-col">16</td><td class="table-name">QuotationHistory</td><td class="file-name">setup-quotation-history.cjs</td></tr>
+                <tr><td class="num-col">17</td><td class="table-name">QuotationItemHistory</td><td class="file-name">setup-quotation-history.cjs</td></tr>
+                <tr><td class="num-col">18</td><td class="table-name">SalesOrder</td><td class="file-name">create-so-tables.js</td></tr>
+                <tr><td class="num-col">19</td><td class="table-name">SalesOrderItem</td><td class="file-name">create-so-tables.js</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 6. R&D -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">🔬</span> R&amp;D — วิจัยและพัฒนา
+            <span class="count">5 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">20</td><td class="table-name">RnD_RawMaterials</td><td class="file-name">setup-rnd-db.cjs</td></tr>
+                <tr><td class="num-col">21</td><td class="table-name">RnD_Formulas</td><td class="file-name">setup-rnd-db.cjs</td></tr>
+                <tr><td class="num-col">22</td><td class="table-name">RnD_Formula_Ingredients</td><td class="file-name">setup-rnd-db.cjs</td></tr>
+                <tr><td class="num-col">23</td><td class="table-name">RnD_Projects</td><td class="file-name">setup-rnd-db.cjs</td></tr>
+                <tr><td class="num-col">24</td><td class="table-name">RnD_Experiments</td><td class="file-name">setup-rnd-db.cjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 7. Production & Planning -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">🏭</span> Production &amp; Planning
+            <span class="count">4 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">25</td><td class="table-name">Planner</td><td class="file-name">setup-planner-db.cjs</td></tr>
+                <tr><td class="num-col">26</td><td class="table-name">Production_Tasks</td><td class="file-name">setup-production-db.cjs</td></tr>
+                <tr><td class="num-col">27</td><td class="table-name">Production_Logs</td><td class="file-name">setup-production-logs.cjs</td></tr>
+                <tr><td class="num-col">28</td><td class="table-name">Packaging_Tasks</td><td class="file-name">setup-packaging-db.cjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 8. QC -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">✅</span> QC — Quality Control
+            <span class="count">6 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">29</td><td class="table-name">QC_Incoming</td><td class="file-name">setup-qc-db.cjs</td></tr>
+                <tr><td class="num-col">30</td><td class="table-name">QC_Production</td><td class="file-name">setup-qc-db.cjs</td></tr>
+                <tr><td class="num-col">31</td><td class="table-name">QC_Defect_NCR</td><td class="file-name">setup-qc-db.cjs</td></tr>
+                <tr><td class="num-col">32</td><td class="table-name">QC_Criteria</td><td class="file-name">setup-qc-db.cjs / migrate-qc-criteria.cjs</td></tr>
+                <tr><td class="num-col">33</td><td class="table-name">QC_Results</td><td class="file-name">setup-qc-db.cjs / migrate-qc-criteria.cjs</td></tr>
+                <tr><td class="num-col">34</td><td class="table-name">RnD_Formula_Tests</td><td class="file-name">setup-qc-formula.cjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 9. Stock -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">📦</span> Stock — คลังสินค้า
+            <span class="count">2 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">35</td><td class="table-name">Stock_Items</td><td class="file-name">create-stock-tables.cjs</td></tr>
+                <tr><td class="num-col">36</td><td class="table-name">Stock_Logs</td><td class="file-name">create-stock-tables.cjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 10. Documents & Library -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">📄</span> Documents &amp; Library
+            <span class="count">4 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">37</td><td class="table-name">Documents</td><td class="file-name">setup-documents-db.mjs</td></tr>
+                <tr><td class="num-col">38</td><td class="table-name">DocumentLibraryFolders</td><td class="file-name">setup-library-db.cjs</td></tr>
+                <tr><td class="num-col">39</td><td class="table-name">DocumentLibrary</td><td class="file-name">setup-library-db.cjs</td></tr>
+                <tr><td class="num-col">40</td><td class="table-name">DocumentLibraryLogs</td><td class="file-name">setup-library-db.cjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 11. Approval & Audit -->
+    <div class="section">
+        <div class="section-header">
+            <span class="icon">📝</span> Approval &amp; Audit
+            <span class="count">2 tables</span>
+        </div>
+        <table>
+            <thead><tr><th class="num-col">#</th><th>Table Name</th><th>ไฟล์ที่สร้าง</th></tr></thead>
+            <tbody>
+                <tr><td class="num-col">41</td><td class="table-name">FormSubmissions</td><td class="file-name">setup-approval-db.cjs</td></tr>
+                <tr><td class="num-col">42</td><td class="table-name">Audit_Logs</td><td class="file-name">migrations/create-audit-logs.cjs</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- A-Z Full List -->
+    <div class="section az-section">
+        <div class="section-header">
+            <span class="icon">🔤</span> รายชื่อ Tables ทั้งหมด (A-Z)
+            <span class="count">42 tables</span>
+        </div>
+        <div class="az-columns">
+            <div class="az-item"><span class="az-num">1.</span><span class="az-name">Attendance</span></div>
+            <div class="az-item"><span class="az-num">2.</span><span class="az-name">Audit_Logs</span></div>
+            <div class="az-item"><span class="az-num">3.</span><span class="az-name">Company</span></div>
+            <div class="az-item"><span class="az-num">4.</span><span class="az-name">Customer</span></div>
+            <div class="az-item"><span class="az-num">5.</span><span class="az-name">CustomerStatus</span></div>
+            <div class="az-item"><span class="az-num">6.</span><span class="az-name">CustomerType</span></div>
+            <div class="az-item"><span class="az-num">7.</span><span class="az-name">Departments</span></div>
+            <div class="az-item"><span class="az-num">8.</span><span class="az-name">DocumentLibrary</span></div>
+            <div class="az-item"><span class="az-num">9.</span><span class="az-name">DocumentLibraryFolders</span></div>
+            <div class="az-item"><span class="az-num">10.</span><span class="az-name">DocumentLibraryLogs</span></div>
+            <div class="az-item"><span class="az-num">11.</span><span class="az-name">Documents</span></div>
+            <div class="az-item"><span class="az-num">12.</span><span class="az-name">Employees</span></div>
+            <div class="az-item"><span class="az-num">13.</span><span class="az-name">FormSubmissions</span></div>
+            <div class="az-item"><span class="az-num">14.</span><span class="az-name">LeaveBalances</span></div>
+            <div class="az-item"><span class="az-num">15.</span><span class="az-name">LeaveRequests</span></div>
+            <div class="az-item"><span class="az-num">16.</span><span class="az-name">Packaging_Tasks</span></div>
+            <div class="az-item"><span class="az-num">17.</span><span class="az-name">Planner</span></div>
+            <div class="az-item"><span class="az-num">18.</span><span class="az-name">Production_Logs</span></div>
+            <div class="az-item"><span class="az-num">19.</span><span class="az-name">Production_Tasks</span></div>
+            <div class="az-item"><span class="az-num">20.</span><span class="az-name">QC_Criteria</span></div>
+            <div class="az-item"><span class="az-num">21.</span><span class="az-name">QC_Defect_NCR</span></div>
+            <div class="az-item"><span class="az-num">22.</span><span class="az-name">QC_Incoming</span></div>
+            <div class="az-item"><span class="az-num">23.</span><span class="az-name">QC_Production</span></div>
+            <div class="az-item"><span class="az-num">24.</span><span class="az-name">QC_Results</span></div>
+            <div class="az-item"><span class="az-num">25.</span><span class="az-name">Quotation</span></div>
+            <div class="az-item"><span class="az-num">26.</span><span class="az-name">QuotationHistory</span></div>
+            <div class="az-item"><span class="az-num">27.</span><span class="az-name">QuotationItem</span></div>
+            <div class="az-item"><span class="az-num">28.</span><span class="az-name">QuotationItemHistory</span></div>
+            <div class="az-item"><span class="az-num">29.</span><span class="az-name">RnD_Experiments</span></div>
+            <div class="az-item"><span class="az-num">30.</span><span class="az-name">RnD_Formula_Ingredients</span></div>
+            <div class="az-item"><span class="az-num">31.</span><span class="az-name">RnD_Formula_Tests</span></div>
+            <div class="az-item"><span class="az-num">32.</span><span class="az-name">RnD_Formulas</span></div>
+            <div class="az-item"><span class="az-num">33.</span><span class="az-name">RnD_Projects</span></div>
+            <div class="az-item"><span class="az-num">34.</span><span class="az-name">RnD_RawMaterials</span></div>
+            <div class="az-item"><span class="az-num">35.</span><span class="az-name">Roles</span></div>
+            <div class="az-item"><span class="az-num">36.</span><span class="az-name">RoleDepartments</span></div>
+            <div class="az-item"><span class="az-num">37.</span><span class="az-name">SalesOrder</span></div>
+            <div class="az-item"><span class="az-num">38.</span><span class="az-name">SalesOrderItem</span></div>
+            <div class="az-item"><span class="az-num">39.</span><span class="az-name">Stock_Items</span></div>
+            <div class="az-item"><span class="az-num">40.</span><span class="az-name">Stock_Logs</span></div>
+            <div class="az-item"><span class="az-num">41.</span><span class="az-name">UserPermissions</span></div>
+            <div class="az-item"><span class="az-num">42.</span><span class="az-name">Users</span></div>
+        </div>
+    </div>
+
+    <!-- Note -->
+    <div class="note-box">
+        ⚠️ <strong>หมายเหตุ:</strong> รายการนี้รวบรวมจากโค้ด (setup scripts / migrations) เท่านั้น
+        อาจมี table ที่ถูกสร้างด้วยมือโดยตรงใน DB ที่ไม่ปรากฏในรายการนี้
+        หากต้องการ list จาก database จริง สามารถรันคำสั่ง: <code>cd backend && node list-tables.cjs</code>
+    </div>
+
+    <!-- Footer -->
+    <div class="report-footer">
+        ERP_THAIHERB Database Tables Report &nbsp;|&nbsp; Generated: 30/05/2569 &nbsp;|&nbsp; Database: MSSQL
+    </div>
+
+</body>
+</html>

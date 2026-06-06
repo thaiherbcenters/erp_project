@@ -164,6 +164,12 @@ export const ALL_PAGES = [
           { id: 'sales_orders_table', name: 'ตารางคำสั่งซื้อ' },
         ],
       },
+      {
+        id: 'sales_billing', name: 'ออกบิล/เอกสาร',
+        sections: [
+          { id: 'sales_billing_form', name: 'ฟอร์มออกเอกสาร' },
+        ],
+      },
     ],
   },
 

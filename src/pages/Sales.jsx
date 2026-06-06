@@ -20,6 +20,7 @@ import { Eye, Edit, Trash2, Clock, History, X, Send } from 'lucide-react';
 import { MOCK_CUSTOMERS } from '../data/mockData';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
+import BillingForm from '../components/BillingForm';
 import API_BASE from '../config';
 import './PageCommon.css';
 import './DocumentControl.css';
@@ -649,6 +650,13 @@ export default function Sales() {
                         )}
                     </div>
                 )
+            )}
+
+            {/* ── Tab: Billing ── */}
+            {(activeTab === 'sales_billing' && hasSubPermission('sales_billing')) && (
+                <div className="subpage-content" key="sales_billing">
+                    <BillingForm onBack={() => window.history.back()} />
+                </div>
             )}
         </div>
     );
