@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
 import { useRnD } from '../context/RnDContext';
 import API_BASE from '../config';
+import { Search } from 'lucide-react';
 import './PageCommon.css';
 import './QC.css';
 
@@ -521,9 +522,12 @@ export default function QC() {
                 <div className="subpage-content" key="qc_incoming">
                     {hasSectionPermission('qc_incoming_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input type="text" placeholder="พิมพ์ Lot No., วัตถุดิบ..." value={searchIncoming} onChange={(e) => setSearchIncoming(e.target.value)} />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input type="text" placeholder="พิมพ์ Lot No., วัตถุดิบ..." value={searchIncoming} onChange={(e) => setSearchIncoming(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                             <button className="btn-primary">+ ตรวจรับวัตถุดิบ</button>
                         </div>
@@ -559,9 +563,12 @@ export default function QC() {
                     {/* Production QC requests */}
                     {hasSectionPermission('qc_inprocess_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input type="text" placeholder="ค้นหาข้อมูล..." value={searchInprocess} onChange={(e) => setSearchInprocess(e.target.value)} />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input type="text" placeholder="ค้นหาข้อมูล..." value={searchInprocess} onChange={(e) => setSearchInprocess(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                         </div>
                     )}
@@ -576,9 +583,12 @@ export default function QC() {
                 <div className="subpage-content" key="qc_final">
                     {hasSectionPermission('qc_final_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input type="text" placeholder="ค้นหาข้อมูล..." value={searchFinal} onChange={(e) => setSearchFinal(e.target.value)} />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input type="text" placeholder="ค้นหาข้อมูล..." value={searchFinal} onChange={(e) => setSearchFinal(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                         </div>
                     )}
@@ -593,9 +603,12 @@ export default function QC() {
                 <div className="subpage-content" key="qc_defect">
                     {hasSectionPermission('qc_defect_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input type="text" placeholder="พิมพ์ NCR No., สินค้า..." value={searchDefect} onChange={(e) => setSearchDefect(e.target.value)} />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input type="text" placeholder="พิมพ์ NCR No., สินค้า..." value={searchDefect} onChange={(e) => setSearchDefect(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                             <button className="btn-danger">+ สร้าง NCR</button>
                         </div>

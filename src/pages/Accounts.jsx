@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_AR, MOCK_AP } from '../data/mockData';
+import { Search } from 'lucide-react';
 import './PageCommon.css';
 
 export default function Accounts() {
@@ -164,14 +165,17 @@ export default function Accounts() {
                     {/* ค้นหา + กรอง docType */}
                     {hasSectionPermission('accounts_ar_invoice') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์เลขที่เอกสาร หรือชื่อลูกค้า..."
-                                    value={arSearch}
-                                    onChange={(e) => setArSearch(e.target.value)}
-                                />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่เอกสาร หรือชื่อลูกค้า..."
+                                        value={arSearch}
+                                        onChange={(e) => setArSearch(e.target.value)}
+                                    />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                             <select
                                 className="filter-select"
@@ -236,14 +240,17 @@ export default function Accounts() {
                 <div className="subpage-content" key="accounts_ap">
                     {hasSectionPermission('accounts_ap_invoice') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์เลขที่เอกสาร หรือชื่อซัพพลายเออร์..."
-                                    value={apSearch}
-                                    onChange={(e) => setApSearch(e.target.value)}
-                                />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่เอกสาร หรือชื่อซัพพลายเออร์..."
+                                        value={apSearch}
+                                        onChange={(e) => setApSearch(e.target.value)}
+                                    />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                             <select
                                 className="filter-select"

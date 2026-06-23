@@ -353,14 +353,17 @@ function EmployeeProfileTab({ hasSectionPermission }) {
             {/* Toolbar */}
             {hasSectionPermission('hr_profile_search') && (
                 <div className="toolbar">
-                    <div className="search-box">
-                        <Search size={14} />
-                        <input
-                            type="text"
-                            placeholder="ค้นหาชื่อ, รหัส, ตำแหน่ง, แผนก..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
+                    <div className="search-group">
+                        <div className="search-input-wrap">
+                            <Search size={16} />
+                            <input
+                                type="text"
+                                placeholder="ค้นหาชื่อ, รหัส, ตำแหน่ง, แผนก..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <button className="search-btn">ค้นหา</button>
                     </div>
                     <button className="btn-primary" onClick={openAddModal}>
                         <UserPlus size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
@@ -1104,10 +1107,13 @@ function AttendanceTab({ hasSectionPermission }) {
                         </div>
                         <div className="att-filter-group att-search-group">
                             <label>ค้นหา</label>
-                            <div className="search-box" style={{ margin: 0 }}>
-                                <Search size={14} />
-                                <input type="text" placeholder="ชื่อ, รหัส..." value={searchQuery}
-                                    onChange={e => setSearchQuery(e.target.value)} />
+                            <div className="search-group" style={{ margin: 0, maxWidth: '220px' }}>
+                                <div className="search-input-wrap">
+                                    <Search size={14} />
+                                    <input type="text" placeholder="ชื่อ, รหัส..." value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                         </div>
                     </div>

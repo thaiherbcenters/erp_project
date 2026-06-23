@@ -16,12 +16,22 @@ router.get('/', async (req, res) => {
         const search = req.query.search || '';
         const offset = (page - 1) * limit;
 
-        let whereClause = '';
+        const category = req.query.category || '';
+
+        let whereClauses = [];
         const request = pool.request();
         if (search) {
-            whereClause = 'WHERE QuotationNo LIKE @search OR CustomerName LIKE @search OR Status LIKE @search';
+            whereClauses.push('(QuotationNo LIKE @search OR CustomerName LIKE @search OR Status LIKE @search)');
             request.input('search', sql.NVarChar, `%${search}%`);
         }
+        
+        if (category === 'quotation') {
+            whereClauses.push("DocType LIKE 'quotation_%'");
+        } else if (category === 'billing') {
+            whereClauses.push("DocType NOT LIKE 'quotation_%'");
+        }
+
+        const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
         const countResult = await request.query(`SELECT COUNT(*) as total FROM Quotation ${whereClause}`);
         const total = countResult.recordset[0].total;

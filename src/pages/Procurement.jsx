@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_PR, MOCK_PO, MOCK_RECV } from '../data/mockData';
+import { Search } from 'lucide-react';
 import './PageCommon.css';
 
 export default function Procurement() {
@@ -152,14 +153,17 @@ export default function Procurement() {
                 <div className="subpage-content" key="procurement_pr">
                     {hasSectionPermission('procurement_pr_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์เลขที่ PR, รายการ หรือผู้ขอ..."
-                                    value={prSearch}
-                                    onChange={(e) => setPrSearch(e.target.value)}
-                                />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่ PR, รายการ หรือผู้ขอ..."
+                                        value={prSearch}
+                                        onChange={(e) => setPrSearch(e.target.value)}
+                                    />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                             <button className="btn-primary">+ สร้างใบขอซื้อ (PR)</button>
                         </div>
@@ -207,14 +211,17 @@ export default function Procurement() {
                 <div className="subpage-content" key="procurement_po">
                     {hasSectionPermission('procurement_po_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์เลขที่ PO, ซัพพลายเออร์ หรือสินค้า..."
-                                    value={poSearch}
-                                    onChange={(e) => setPoSearch(e.target.value)}
-                                />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่ PO, ซัพพลายเออร์ หรือสินค้า..."
+                                        value={poSearch}
+                                        onChange={(e) => setPoSearch(e.target.value)}
+                                    />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                             <button className="btn-primary">+ สร้างใบสั่งซื้อ (PO)</button>
                         </div>
@@ -264,14 +271,17 @@ export default function Procurement() {
                 <div className="subpage-content" key="procurement_recv">
                     {hasSectionPermission('procurement_recv_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์เลขที่รับ, อ้างอิง PO หรือซัพพลายเออร์..."
-                                    value={recvSearch}
-                                    onChange={(e) => setRecvSearch(e.target.value)}
-                                />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่รับ, อ้างอิง PO หรือซัพพลายเออร์..."
+                                        value={recvSearch}
+                                        onChange={(e) => setRecvSearch(e.target.value)}
+                                    />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                             <button className="btn-primary">+ บันทึกรับสินค้า</button>
                         </div>

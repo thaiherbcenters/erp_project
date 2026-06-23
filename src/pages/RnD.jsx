@@ -283,9 +283,12 @@ export default function RnD() {
                 <div className="toolbar">
                     <div className="toolbar-left">
                         {hasSectionPermission('rnd_formulas_search') && (
-                            <div className="search-box">
-                                <Search size={16} />
-                                <input type="text" placeholder="ค้นหาสูตร..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input type="text" placeholder="ค้นหาสูตร..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                         )}
                         <div className="rnd-filter-group">
@@ -362,9 +365,12 @@ export default function RnD() {
                 <div className="toolbar">
                     <div className="toolbar-left">
                         {hasSectionPermission('rnd_projects_search') && (
-                            <div className="search-box">
-                                <Search size={16} />
-                                <input type="text" placeholder="ค้นหาโครงการ..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input type="text" placeholder="ค้นหาโครงการ..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                         )}
                     </div>

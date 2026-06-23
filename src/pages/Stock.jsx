@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Eye, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle, Search } from 'lucide-react';
 import API_BASE from '../config';
 import './PageCommon.css';
 
@@ -33,6 +33,17 @@ export default function Stock() {
     const [selectedLog, setSelectedLog] = useState(null);
     const [logDetailLoading, setLogDetailLoading] = useState(false);
     const [logDetail, setLogDetail] = useState(null);
+
+    // ── Auto-search Debounce ──
+    useEffect(() => {
+        const t = setTimeout(() => { setAppliedSearchStock(searchStock); setStockPagination(p => ({...p, page: 1})); }, 400);
+        return () => clearTimeout(t);
+    }, [searchStock]);
+
+    useEffect(() => {
+        const t = setTimeout(() => { setAppliedSearchLogs(searchLogs); setLogsPagination(p => ({...p, page: 1})); }, 400);
+        return () => clearTimeout(t);
+    }, [searchLogs]);
 
     // ── Fetch real data from API (with Pagination & Search) ──
     useEffect(() => {
@@ -467,21 +478,23 @@ export default function Stock() {
                 <div className="subpage-content" key="stock_data">
                     {hasSectionPermission('stock_data_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์ชื่อสินค้าหรือหมวดหมู่..."
-                                    value={searchStock}
-                                    onChange={(e) => setSearchStock(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            setStockPagination(prev => ({ ...prev, page: 1 }));
-                                            setAppliedSearchStock(searchStock);
-                                        }
-                                    }}
-                                />
-                                <button className="btn-primary" onClick={() => {
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์ชื่อสินค้าหรือหมวดหมู่..."
+                                        value={searchStock}
+                                        onChange={(e) => setSearchStock(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                setStockPagination(prev => ({ ...prev, page: 1 }));
+                                                setAppliedSearchStock(searchStock);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <button className="search-btn" onClick={() => {
                                     setStockPagination(prev => ({ ...prev, page: 1 }));
                                     setAppliedSearchStock(searchStock);
                                 }}>ค้นหา</button>
@@ -571,21 +584,23 @@ export default function Stock() {
                 <div className="subpage-content" key="stock_logs">
                     {hasSectionPermission('stock_logs_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input
-                                    type="text"
-                                    placeholder="พิมพ์เลขที่อ้างอิง, ชื่อสินค้า หรือหมายเหตุ..."
-                                    value={searchLogs}
-                                    onChange={(e) => setSearchLogs(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            setLogsPagination(prev => ({ ...prev, page: 1 }));
-                                            setAppliedSearchLogs(searchLogs);
-                                        }
-                                    }}
-                                />
-                                <button className="btn-primary" onClick={() => {
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่อ้างอิง, ชื่อสินค้า หรือหมายเหตุ..."
+                                        value={searchLogs}
+                                        onChange={(e) => setSearchLogs(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                setLogsPagination(prev => ({ ...prev, page: 1 }));
+                                                setAppliedSearchLogs(searchLogs);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <button className="search-btn" onClick={() => {
                                     setLogsPagination(prev => ({ ...prev, page: 1 }));
                                     setAppliedSearchLogs(searchLogs);
                                 }}>ค้นหา</button>

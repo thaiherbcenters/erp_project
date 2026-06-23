@@ -4,7 +4,7 @@ import { useAlert } from './CustomAlert';
 import API_BASE from '../config';
 import './ContractManagement.css';
 
-const ContractManagement = () => {
+const ContractManagement = ({ onViewDocument }) => {
     const { showAlert } = useAlert();
     const [contracts, setContracts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -115,6 +115,19 @@ const ContractManagement = () => {
         }
     };
 
+    const handlePrintDoc = async (doc) => {
+        if (onViewDocument) {
+            onViewDocument(doc.DocumentType, doc.DocumentID);
+        } else {
+            // Fallback for legal documents if no handler provided
+            if (doc.DocumentType === 'poa' || doc.DocumentType === 'corp_rep') {
+                window.open(`${API_BASE}/legal-documents/${doc.DocumentID}/print`, '_blank');
+            } else {
+                showAlert('error', 'ไม่สามารถเปิดเอกสารได้จากหน้านี้');
+            }
+        }
+    };
+
     const closeViewModal = () => {
         setViewModalData(null);
         setLinkedDocs([]);
@@ -135,9 +148,23 @@ const ContractManagement = () => {
                     </h1>
                     <p className="contract-subtitle">เพิ่ม/ลบ สัญญาและโปรเจกต์เพื่อใช้ผูกกับเอกสารต่างๆ ในระบบ</p>
                 </div>
-                <button className="btn-add-contract" onClick={() => setShowForm(!showForm)}>
-                    <Plus size={18} />
-                    {showForm ? 'ยกเลิก' : 'เพิ่มสัญญาใหม่'}
+            </div>
+
+            <div className="toolbar" style={{ justifyContent: 'space-between', marginBottom: '24px' }}>
+                <div className="search-group">
+                    <div className="search-input-wrap">
+                        <Search size={18} />
+                        <input 
+                            type="text" 
+                            placeholder="ค้นหาเลขที่สัญญา หรือ ชื่อโปรเจกต์..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <button className="search-btn">ค้นหา</button>
+                </div>
+                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setShowForm(!showForm)}>
+                    <Plus size={16} /> {showForm ? 'ยกเลิก' : 'เพิ่มสัญญาใหม่'}
                 </button>
             </div>
 
@@ -169,26 +196,16 @@ const ContractManagement = () => {
                 </form>
             )}
 
-            <div className="contract-list-card">
-                <div className="contract-list-header">
-                    <div className="search-box">
-                        <Search size={16} color="#64748b" />
-                        <input 
-                            type="text" 
-                            placeholder="ค้นหาเลขที่สัญญา หรือ ชื่อโปรเจกต์..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                </div>
+            <div className="table-card card">
+
 
                 {isLoading ? (
                     <div className="loading-state">กำลังโหลดข้อมูล...</div>
                 ) : filteredContracts.length === 0 ? (
-                    <div className="empty-state">ไม่พบข้อมูลสัญญาในระบบ</div>
+                    <div className="empty-state" style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>ไม่พบข้อมูลสัญญาในระบบ</div>
                 ) : (
                     <div className="table-responsive">
-                        <table className="contract-table">
+                        <table className="data-table">
                             <thead>
                                 <tr>
                                     <th>เลขที่สัญญา</th>
@@ -254,6 +271,7 @@ const ContractManagement = () => {
                                             <th>เลขที่เอกสาร</th>
                                             <th>วันที่เอกสาร</th>
                                             <th>สถานะ</th>
+                                            <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -263,6 +281,13 @@ const ContractManagement = () => {
                                                 <td>{doc.DocumentNo || '-'}</td>
                                                 <td>{doc.DocumentDate ? new Date(doc.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
                                                 <td><span className="status-badge progress">{doc.Status}</span></td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <div className="action-buttons justify-center">
+                                                        <button className="btn-icon text-blue-600 hover:bg-blue-50" title="ดูเอกสาร" onClick={() => handlePrintDoc(doc)}>
+                                                            <Eye size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

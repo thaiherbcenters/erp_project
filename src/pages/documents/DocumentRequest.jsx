@@ -280,14 +280,17 @@ export default function DocumentRequest({ hasPermission }) {
         <div className="doc-fade-in">
             {/* ── Toolbar ── */}
             <div className="toolbar">
-                <div className="search-box">
-                    <Search size={16} />
-                    <input
-                        type="text"
-                        placeholder="ค้นหารหัสฟอร์ม, ชื่อเอกสาร, หรือผู้ส่ง..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                <div className="search-group">
+                    <div className="search-input-wrap">
+                        <Search size={16} />
+                        <input
+                            type="text"
+                            placeholder="ค้นหารหัสฟอร์ม, ชื่อเอกสาร, หรือผู้ส่ง..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <button className="search-btn">ค้นหา</button>
                 </div>
             </div>
 

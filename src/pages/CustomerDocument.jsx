@@ -98,12 +98,13 @@ export default function CustomerDocument({ hasPermission }) {
     if (viewMode === 'list') {
         return (
             <div className="doc-fade-in">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', gap: '20px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-                        <div className="search-box" style={{ maxWidth: '400px', margin: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '20px' }}>
+                    <div className="search-group">
+                        <div className="search-input-wrap">
                             <Search size={16} />
                             <input type="text" placeholder="ค้นหารหัส หรือ ชื่อบริษัท..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
+                        <button className="search-btn">ค้นหา</button>
                     </div>
                     <button className="btn-primary" onClick={() => setViewMode('create')} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Plus size={18} /> สร้างเอกสารข้อมูลลูกค้า

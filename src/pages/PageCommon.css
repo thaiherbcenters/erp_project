@@ -23,47 +23,109 @@
     flex-wrap: wrap;
 }
 
-.search-box {
+/* ── Search Group: input + button joined together ── */
+.search-group {
+    display: flex;
+    align-items: stretch;
+    max-width: 380px;
+    flex: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1.5px solid #e2e8f0;
+    background: #fff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-group:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+}
+
+.search-group .search-input-wrap {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: var(--bg-white);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px 14px;
+    padding: 0 12px;
     flex: 1;
-    max-width: 360px;
-    transition: border-color 0.2s;
+    min-width: 0;
+}
+
+.search-group .search-input-wrap svg {
+    color: #94a3b8;
+    flex-shrink: 0;
+}
+
+.search-group input {
+    background: none;
+    border: none;
+    color: #1e293b;
+    font-size: 14px;
+    font-family: inherit;
+    font-weight: 400;
+    outline: none;
+    width: 100%;
+    height: 38px;
+    padding: 0;
+}
+
+.search-group input::placeholder {
+    color: #a0aec0;
+}
+
+.search-group .search-btn {
+    display: none; /* User requested to remove the search button globally */
+}
+
+/* Legacy .search-box — still used in other pages */
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0 14px;
+    height: 38px;
+    flex: 1;
+    max-width: 380px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .search-box:focus-within {
     border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.08);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
 }
 
 .search-box span {
-    color: var(--text-muted);
+    color: #94a3b8;
     font-size: 13px;
     font-weight: 500;
+}
+
+.search-box svg {
+    color: #94a3b8;
+    flex-shrink: 0;
 }
 
 .search-box input {
     background: none;
     border: none;
-    color: var(--text);
-    font-size: 13px;
+    color: #1e293b;
+    font-size: 14px;
     font-family: inherit;
     font-weight: 400;
     outline: none;
     width: 100%;
+    height: 100%;
+    padding: 0;
 }
 
 .search-box input::placeholder {
-    color: var(--text-muted);
+    color: #a0aec0;
 }
-
 .btn-primary {
-    padding: 8px 18px;
+    padding: 0 18px;
+    height: 38px;
     background: var(--primary);
     color: #fff;
     border: none;
@@ -85,7 +147,8 @@
 }
 
 .btn-danger {
-    padding: 8px 18px;
+    padding: 0 18px;
+    height: 38px;
     background: var(--danger);
     color: #fff;
     border: none;
@@ -107,7 +170,8 @@
 }
 
 .btn-secondary {
-    padding: 8px 18px;
+    padding: 0 18px;
+    height: 38px;
     background: #fff;
     color: var(--text-secondary);
     border: 1.5px solid var(--border);
@@ -120,6 +184,7 @@
     white-space: nowrap;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
 }
 

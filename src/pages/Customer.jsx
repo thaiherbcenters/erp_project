@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
-import { Eye, Edit2, Trash2, X } from 'lucide-react';
+import { Eye, Edit2, Trash2, X, Search } from 'lucide-react';
 import API_BASE from '../config';
 import './PageCommon.css';
 
@@ -156,9 +156,12 @@ export default function Customer() {
                 <div className="subpage-content" key="customer_list">
                     {hasSectionPermission('customer_list_search') && (
                         <div className="toolbar">
-                            <div className="search-box">
-                                <span>ค้นหา</span>
-                                <input type="text" placeholder="พิมพ์ชื่อ รหัส หรือประเภทลูกค้า..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input type="text" placeholder="พิมพ์ชื่อ รหัส หรือประเภทลูกค้า..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                             <button className="btn-primary" onClick={openCreate}>+ เพิ่มลูกค้าใหม่</button>
                         </div>

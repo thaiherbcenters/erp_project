@@ -733,9 +733,12 @@ export default function Planning() {
                 <div className="toolbar">
                     <div className="toolbar-left">
                         {hasSectionPermission('planning_list_search') && (
-                            <div className="search-box">
-                                <Search size={16} />
-                                <input type="text" placeholder="ค้นหาใบสั่งผลิต..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={16} />
+                                    <input type="text" placeholder="ค้นหาใบสั่งผลิต..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                </div>
+                                <button className="search-btn">ค้นหา</button>
                             </div>
                         )}
                         <div className="plan-filter-group">

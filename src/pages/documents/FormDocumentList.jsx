@@ -76,14 +76,17 @@ export default function FormDocumentList({ hasPermission, documents, standards, 
 
                 {/* ── Left Side (Search & Info) ── */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1 }}>
-                    <div className="search-box" style={{ maxWidth: '400px', margin: 0 }}>
-                        <Search size={16} />
-                        <input
-                            type="text"
-                            placeholder="ค้นหารหัส หรือ ชื่อแบบฟอร์ม..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="search-group" style={{ maxWidth: '400px', margin: 0 }}>
+                        <div className="search-input-wrap">
+                            <Search size={16} />
+                            <input
+                                type="text"
+                                placeholder="ค้นหารหัส หรือ ชื่อแบบฟอร์ม..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <button className="search-btn">ค้นหา</button>
                     </div>
 
                     {/* ── Count Info ── */}

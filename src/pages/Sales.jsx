@@ -17,7 +17,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
-import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText } from 'lucide-react';
+import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search } from 'lucide-react';
 import { MOCK_CUSTOMERS } from '../data/mockData';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
@@ -61,7 +61,33 @@ export default function Sales() {
     const [showPOAForm, setShowPOAForm] = useState(false);
     const [localPOAs, setLocalPOAs] = useState([]);
     const [editingPOAId, setEditingPOAId] = useState(null);
-    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [poaSearch, setPoaSearch] = useState('');
+    const [appliedPoaSearch, setAppliedPoaSearch] = useState('');
+
+    // ── State: Billing ──
+    const [showBillingForm, setShowBillingForm] = useState(false);
+    const [localBillings, setLocalBillings] = useState([]);
+    const [editingBillingId, setEditingBillingId] = useState(null);
+    const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [billingSearch, setBillingSearch] = useState('');
+    const [appliedBillingSearch, setAppliedBillingSearch] = useState('');
+
+    // ── Auto-search Debounce ──
+    useEffect(() => {
+        const t = setTimeout(() => { setAppliedQuotationSearch(quotationSearch); setQuotationPagination(p => ({...p, page: 1})); }, 400);
+        return () => clearTimeout(t);
+    }, [quotationSearch]);
+
+    useEffect(() => {
+        const t = setTimeout(() => { setAppliedBillingSearch(billingSearch); setBillingPagination(p => ({...p, page: 1})); }, 400);
+        return () => clearTimeout(t);
+    }, [billingSearch]);
+
+    useEffect(() => {
+        const t = setTimeout(() => { setAppliedPoaSearch(poaSearch); setPoaPagination(p => ({...p, page: 1})); }, 400);
+        return () => clearTimeout(t);
+    }, [poaSearch]);
 
     // ── Fetch ข้อมูล Quotations (with Pagination) ──
     useEffect(() => {
@@ -90,6 +116,22 @@ export default function Sales() {
         };
         fetchSalesOrders();
     }, [showSOForm]);
+
+    // ── Fetch ข้อมูล Billing ──
+    useEffect(() => {
+        const fetchBillings = async () => {
+            if (activeTab !== 'sales_billing') return;
+            try {
+                const res = await fetch(`${API_BASE}/quotations?category=billing&page=${billingPagination.page}&limit=${billingPagination.limit}&search=${encodeURIComponent(appliedBillingSearch)}`);
+                const json = await res.json();
+                if (json.success) {
+                    setLocalBillings(json.data || []);
+                    if (json.pagination) setBillingPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                }
+            } catch (err) { console.error('Error fetching billings:', err); }
+        };
+        fetchBillings();
+    }, [activeTab, billingPagination.page, appliedBillingSearch, showBillingForm]);
 
     // ── Fetch ข้อมูล POA ──
     useEffect(() => {
@@ -296,14 +338,19 @@ export default function Sales() {
 
     return (
         <div className="page-container sales-page page-enter">
-            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
-                <h1>{getPageTitle()}</h1>
-                <p>{getPageDesc()}</p>
-            </div>
 
             {/* ── Tab: Sales Dashboard ── */}
             {(activeTab === 'sales_dashboard' && hasSubPermission('sales_dashboard')) && (
                 <div className="subpage-content" key="sales_dashboard">
+                    <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <div>
+                            <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                <LayoutDashboard size={24} color="#1e40af" />
+                                ภาพรวมยอดขาย
+                            </h1>
+                            <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>ภาพรวมข้อมูลยอดขาย ลูกค้า และเอกสารทั้งหมดของฝ่ายขาย</p>
+                        </div>
+                    </div>
                     <div className="summary-row">
                         {hasSectionPermission('sales_dashboard_revenue') && (
                             <div className="summary-card card">
@@ -443,32 +490,45 @@ export default function Sales() {
                     />
                 ) : (
                     <div className="subpage-content" key="sales_quotation">
+                        <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                    <FileSpreadsheet size={24} color="#1e40af" />
+                                    ใบเสนอราคา (Quotation)
+                                </h1>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการข้อมูลเอกสารใบเสนอราคา</p>
+                            </div>
+                        </div>
                         {hasSectionPermission('sales_quotation_search') && (
-                            <div className="toolbar">
-                                <div className="search-box">
-                                    <span>ค้นหา</span>
-                                    <input
-                                        type="text"
-                                        placeholder="พิมพ์เลขที่ใบเสนอราคา..."
-                                        value={quotationSearch}
-                                        onChange={(e) => setQuotationSearch(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                setQuotationPagination(prev => ({ ...prev, page: 1 }));
-                                                setAppliedQuotationSearch(quotationSearch);
-                                            }
-                                        }}
-                                    />
-                                    <button className="btn-primary" onClick={() => {
+                            <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+                                <div className="search-group">
+                                    <div className="search-input-wrap">
+                                        <Search size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="พิมพ์เลขที่ใบเสนอราคา..."
+                                            value={quotationSearch}
+                                            onChange={(e) => setQuotationSearch(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    setQuotationPagination(prev => ({ ...prev, page: 1 }));
+                                                    setAppliedQuotationSearch(quotationSearch);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <button className="search-btn" onClick={() => {
                                         setQuotationPagination(prev => ({ ...prev, page: 1 }));
                                         setAppliedQuotationSearch(quotationSearch);
                                     }}>ค้นหา</button>
                                 </div>
-                                <button className="btn-primary" onClick={() => {
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
                                     setEditingQuotationId(null);
                                     setIsViewOnly(false);
                                     setShowQuotationForm(true);
-                                }}>+ สร้างใบเสนอราคา</button>
+                                }}>
+                                    <Plus size={16} /> สร้างใบเสนอราคา
+                                </button>
                             </div>
                         )}
 
@@ -657,13 +717,27 @@ export default function Sales() {
                     />
                 ) : (
                     <div className="subpage-content" key="sales_orders">
+                        <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                    <ShoppingCart size={24} color="#1e40af" />
+                                    คำสั่งซื้อ (Sales Order)
+                                </h1>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการข้อมูลคำสั่งซื้อ</p>
+                            </div>
+                        </div>
                         {hasSectionPermission('sales_orders_search') && (
-                            <div className="toolbar">
-                                <div className="search-box">
-                                    <span>ค้นหา</span>
-                                    <input type="text" placeholder="พิมพ์เลขที่ SO, ลูกค้า..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} />
+                            <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+                                <div className="search-group">
+                                    <div className="search-input-wrap">
+                                        <Search size={18} />
+                                        <input type="text" placeholder="พิมพ์เลขที่ SO, ลูกค้า..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} />
+                                    </div>
+                                    <button className="search-btn">ค้นหา</button>
                                 </div>
-                                <button className="btn-primary" onClick={() => setShowSOForm(true)}>+ สร้าง Sales Order</button>
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setShowSOForm(true)}>
+                                    <Plus size={16} /> สร้าง Sales Order
+                                </button>
                             </div>
                         )}
 
@@ -726,9 +800,108 @@ export default function Sales() {
 
             {/* ── Tab: Billing ── */}
             {(activeTab === 'sales_billing' && hasSubPermission('sales_billing')) && (
-                <div className="subpage-content" key="sales_billing">
-                    <BillingForm />
-                </div>
+                showBillingForm ? (
+                    <div className="subpage-content" key="sales_billing_form">
+                        <BillingForm onBack={() => { setShowBillingForm(false); setEditingBillingId(null); }} />
+                    </div>
+                ) : (
+                    <div className="subpage-content" key="sales_billing">
+                        <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                    <Receipt size={24} color="#1e40af" />
+                                    ออกบิล/เอกสาร (Billing)
+                                </h1>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>จัดการบิลและเอกสารฝ่ายขาย</p>
+                            </div>
+                        </div>
+                        <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่บิล, ลูกค้า..."
+                                        value={billingSearch}
+                                        onChange={(e) => setBillingSearch(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                setBillingPagination(prev => ({ ...prev, page: 1 }));
+                                                setAppliedBillingSearch(billingSearch);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <button className="search-btn" onClick={() => {
+                                    setBillingPagination(prev => ({ ...prev, page: 1 }));
+                                    setAppliedBillingSearch(billingSearch);
+                                }}>ค้นหา</button>
+                            </div>
+                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setEditingBillingId(null); setShowBillingForm(true); }}>
+                                <Plus size={16} /> สร้างบิล/เอกสาร
+                            </button>
+                        </div>
+
+                        <div className="table-card card">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>เลขที่บิล</th>
+                                        <th>วันที่บิล</th>
+                                        <th>ลูกค้า</th>
+                                        <th>ยอดรวม</th>
+                                        <th>สถานะ</th>
+                                        <th style={{ textAlign: 'center' }}>การจัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {localBillings.length === 0 ? (
+                                        <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลบิล/เอกสาร</td></tr>
+                                    ) : localBillings.map(b => (
+                                        <tr key={b.QuotationID || b.id}>
+                                            <td>{b.QuotationNo || '-'}</td>
+                                            <td>{b.BillDate ? new Date(b.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                            <td>{b.CustomerName || '-'}</td>
+                                            <td>฿{((b.GrandTotal) || 0).toLocaleString()}</td>
+                                            <td>
+                                                <span className={`badge ${b.Status === 'อนุมัติ' ? 'badge-success' : b.Status === 'รอตรวจสอบ' ? 'badge-info' : 'badge-neutral'}`}>
+                                                    {b.Status || 'ร่าง'}
+                                                </span>
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <div className="action-buttons justify-center">
+                                                    <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดูเอกสาร" onClick={() => { setEditingBillingId(b.QuotationID); setShowBillingForm(true); }}>
+                                                        <Eye size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* Pagination Controls */}
+                        {billingPagination.totalPages > 1 && (
+                            <div className="pagination-controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', padding: '15px 0' }}>
+                                <button 
+                                    className="btn-secondary"
+                                    disabled={billingPagination.page === 1}
+                                    onClick={() => setBillingPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                >
+                                    ก่อนหน้า
+                                </button>
+                                <span>หน้า {billingPagination.page} / {billingPagination.totalPages}</span>
+                                <button 
+                                    className="btn-secondary"
+                                    disabled={billingPagination.page === billingPagination.totalPages}
+                                    onClick={() => setBillingPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                >
+                                    ถัดไป
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )
             )}
 
             {/* ── Tab: หนังสือมอบอำนาจ ── */}
@@ -742,11 +915,38 @@ export default function Sales() {
                     </div>
                 ) : (
                     <div className="subpage-content" key="sales_poa_list">
-                        <div className="toolbar" style={{ justifyContent: 'flex-end' }}>
-                            <button 
-                                className="btn-primary" 
-                                onClick={() => { setEditingPOAId(null); setShowPOAForm(true); }}
-                            >
+                        <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                    <Briefcase size={24} color="#1e40af" />
+                                    หนังสือมอบอำนาจ (POA)
+                                </h1>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการหนังสือมอบอำนาจ</p>
+                            </div>
+                        </div>
+                        <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="พิมพ์เลขที่เอกสาร, ผู้มอบ, ผู้รับมอบ..."
+                                        value={poaSearch}
+                                        onChange={(e) => setPoaSearch(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                setPoaPagination(prev => ({ ...prev, page: 1 }));
+                                                setAppliedPoaSearch(poaSearch);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <button className="search-btn" onClick={() => {
+                                    setPoaPagination(prev => ({ ...prev, page: 1 }));
+                                    setAppliedPoaSearch(poaSearch);
+                                }}>ค้นหา</button>
+                            </div>
+                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setEditingPOAId(null); setShowPOAForm(true); }}>
                                 <Plus size={16} /> สร้างหนังสือมอบอำนาจ
                             </button>
                         </div>
@@ -764,9 +964,17 @@ export default function Sales() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {localPOAs.length === 0 ? (
+                                    {localPOAs.filter(p => !appliedPoaSearch || 
+                                        p.DocumentNo?.toLowerCase().includes(appliedPoaSearch.toLowerCase()) || 
+                                        p.GrantorName?.toLowerCase().includes(appliedPoaSearch.toLowerCase()) || 
+                                        p.GranteeName?.toLowerCase().includes(appliedPoaSearch.toLowerCase())
+                                    ).length === 0 ? (
                                         <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลหนังสือมอบอำนาจ</td></tr>
-                                    ) : localPOAs.map(p => (
+                                    ) : localPOAs.filter(p => !appliedPoaSearch || 
+                                        p.DocumentNo?.toLowerCase().includes(appliedPoaSearch.toLowerCase()) || 
+                                        p.GrantorName?.toLowerCase().includes(appliedPoaSearch.toLowerCase()) || 
+                                        p.GranteeName?.toLowerCase().includes(appliedPoaSearch.toLowerCase())
+                                    ).map(p => (
                                         <tr key={p.DocumentID}>
                                             <td>{p.DocumentNo || '-'}</td>
                                             <td>{p.DocumentDate ? new Date(p.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
@@ -823,6 +1031,15 @@ export default function Sales() {
             {/* ── Tab: หนังสือแต่งตั้งผู้แทนนิติบุคคล ── */}
             {(activeTab === 'sales_corp_rep' && hasSubPermission('sales_corp_rep')) && (
                 <div className="subpage-content" key="sales_corp_rep">
+                    <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <div>
+                            <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                <UserCheck size={24} color="#1e40af" />
+                                หนังสือแต่งตั้งผู้แทนนิติบุคคล
+                            </h1>
+                            <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการหนังสือแต่งตั้งผู้แทนนิติบุคคล</p>
+                        </div>
+                    </div>
                     <CorporateRepresentativeForm onBack={() => {}} />
                 </div>
             )}
@@ -830,7 +1047,21 @@ export default function Sales() {
             {/* ── Tab: จัดการสัญญา ── */}
             {(activeTab === 'sales_contracts' && hasSubPermission('sales_contracts')) && (
                 <div className="subpage-content" key="sales_contracts">
-                    <ContractManagement />
+                    <ContractManagement onViewDocument={(docId, docType) => {
+                        if (docType === 'Quotation') {
+                            setEditingQuotationId(docId);
+                            setIsViewOnly(true);
+                            setShowQuotationForm(true);
+                            setActiveTab('sales_quotation');
+                        } else if (docType === 'Billing') {
+                            setEditingBillingId(docId);
+                            setIsViewOnly(true);
+                            setShowBillingForm(true);
+                            setActiveTab('sales_billing');
+                        } else {
+                            showAlert('ข้อผิดพลาด', 'ไม่สามารถเปิดเอกสารได้จากหน้านี้', 'error');
+                        }
+                    }} />
                 </div>
             )}
         </div>

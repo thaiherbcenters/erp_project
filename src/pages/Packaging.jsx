@@ -543,14 +543,17 @@ export default function Packaging() {
                     <>
                         <div className="toolbar">
                             <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <div className="search-box">
-                                    <Search size={16} />
-                                    <input
-                                        type="text"
-                                        placeholder="ค้นหาคำสั่งบรรจุ..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
+                                <div className="search-group">
+                                    <div className="search-input-wrap">
+                                        <Search size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="ค้นหาคำสั่งบรรจุ..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <button className="search-btn">ค้นหา</button>
                                 </div>
                                 <select
                                     value={statusFilter}
