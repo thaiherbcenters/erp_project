@@ -517,6 +517,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         billStatus: 'ktb',
         billNo: `QT${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-001`,
         billDate: new Date().toISOString().split('T')[0],
+        contractId: '',
         customerTypeId: '',
         customerName: '',
         contactPerson: '',
@@ -569,6 +570,23 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         }
     }, [formData.notes]);
 
+    // Fetch Contracts for Dropdown
+    const [contracts, setContracts] = useState([]);
+    useEffect(() => {
+        const fetchContracts = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/contracts`);
+                const json = await res.json();
+                if (json.success) {
+                    setContracts(json.data);
+                }
+            } catch (err) {
+                console.error('Error fetching contracts:', err);
+            }
+        };
+        fetchContracts();
+    }, []);
+
     // Fetch existing quotation for editing
     useEffect(() => {
         if (editId) {
@@ -587,6 +605,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                             billStatus: data.BankAccount || 'ktb',
                             billNo: data.QuotationNo || '',
                             billDate: data.BillDate ? data.BillDate.split('T')[0] : '',
+                            contractId: data.ContractID || '',
                             customerName: data.CustomerName || '',
                             address: data.Address || '',
                             phone: data.Phone || '',
@@ -835,6 +854,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
             showShippingInPrint: true,
             designFee: designFee,
             showDesignFeeInPrint: formData.showDesignFeeInPrint,
+            contractId: formData.contractId || null,
             status: editId ? undefined : 'พร้อมใช้', // Keep existing status if editing
             items: items.filter(i => i.name).map(i => ({
                 name: i.name,
@@ -980,9 +1000,22 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                             <div className="q-section-icon"><FileText size={18} /></div>
                             <div>
                                 <div className="q-section-title">ข้อมูลเอกสาร</div>
-                                <div className="q-section-desc">เลือกประเภทเอกสาร บัญชีธนาคาร และเลขที่เอกสาร</div>
+                                <div className="q-section-desc">ตั้งค่าอ้างอิงสัญญา ประเภทเอกสาร บัญชีธนาคาร และเลขที่เอกสาร</div>
                             </div>
                         </div>
+
+                        <div className="form-group" style={{ marginBottom: '14px' }}>
+                            <label>อ้างอิงสัญญา (เลือกจากระบบ)</label>
+                            <select name="contractId" value={formData.contractId} onChange={handleFormChange}>
+                                <option value="">-- ไม่ระบุสัญญา / ไม่ได้เชื่อมโยง --</option>
+                                {contracts.map(c => (
+                                    <option key={c.ContractID} value={c.ContractID}>
+                                        {c.ContractNo} - {c.ContractName} ({c.CustomerName})
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="form-row">
                             <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label>ประเภทเอกสาร <span className="required">*</span></label>

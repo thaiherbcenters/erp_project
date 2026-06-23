@@ -37,7 +37,7 @@ router.get('/', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query(`
             SELECT 
-                SalesOrderID, SalesOrderNo, QuotationNo, CustomerName, 
+                SalesOrderID, SalesOrderNo, QuotationNo, ContractID, CustomerName, 
                 OrderDate, DeliveryDate, GrandTotal, CustomerPONumber,
                 Status, CreatedBy, CreatedAt
             FROM SalesOrder
@@ -92,7 +92,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
         orderDate, deliveryDate,
         subTotal, discountPercent, discountAmount, afterDiscount,
         vatRate, vatAmount, shippingCost, grandTotal,
-        customerPONumber, notes, createdBy, items
+        customerPONumber, notes, createdBy, contractId, items
     } = req.body;
 
     let transaction;
@@ -127,10 +127,11 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
         request.input('customerPO', sql.NVarChar, customerPONumber || null);
         request.input('notes', sql.NVarChar, notes || '');
         request.input('createdBy', sql.NVarChar, createdBy || '');
+        request.input('contractId', sql.Int, contractId || null);
 
         const headerResult = await request.query(`
             INSERT INTO SalesOrder (
-                SalesOrderNo, QuotationID, QuotationNo, DocType,
+                SalesOrderNo, QuotationID, QuotationNo, ContractID, DocType,
                 CustomerName, Address, Phone, TaxID,
                 OrderDate, DeliveryDate,
                 SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
@@ -139,7 +140,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
             )
             OUTPUT INSERTED.SalesOrderID
             VALUES (
-                @soNo, @quotationId, @quotationNo, @docType,
+                @soNo, @quotationId, @quotationNo, @contractId, @docType,
                 @customerName, @address, @phone, @taxId,
                 @orderDate, @deliveryDate,
                 @subTotal, @discountPercent, @discountAmount, @afterDiscount,
@@ -233,7 +234,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
     } catch (err) {
         if (transaction) await transaction.rollback();
         console.error('Error creating sales order:', err);
-        res.status(500).json({ success: false, message: 'Failed to create sales order', error: err.message });
+        res.status(500).json({ success: false, message: 'Failed to create sales order: ' + err.message, error: err.message });
     }
 });
 
@@ -247,7 +248,7 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, re
         orderDate, deliveryDate,
         subTotal, discountPercent, discountAmount, afterDiscount,
         vatRate, vatAmount, shippingCost, grandTotal,
-        customerPONumber, notes, status, items
+        customerPONumber, notes, status, contractId, items
     } = req.body;
 
     let transaction;
@@ -276,6 +277,7 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, re
         request.input('customerPO', sql.NVarChar, customerPONumber || null);
         request.input('notes', sql.NVarChar, notes || '');
         request.input('status', sql.NVarChar, status || 'ร่าง');
+        request.input('contractId', sql.Int, contractId || null);
 
         await request.query(`
             UPDATE SalesOrder SET
@@ -285,7 +287,8 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, re
                 DiscountAmount = @discountAmount, AfterDiscount = @afterDiscount,
                 VatRate = @vatRate, VatAmount = @vatAmount,
                 ShippingCost = @shippingCost, GrandTotal = @grandTotal,
-                CustomerPONumber = @customerPO, Notes = @notes, Status = @status
+                CustomerPONumber = @customerPO, Notes = @notes, Status = @status,
+                ContractID = @contractId
             WHERE SalesOrderID = @id
         `);
 
@@ -319,7 +322,7 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, re
     } catch (err) {
         if (transaction) await transaction.rollback();
         console.error('Error updating sales order:', err);
-        res.status(500).json({ success: false, message: 'Failed to update sales order', error: err.message });
+        res.status(500).json({ success: false, message: 'Failed to update sales order: ' + err.message, error: err.message });
     }
 });
 

@@ -83,6 +83,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
         vatRate: 0,
         shippingCost: 0,
         customerPONumber: '',
+        contractId: '',
         notes: '',
     });
 
@@ -100,6 +101,23 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             } catch (err) { console.error('Error fetching approved QTs:', err); }
         };
         fetchApproved();
+    }, []);
+
+    // Fetch Contracts for Dropdown
+    const [contracts, setContracts] = useState([]);
+    useEffect(() => {
+        const fetchContracts = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/contracts`);
+                const json = await res.json();
+                if (json.success) {
+                    setContracts(json.data);
+                }
+            } catch (err) {
+                console.error('Error fetching contracts:', err);
+            }
+        };
+        fetchContracts();
     }, []);
 
     // Fetch existing SO for editing
@@ -123,6 +141,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                             vatRate: d.VatRate || 0,
                             shippingCost: d.ShippingCost || 0,
                             customerPONumber: d.CustomerPONumber || '',
+                            contractId: d.ContractID || '',
                             notes: d.Notes || '',
                         });
                         if (d.QuotationNo) setSelectedQT(d.QuotationNo);
@@ -159,6 +178,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                     discountPercent: d.DiscountPercent || 0,
                     vatRate: d.VatRate || 0,
                     shippingCost: d.ShippingCost || 0,
+                    contractId: d.ContractID || '',
                     notes: '',
                 }));
                 if (d.items?.length > 0) {
@@ -225,6 +245,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             discountAmount, afterDiscount, vatRate: formData.vatRate,
             vatAmount, shippingCost: shipping, grandTotal,
             customerPONumber: formData.customerPONumber,
+            contractId: formData.contractId,
             notes: formData.notes,
             createdBy: '',
             items: items.filter(i => i.name).map(i => ({
@@ -456,6 +477,32 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                         </div>
                 </div>
             )}
+
+            {/* ── อ้างอิงสัญญา ── */}
+            <div style={sectionStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border-light, #f1f5f9)' }}>
+                    <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, color: '#d97706' }}>📄</div>
+                    <div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>อ้างอิงสัญญา</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>เลือกสัญญาเพื่อผูกข้อมูล หรือข้ามถ้าไม่มี</div>
+                    </div>
+                </div>
+                <div>
+                    <select 
+                        style={inputStyle} 
+                        name="contractId" 
+                        value={formData.contractId} 
+                        onChange={handleFormChange}
+                    >
+                        <option value="">-- ไม่ระบุสัญญา / ไม่ได้เชื่อมโยง --</option>
+                        {contracts.map(c => (
+                            <option key={c.ContractID} value={c.ContractID}>
+                                {c.ContractNo} - {c.ContractName} ({c.CustomerName})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
 
             {/* ── ข้อมูลลูกค้า ── */}
             <div style={sectionStyle}>

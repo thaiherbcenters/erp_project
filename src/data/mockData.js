@@ -170,6 +170,18 @@ export const ALL_PAGES = [
           { id: 'sales_billing_form', name: 'ฟอร์มออกเอกสาร' },
         ],
       },
+      {
+        id: 'sales_poa', name: 'หนังสือมอบอำนาจ',
+        sections: [
+          { id: 'sales_poa_form', name: 'ฟอร์มหนังสือมอบอำนาจ' },
+        ],
+      },
+      {
+        id: 'sales_contracts', name: 'จัดการสัญญา',
+        sections: [
+          { id: 'sales_contracts_list', name: 'รายการสัญญา' },
+        ],
+      },
     ],
   },
 

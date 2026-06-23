@@ -1,0 +1,306 @@
+/* TemplateUploader.css */
+
+.template-uploader-container {
+    padding: 24px;
+    background-color: #f8fafc;
+    border-radius: 12px;
+    font-family: 'Sarabun', 'Inter', sans-serif;
+}
+
+.template-uploader-title {
+    display: flex;
+    align-items: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 8px;
+}
+
+.template-uploader-title svg {
+    margin-right: 12px;
+    color: #2563eb;
+}
+
+.template-uploader-subtitle {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin-bottom: 24px;
+}
+
+.template-uploader-card {
+    background-color: #ffffff;
+    padding: 24px;
+    border-radius: 16px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    max-width: 800px;
+}
+
+.template-uploader-group {
+    margin-bottom: 24px;
+}
+
+.template-uploader-label {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 8px;
+}
+
+.template-uploader-select {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #0f172a;
+    background-color: #f8fafc;
+    transition: all 0.2s ease;
+}
+
+.template-uploader-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    background-color: #ffffff;
+}
+
+.template-uploader-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.template-uploader-dropzone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 32px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #f8fafc;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    text-align: center;
+}
+
+.template-uploader-dropzone:hover {
+    background-color: #f1f5f9;
+    border-color: #94a3b8;
+    transform: translateY(-2px);
+}
+
+.template-uploader-dropzone.pdf:hover {
+    border-color: #ef4444;
+    background-color: #fef2f2;
+}
+
+.template-uploader-dropzone.json:hover {
+    border-color: #eab308;
+    background-color: #fefce8;
+}
+
+.template-uploader-dropzone svg {
+    margin-bottom: 12px;
+}
+
+.template-uploader-dropzone.pdf svg {
+    color: #ef4444;
+}
+
+.template-uploader-dropzone.json svg {
+    color: #eab308;
+}
+
+.template-uploader-dropzone-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 4px;
+}
+
+.template-uploader-dropzone-desc {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 16px;
+}
+
+.template-uploader-input-hidden {
+    display: none;
+}
+
+.template-uploader-file-selected {
+    font-size: 0.85rem;
+    color: #16a34a;
+    font-weight: 600;
+    margin-top: 8px;
+    background-color: #dcfce7;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: inline-block;
+}
+
+.template-uploader-status {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-radius: 8px;
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.template-uploader-status svg {
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.template-uploader-status.success {
+    background-color: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+}
+
+.template-uploader-status.error {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+.template-uploader-button {
+    width: 100%;
+    padding: 16px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    font-size: 1.1rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.template-uploader-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+.template-uploader-button:disabled {
+    background: #cbd5e1;
+    color: #64748b;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.template-uploader-button svg {
+    margin-right: 10px;
+}
+
+/* Spinner Animation */
+.template-uploader-spinner {
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top: 3px solid #ffffff;
+    width: 20px;
+    height: 20px;
+    animation: template-spin 1s linear infinite;
+    margin-right: 12px;
+}
+
+@keyframes template-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Multi-page styling */
+.template-uploader-pages {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.template-uploader-page-block {
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    background-color: #ffffff;
+}
+
+.template-uploader-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.template-uploader-page-header h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.template-uploader-btn-remove {
+    display: flex;
+    align-items: center;
+    color: #ef4444;
+    background: none;
+    border: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.template-uploader-btn-remove:hover {
+    color: #b91c1c;
+}
+
+.template-uploader-btn-remove svg {
+    margin-right: 4px;
+}
+
+.template-uploader-btn-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 12px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    background-color: transparent;
+    color: #475569;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 32px;
+}
+
+.template-uploader-btn-add:hover {
+    border-color: #3b82f6;
+    color: #2563eb;
+    background-color: #eff6ff;
+}
+
+.template-uploader-btn-add svg {
+    margin-right: 8px;
+}
+
+@media (max-width: 768px) {
+    .template-uploader-grid {
+        grid-template-columns: 1fr;
+    }
+}

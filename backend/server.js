@@ -54,6 +54,10 @@ const shippingRoutes = require('./routes/shipping');
 const quotationRoutes = require('./routes/quotations');
 const salesOrderRoutes = require('./routes/sales-orders');
 const auditLogRoutes = require('./routes/audit-logs');
+const legalDocumentRoutes = require('./routes/legalDocuments');
+const contractRoutes = require('./routes/contracts');
+const printRoutes = require('./routes/print');
+const templateRoutes = require('./routes/templates');
 
 // ── Rate Limiting สำหรับ Login (ป้องกัน brute force) ──
 const loginLimiter = rateLimit({
@@ -88,10 +92,15 @@ app.use('/api/planner', plannerRoutes);
 app.use('/api/rnd', rndRoutes);
 app.use('/api/packaging', packagingRoutes);
 app.use('/api/stock', stockRoutes);
+app.use('/api/legal-documents', legalDocumentRoutes);
+app.use('/api/print', printRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/quotations', quotationRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
+app.use('/api/legal-documents', legalDocumentRoutes);
+app.use('/api/contracts', contractRoutes);
+app.use('/api/templates', templateRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

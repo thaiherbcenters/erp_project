@@ -15,9 +15,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Users, Building2, Wrench,
-    Search, Plus, Pencil, Trash2, KeyRound, X, UserPlus, ShieldCheck, FileText
+    Search, Plus, Pencil, Trash2, KeyRound, X, UserPlus, ShieldCheck, FileText, Upload
 } from 'lucide-react';
 import PermissionManager from './PermissionManager';
+import TemplateUploader from '../components/TemplateUploader';
 import './Settings.css';
 import API_BASE from '../config';
 const API = API_BASE;
@@ -85,6 +86,9 @@ export default function Settings() {
                 <button className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`} onClick={() => setActiveTab('general')}>
                     <SettingsIcon size={16} /> ทั่วไป
                 </button>
+                <button className={`settings-tab ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}>
+                    <Upload size={16} /> เทมเพลต PDF
+                </button>
                 <button className={`settings-tab ${activeTab === 'audit_logs' ? 'active' : ''}`} onClick={() => setActiveTab('audit_logs')}>
                     <FileText size={16} /> ประวัติการใช้งาน
                 </button>
@@ -96,6 +100,7 @@ export default function Settings() {
             {['roles', 'settings_roles'].includes(activeTab) && <RolesTab showToast={showToast} />}
             {activeTab === 'permissions' && <div className="settings-permissions-wrapper"><PermissionManager isEmbed={true} /></div>}
             {activeTab === 'general' && <GeneralTab />}
+            {activeTab === 'templates' && <div className="p-6"><TemplateUploader /></div>}
             {activeTab === 'audit_logs' && <AuditLogTab />}
 
             {/* Toast */}

@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
 
         const result = await request.query(`
             SELECT 
-                QuotationID, QuotationNo, CustomerName, BillDate, ValidUntil, 
+                QuotationID, QuotationNo, ContractID, CustomerName, BillDate, ValidUntil, 
                 GrandTotal, Status, CreatedAt, Revision
             FROM Quotation
             ${whereClause}
@@ -60,7 +60,7 @@ router.get('/status/approved', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query(`
             SELECT 
-                QuotationID, QuotationNo, CustomerName, BillDate, 
+                QuotationID, QuotationNo, ContractID, CustomerName, BillDate, 
                 GrandTotal, Status
             FROM Quotation
             WHERE Status != N'สร้าง SO แล้ว'
@@ -114,7 +114,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
         depositPercent, depositAmount, remainingAmount, signer, notes, 
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
         designFee, showDesignFeeInPrint,
-        status, items 
+        status, contractId, items 
     } = req.body;
 
     let transaction;
@@ -159,17 +159,18 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
         request.input('designFee', sql.Decimal(18,2), designFee || 0);
         request.input('showDesignFee', sql.Bit, showDesignFeeInPrint ? 1 : 0);
         request.input('status', sql.NVarChar, status || 'ร่าง');
+        request.input('contractId', sql.Int, contractId || null);
 
         const headerResult = await request.query(`
             INSERT INTO Quotation (
-                QuotationNo, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
+                QuotationNo, ContractID, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status
             )
             OUTPUT INSERTED.QuotationID
             VALUES (
-                @quotationNo, @docType, @bankAccount, @customerName, @address, @phone, @taxId,
+                @quotationNo, @contractId, @docType, @bankAccount, @customerName, @address, @phone, @taxId,
                 @billDate, @validUntil, @subTotal, @discountPercent, @discountAmount, @afterDiscount,
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
                 @remainingAmount, @signer, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status
@@ -248,7 +249,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
     } catch (err) {
         if (transaction) await transaction.rollback();
         console.error('Error creating quotation:', err);
-        res.status(500).json({ success: false, message: 'Failed to create quotation', error: err.message });
+        res.status(500).json({ success: false, message: 'Failed to create quotation: ' + err.message, error: err.message });
     }
 });
 
@@ -262,7 +263,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSch
         depositPercent, depositAmount, remainingAmount, signer, notes, 
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
         designFee, showDesignFeeInPrint,
-        status, items 
+        status, contractId, items 
     } = req.body;
 
     let transaction;
@@ -305,6 +306,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSch
         request.input('designFee', sql.Decimal(18,2), designFee || 0);
         request.input('showDesignFee', sql.Bit, showDesignFeeInPrint ? 1 : 0);
         request.input('status', sql.NVarChar, status || 'ร่าง');
+        request.input('contractId', sql.Int, contractId || null);
 
         // 1. Backup Current Version to History Table before modifying
         const backupReq = new sql.Request(transaction);
@@ -393,7 +395,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSch
     } catch (err) {
         if (transaction) await transaction.rollback();
         console.error('Error updating quotation:', err);
-        res.status(500).json({ success: false, message: 'Failed to update quotation', error: err.message });
+        res.status(500).json({ success: false, message: 'Failed to update quotation: ' + err.message, error: err.message });
     }
 });
 

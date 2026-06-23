@@ -1,0 +1,113 @@
+{
+  "templateName": "4.1 แบบคำรับรองและหนังสือให้ความยินยอมสำหร.pdf",
+  "templateConfig": {
+    "defaultFontSize": 7,
+    "defaultFontFamily": "Sarabun"
+  },
+  "fields": [
+    {
+      "id": "nlp_1781932844389_gv6ef1",
+      "name": "Auto Field 1",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 69.22650157545146,
+      "yPercent": 17.97164856829276,
+      "widthPct": 21.68030154666028,
+      "heightPct": 1.8,
+      "query": "SELECT TOP 1 WrittenAt \nFROM LegalDocuments \nORDER BY DocumentId DESC;"
+    },
+    {
+      "id": "nlp_1781932844389_xxtakm",
+      "name": "Auto Field 2",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 67.9699687416662,
+      "yPercent": 21.24470873872638,
+      "widthPct": 22.49718169843338,
+      "heightPct": 1.8,
+      "query": "SELECT TOP 1   OperatorIDExpiryDate\nFROM LegalDocuments \nORDER BY DocumentId DESC;"
+    },
+    {
+      "id": "nlp_1781932844389_o4hktr",
+      "name": "Auto Field 3",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 55.54399224030124,
+      "yPercent": 26.65573926263778,
+      "widthPct": 34.94946338020533,
+      "heightPct": 1.8,
+      "query": ""
+    },
+    {
+      "id": "nlp_cb_1781932844389_bf6dy6",
+      "name": "Auto Checkbox 4",
+      "type": "checkbox",
+      "pageIndex": 1,
+      "xPercent": 26.187596586709667,
+      "yPercent": 29.153601292284296,
+      "widthPct": 2.388691796008869,
+      "heightPct": 1.8,
+      "query": "SELECT TOP 1   ProdTypeHealthProduct\nFROM LegalDocuments \nORDER BY DocumentId DESC;"
+    },
+    {
+      "id": "nlp_cb_1781932844389_ibgsmd",
+      "name": "Auto Checkbox 5",
+      "type": "checkbox",
+      "pageIndex": 1,
+      "xPercent": 25.98602432305314,
+      "yPercent": 31.66215317369821,
+      "widthPct": 2.388691796008869,
+      "heightPct": 1.8
+    },
+    {
+      "id": "nlp_cb_1781932844389_nytfpo",
+      "name": "Auto Checkbox 6",
+      "type": "checkbox",
+      "pageIndex": 1,
+      "xPercent": 59.798091782570715,
+      "yPercent": 31.66215317369821,
+      "widthPct": 2.3886917960088736,
+      "heightPct": 1.8
+    },
+    {
+      "id": "nlp_1781932844389_banoza",
+      "name": "Auto Field 7",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 29.734739737242457,
+      "yPercent": 34.854855568225,
+      "widthPct": 60.75870580465096,
+      "heightPct": 1.8
+    },
+    {
+      "id": "nlp_1781932844389_atppdl",
+      "name": "Auto Field 8",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 20.088118797739426,
+      "yPercent": 37.32064804256936,
+      "widthPct": 70.4053603395313,
+      "heightPct": 1.8
+    },
+    {
+      "id": "nlp_1781932844389_gsha2l",
+      "name": "Auto Field 9",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 57.517973184108236,
+      "yPercent": 77.14984796655264,
+      "widthPct": 23.433033773334113,
+      "heightPct": 1.8
+    },
+    {
+      "id": "nlp_1781932844389_cdjw7v",
+      "name": "Auto Field 10",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 56.47053811395551,
+      "yPercent": 79.615640440897,
+      "widthPct": 27.394555029228133,
+      "heightPct": 1.8
+    }
+  ]
+}

@@ -14,13 +14,16 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
-import { Eye, Edit, Trash2, Clock, History, X, Send } from 'lucide-react';
+import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText } from 'lucide-react';
 import { MOCK_CUSTOMERS } from '../data/mockData';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
 import BillingForm from '../components/BillingForm';
+import PowerOfAttorneyForm from '../components/PowerOfAttorneyForm';
+import ContractManagement from '../components/ContractManagement';
 import API_BASE from '../config';
 import './PageCommon.css';
 import './DocumentControl.css';
@@ -54,6 +57,12 @@ export default function Sales() {
     const [editingSOId, setEditingSOId] = useState(null);
     const [isSOViewOnly, setIsSOViewOnly] = useState(false);
 
+    // ── State: POA ──
+    const [showPOAForm, setShowPOAForm] = useState(false);
+    const [localPOAs, setLocalPOAs] = useState([]);
+    const [editingPOAId, setEditingPOAId] = useState(null);
+    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+
     // ── Fetch ข้อมูล Quotations (with Pagination) ──
     useEffect(() => {
         const fetchQuotations = async () => {
@@ -81,6 +90,64 @@ export default function Sales() {
         };
         fetchSalesOrders();
     }, [showSOForm]);
+
+    // ── Fetch ข้อมูล POA ──
+    useEffect(() => {
+        const fetchPOAs = async () => {
+            if (activeTab !== 'sales_poa') return;
+            try {
+                const res = await fetch(`${API_BASE}/legal-documents?type=poa&page=${poaPagination.page}&limit=${poaPagination.limit}`);
+                const json = await res.json();
+                if (json.success) {
+                    setLocalPOAs(json.data || []);
+                    if (json.pagination) setPoaPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                }
+            } catch (err) { console.error('Error fetching POAs:', err); }
+        };
+        fetchPOAs();
+    }, [activeTab, poaPagination.page, showPOAForm]);
+
+    // ── Delete POA ──
+    const handleDeletePOA = async (id) => {
+        const confirmed = await showConfirm('ยืนยันการลบ', 'คุณต้องการลบหนังสือมอบอำนาจนี้ใช่หรือไม่?');
+        if (!confirmed) return;
+        try {
+            const res = await fetch(`${API_BASE}/legal-documents/${id}`, { method: 'DELETE' });
+            const json = await res.json();
+            if (json.success) {
+                showAlert('สำเร็จ', 'ลบเอกสารเรียบร้อยแล้ว', 'success');
+                setLocalPOAs(prev => prev.filter(p => p.DocumentID !== id));
+            } else {
+                showAlert('ข้อผิดพลาด', json.message, 'error');
+            }
+        } catch (err) {
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถลบเอกสารได้', 'error');
+        }
+    };
+
+    const handlePrintPOA = async (documentId) => {
+        try {
+            showAlert('รอสักครู่', 'กำลังสร้างเอกสาร PDF...', 'info');
+            const printPayload = { documentType: 'poa', documentId };
+            const printResponse = await fetch(`${API_BASE}/print`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(printPayload)
+            });
+
+            if (printResponse.ok) {
+                const blob = await printResponse.blob();
+                const url = window.URL.createObjectURL(blob);
+                window.open(url, '_blank');
+                showAlert('สำเร็จ', 'เปิดเอกสาร PDF แล้ว', 'success');
+            } else {
+                showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถสร้างเอกสาร PDF ได้', 'error');
+            }
+        } catch (error) {
+            console.error('Error printing POA:', error);
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับระบบได้', 'error');
+        }
+    };
 
     // ── Fetch History List ──
     const handleViewHistory = async (id) => {
@@ -207,6 +274,9 @@ export default function Sales() {
             case 'sales_customers': return 'จัดการข้อมูลลูกค้า';
             case 'sales_quotation': return 'ใบเสนอราคา';
             case 'sales_orders': return 'คำสั่งซื้อ';
+            case 'sales_poa': return 'หนังสือมอบอำนาจ';
+            case 'sales_contracts': return 'จัดการสัญญา';
+            case 'sales_corp_rep': return 'หนังสือแต่งตั้งผู้แทนนิติบุคคล';
             default: return 'ฝ่ายขาย';
         }
     };
@@ -217,6 +287,9 @@ export default function Sales() {
             case 'sales_customers': return 'จัดการข้อมูลและรายชื่อลูกค้าทั้งหมดในระบบ';
             case 'sales_quotation': return 'สร้างและจัดการข้อมูลเอกสารใบเสนอราคา (Quotation)';
             case 'sales_orders': return 'สร้างและจัดการข้อมูลคำสั่งซื้อ (Sales Order)';
+            case 'sales_poa': return 'สร้างและจัดการหนังสือมอบอำนาจ';
+            case 'sales_contracts': return 'เพิ่มและลบสัญญาระหว่างบริษัทกับลูกค้า';
+            case 'sales_corp_rep': return 'สร้างและจัดการหนังสือแต่งตั้งผู้แทนนิติบุคคล';
             default: return 'จัดการข้อมูลลูกค้า ใบเสนอราคา และคำสั่งซื้อ';
         }
     };
@@ -505,7 +578,6 @@ export default function Sales() {
                         )}
 
                         {/* History Modal */}
-                        {/* History Modal */}
                         {showHistoryModal && (
                             <div className="pdf-preview-overlay" onClick={() => setShowHistoryModal(false)}>
                                 <div className="pdf-preview-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', height: 'auto', padding: '24px', maxHeight: '80vh', overflowY: 'auto' }}>
@@ -655,9 +727,112 @@ export default function Sales() {
             {/* ── Tab: Billing ── */}
             {(activeTab === 'sales_billing' && hasSubPermission('sales_billing')) && (
                 <div className="subpage-content" key="sales_billing">
-                    <BillingForm onBack={() => window.history.back()} />
+                    <BillingForm />
+                </div>
+            )}
+
+            {/* ── Tab: หนังสือมอบอำนาจ ── */}
+            {(activeTab === 'sales_poa' && hasSubPermission('sales_poa')) && (
+                showPOAForm ? (
+                    <div className="subpage-content" key="sales_poa_form">
+                        <PowerOfAttorneyForm 
+                            documentId={editingPOAId}
+                            onBack={() => { setShowPOAForm(false); setEditingPOAId(null); }} 
+                        />
+                    </div>
+                ) : (
+                    <div className="subpage-content" key="sales_poa_list">
+                        <div className="toolbar" style={{ justifyContent: 'flex-end' }}>
+                            <button 
+                                className="btn-primary" 
+                                onClick={() => { setEditingPOAId(null); setShowPOAForm(true); }}
+                            >
+                                <Plus size={16} /> สร้างหนังสือมอบอำนาจ
+                            </button>
+                        </div>
+                        <div className="table-card card">
+                            <div className="table-responsive">
+                                <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>เลขที่เอกสาร</th>
+                                        <th>วันที่เอกสาร</th>
+                                        <th>ผู้มอบอำนาจ</th>
+                                        <th>ผู้รับมอบอำนาจ</th>
+                                        <th>สถานะ</th>
+                                        <th style={{ textAlign: 'center' }}>การจัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {localPOAs.length === 0 ? (
+                                        <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลหนังสือมอบอำนาจ</td></tr>
+                                    ) : localPOAs.map(p => (
+                                        <tr key={p.DocumentID}>
+                                            <td>{p.DocumentNo || '-'}</td>
+                                            <td>{p.DocumentDate ? new Date(p.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
+                                            <td>{p.GrantorName || '-'}</td>
+                                            <td>{p.GranteeName || '-'}</td>
+                                            <td>
+                                                <span className={`badge ${p.Status === 'อนุมัติ' ? 'badge-success' : p.Status === 'รอตรวจสอบ' ? 'badge-info' : 'badge-neutral'}`}>
+                                                    {p.Status || 'ร่าง'}
+                                                </span>
+                                            </td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <div className="action-buttons justify-center">
+                                                    <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดู/พิมพ์ PDF" onClick={() => handlePrintPOA(p.DocumentID)}>
+                                                        <FileText size={16} />
+                                                    </button>
+                                                    <button className="btn-icon" title="แก้ไข" onClick={() => { setEditingPOAId(p.DocumentID); setShowPOAForm(true); }}>
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" title="ลบ" onClick={() => handleDeletePOA(p.DocumentID)}>
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* Pagination Controls */}
+                        {poaPagination.totalPages > 1 && (
+                            <div className="pagination-controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', padding: '15px 0' }}>
+                                <button 
+                                    className="btn-secondary"
+                                    disabled={poaPagination.page === 1}
+                                    onClick={() => setPoaPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                >
+                                    ก่อนหน้า
+                                </button>
+                                <span>หน้า {poaPagination.page} / {poaPagination.totalPages}</span>
+                                <button 
+                                    className="btn-secondary"
+                                    disabled={poaPagination.page === poaPagination.totalPages}
+                                    onClick={() => setPoaPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                >
+                                    ถัดไป
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                )
+            )}
+
+            {/* ── Tab: หนังสือแต่งตั้งผู้แทนนิติบุคคล ── */}
+            {(activeTab === 'sales_corp_rep' && hasSubPermission('sales_corp_rep')) && (
+                <div className="subpage-content" key="sales_corp_rep">
+                    <CorporateRepresentativeForm onBack={() => {}} />
+                </div>
+            )}
+
+            {/* ── Tab: จัดการสัญญา ── */}
+            {(activeTab === 'sales_contracts' && hasSubPermission('sales_contracts')) && (
+                <div className="subpage-content" key="sales_contracts">
+                    <ContractManagement />
                 </div>
             )}
         </div>
     );
-}
+};

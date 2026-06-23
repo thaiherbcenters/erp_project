@@ -45,6 +45,7 @@ const createQuotationSchema = z.object({
     showShippingInPrint: z.boolean().optional().default(false),
     designFee: z.number().min(0).default(0),
     showDesignFeeInPrint: z.boolean().optional().default(false),
+    contractId: z.union([z.string(), z.number()]).nullable().optional(),
     status: z.string().optional().default('ร่าง'),
     items: z.array(quotationItemSchema).optional().default([]),
 });
