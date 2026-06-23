@@ -230,10 +230,24 @@
 }
 
 .template-uploader-page-block {
+    background: #fff;
     border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 20px;
-    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s ease;
+}
+
+.template-uploader-page-block.dragging {
+    opacity: 0.5;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: scale(0.98);
+}
+
+.template-uploader-page-block.drag-over {
+    border: 2px dashed var(--primary);
+    background: #f8fafc;
 }
 
 .template-uploader-page-header {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, FileJson, CheckCircle, AlertCircle, Plus, Trash2, Check, RefreshCw } from 'lucide-react';
+import { Upload, FileText, FileJson, CheckCircle, AlertCircle, Plus, Trash2, Check, RefreshCw, GripVertical } from 'lucide-react';
 import API_BASE from '../config';
 import './TemplateUploader.css';
 
@@ -9,6 +9,42 @@ export default function TemplateUploader() {
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [status, setStatus] = useState(null);
+
+    // ── Drag and Drop State ──
+    const [draggedItemIndex, setDraggedItemIndex] = useState(null);
+    const [dragOverItemIndex, setDragOverItemIndex] = useState(null);
+
+    const handleDragStart = (e, index) => {
+        setDraggedItemIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragEnter = (e, index) => {
+        setDragOverItemIndex(index);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedItemIndex(null);
+        setDragOverItemIndex(null);
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault(); // Necessary to allow dropping
+    };
+
+    const handleDrop = (e, index) => {
+        e.preventDefault();
+        if (draggedItemIndex === null || draggedItemIndex === index) return;
+        
+        const newPages = [...pages];
+        const draggedItem = newPages[draggedItemIndex];
+        newPages.splice(draggedItemIndex, 1);
+        newPages.splice(index, 0, draggedItem);
+        
+        setPages(newPages);
+        setDraggedItemIndex(null);
+        setDragOverItemIndex(null);
+    };
 
     // Fetch existing templates when documentType changes
     useEffect(() => {
@@ -160,9 +196,23 @@ export default function TemplateUploader() {
 
                 <div className="template-uploader-pages">
                     {pages.map((page, index) => (
-                        <div key={page.id} className="template-uploader-page-block">
+                        <div 
+                            key={page.id} 
+                            className={`template-uploader-page-block ${draggedItemIndex === index ? 'dragging' : ''} ${dragOverItemIndex === index ? 'drag-over' : ''}`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, index)}
+                            onDragEnter={(e) => handleDragEnter(e, index)}
+                            onDragEnd={handleDragEnd}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, index)}
+                        >
                             <div className="template-uploader-page-header">
-                                <h3>หน้าที่ {index + 1} {page.isExisting && <span className="text-sm font-normal text-green-600 bg-green-50 px-2 py-1 rounded ml-2">ใช้ไฟล์เดิม</span>}</h3>
+                                <div className="flex items-center gap-2">
+                                    <div className="cursor-move text-gray-400 hover:text-gray-600 transition-colors p-1" title="ลากเพื่อสลับตำแหน่ง">
+                                        <GripVertical size={20} />
+                                    </div>
+                                    <h3>หน้าที่ {index + 1} {page.isExisting && <span className="text-sm font-normal text-green-600 bg-green-50 px-2 py-1 rounded ml-2">ใช้ไฟล์เดิม</span>}</h3>
+                                </div>
                                 <button 
                                     onClick={() => handleRemovePage(page.id)}
                                     className="template-uploader-btn-remove"
