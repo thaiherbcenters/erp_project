@@ -151,9 +151,17 @@ router.post('/', async (req, res) => {
                         rawValue = new Intl.DateTimeFormat('th-TH', { 
                             day: 'numeric', month: 'long', year: 'numeric' 
                         }).format(rawValue);
+                    } else if (typeof rawValue === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(rawValue)) {
+                        const dateObj = new Date(rawValue);
+                        if (!isNaN(dateObj)) {
+                            rawValue = new Intl.DateTimeFormat('th-TH', { 
+                                day: 'numeric', month: 'long', year: 'numeric' 
+                            }).format(dateObj);
+                        }
                     }
                     
-                    const value = String(rawValue || '');
+                    let value = String(rawValue || '');
+                    
                     if (!value) continue;
 
                     const pageIndex = (field.pageIndex || 1) - 1;
@@ -246,13 +254,56 @@ router.post('/', async (req, res) => {
                             currentX += activeFont.widthOfTextAtSize(chars[i], fieldFontSize) + spacing;
                         }
                     } else {
-                        pdfPage.drawText(value, {
-                            x: x,
-                            y: adjustedY,
-                            size: fieldFontSize,
-                            font: activeFont,
-                            color: rgb(0.15, 0.15, 0.15),
-                        });
+                        // Fix for Thai Sara Am and Tone Marks in pdf-lib (Sarabun font)
+                        // This intercepts clusters like น้ำ and draws นำ first to maintain kerning,
+                        // then explicitly overlays the tone mark ้ at the correct X coordinate.
+                        const amToneRegex = /([ก-ฮ][ัิ-ู]?)([\u0E48-\u0E4C])\u0E33|([ก-ฮ][ัิ-ู]?)\u0E33([\u0E48-\u0E4C])/g;
+                        if (amToneRegex.test(value)) {
+                            amToneRegex.lastIndex = 0;
+                            let currentX = x;
+                            let lastIndex = 0;
+                            let match;
+                            
+                            while ((match = amToneRegex.exec(value)) !== null) {
+                                // Draw preceding text normally
+                                const beforeStr = value.substring(lastIndex, match.index);
+                                if (beforeStr) {
+                                    pdfPage.drawText(beforeStr, { x: currentX, y: adjustedY, size: fieldFontSize, font: activeFont, color: rgb(0.15, 0.15, 0.15) });
+                                    currentX += activeFont.widthOfTextAtSize(beforeStr, fieldFontSize);
+                                }
+                                
+                                const base = match[1] || match[3];
+                                const tone = match[2] || match[4];
+                                
+                                // Draw base + ำ (e.g. นำ) to preserve the negative left bearing kerning of ำ
+                                const baseAm = base + '\u0E33';
+                                pdfPage.drawText(baseAm, { x: currentX, y: adjustedY, size: fieldFontSize, font: activeFont, color: rgb(0.15, 0.15, 0.15) });
+                                
+                                // Tone marks have negative left bearings in Thai TTF fonts.
+                                // Drawing it at currentX + width(base) places it perfectly over the base.
+                                const toneX = currentX + activeFont.widthOfTextAtSize(base, fieldFontSize);
+                                // Shift Tone Mark UP by 25% of font size to avoid vertical overlap with Sara Am's circle
+                                const toneY = adjustedY + (fieldFontSize * 0.25);
+                                pdfPage.drawText(tone, { x: toneX, y: toneY, size: fieldFontSize, font: activeFont, color: rgb(0.15, 0.15, 0.15) });
+                                
+                                currentX += activeFont.widthOfTextAtSize(baseAm, fieldFontSize);
+                                lastIndex = amToneRegex.lastIndex;
+                            }
+                            
+                            const remaining = value.substring(lastIndex);
+                            if (remaining) {
+                                pdfPage.drawText(remaining, { x: currentX, y: adjustedY, size: fieldFontSize, font: activeFont, color: rgb(0.15, 0.15, 0.15) });
+                            }
+                        } else {
+                            // Standard rendering
+                            pdfPage.drawText(value, {
+                                x: x,
+                                y: adjustedY,
+                                size: fieldFontSize,
+                                font: activeFont,
+                                color: rgb(0.15, 0.15, 0.15),
+                            });
+                        }
                     }
                 }
             }

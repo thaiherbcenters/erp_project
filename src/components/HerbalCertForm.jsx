@@ -25,10 +25,6 @@ const HerbalCertForm = forwardRef(({ documentId, customerData, contractId, embed
         refProductNameThai: '',
         refRegistrationNo: '',
         certificateHolder: '',
-        condition1: true,
-        condition2: true,
-        condition3: true,
-        signerName: '',
         signDate: '',
     });
 
@@ -189,41 +185,9 @@ const HerbalCertForm = forwardRef(({ documentId, customerData, contractId, embed
                 </div>
             </div>
 
-            <div className="card" style={{ padding: '24px', background: '#fff', marginBottom: '20px' }}>
-                <h4 style={sectionTitleStyle}><FileText size={18} color="#2563eb" /> เงื่อนไขการรับรอง</h4>
-                
-                <div style={checkboxRowStyle}>
-                    <input type="checkbox" name="condition1" checked={form.condition1} onChange={handleChange} style={{ marginTop: '4px', transform: 'scale(1.2)' }} />
-                    <p style={checkboxDescStyle}>
-                        <b>๑.</b> ผลิตโดยผู้ผลิตและสถานที่ผลิตในประเทศไทยทุกขั้นตอนการผลิตเดียวกันกับทะเบียนตำรับแม่แบบ
-                    </p>
-                </div>
-                
-                <div style={checkboxRowStyle}>
-                    <input type="checkbox" name="condition2" checked={form.condition2} onChange={handleChange} style={{ marginTop: '4px', transform: 'scale(1.2)' }} />
-                    <p style={checkboxDescStyle}>
-                        <b>๒.</b> ผลิตภัณฑ์สมุนไพรที่ขอใช้ชื่อการค้าใหม่และทะเบียนตำรับแม่แบบมีความเหมือนกันทุกประการ
-                        ในด้านสูตรตำรับ กระบวนการผลิต วิธีควบคุมคุณภาพและข้อกำหนดเฉพาะของผลิตภัณฑ์สมุนไพร
-                        ข้อมูลด้านความปลอดภัย และสรรพคุณของผลิตภัณฑ์สมุนไพร
-                    </p>
-                </div>
-
-                <div style={checkboxRowStyle}>
-                    <input type="checkbox" name="condition3" checked={form.condition3} onChange={handleChange} style={{ marginTop: '4px', transform: 'scale(1.2)' }} />
-                    <p style={checkboxDescStyle}>
-                        <b>๓.</b> เอกสารอื่นตามที่กำหนดไว้ในมาตรา ๓๖ แห่งพระราชบัญญัติผลิตภัณฑ์สมุนไพร พ.ศ.๒๕๖๒
-                        เป็นเอกสารฉบับเดียวกันกับทะเบียนตำรับแม่แบบที่ถูกอ้างอิง พร้อมรับรองว่าเป็นเอกสารฉบับเดียวกัน
-                    </p>
-                </div>
-            </div>
-
             <div className="card" style={{ padding: '24px', background: '#fff' }}>
                 <h4 style={sectionTitleStyle}><FileText size={18} color="#2563eb" /> ผู้ให้คำรับรอง</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div>
-                        <label style={labelStyle}>ลงลายมือชื่อ (ชื่อผู้ให้คำรับรอง)</label>
-                        <input name="signerName" value={form.signerName} onChange={handleChange} style={inputStyle} />
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
                     <div>
                         <label style={labelStyle}>วันที่ลงนาม</label>
                         <input name="signDate" type="date" value={form.signDate} onChange={handleChange} style={inputStyle} />

@@ -115,7 +115,8 @@ router.post('/', async (req, res) => {
             .input('ContractID', sql.Int, data.contractId || null)
             
             .input('ApplicantType', sql.NVarChar, data.personType || data.grantorType || null)
-            .input('ApplicantName', sql.NVarChar, data.licenseeName || data.grantorName || null)
+            .input('ApplicantPrefix', sql.NVarChar, data.applicantPrefix || null)
+            .input('ApplicantName', sql.NVarChar, data.applicantName || data.licenseeName || data.grantorName || null)
             .input('ApplicantCitizenID', sql.NVarChar, data.citizenId || data.grantorCitizenId || null)
             .input('ApplicantCitizenIDExpiryDate', sql.Date, data.citizenIdExpiry || data.grantorCitizenIdExpiryDate || null)
             .input('ApplicantJuristicID', sql.NVarChar, data.juristicId || data.grantorJuristicId || null)
@@ -173,31 +174,39 @@ router.post('/', async (req, res) => {
             .input('HasNoticeNo', sql.Bit, data.hasNoticeNo ? 1 : 0)
             .input('RegNoticeNo', sql.NVarChar, data.regNoticeNo || null)
             
+            .input('ReceiptNo', sql.NVarChar, data.receiptNo || null)
+            .input('RefProductNameThai', sql.NVarChar, data.refProductNameThai || null)
+            .input('RefRegistrationNo', sql.NVarChar, data.refRegistrationNo || null)
+            .input('CertificateHolder', sql.NVarChar, data.certificateHolder || null)
+            .input('SignDate', sql.Date, data.signDate || null)
+            
             .input('AttachLicenseCopy', sql.Bit, data.attachLicenseCopy ? 1 : 0)
             
             .input('Status', sql.NVarChar, data.status || 'ร่าง')
             .query(`
                 INSERT INTO HerbalCertDocuments (
                     DocumentNo, WrittenAt, DocumentDate, DocumentType, ContractID,
-                    ApplicantType, ApplicantName, ApplicantCitizenID, ApplicantCitizenIDExpiryDate, ApplicantJuristicID, LicenseNo, JuristicIDExpiryDate,
+                    ApplicantType, ApplicantPrefix, ApplicantName, ApplicantCitizenID, ApplicantCitizenIDExpiryDate, ApplicantJuristicID, LicenseNo, JuristicIDExpiryDate,
                     OperatorPrefix, OperatorName, OperatorCitizenID, OperatorIDExpiryDate,
                     EstablishmentName, EstAddressNo, EstBuilding, EstMoo, EstSoi, EstRoad, EstSubDistrict, EstDistrict, EstProvince, EstPostcode, EstPhone, EstFax, EstEmail,
                     IsProducer, IsImporter, ProdTypeHerbalMedicine, ProdTypeTraditionalMed, ProdTypeDevMed, ProdTypeHealthProduct, ProdTypeCosmetic, ProdTypeDetail,
                     RequestType, ReqTypeRegister, ReqTypeNotifyDetail, ReqTypeNotify, ReqTypeRenew, 
                     SubmitterIsIn, SubmitFormType, SubmitFormTypeAmend, SubmitFormTypeReplace, SubmitFormTypeOtherCheck, SubmitFormOther, 
                     ProductName, ProductReceiveNo, SubmitterIsOr, ProductNameAlt, HasRegNo, RegNo, HasRegDetail, RegDetailNo, HasNoticeNo, RegNoticeNo,
+                    ReceiptNo, RefProductNameThai, RefRegistrationNo, CertificateHolder, SignDate,
                     AttachLicenseCopy,
                     Status, CreatedAt, UpdatedAt
                 ) OUTPUT INSERTED.DocumentID
                 VALUES (
                     @DocumentNo, @WrittenAt, @DocumentDate, @DocumentType, @ContractID,
-                    @ApplicantType, @ApplicantName, @ApplicantCitizenID, @ApplicantCitizenIDExpiryDate, @ApplicantJuristicID, @LicenseNo, @JuristicIDExpiryDate,
+                    @ApplicantType, @ApplicantPrefix, @ApplicantName, @ApplicantCitizenID, @ApplicantCitizenIDExpiryDate, @ApplicantJuristicID, @LicenseNo, @JuristicIDExpiryDate,
                     @OperatorPrefix, @OperatorName, @OperatorCitizenID, @OperatorIDExpiryDate,
                     @EstablishmentName, @EstAddressNo, @EstBuilding, @EstMoo, @EstSoi, @EstRoad, @EstSubDistrict, @EstDistrict, @EstProvince, @EstPostcode, @EstPhone, @EstFax, @EstEmail,
                     @IsProducer, @IsImporter, @ProdTypeHerbalMedicine, @ProdTypeTraditionalMed, @ProdTypeDevMed, @ProdTypeHealthProduct, @ProdTypeCosmetic, @ProdTypeDetail,
                     @RequestType, @ReqTypeRegister, @ReqTypeNotifyDetail, @ReqTypeNotify, @ReqTypeRenew,
                     @SubmitterIsIn, @SubmitFormType, @SubmitFormTypeAmend, @SubmitFormTypeReplace, @SubmitFormTypeOtherCheck, @SubmitFormOther,
                     @ProductName, @ProductReceiveNo, @SubmitterIsOr, @ProductNameAlt, @HasRegNo, @RegNo, @HasRegDetail, @RegDetailNo, @HasNoticeNo, @RegNoticeNo,
+                    @ReceiptNo, @RefProductNameThai, @RefRegistrationNo, @CertificateHolder, @SignDate,
                     @AttachLicenseCopy,
                     @Status, GETDATE(), GETDATE()
                 )
@@ -226,7 +235,8 @@ router.put('/:id', async (req, res) => {
             .input('ContractID', sql.Int, data.contractId || null)
             
             .input('ApplicantType', sql.NVarChar, data.personType || data.grantorType || null)
-            .input('ApplicantName', sql.NVarChar, data.licenseeName || data.grantorName || null)
+            .input('ApplicantPrefix', sql.NVarChar, data.applicantPrefix || null)
+            .input('ApplicantName', sql.NVarChar, data.applicantName || data.licenseeName || data.grantorName || null)
             .input('ApplicantCitizenID', sql.NVarChar, data.citizenId || data.grantorCitizenId || null)
             .input('ApplicantCitizenIDExpiryDate', sql.Date, data.citizenIdExpiry || data.grantorCitizenIdExpiryDate || null)
             .input('ApplicantJuristicID', sql.NVarChar, data.juristicId || data.grantorJuristicId || null)
@@ -284,6 +294,12 @@ router.put('/:id', async (req, res) => {
             .input('HasNoticeNo', sql.Bit, data.hasNoticeNo ? 1 : 0)
             .input('RegNoticeNo', sql.NVarChar, data.regNoticeNo || null)
             
+            .input('ReceiptNo', sql.NVarChar, data.receiptNo || null)
+            .input('RefProductNameThai', sql.NVarChar, data.refProductNameThai || null)
+            .input('RefRegistrationNo', sql.NVarChar, data.refRegistrationNo || null)
+            .input('CertificateHolder', sql.NVarChar, data.certificateHolder || null)
+            .input('SignDate', sql.Date, data.signDate || null)
+            
             .input('AttachLicenseCopy', sql.Bit, data.attachLicenseCopy ? 1 : 0)
             
             .input('Status', sql.NVarChar, data.status || 'ร่าง')
@@ -296,6 +312,7 @@ router.put('/:id', async (req, res) => {
                     ContractID = @ContractID,
                     
                     ApplicantType = @ApplicantType,
+                    ApplicantPrefix = @ApplicantPrefix,
                     ApplicantName = @ApplicantName,
                     ApplicantCitizenID = @ApplicantCitizenID,
                     ApplicantCitizenIDExpiryDate = @ApplicantCitizenIDExpiryDate,
@@ -354,6 +371,12 @@ router.put('/:id', async (req, res) => {
                     RegDetailNo = @RegDetailNo,
                     HasNoticeNo = @HasNoticeNo,
                     RegNoticeNo = @RegNoticeNo,
+                    
+                    ReceiptNo = @ReceiptNo,
+                    RefProductNameThai = @RefProductNameThai,
+                    RefRegistrationNo = @RefRegistrationNo,
+                    CertificateHolder = @CertificateHolder,
+                    SignDate = @SignDate,
                     
                     AttachLicenseCopy = @AttachLicenseCopy,
                     

@@ -1,0 +1,117 @@
+{
+  "templateName": "11 คำรับรองสำหรับผู้ยื่น(แม่แบบ).pdf",
+  "templateConfig": {
+    "defaultFontSize": 7,
+    "defaultFontFamily": "Sarabun"
+  },
+  "fields": [
+    {
+      "id": "nlp_1783062530735_igjps8",
+      "name": "Auto Field 3",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 50.597376262469666,
+      "yPercent": 76.41900698714491,
+      "widthPct": 23.965112985020184,
+      "heightPct": 1.8,
+      "query": "SELECT SignDate FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    },
+    {
+      "id": "645a41cb-ae34-4eef-9d24-ad088a1b7796",
+      "name": "Auto Field 4",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 64.01966096625995,
+      "yPercent": 13.912113668784375,
+      "widthPct": 22.806638992741696,
+      "heightPct": 1.8,
+      "query": "SELECT WrittenAt FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    },
+    {
+      "id": "6xew4",
+      "name": "Auto Field 4_copy",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 62.85416892335938,
+      "yPercent": 16.471670758972397,
+      "widthPct": 24.213520307593555,
+      "heightPct": 1.8,
+      "query": "SELECT DocumentDate FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    },
+    {
+      "id": "8jkosp",
+      "name": "Auto Field 4_copy_copy",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 48.49915456079036,
+      "yPercent": 18.969061976274485,
+      "widthPct": 38.54613960049367,
+      "heightPct": 1.8,
+      "query": "SELECT ApplicantName FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    },
+    {
+      "id": "oqgv78",
+      "name": "Auto Field 4_copy_copy_copy",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 66.72967078089113,
+      "yPercent": 21.466448054839404,
+      "widthPct": 20.608390117855027,
+      "heightPct": 1.8,
+      "query": "SELECT ProductName FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    },
+    {
+      "id": "4k27jb",
+      "name": "Auto Field 4_copy_copy_copy_copy",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 20.192200010218023,
+      "yPercent": 23.839489540789533,
+      "widthPct": 66.77174730704304,
+      "heightPct": 1.8,
+      "query": "SELECT ReceiptNo FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    },
+    {
+      "id": "qyq27g",
+      "name": "Auto Field 4_copy_copy_copy_copy_copy",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 37.62476134411096,
+      "yPercent": 31.310744113109394,
+      "widthPct": 49.185709068633486,
+      "heightPct": 1.8,
+      "query": "SELECT RefProductNameThai FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    },
+    {
+      "id": "ayiwke",
+      "name": "Auto Field 4_copy_copy_copy_copy_copy_copy",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 24.06111454157675,
+      "yPercent": 33.80812505293715,
+      "widthPct": 62.902814606716554,
+      "heightPct": 1.8,
+      "query": "SELECT RefRegistrationNo FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    },
+    {
+      "id": "w5mpdj",
+      "name": "Auto Field 4_copy_copy_copy_copy_copy_copy_copy",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 54.06771351066951,
+      "yPercent": 36.36768728186234,
+      "widthPct": 31.86345880563768,
+      "heightPct": 1.8,
+      "query": "SELECT CertificateHolder FROM HerbalCertDocuments WHERE DocumentType = 'herbal_cert';",
+      "multiline": false
+    }
+  ]
+}
