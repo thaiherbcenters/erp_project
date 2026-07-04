@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Search, FileText, Eye, X } from 'lucide-react';
+import { Plus, Trash2, Search, FileText, Eye, X, Paperclip } from 'lucide-react';
 import { useAlert } from './CustomAlert';
 import API_BASE from '../config';
 import './ContractManagement.css';
@@ -305,10 +305,15 @@ const ContractManagement = ({ onViewDocument }) => {
                                                 <td>{doc.DocumentDate ? new Date(doc.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
                                                 <td><span className="status-badge progress">{doc.Status}</span></td>
                                                 <td style={{ textAlign: 'center' }}>
-                                                    <div className="action-buttons justify-center">
-                                                        <button className="btn-icon text-blue-600 hover:bg-blue-50" title="ดูเอกสาร" onClick={() => handlePrintDoc(doc)}>
+                                                    <div className="action-buttons justify-center" style={{ display: 'flex', gap: '8px' }}>
+                                                        <button className="btn-icon" title="ดูเอกสารฉบับพิมพ์" onClick={() => handlePrintDoc(doc)} style={{ color: '#2563eb', background: '#eff6ff', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>
                                                             <Eye size={16} />
                                                         </button>
+                                                        {doc.HasAttachment ? (
+                                                            <a href={`${API_BASE}${doc.AttachmentPath}`} target="_blank" rel="noreferrer" className="btn-icon" title="ดูไฟล์แนบลายเซ็น" style={{ color: '#10b981', background: '#ecfdf5', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>
+                                                                <Paperclip size={16} />
+                                                            </a>
+                                                        ) : null}
                                                     </div>
                                                 </td>
                                             </tr>
