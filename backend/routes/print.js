@@ -6,6 +6,19 @@ const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const { poolPromise } = require('../config/db');
 
+// GET /check-template/:documentType
+// ตรวจสอบว่ามีแฟ้มแม่แบบสำหรับประเภทเอกสารนี้หรือไม่
+router.get('/check-template/:documentType', (req, res) => {
+    const { documentType } = req.params;
+    if (!documentType || !/^[a-zA-Z0-9_-]+$/.test(documentType)) {
+        return res.json({ exists: false, error: 'Invalid document type' });
+    }
+    
+    const dir = path.join(__dirname, `../pdf_templates/${documentType}`);
+    const exists = fs.existsSync(dir);
+    res.json({ exists });
+});
+
 router.post('/', async (req, res) => {
     let pool;
     try {
@@ -120,7 +133,11 @@ router.post('/', async (req, res) => {
 
                 let queryStr = field.query;
                 if (documentId) {
-                    queryStr = queryStr.replace(/FROM\s+LegalDocuments[\s\S]*$/i, `FROM LegalDocuments WHERE DocumentID = ${documentId}`);
+                    let tableName = 'LegalDocuments';
+                    if (documentType === 'herbal_cert') {
+                        tableName = 'HerbalCertDocuments';
+                    }
+                    queryStr = queryStr.replace(/FROM\s+[A-Za-z_]+[\s\S]*$/i, `FROM ${tableName} WHERE DocumentID = ${documentId}`);
                 }
 
                 const result = await pool.request().query(queryStr);

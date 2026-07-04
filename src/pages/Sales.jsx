@@ -17,22 +17,23 @@ import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
-import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search } from 'lucide-react';
+import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search, Copy, Upload, Download, UploadCloud } from 'lucide-react';
 import { MOCK_CUSTOMERS } from '../data/mockData';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
 import BillingForm from '../components/BillingForm';
 import PowerOfAttorneyForm from '../components/PowerOfAttorneyForm';
+import RegistrationDocCreator from '../components/RegistrationDocCreator';
 import ContractManagement from '../components/ContractManagement';
 import API_BASE from '../config';
 import './PageCommon.css';
 import './DocumentControl.css';
 
 export default function Sales() {
-    const { showAlert, showConfirm } = useAlert();
+    const { showAlert, showConfirm, showLoading, hideLoading } = useAlert();
     const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
     const visibleSubPages = getVisibleSubPages('sales');
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'sales_dashboard';
 
     // ── State: ค้นหาแยกแต่ละ tab ──
@@ -50,6 +51,21 @@ export default function Sales() {
     const [isHistoryView, setIsHistoryView] = useState(false); // To pass to form
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [historyList, setHistoryList] = useState([]);
+    const [historyItemNo, setHistoryItemNo] = useState('');
+    
+    // ── States สำหรับ Doc History (POA/Herbal) ──
+    const [showDocHistoryModal, setShowDocHistoryModal] = useState(false);
+    const [docHistoryList, setDocHistoryList] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyDocumentNo, setHistoryDocumentNo] = useState('');
+    const [historyTab, setHistoryTab] = useState('versions'); // 'versions' | 'attachments'
+    const [docAttachments, setDocAttachments] = useState([]);
+    const [uploadFile, setUploadFile] = useState(null);
+    const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
+    const [uploadReceiver, setUploadReceiver] = useState('');
+    const [uploadRemarks, setUploadRemarks] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
+    const [returnTab, setReturnTab] = useState(null); // Track where to return after closing a form
 
     // ── State: Sales Order ──
     const [showSOForm, setShowSOForm] = useState(false);
@@ -151,19 +167,49 @@ export default function Sales() {
 
     // ── Delete POA ──
     const handleDeletePOA = async (id) => {
-        const confirmed = await showConfirm('ยืนยันการลบ', 'คุณต้องการลบหนังสือมอบอำนาจนี้ใช่หรือไม่?');
+        const confirmed = await showConfirm('ยืนยันการลบ', 'คุณต้องการลบเอกสารขึ้นทะเบียนนี้ใช่หรือไม่?');
         if (!confirmed) return;
         try {
             const res = await fetch(`${API_BASE}/legal-documents/${id}`, { method: 'DELETE' });
             const json = await res.json();
             if (json.success) {
                 showAlert('สำเร็จ', 'ลบเอกสารเรียบร้อยแล้ว', 'success');
-                setLocalPOAs(prev => prev.filter(p => p.DocumentID !== id));
+                // Fetch list directly
+                const resList = await fetch(`${API_BASE}/legal-documents?type=poa&page=${poaPagination.page}&limit=${poaPagination.limit}`);
+                const jsonList = await resList.json();
+                if (jsonList.success) {
+                    setLocalPOAs(jsonList.data || []);
+                    if (jsonList.pagination) setPoaPagination(prev => ({ ...prev, totalPages: jsonList.pagination.totalPages }));
+                }
+                
+                // If the modal was open and we deleted a document from it, we should refresh the modal
+                if (showDocHistoryModal && historyDocumentNo) {
+                    handleViewDocHistory(historyDocumentNo, 'poa');
+                }
             } else {
                 showAlert('ข้อผิดพลาด', json.message, 'error');
             }
         } catch (err) {
             showAlert('ข้อผิดพลาด', 'ไม่สามารถลบเอกสารได้', 'error');
+        }
+    };
+
+    const handleCreateVersionPOA = async (id) => {
+        const confirmed = await showConfirm('สร้างเวอร์ชันใหม่', 'คุณต้องการสร้างเอกสารนี้เป็นเวอร์ชันใหม่ (สถานะร่าง) ใช่หรือไม่?');
+        if (!confirmed) return;
+        try {
+            const res = await fetch(`${API_BASE}/legal-documents/${id}/version`, { method: 'POST' });
+            const json = await res.json();
+            if (json.success) {
+                showAlert('สำเร็จ', 'สร้างเวอร์ชันใหม่เรียบร้อยแล้ว', 'success');
+                setPoaPagination(prev => ({ ...prev, page: 1 }));
+                setEditingPOAId(json.documentId);
+                setShowPOAForm(true);
+            } else {
+                showAlert('ข้อผิดพลาด', json.message, 'error');
+            }
+        } catch (err) {
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถสร้างเวอร์ชันใหม่ได้', 'error');
         }
     };
 
@@ -208,6 +254,102 @@ export default function Sales() {
         }
     };
 
+    const handleViewDocHistory = async (documentNo, type = 'poa', defaultTab = 'versions') => {
+        setHistoryDocumentNo(documentNo);
+        setShowDocHistoryModal(true);
+        setHistoryLoading(true);
+        setDocHistoryList([]);
+        setDocAttachments([]);
+        setHistoryTab(defaultTab);
+        try {
+            const endpoint = type === 'herbal' ? `${API_BASE}/herbal-cert-documents/history/${encodeURIComponent(documentNo)}` : `${API_BASE}/legal-documents/history/${encodeURIComponent(documentNo)}`;
+            const res = await fetch(endpoint);
+            const json = await res.json();
+            if (json.success) {
+                setDocHistoryList(json.data || []);
+            } else {
+                showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถดึงประวัติเอกสารได้', 'error');
+            }
+            
+            // Fetch attachments
+            const attRes = await fetch(`${API_BASE}/legal-documents/attachments/${encodeURIComponent(documentNo)}`);
+            const attJson = await attRes.json();
+            if (attJson.success) {
+                setDocAttachments(attJson.data || []);
+            }
+        } catch (err) {
+            console.error('Error fetching doc history:', err);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    const handleUploadAttachment = async (e) => {
+        e.preventDefault();
+        if (!uploadFile) {
+            showAlert('ข้อผิดพลาด', 'กรุณาเลือกไฟล์ที่ต้องการอัปโหลด', 'warning');
+            return;
+        }
+
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+        formData.append('receivedDate', uploadDate);
+        formData.append('receiverName', uploadReceiver);
+        formData.append('remarks', uploadRemarks);
+
+        try {
+            const res = await fetch(`${API_BASE}/legal-documents/upload/${encodeURIComponent(historyDocumentNo)}`, {
+                method: 'POST',
+                body: formData
+            });
+            const json = await res.json();
+            
+            if (json.success) {
+                showAlert('สำเร็จ', 'อัปโหลดเอกสารและอัปเดตสถานะเป็น "ลูกค้าลงนามแล้ว" เรียบร้อย', 'success');
+                setUploadFile(null);
+                setUploadReceiver('');
+                setUploadRemarks('');
+                const fileInput = document.getElementById('upload-file-input');
+                if (fileInput) fileInput.value = '';
+                
+                handleViewDocHistory(historyDocumentNo);
+                setLocalPOAs(prev => prev.map(p => 
+                    p.DocumentNo === historyDocumentNo ? { ...p, Status: 'ลูกค้าลงนามแล้ว' } : p
+                ));
+            } else {
+                showAlert('เกิดข้อผิดพลาด', json.message || 'ไม่สามารถอัปโหลดไฟล์ได้', 'error');
+            }
+        } catch (err) {
+            console.error('Error uploading file:', err);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const handleDeleteAttachment = async (attachmentId) => {
+        const ok = await showConfirm('ยืนยันการลบไฟล์แนบ', 'คุณต้องการลบไฟล์แนบนี้ใช่หรือไม่?', 'warning');
+        if (!ok) return;
+        
+        try {
+            const res = await fetch(`${API_BASE}/legal-documents/attachments/${attachmentId}`, { method: 'DELETE' });
+            const json = await res.json();
+            
+            if (json.success) {
+                showAlert('สำเร็จ', 'ลบไฟล์แนบเรียบร้อยแล้ว', 'success');
+                // Refresh attachments list
+                setDocAttachments(prev => prev.filter(a => a.AttachmentID !== attachmentId));
+            } else {
+                showAlert('เกิดข้อผิดพลาด', json.message || 'ไม่สามารถลบไฟล์แนบได้', 'error');
+            }
+        } catch (err) {
+            console.error('Error deleting attachment:', err);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        }
+    };
+
     const handleDeleteQuotation = async (id) => {
         const ok = await showConfirm('ยืนยันการลบ', 'คุณต้องการลบใบเสนอราคานี้ใช่หรือไม่?', 'warning');
         if (!ok) return;
@@ -233,7 +375,7 @@ export default function Sales() {
     };
 
     const handleSendToPlanner = async (so) => {
-        const ok = await showConfirm('ยืนยันการส่ง', `ส่งคำสั่งซื้อ ${so.SalesOrderNo} ไปให้ Planner วางแผนผลิตใช่หรือไม่?`, 'info');
+        const ok = await showConfirm('ยืนยันการส่ง', `ส่งคำสั่งขาย ${so.SalesOrderNo} ไปให้ Planner วางแผนผลิตใช่หรือไม่?`, 'info');
         if (!ok) return;
         try {
             const res = await fetch(`${API_BASE}/sales-orders/${so.SalesOrderID}/status`, {
@@ -309,14 +451,25 @@ export default function Sales() {
         }
     };
 
+    const getRegistrationStatusClass = (status) => {
+        switch (status) {
+            case 'ร่าง': return 'badge-neutral';
+            case 'สร้างแล้ว': return 'badge-info';
+            case 'ส่งให้ลูกค้าแล้ว': return 'badge-danger';
+            case 'ลูกค้าขอแก้ไข': return 'badge-warning';
+            case 'ลูกค้าลงนามแล้ว': return 'badge-success';
+            default: return 'badge-neutral';
+        }
+    };
+
     // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
     const getPageTitle = () => {
         switch (activeTab) {
             case 'sales_dashboard': return 'ภาพรวมยอดขาย';
             case 'sales_customers': return 'จัดการข้อมูลลูกค้า';
             case 'sales_quotation': return 'ใบเสนอราคา';
-            case 'sales_orders': return 'คำสั่งซื้อ';
-            case 'sales_poa': return 'หนังสือมอบอำนาจ';
+            case 'sales_orders': return 'คำสั่งขาย';
+            case 'sales_poa': return 'ขึ้นทะเบียน';
             case 'sales_contracts': return 'จัดการสัญญา';
             case 'sales_corp_rep': return 'หนังสือแต่งตั้งผู้แทนนิติบุคคล';
             default: return 'ฝ่ายขาย';
@@ -328,13 +481,21 @@ export default function Sales() {
             case 'sales_dashboard': return 'ภาพรวมข้อมูลยอดขาย ลูกค้า และเอกสารทั้งหมดของฝ่ายขาย';
             case 'sales_customers': return 'จัดการข้อมูลและรายชื่อลูกค้าทั้งหมดในระบบ';
             case 'sales_quotation': return 'สร้างและจัดการข้อมูลเอกสารใบเสนอราคา (Quotation)';
-            case 'sales_orders': return 'สร้างและจัดการข้อมูลคำสั่งซื้อ (Sales Order)';
-            case 'sales_poa': return 'สร้างและจัดการหนังสือมอบอำนาจ';
+            case 'sales_orders': return 'สร้างและจัดการข้อมูลคำสั่งขาย (Sales Order)';
+            case 'sales_poa': return 'สร้างและจัดการเอกสารขึ้นทะเบียน';
             case 'sales_contracts': return 'เพิ่มและลบสัญญาระหว่างบริษัทกับลูกค้า';
             case 'sales_corp_rep': return 'สร้างและจัดการหนังสือแต่งตั้งผู้แทนนิติบุคคล';
-            default: return 'จัดการข้อมูลลูกค้า ใบเสนอราคา และคำสั่งซื้อ';
+            default: return 'จัดการข้อมูลลูกค้า ใบเสนอราคา และคำสั่งขาย';
         }
     };
+
+    // คำนวณเวอร์ชันล่าสุดของแต่ละเอกสาร
+    const poaMaxVersions = {};
+    localPOAs.forEach(p => {
+        if (!poaMaxVersions[p.DocumentNo] || p.Version > poaMaxVersions[p.DocumentNo]) {
+            poaMaxVersions[p.DocumentNo] = p.Version;
+        }
+    });
 
     return (
         <div className="page-container sales-page page-enter">
@@ -369,7 +530,7 @@ export default function Sales() {
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                                 </div>
                                 <div>
-                                    <span className="summary-label">คำสั่งซื้อ</span>
+                                    <span className="summary-label">คำสั่งขาย</span>
                                     <span className="summary-value">{totalOrders}</span>
                                 </div>
                             </div>
@@ -403,7 +564,7 @@ export default function Sales() {
                         {/* Recent Sales Orders */}
                         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                             <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>คำสั่งซื้อล่าสุด</span>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>คำสั่งขายล่าสุด</span>
                                 <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sales Orders</span>
                             </div>
                             <div style={{ padding: '0' }}>
@@ -481,11 +642,19 @@ export default function Sales() {
                             setShowQuotationForm(false);
                             setEditingQuotationId(null);
                             setIsViewOnly(false);
+                            if (returnTab) {
+                                setSearchParams({ tab: returnTab });
+                                setReturnTab(null);
+                            }
                         }} 
                         onSave={() => {
                             setShowQuotationForm(false);
                             setEditingQuotationId(null);
                             setIsViewOnly(false);
+                            if (returnTab) {
+                                setSearchParams({ tab: returnTab });
+                                setReturnTab(null);
+                            }
                         }}
                     />
                 ) : (
@@ -712,8 +881,24 @@ export default function Sales() {
                     <SalesOrderForm
                         editId={editingSOId}
                         viewOnly={isSOViewOnly}
-                        onBack={() => { setShowSOForm(false); setEditingSOId(null); setIsSOViewOnly(false); }}
-                        onSave={() => { setShowSOForm(false); setEditingSOId(null); setIsSOViewOnly(false); }}
+                        onBack={() => { 
+                            setShowSOForm(false); 
+                            setEditingSOId(null); 
+                            setIsSOViewOnly(false);
+                            if (returnTab) {
+                                setSearchParams({ tab: returnTab });
+                                setReturnTab(null);
+                            }
+                        }}
+                        onSave={() => { 
+                            setShowSOForm(false); 
+                            setEditingSOId(null); 
+                            setIsSOViewOnly(false);
+                            if (returnTab) {
+                                setSearchParams({ tab: returnTab });
+                                setReturnTab(null);
+                            }
+                        }}
                     />
                 ) : (
                     <div className="subpage-content" key="sales_orders">
@@ -721,9 +906,9 @@ export default function Sales() {
                             <div>
                                 <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
                                     <ShoppingCart size={24} color="#1e40af" />
-                                    คำสั่งซื้อ (Sales Order)
+                                    คำสั่งขาย (Sales Order)
                                 </h1>
-                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการข้อมูลคำสั่งซื้อ</p>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการข้อมูลคำสั่งขาย</p>
                             </div>
                         </div>
                         {hasSectionPermission('sales_orders_search') && (
@@ -802,7 +987,14 @@ export default function Sales() {
             {(activeTab === 'sales_billing' && hasSubPermission('sales_billing')) && (
                 showBillingForm ? (
                     <div className="subpage-content" key="sales_billing_form">
-                        <BillingForm onBack={() => { setShowBillingForm(false); setEditingBillingId(null); }} />
+                        <BillingForm onBack={() => { 
+                            setShowBillingForm(false); 
+                            setEditingBillingId(null);
+                            if (returnTab) {
+                                setSearchParams({ tab: returnTab });
+                                setReturnTab(null);
+                            }
+                        }} />
                     </div>
                 ) : (
                     <div className="subpage-content" key="sales_billing">
@@ -904,13 +1096,14 @@ export default function Sales() {
                 )
             )}
 
-            {/* ── Tab: หนังสือมอบอำนาจ ── */}
+            {/* ── Tab: ขึ้นทะเบียน ── */}
             {(activeTab === 'sales_poa' && hasSubPermission('sales_poa')) && (
                 showPOAForm ? (
                     <div className="subpage-content" key="sales_poa_form">
-                        <PowerOfAttorneyForm 
-                            documentId={editingPOAId}
-                            onBack={() => { setShowPOAForm(false); setEditingPOAId(null); }} 
+                        <RegistrationDocCreator
+                            onBack={() => { setShowPOAForm(false); setEditingPOAId(null); }}
+                            editingDocId={editingPOAId}
+                            editingDocType={editingPOAId ? 'poa' : null}
                         />
                     </div>
                 ) : (
@@ -919,9 +1112,9 @@ export default function Sales() {
                             <div>
                                 <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
                                     <Briefcase size={24} color="#1e40af" />
-                                    หนังสือมอบอำนาจ (POA)
+                                    ขึ้นทะเบียน (POA)
                                 </h1>
-                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการหนังสือมอบอำนาจ</p>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการเอกสารขึ้นทะเบียน</p>
                             </div>
                         </div>
                         <div className="toolbar" style={{ justifyContent: 'space-between' }}>
@@ -947,7 +1140,7 @@ export default function Sales() {
                                 }}>ค้นหา</button>
                             </div>
                             <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setEditingPOAId(null); setShowPOAForm(true); }}>
-                                <Plus size={16} /> สร้างหนังสือมอบอำนาจ
+                                <Plus size={16} /> สร้างเอกสารขึ้นทะเบียน
                             </button>
                         </div>
                         <div className="table-card card">
@@ -956,6 +1149,7 @@ export default function Sales() {
                                 <thead>
                                     <tr>
                                         <th>เลขที่เอกสาร</th>
+                                        <th>เวอร์ชัน</th>
                                         <th>วันที่เอกสาร</th>
                                         <th>ผู้มอบอำนาจ</th>
                                         <th>ผู้รับมอบอำนาจ</th>
@@ -969,7 +1163,7 @@ export default function Sales() {
                                         p.GrantorName?.toLowerCase().includes(appliedPoaSearch.toLowerCase()) || 
                                         p.GranteeName?.toLowerCase().includes(appliedPoaSearch.toLowerCase())
                                     ).length === 0 ? (
-                                        <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลหนังสือมอบอำนาจ</td></tr>
+                                        <tr><td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลเอกสารขึ้นทะเบียน</td></tr>
                                     ) : localPOAs.filter(p => !appliedPoaSearch || 
                                         p.DocumentNo?.toLowerCase().includes(appliedPoaSearch.toLowerCase()) || 
                                         p.GrantorName?.toLowerCase().includes(appliedPoaSearch.toLowerCase()) || 
@@ -977,23 +1171,32 @@ export default function Sales() {
                                     ).map(p => (
                                         <tr key={p.DocumentID}>
                                             <td>{p.DocumentNo || '-'}</td>
+                                            <td>{p.Version > 1 ? `V${p.Version}` : '-'}</td>
                                             <td>{p.DocumentDate ? new Date(p.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
                                             <td>{p.GrantorName || '-'}</td>
                                             <td>{p.GranteeName || '-'}</td>
                                             <td>
-                                                <span className={`badge ${p.Status === 'อนุมัติ' ? 'badge-success' : p.Status === 'รอตรวจสอบ' ? 'badge-info' : 'badge-neutral'}`}>
+                                                <span className={`badge ${getRegistrationStatusClass(p.Status)}`}>
                                                     {p.Status || 'ร่าง'}
                                                 </span>
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <div className="action-buttons justify-center">
-                                                    <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดู/พิมพ์ PDF" onClick={() => handlePrintPOA(p.DocumentID)}>
+                                                    <button className="btn-icon text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700" style={{ color: '#4f46e5' }} title="ไฟล์แนบ/อัปโหลด" onClick={() => handleViewDocHistory(p.DocumentNo, 'poa', 'attachments')}>
+                                                        <Upload size={16} />
+                                                    </button>
+                                                    {p.Version > 1 && (
+                                                        <button className="btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700" style={{ color: '#9333ea' }} title="ประวัติการแก้ไข" onClick={() => handleViewDocHistory(p.DocumentNo, 'poa', 'versions')}>
+                                                            <History size={16} />
+                                                        </button>
+                                                    )}
+                                                    <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" style={{ color: '#2563eb' }} title="ดู/พิมพ์ PDF" onClick={() => handlePrintPOA(p.DocumentID)}>
                                                         <FileText size={16} />
                                                     </button>
-                                                    <button className="btn-icon" title="แก้ไข" onClick={() => { setEditingPOAId(p.DocumentID); setShowPOAForm(true); }}>
+                                                    <button className="btn-icon" style={{ color: '#f59e0b' }} title="แก้ไข" onClick={() => { setEditingPOAId(p.DocumentID); setShowPOAForm(true); }}>
                                                         <Edit size={16} />
                                                     </button>
-                                                    <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" title="ลบ" onClick={() => handleDeletePOA(p.DocumentID)}>
+                                                    <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" style={{ color: '#dc2626' }} title="ลบ" onClick={() => handleDeletePOA(p.DocumentID)}>
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
@@ -1047,21 +1250,263 @@ export default function Sales() {
             {/* ── Tab: จัดการสัญญา ── */}
             {(activeTab === 'sales_contracts' && hasSubPermission('sales_contracts')) && (
                 <div className="subpage-content" key="sales_contracts">
-                    <ContractManagement onViewDocument={(docId, docType) => {
-                        if (docType === 'Quotation') {
+                    <ContractManagement onViewDocument={(docType, docId) => {
+                        if (docType === 'Quotation' || docType === 'ใบเสนอราคา') {
                             setEditingQuotationId(docId);
                             setIsViewOnly(true);
                             setShowQuotationForm(true);
-                            setActiveTab('sales_quotation');
-                        } else if (docType === 'Billing') {
+                            setReturnTab('sales_contracts');
+                            setSearchParams({ tab: 'sales_quotation' });
+                        } else if (docType === 'Billing' || docType === 'ใบวางบิล' || docType === 'ใบแจ้งหนี้') {
                             setEditingBillingId(docId);
                             setIsViewOnly(true);
                             setShowBillingForm(true);
-                            setActiveTab('sales_billing');
+                            setReturnTab('sales_contracts');
+                            setSearchParams({ tab: 'sales_billing' });
+                        } else if (docType === 'Sales Order' || docType === 'ใบสั่งขาย' || docType === 'ใบสั่งซื้อ') {
+                            setEditingSOId(docId);
+                            setIsSOViewOnly(true);
+                            setShowSOForm(true);
+                            setReturnTab('sales_contracts');
+                            setSearchParams({ tab: 'sales_orders' });
+                        } else if (docType === 'poa' || docType === 'corp_rep' || docType === 'herbal_cert') {
+                            // สำหรับเอกสารทางกฎหมาย ให้ดึง PDF มาพรีวิว
+                            showLoading('กำลังเปิดเอกสาร...', 'กรุณารอสักครู่ ระบบกำลังสร้าง PDF');
+                            fetch(`${API_BASE}/print`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ documentType: docType, documentId: docId })
+                            })
+                            .then(res => {
+                                if (res.ok) return res.blob();
+                                throw new Error('ไม่สามารถสร้าง PDF ได้');
+                            })
+                            .then(blob => {
+                                hideLoading();
+                                const url = window.URL.createObjectURL(blob);
+                                window.open(url, '_blank');
+                            })
+                            .catch(err => {
+                                hideLoading();
+                                console.error('Print Error:', err);
+                                showAlert('ข้อผิดพลาด', 'ไม่สามารถเปิดเอกสาร PDF ได้: ' + err.message, 'error');
+                            });
                         } else {
-                            showAlert('ข้อผิดพลาด', 'ไม่สามารถเปิดเอกสารได้จากหน้านี้', 'error');
+                            showAlert('ข้อผิดพลาด', `ไม่สามารถเปิดเอกสารประเภท "${docType}" ได้จากหน้านี้`, 'error');
                         }
                     }} />
+                </div>
+            )}
+
+            {/* Doc History Modal */}
+            {showDocHistoryModal && (
+                <div className="pdf-preview-overlay" onClick={() => setShowDocHistoryModal(false)}>
+                    <div className="pdf-preview-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', height: 'auto', padding: '24px', maxHeight: '80vh', overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <History size={18} /> ประวัติเอกสาร {historyDocumentNo}
+                            </h3>
+                            <button onClick={() => setShowDocHistoryModal(false)} className="doc-action-btn" style={{ width: '30px', height: '30px', background: '#f1f5f9', borderRadius: '6px' }}>
+                                <X size={16} />
+                            </button>
+                        </div>
+                        
+                        {historyLoading ? (
+                            <div style={{ textAlign: 'center', padding: '40px' }}><div className="loading-spinner"></div></div>
+                        ) : (
+                            <div>
+                                <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
+                                    <button 
+                                        onClick={() => setHistoryTab('versions')}
+                                        style={{ 
+                                            padding: '8px 4px', 
+                                            background: 'none', 
+                                            border: 'none', 
+                                            borderBottom: historyTab === 'versions' ? '2px solid #2563eb' : '2px solid transparent',
+                                            color: historyTab === 'versions' ? '#2563eb' : '#64748b',
+                                            fontWeight: historyTab === 'versions' ? 600 : 400,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        ประวัติการแก้ไข
+                                    </button>
+                                    <button 
+                                        onClick={() => setHistoryTab('attachments')}
+                                        style={{ 
+                                            padding: '8px 4px', 
+                                            background: 'none', 
+                                            border: 'none', 
+                                            borderBottom: historyTab === 'attachments' ? '2px solid #2563eb' : '2px solid transparent',
+                                            color: historyTab === 'attachments' ? '#2563eb' : '#64748b',
+                                            fontWeight: historyTab === 'attachments' ? 600 : 400,
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        เอกสารอัปโหลด {docAttachments.length > 0 && `(${docAttachments.length})`}
+                                    </button>
+                                </div>
+
+                                {historyTab === 'versions' ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {docHistoryList.length === 0 ? (
+                                            <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>ไม่มีประวัติการแก้ไข</p>
+                                        ) : (
+                                            docHistoryList.map((h, i) => (
+                                                <div key={h.DocumentID} style={{
+                                                    padding: '14px 16px',
+                                                    border: '1px solid var(--border)',
+                                                    borderRadius: '8px',
+                                                    background: i === 0 ? '#f0fdf4' : 'var(--bg)',
+                                                }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <span style={{ fontWeight: 600, fontSize: '13px' }}>
+                                                                {h.Version === 1 ? 'ต้นฉบับ (V1)' : `V${h.Version}`}
+                                                            </span>
+                                                            {i > 0 && (
+                                                                <span style={{ fontSize: '10px', color: '#64748b' }}>ถูกแทนที่</span>
+                                                            )}
+                                                            <span className={`badge ${getRegistrationStatusClass(h.Status)}`} style={{ fontSize: '10px' }}>
+                                                                {h.Status || 'ร่าง'}
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                                            <button className="btn-icon" style={{ color: '#2563eb' }} title="ดู PDF" onClick={() => handlePrintPOA(h.DocumentID)}>
+                                                                <FileText size={16} />
+                                                            </button>
+                                                            {i === 0 && (
+                                                                <button className="btn-icon" style={{ color: '#dc2626' }} title="ลบเวอร์ชันนี้" onClick={() => handleDeletePOA(h.DocumentID)}>
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '16px' }}>
+                                                        <span>วันที่เอกสาร: {h.DocumentDate ? new Date(h.DocumentDate).toLocaleDateString('th-TH') : '-'}</span>
+                                                        <span>สร้างเมื่อ: {new Date(h.CreatedAt).toLocaleDateString('th-TH')}</span>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                        <form onSubmit={handleUploadAttachment} style={{ padding: '24px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+                                                <div style={{ background: '#ecfdf5', padding: '8px', borderRadius: '8px', color: '#10b981' }}>
+                                                    <UploadCloud size={20} />
+                                                </div>
+                                                <h4 style={{ margin: 0, fontSize: '16px', color: '#0f172a', fontWeight: '600' }}>อัปโหลดเอกสารที่มีลายเซ็นลูกค้าแล้ว</h4>
+                                            </div>
+                                            
+                                            <div style={{ 
+                                                border: '2px dashed #cbd5e1', 
+                                                borderRadius: '8px', 
+                                                padding: '20px', 
+                                                textAlign: 'center',
+                                                background: '#f8fafc',
+                                                transition: 'all 0.2s ease',
+                                                cursor: 'pointer',
+                                                position: 'relative'
+                                            }}
+                                            onMouseOver={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.background = '#eff6ff'; }}
+                                            onMouseOut={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc'; }}
+                                            >
+                                                <input 
+                                                    type="file" 
+                                                    id="upload-file-input" 
+                                                    accept=".pdf,.jpg,.jpeg,.png" 
+                                                    onChange={(e) => setUploadFile(e.target.files[0])} 
+                                                    style={{ 
+                                                        position: 'absolute',
+                                                        top: 0, left: 0, width: '100%', height: '100%',
+                                                        opacity: 0, cursor: 'pointer'
+                                                    }} 
+                                                    required 
+                                                />
+                                                <div style={{ pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                                    <Upload size={24} color={uploadFile ? '#10b981' : '#64748b'} />
+                                                    <span style={{ fontSize: '14px', color: uploadFile ? '#10b981' : '#334155', fontWeight: uploadFile ? '600' : '500' }}>
+                                                        {uploadFile ? `เลือกไฟล์แล้ว: ${uploadFile.name}` : 'คลิกหรือลากไฟล์มาวางที่นี่เพื่ออัปโหลด'}
+                                                    </span>
+                                                    {!uploadFile && <span style={{ fontSize: '12px', color: '#64748b' }}>รองรับไฟล์ PDF, JPG, PNG ขนาดไม่เกิน 10MB</span>}
+                                                </div>
+                                            </div>
+                                            
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                    <label style={{ fontSize: '13px', color: '#475569', fontWeight: '500' }}>วันที่รับเอกสารคืน</label>
+                                                    <input type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} className="form-input" style={{ padding: '8px 12px', borderRadius: '6px' }} required />
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                    <label style={{ fontSize: '13px', color: '#475569', fontWeight: '500' }}>ชื่อผู้รับเอกสาร</label>
+                                                    <input type="text" value={uploadReceiver} onChange={(e) => setUploadReceiver(e.target.value)} placeholder="เช่น สมชาย เซลส์แมน" className="form-input" style={{ padding: '8px 12px', borderRadius: '6px' }} />
+                                                </div>
+                                            </div>
+                                            
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                <label style={{ fontSize: '13px', color: '#475569', fontWeight: '500' }}>หมายเหตุเพิ่มเติม (ถ้ามี)</label>
+                                                <input type="text" value={uploadRemarks} onChange={(e) => setUploadRemarks(e.target.value)} placeholder="พิมพ์หมายเหตุเพิ่มเติม..." className="form-input" style={{ padding: '8px 12px', borderRadius: '6px' }} />
+                                            </div>
+                                            
+                                            <button type="submit" disabled={isUploading || !uploadFile} className="btn btn-primary" style={{ 
+                                                marginTop: '8px', 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                justifyContent: 'center', 
+                                                gap: '8px',
+                                                padding: '10px 16px',
+                                                fontSize: '14px',
+                                                fontWeight: '600',
+                                                borderRadius: '8px',
+                                                transition: 'all 0.2s',
+                                                boxShadow: isUploading || !uploadFile ? 'none' : '0 4px 6px -1px rgba(16, 185, 129, 0.3)',
+                                                background: isUploading || !uploadFile ? '#cbd5e1' : '#10b981',
+                                                border: 'none'
+                                            }}>
+                                                {isUploading ? <div className="loading-spinner" style={{ width: '16px', height: '16px', borderTopColor: '#fff' }}></div> : <UploadCloud size={18} />}
+                                                อัปโหลดและอัปเดตสถานะเป็น "ลูกค้าลงนามแล้ว"
+                                            </button>
+                                        </form>
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            <h4 style={{ margin: '8px 0', fontSize: '14px', color: '#334155' }}>รายการไฟล์แนบ</h4>
+                                            {docAttachments.length === 0 ? (
+                                                <p style={{ textAlign: 'center', color: '#64748b', padding: '20px', background: '#f8fafc', borderRadius: '8px' }}>ยังไม่มีไฟล์แนบสำหรับเอกสารนี้</p>
+                                            ) : (
+                                                docAttachments.map((att) => (
+                                                    <div key={att.AttachmentID} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                <FileText size={14} color="#64748b" />
+                                                                <span style={{ fontWeight: 500, fontSize: '14px', color: '#334155' }}>{att.FileName}</span>
+                                                            </div>
+                                                            <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '16px' }}>
+                                                                <span>รับเมื่อ: {att.ReceivedDate ? new Date(att.ReceivedDate).toLocaleDateString('th-TH') : '-'}</span>
+                                                                {att.ReceiverName && <span>ผู้รับ: {att.ReceiverName}</span>}
+                                                            </div>
+                                                            {att.Remarks && <div style={{ fontSize: '12px', color: '#64748b' }}>หมายเหตุ: {att.Remarks}</div>}
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                                            <a href={`${API_BASE}${att.FilePath}`} target="_blank" rel="noreferrer" className="btn-icon" style={{ color: '#10b981', background: '#ecfdf5', padding: '8px', borderRadius: '6px' }} title="พรีวิวไฟล์">
+                                                                <Eye size={16} />
+                                                            </a>
+                                                            <a href={`${API_BASE}${att.FilePath}`} download target="_blank" rel="noreferrer" className="btn-icon" style={{ color: '#2563eb', background: '#eff6ff', padding: '8px', borderRadius: '6px' }} title="ดาวน์โหลดไฟล์">
+                                                                <Download size={16} />
+                                                            </a>
+                                                            <button className="btn-icon" style={{ color: '#ef4444', background: '#fef2f2', padding: '8px', borderRadius: '6px' }} title="ลบไฟล์" onClick={() => handleDeleteAttachment(att.AttachmentID)}>
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

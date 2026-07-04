@@ -4,7 +4,7 @@
  * =============================================================================
  *
  * แสดงภาพรวมของระบบ ERP:
- *   - Tab home_stats    : สถิติภาพรวม (ยอดขาย, คำสั่งซื้อ, สินค้า, ลูกค้า) + กราฟ
+ *   - Tab home_stats    : สถิติภาพรวม (ยอดขาย, คำสั่งขาย, สินค้า, ลูกค้า) + กราฟ
  *   - Tab home_activity : กิจกรรมล่าสุด (รายการ activity)
  *   - Tab home_actions  : ปุ่มดำเนินการด่วน (Quick Actions)
  *
@@ -24,14 +24,14 @@ export default function Home() {
     // ── ข้อมูลสถิติภาพรวม ──
     const stats = [
         { id: 'home_stats_revenue', label: 'ยอดขายรวม (เดือนนี้)', value: '฿1,250,000', change: '+15.5%', positive: true },
-        { id: 'home_stats_orders', label: 'คำสั่งซื้อ OEM', value: '128', change: '+5.2%', positive: true },
+        { id: 'home_stats_orders', label: 'คำสั่งขาย OEM', value: '128', change: '+5.2%', positive: true },
         { id: 'home_stats_products', label: 'สินค้าคงคลัง (รายการ)', value: '450', change: '-1.1%', positive: false },
         { id: 'home_stats_customers', label: 'ตัวแทนจำหน่าย', value: '85', change: '+12.0%', positive: true },
     ];
 
     // ── ข้อมูลกิจกรรมล่าสุด ──
     const recentActivities = [
-        { action: 'คำสั่งซื้อ OEM ใหม่', detail: '#OEM-2024-089 (สมุนไพรอัดเม็ด)', time: '10 นาทีที่แล้ว' },
+        { action: 'คำสั่งขาย OEM ใหม่', detail: '#OEM-2024-089 (สมุนไพรอัดเม็ด)', time: '10 นาทีที่แล้ว' },
         { action: 'อัปเดตสต็อก', detail: 'ฟ้าทะลายโจรแคปซูล (+500 ขวด)', time: '45 นาทีที่แล้ว' },
         { action: 'ส่งมอบงานผลิต', detail: 'Lot: L-2401 (ชาสมุนไพร)', time: '2 ชั่วโมงที่แล้ว' },
         { action: 'อนุมัติสูตรใหม่', detail: 'เซรั่มบำรุงผิวสูตรขมิ้นชัน', time: '3 ชั่วโมงที่แล้ว' },
@@ -50,7 +50,7 @@ export default function Home() {
 
     const getPageDesc = () => {
         switch (activeTab) {
-            case 'home_stats': return 'สรุปข้อมูลสถิติ ยอดขาย คำสั่งซื้อ และสินค้าคงคลัง';
+            case 'home_stats': return 'สรุปข้อมูลสถิติ ยอดขาย คำสั่งขาย และสินค้าคงคลัง';
             case 'home_activity': return 'ประวัติการทำรายการต่างๆ ภายในระบบ ERP';
             case 'home_actions': return 'ปุ่มทางลัดสำหรับเข้าถึงฟังก์ชันที่ใช้งานบ่อย';
             default: return 'สรุปข้อมูลภาพรวมของระบบ';
@@ -150,7 +150,7 @@ export default function Home() {
                         <div className="quick-actions card">
                             <h2>ดำเนินการด่วน</h2>
                             <div className="actions-grid">
-                                {['เพิ่มสินค้า', 'สร้างคำสั่งซื้อ', 'สร้างรายงาน', 'เพิ่มพนักงาน'].map((action, i) => (
+                                {['เพิ่มสินค้า', 'สร้างคำสั่งขาย', 'สร้างรายงาน', 'เพิ่มพนักงาน'].map((action, i) => (
                                     <button className="action-btn" key={i}>{action}</button>
                                 ))}
                             </div>

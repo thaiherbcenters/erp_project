@@ -16,7 +16,7 @@
  */
 
 import { createContext, useContext, useState, useCallback } from 'react';
-import { CheckCircle, AlertTriangle, XCircle, Info, X } from 'lucide-react';
+import { CheckCircle, AlertTriangle, XCircle, Info, X, Loader2 } from 'lucide-react';
 import './CustomAlert.css';
 
 const AlertContext = createContext(null);
@@ -36,12 +36,21 @@ export function AlertProvider({ children }) {
         });
     }, []);
 
+    const showLoading = useCallback((title = 'กำลังโหลด...', message = 'กรุณารอสักครู่') => {
+        setModal({ title, message, type: 'info', mode: 'loading' });
+    }, []);
+
+    const hideLoading = useCallback(() => {
+        setModal((prev) => (prev?.mode === 'loading' ? null : prev));
+    }, []);
+
     const handleClose = (result) => {
         if (modal?.resolve) modal.resolve(result);
         setModal(null);
     };
 
-    const getIcon = (type) => {
+    const getIcon = (type, mode) => {
+        if (mode === 'loading') return <Loader2 size={28} className="animate-spin" />;
         switch (type) {
             case 'success': return <CheckCircle size={28} />;
             case 'warning': return <AlertTriangle size={28} />;
@@ -51,19 +60,21 @@ export function AlertProvider({ children }) {
     };
 
     return (
-        <AlertContext.Provider value={{ showAlert, showConfirm }}>
+        <AlertContext.Provider value={{ showAlert, showConfirm, showLoading, hideLoading }}>
             {children}
             {modal && (
                 <div className="custom-alert-overlay" onClick={() => handleClose(false)}>
                     <div className={`custom-alert-modal custom-alert-${modal.type}`} onClick={(e) => e.stopPropagation()}>
-                        {/* Close button */}
-                        <button className="custom-alert-close" onClick={() => handleClose(false)}>
-                            <X size={18} />
-                        </button>
+                        {/* Close button - Hide if loading */}
+                        {modal.mode !== 'loading' && (
+                            <button className="custom-alert-close" onClick={() => handleClose(false)}>
+                                <X size={18} />
+                            </button>
+                        )}
 
                         {/* Icon */}
                         <div className={`custom-alert-icon custom-alert-icon-${modal.type}`}>
-                            {getIcon(modal.type)}
+                            {getIcon(modal.type, modal.mode)}
                         </div>
 
                         {/* Content */}
@@ -72,21 +83,23 @@ export function AlertProvider({ children }) {
                             <p className="custom-alert-message">{modal.message}</p>
                         </div>
 
-                        {/* Buttons */}
-                        <div className="custom-alert-actions">
-                            {modal.mode === 'confirm' && (
-                                <button className="custom-alert-btn custom-alert-btn-cancel" onClick={() => handleClose(false)}>
-                                    ยกเลิก
+                        {/* Buttons - Hide if loading */}
+                        {modal.mode !== 'loading' && (
+                            <div className="custom-alert-actions">
+                                {modal.mode === 'confirm' && (
+                                    <button className="custom-alert-btn custom-alert-btn-cancel" onClick={() => handleClose(false)}>
+                                        ยกเลิก
+                                    </button>
+                                )}
+                                <button
+                                    className={`custom-alert-btn custom-alert-btn-${modal.type}`}
+                                    onClick={() => handleClose(true)}
+                                    autoFocus
+                                >
+                                    {modal.mode === 'confirm' ? 'ยืนยัน' : 'ตกลง'}
                                 </button>
-                            )}
-                            <button
-                                className={`custom-alert-btn custom-alert-btn-${modal.type}`}
-                                onClick={() => handleClose(true)}
-                                autoFocus
-                            >
-                                {modal.mode === 'confirm' ? 'ยืนยัน' : 'ตกลง'}
-                            </button>
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

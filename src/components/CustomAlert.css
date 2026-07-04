@@ -98,6 +98,7 @@
     color: #6b7280;
     margin: 0;
     line-height: 1.6;
+    white-space: pre-wrap;
     white-space: pre-line;
 }
 
@@ -187,4 +188,17 @@
         opacity: 1;
         transform: translateY(0) scale(1);
     }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
 }

@@ -39,12 +39,25 @@ const getMonthPrefix = (date = new Date()) => {
  * @returns {Promise<string>} - The new generated ID
  */
 const generateSequence = async (pool, tableName, columnName, prefix, padLength = 3, separator = '-') => {
-    // Query count of records that start with the exact prefix
+    // Get the maximum value of the column for the given prefix to avoid collisions on deletion
     const result = await pool.request()
         .input('prefix', sql.NVarChar, `${prefix}${separator}%`)
-        .query(`SELECT COUNT(*) AS cnt FROM ${tableName} WHERE ${columnName} LIKE @prefix`);
+        .query(`SELECT MAX(${columnName}) AS maxVal FROM ${tableName} WHERE ${columnName} LIKE @prefix`);
 
-    const seq = String((result.recordset[0].cnt || 0) + 1).padStart(padLength, '0');
+    let nextSeq = 1;
+    const maxVal = result.recordset[0].maxVal;
+    
+    if (maxVal) {
+        // Extract the numeric part at the end after the separator
+        const parts = maxVal.split(separator);
+        const seqStr = parts[parts.length - 1];
+        const parsedSeq = parseInt(seqStr, 10);
+        if (!isNaN(parsedSeq)) {
+            nextSeq = parsedSeq + 1;
+        }
+    }
+
+    const seq = String(nextSeq).padStart(padLength, '0');
     return `${prefix}${separator}${seq}`;
 };
 

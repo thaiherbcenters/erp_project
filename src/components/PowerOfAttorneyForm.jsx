@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Save, Printer, ArrowLeft } from 'lucide-react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { Save, Printer, ArrowLeft, FileSignature } from 'lucide-react';
 import { useAlert } from './CustomAlert';
 import API_BASE from '../config';
 import './PowerOfAttorneyForm.css';
@@ -71,9 +71,10 @@ const IdCardInput = ({ value = '', onChange, pattern = '1-4-5-2-1' }) => {
     );
 };
 
-const PowerOfAttorneyForm = ({ documentId, onBack }) => {
-    const { showAlert } = useAlert();
+const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, contractId: externalContractId, embedded, sharedFormData, onSharedDataChange }, ref) => {
+    const { showAlert, showConfirm, showLoading, hideLoading } = useAlert();
     const [isSaving, setIsSaving] = useState(false);
+    const [isPrinting, setIsPrinting] = useState(false);
     const [contracts, setContracts] = useState([]);
     const [currentDocId, setCurrentDocId] = useState(documentId || null);
 
@@ -175,10 +176,13 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
 
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setForm(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
+        const finalValue = type === 'checkbox' ? checked : value;
+        setForm(prev => ({ ...prev, [name]: finalValue }));
+        
+        // Propagate shared fields upwards
+        if ((name === 'writtenAt' || name === 'documentDate') && onSharedDataChange) {
+            onSharedDataChange(name, finalValue);
+        }
     };
 
     useEffect(() => {
@@ -196,6 +200,38 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
         fetchContracts();
     }, []);
 
+    // Auto-fill customer data when provided from parent
+    useEffect(() => {
+        if (customerData && !currentDocId) {
+            setForm(prev => ({
+                ...prev,
+                licenseeName: customerData.CustomerName || '',
+                citizenId: customerData.TaxID || '',
+                establishmentName: customerData.CustomerName || '',
+                estPhone: customerData.Phone || '',
+                estEmail: customerData.Email || '',
+            }));
+        }
+    }, [customerData, currentDocId]);
+
+    // Auto-fill contractId from parent
+    useEffect(() => {
+        if (externalContractId && !currentDocId) {
+            setForm(prev => ({ ...prev, contractId: externalContractId }));
+        }
+    }, [externalContractId, currentDocId]);
+
+    // Sync from shared state
+    useEffect(() => {
+        if (sharedFormData) {
+            setForm(prev => ({
+                ...prev,
+                writtenAt: sharedFormData.writtenAt !== undefined ? sharedFormData.writtenAt : prev.writtenAt,
+                documentDate: sharedFormData.documentDate !== undefined ? sharedFormData.documentDate : prev.documentDate,
+            }));
+        }
+    }, [sharedFormData]);
+
     // Fetch existing document data if documentId is provided
     useEffect(() => {
         if (currentDocId) {
@@ -211,11 +247,14 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
                             return dateString.split('T')[0];
                         };
                         
+                        const newWrittenAt = d.WrittenAt || '';
+                        const newDocDate = formatDt(d.DocumentDate);
+                        
                         setForm(prev => ({
                             ...prev,
                             documentNo: d.DocumentNo || '',
-                            writtenAt: d.WrittenAt || '',
-                            documentDate: formatDt(d.DocumentDate),
+                            writtenAt: newWrittenAt,
+                            documentDate: newDocDate,
                             contractId: d.ContractID || '',
                             
                             licenseeName: d.GrantorName || '',
@@ -295,6 +334,11 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
                             witness1Name: d.Witness1Name || '',
                             witness2Name: d.Witness2Name || ''
                         }));
+                        
+                        if (onSharedDataChange) {
+                            onSharedDataChange('writtenAt', newWrittenAt);
+                            onSharedDataChange('documentDate', newDocDate);
+                        }
                     }
                 } catch (error) {
                     console.error('Error fetching document:', error);
@@ -331,6 +375,19 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
         return payload;
     };
 
+    useImperativeHandle(ref, () => ({
+        getFormData: () => {
+            const payload = getCleanPayload();
+            if (currentDocId) {
+                payload.documentId = currentDocId;
+            }
+            return {
+                type: 'poa',
+                data: payload
+            };
+        }
+    }));
+
     const handleSave = async () => {
         setIsSaving(true);
         try {
@@ -350,7 +407,7 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
             const result = await response.json();
             if (result.success) {
                 showAlert('สำเร็จ', 'บันทึกข้อมูลหนังสือมอบอำนาจเรียบร้อยแล้ว', 'success');
-                if (!currentDocId && result.documentId) {
+                if (result.documentId && result.documentId !== currentDocId) {
                     setCurrentDocId(result.documentId);
                 }
             } else {
@@ -365,10 +422,23 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
     };
 
     const handlePrint = async () => {
-        setIsSaving(true);
+        setIsPrinting(true);
         try {
+            // 0. ตรวจสอบแม่แบบก่อนพิมพ์
+            try {
+                const checkRes = await fetch(`${API_BASE}/print/check-template/poa`);
+                const checkData = await checkRes.json();
+                if (!checkData.exists) {
+                    showAlert('เกิดข้อผิดพลาด', 'ไม่พบแม่แบบ (Template) สำหรับหนังสือมอบอำนาจในระบบ', 'error');
+                    return;
+                }
+            } catch (e) {
+                console.error('Template check failed', e);
+            }
+
             // 1. บันทึกข้อมูลลง Database ก่อน
             const payload = getCleanPayload();
+            // ถ้าพิมพ์จากฟอร์มเดี่ยว ๆ จะไม่กำหนด Status ให้เป็นพรีวิว เพื่อไม่ให้บันทึกทับสถานะร่าง (Backend จัดการ Status ให้)
             
             const method = currentDocId ? 'PUT' : 'POST';
             const url = currentDocId 
@@ -384,26 +454,28 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
             const saveResult = await saveResponse.json();
             if (!saveResult.success) {
                 showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกข้อมูลก่อนพิมพ์ได้', 'error');
-                setIsSaving(false);
                 return;
             }
 
             // 2. ข้อมูลลง DB แล้ว ค่อยเรียก Print API ไปดึงข้อมูลล่าสุดมาพิมพ์
             const printPayload = { documentType: 'poa' };
-            const docIdToPrint = currentDocId || saveResult.documentId;
+            let docIdToPrint = currentDocId;
+            if (saveResult.documentId && saveResult.documentId !== currentDocId) {
+                setCurrentDocId(saveResult.documentId);
+                docIdToPrint = saveResult.documentId;
+            }
             if (docIdToPrint) {
                 printPayload.documentId = docIdToPrint;
-                if (!currentDocId && saveResult.documentId) {
-                    setCurrentDocId(saveResult.documentId);
-                }
             }
 
+            showLoading('กำลังเปิดเอกสาร...', 'กรุณารอสักครู่ ระบบกำลังสร้าง PDF');
             const printResponse = await fetch(`${API_BASE}/print`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(printPayload)
             });
 
+            hideLoading();
             if (printResponse.ok) {
                 const blob = await printResponse.blob();
                 const url = window.URL.createObjectURL(blob);
@@ -414,39 +486,36 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
                 showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถสร้างเอกสาร PDF ได้', 'error');
             }
         } catch (error) {
+            hideLoading();
             console.error('Error printing document:', error);
             showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับระบบได้', 'error');
         } finally {
-            setIsSaving(false);
+            setIsPrinting(false);
         }
     };
 
     return (
-        <div className="poa-form-wrapper">
+        <div className={!embedded ? "print-page-break card" : "poa-form-wrapper"} style={!embedded ? { padding: 0, overflow: 'hidden', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' } : {}}>
             {/* ════════════════════════════════════════════════════════════════ */}
             {/* Header                                                         */}
             {/* ════════════════════════════════════════════════════════════════ */}
-            <div className="poa-header">
-                <h2>
+            {!embedded && (
+                <div style={{ padding: '16px 24px', background: '#1e40af', color: '#fff', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {onBack && (
-                        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                            <ArrowLeft />
+                        <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', color: '#fff', marginRight: '8px' }}>
+                            <ArrowLeft size={20} />
                         </button>
                     )}
-                    ฟอร์มหนังสือมอบอำนาจ
-                </h2>
-                <div className="poa-header-actions">
-
-                    <button onClick={handlePrint} disabled={isSaving} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', padding: '8px 16px', cursor: isSaving ? 'wait' : 'pointer' }}>
-                        <Printer size={16} /> {isSaving ? 'กำลังบันทึกและสร้าง PDF...' : 'บันทึกและพิมพ์ PDF'}
-                    </button>
+                    <FileSignature size={20} />
+                    <span style={{ fontSize: '16px', fontWeight: '700' }}>📜 หนังสือมอบอำนาจ</span>
                 </div>
-            </div>
+            )}
 
-            <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px', lineHeight: 1.6 }}>
-                สำหรับการมอบอำนาจ (ฉบับจะ = คำขอ) ของผู้รับอนุญาตผลิต/นำเข้าผลิตภัณฑ์สมุนไพร
-                (ตามแบบ ทบ.๑/จร.๑/ขจ.๑ / ทบ.๑ จร.๑ ขจ.๑ /บท./ลล.)
-            </p>
+            <div className={!embedded ? "poa-form-wrapper" : ""} style={!embedded ? { boxShadow: 'none' } : {}}>
+                <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px', lineHeight: 1.6 }}>
+                    สำหรับการมอบอำนาจ (ฉบับจะ = คำขอ) ของผู้รับอนุญาตผลิต/นำเข้าผลิตภัณฑ์สมุนไพร
+                    (ตามแบบ ทบ.๑/จร.๑/ขจ.๑ / ทบ.๑ จร.๑ ขจ.๑ /บท./ลล.)
+                </p>
 
             {/* ════════════════════════════════════════════════════════════════ */}
             {/* ข้อมูลทั่วไป: เขียนที่ / วันที่                                      */}
@@ -933,8 +1002,39 @@ const PowerOfAttorneyForm = ({ documentId, onBack }) => {
 
             {/* ── Version ── */}
             <div className="poa-version">ver001 261264</div>
+            
+            </div> {/* Close the inner wrapper */}
+
+            {/* ════════════════════════════════════════════════════════════════ */}
+            {/* Footer Buttons                                                 */}
+            {/* ════════════════════════════════════════════════════════════════ */}
+            {!embedded && (
+                <div className="no-print" style={{
+                    position: 'sticky',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: '#ffffff',
+                    borderTop: '1px solid #e2e8f0',
+                    padding: '16px 24px',
+                    display: 'flex',
+                    justifyContent: 'flex-end',
+                    gap: '12px',
+                    boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.05)',
+                    zIndex: 50,
+                    marginTop: '24px',
+                    borderRadius: '0 0 12px 12px'
+                }}>
+                    <button onClick={handlePrint} disabled={isSaving || isPrinting} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>
+                        <Printer size={18} /> {isPrinting ? 'กำลังสร้าง PDF...' : 'พรีวิว / พิมพ์'}
+                    </button>
+                    <button onClick={handleSave} disabled={isSaving || isPrinting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>
+                        <Save size={18} /> {isSaving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+                    </button>
+                </div>
+            )}
         </div>
     );
-};
+});
 
 export default PowerOfAttorneyForm;

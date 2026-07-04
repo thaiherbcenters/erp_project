@@ -214,7 +214,7 @@ export default function Planning() {
                         <div>
                             <h2>📋 จัดทำแผนผลิตจาก {soPlanData.soNo}</h2>
                             <div className="rnd-modal-meta" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                <span className="badge badge-primary">MTO — ผลิตตามคำสั่งซื้อ</span>
+                                <span className="badge badge-primary">MTO — ผลิตตามคำสั่งขาย</span>
                                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ลูกค้า: <strong>{soPlanData.customerName}</strong></span>
                                 {soPlanData.deliveryDate && (
                                     <span style={{ fontSize: 12, color: '#dc2626' }}>กำหนดส่ง: <strong>{new Date(soPlanData.deliveryDate).toLocaleDateString('th-TH')}</strong></span>
@@ -580,10 +580,10 @@ export default function Planning() {
                 </div>
             )}
 
-            {/* คำสั่งซื้อที่รอวางแผน (Sales Orders) */}
+            {/* คำสั่งขายที่รอวางแผน (Sales Orders) */}
             <div className="card" style={{ marginBottom: 16 }}>
                 <h3 className="plan-card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0284c7', margin: '0 0 4px' }}>
-                    <ShoppingCart size={16} /> คำสั่งซื้อที่รอวางแผน (Pending Sales Orders)
+                    <ShoppingCart size={16} /> คำสั่งขายที่รอวางแผน (Pending Sales Orders)
                 </h3>
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>ออเดอร์จากฝ่ายขายที่รอการจัดทำแผนผลิต (ใบสั่งผลิต)</p>
                 <div className="table-card">
@@ -598,9 +598,9 @@ export default function Planning() {
                         </thead>
                         <tbody>
                             {loadingSOs ? (
-                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลคำสั่งซื้อ...</td></tr>
+                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลคำสั่งขาย...</td></tr>
                             ) : pendingSalesOrders.length === 0 ? (
-                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีคำสั่งซื้อที่รอวางแผนในขณะนี้ 🎉</td></tr>
+                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีคำสั่งขายที่รอวางแผนในขณะนี้ 🎉</td></tr>
                             ) : pendingSalesOrders.map(so => (
                                 <tr key={so.SalesOrderID}>
                                     <td className="text-bold" style={{ color: 'var(--primary)' }}>{so.SalesOrderNo}</td>
@@ -1157,7 +1157,7 @@ export default function Planning() {
                         {createFromSOData && (
                             <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 14, marginBottom: 18 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontWeight: 600, fontSize: 14, color: '#0369a1' }}>
-                                    <ShoppingCart size={15} /> ข้อมูลจากคำสั่งซื้อ: {createFromSOData.soNo}
+                                    <ShoppingCart size={15} /> ข้อมูลจากคำสั่งขาย: {createFromSOData.soNo}
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 12, marginBottom: 10 }}>
                                     <div><span style={{ color: 'var(--text-muted)' }}>ลูกค้า:</span> <strong>{createFromSOData.customerName}</strong></div>

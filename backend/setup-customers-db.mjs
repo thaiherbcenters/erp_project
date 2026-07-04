@@ -14,10 +14,10 @@ const config = {
 };
 
 const SEED_TYPES = [
-    { id: 1, name: 'Retail (ขายปลีก)' },
-    { id: 2, name: 'OEM (รับจ้างผลิต)' },
-    { id: 3, name: 'Distributor (ตัวแทนจำหน่าย)' },
-    { id: 4, name: 'Government (หน่วยงานราชการ)' }
+    { id: 1, name: 'ทั่วไป' },
+    { id: 2, name: 'OEM นิติบุคคล' },
+    { id: 3, name: 'OEM บุคคลธรรมดา' },
+    { id: 4, name: 'ลูกค้าขึ้นทะเบียน' }
 ];
 
 const SEED_STATUSES = [

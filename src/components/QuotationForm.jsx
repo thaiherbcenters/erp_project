@@ -525,6 +525,8 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         address: '',
         phone: '',
         taxId: '',
+        taxBranch: 'head_office',
+        branchNo: '',
         discountPercent: 0,
         vatRate: 0,
         shippingCost: 0,
@@ -586,6 +588,61 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         };
         fetchContracts();
     }, []);
+
+    const [customerTypes, setCustomerTypes] = useState([]);
+    useEffect(() => {
+        const fetchCustomerTypes = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/customers/types`);
+                const json = await res.json();
+                if (json.success) {
+                    setCustomerTypes(json.data || []);
+                }
+            } catch (err) {
+                console.error("Failed to fetch customer types:", err);
+            }
+        };
+        fetchCustomerTypes();
+    }, []);
+
+    const [showCustomerModal, setShowCustomerModal] = useState(false);
+    const [customerList, setCustomerList] = useState([]);
+    const [customerSearch, setCustomerSearch] = useState('');
+
+    const openCustomerModal = async () => {
+        try {
+            const res = await fetch(`${API_BASE}/customers`);
+            const json = await res.json();
+            if (json.success) {
+                setCustomerList(json.data || []);
+                setShowCustomerModal(true);
+            }
+        } catch (err) {
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถโหลดรายชื่อลูกค้าได้', 'error');
+        }
+    };
+
+    const handleSelectCustomer = (cust) => {
+        setFormData(prev => ({
+            ...prev,
+            customerName: cust.CustomerName || '',
+            contactPerson: cust.ContactPerson || '',
+            phone: cust.Phone || '',
+            email: cust.Email || '',
+            address: cust.Address || '',
+            taxId: cust.TaxID || '',
+            taxBranch: cust.TaxBranch || 'head_office',
+            branchNo: cust.BranchNo || '',
+            customerTypeId: cust.CustomerTypeID || ''
+        }));
+        setShowCustomerModal(false);
+    };
+
+    const filteredCustomers = customerList.filter(c =>
+        (c.CustomerName || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
+        (c.CustomerCode || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
+        (c.ContactPerson || '').toLowerCase().includes(customerSearch.toLowerCase())
+    );
 
     // Fetch existing quotation for editing
     useEffect(() => {
@@ -1010,7 +1067,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 <option value="">-- ไม่ระบุสัญญา / ไม่ได้เชื่อมโยง --</option>
                                 {contracts.map(c => (
                                     <option key={c.ContractID} value={c.ContractID}>
-                                        {c.ContractNo} - {c.ContractName} ({c.CustomerName})
+                                        {c.ContractNo} - {c.ContractName} {c.CustomerName ? `(${c.CustomerName})` : ''}
                                     </option>
                                 ))}
                             </select>
@@ -1054,12 +1111,17 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
 
                     {/* ===== Section 2: ข้อมูลลูกค้า ===== */}
                     <div className="q-section">
-                        <div className="q-section-header">
-                            <div className="q-section-icon"><span style={{ fontSize: '16px' }}>👤</span></div>
-                            <div>
-                                <div className="q-section-title">ข้อมูลลูกค้า</div>
-                                <div className="q-section-desc">ชื่อ ที่อยู่ เบอร์โทร และเลขผู้เสียภาษีของลูกค้า</div>
+                        <div className="q-section-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div className="q-section-icon"><span style={{ fontSize: '16px' }}>👤</span></div>
+                                <div>
+                                    <div className="q-section-title">ข้อมูลลูกค้า</div>
+                                    <div className="q-section-desc">ชื่อ ที่อยู่ เบอร์โทร และเลขผู้เสียภาษีของลูกค้า</div>
+                                </div>
                             </div>
+                            <button type="button" className="btn-primary" onClick={openCustomerModal} style={{ padding: '6px 12px', fontSize: '13px' }}>
+                                🔍 เลือกลูกค้าจากฐานข้อมูล
+                            </button>
                         </div>
                         <div className="form-row" style={{ gridTemplateColumns: '1.2fr 2fr 1.5fr' }}>
                             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1071,10 +1133,9 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                     required 
                                 >
                                     <option value="">-- เลือกประเภท --</option>
-                                    <option value="1">ลูกค้า Retail (ขายปลีก)</option>
-                                    <option value="2">ลูกค้า OEM (รับจ้างผลิต)</option>
-                                    <option value="3">ลูกค้า Distributor (ตัวแทนจำหน่าย)</option>
-                                    <option value="4">ลูกค้า Government (รัฐ)</option>
+                                    {customerTypes.map(t => (
+                                        <option key={t.CustomerTypeID} value={t.CustomerTypeID}>{t.CustomerTypeName}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -1085,6 +1146,25 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 <label>ผู้ติดต่อ</label>
                                 <input type="text" name="contactPerson" placeholder="ชื่อผู้ติดต่อ (ถ้ามี)" value={formData.contactPerson} onChange={handleFormChange} />
                             </div>
+                        </div>
+                        
+                        <div className="form-row" style={{ gridTemplateColumns: '1.2fr 2fr 1.5fr' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label>สำนักงานใหญ่ / สาขา</label>
+                                <select name="taxBranch" value={formData.taxBranch} onChange={handleFormChange}>
+                                    <option value="head_office">สำนักงานใหญ่</option>
+                                    <option value="branch">สาขา</option>
+                                </select>
+                            </div>
+                            {formData.taxBranch === 'branch' ? (
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label>รหัสสาขา</label>
+                                    <input type="text" name="branchNo" placeholder="เช่น 00001" value={formData.branchNo} onChange={handleFormChange} maxLength={5} />
+                                </div>
+                            ) : (
+                                <div className="form-group" style={{ marginBottom: 0 }}></div>
+                            )}
+                            <div className="form-group" style={{ marginBottom: 0 }}></div>
                         </div>
                         <div className="form-group">
                             <label>ที่อยู่ <span className="required">*</span></label>
@@ -1656,6 +1736,54 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                     </div>
                 </div>
             </div>
+            {/* Customer Selection Modal */}
+            {showCustomerModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: '10px', width: '700px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2 style={{ margin: 0, fontSize: '18px' }}>เลือกลูกค้า</h2>
+                            <button onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888' }}>&times;</button>
+                        </div>
+                        <div style={{ padding: '16px 24px', borderBottom: '1px solid #eee' }}>
+                            <input 
+                                type="text" 
+                                placeholder="ค้นหาชื่อ, รหัส, ผู้ติดต่อ..." 
+                                value={customerSearch}
+                                onChange={(e) => setCustomerSearch(e.target.value)}
+                                style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
+                            />
+                        </div>
+                        <div style={{ overflowY: 'auto', flex: 1, padding: '0' }}>
+                            <table className="data-table" style={{ border: 'none' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>รหัสลูกค้า</th>
+                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>ชื่อลูกค้า</th>
+                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>ผู้ติดต่อ</th>
+                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1, textAlign: 'center' }}>เลือก</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
+                                        <tr key={c.CustomerID} className="hover-row">
+                                            <td style={{ color: '#4f46e5', fontWeight: '500' }}>{c.CustomerCode}</td>
+                                            <td style={{ fontWeight: '500' }}>{c.CustomerName}</td>
+                                            <td>{c.ContactPerson || '-'}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                <button type="button" onClick={() => handleSelectCustomer(c)} className="btn-primary" style={{ padding: '4px 12px', fontSize: '12px' }}>
+                                                    เลือก
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    )) : (
+                                        <tr><td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: '#999' }}>ไม่พบข้อมูลลูกค้า</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

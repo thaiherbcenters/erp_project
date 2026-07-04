@@ -55,6 +55,7 @@ const quotationRoutes = require('./routes/quotations');
 const salesOrderRoutes = require('./routes/sales-orders');
 const auditLogRoutes = require('./routes/audit-logs');
 const legalDocumentRoutes = require('./routes/legalDocuments');
+const herbalCertDocumentRoutes = require('./routes/herbalCertDocuments');
 const contractRoutes = require('./routes/contracts');
 const printRoutes = require('./routes/print');
 const templateRoutes = require('./routes/templates');
@@ -98,7 +99,7 @@ app.use('/api/shipping', shippingRoutes);
 app.use('/api/quotations', quotationRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
-app.use('/api/legal-documents', legalDocumentRoutes);
+app.use('/api/herbal-cert-documents', herbalCertDocumentRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/templates', templateRoutes);
 

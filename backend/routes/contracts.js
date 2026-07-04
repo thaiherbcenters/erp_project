@@ -51,7 +51,7 @@ router.get('/:id/documents', async (req, res) => {
             .query(`
                 SELECT DocumentID, DocumentNo, DocumentDate, DocumentType, Status, CreatedAt
                 FROM LegalDocuments
-                WHERE ContractID = @ContractID
+                WHERE ContractID = @ContractID AND Status != 'พรีวิว'
                 
                 UNION ALL
                 

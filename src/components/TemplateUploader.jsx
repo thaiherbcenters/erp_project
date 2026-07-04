@@ -183,6 +183,7 @@ export default function TemplateUploader() {
                             className="template-uploader-select flex-1"
                         >
                             <option value="poa">หนังสือมอบอำนาจ (poa)</option>
+                            <option value="herbal_cert">คำรับรองอ้างอิงแม่แบบ (herbal_cert)</option>
                             <option value="certificate" disabled>ใบรับรอง (กำลังพัฒนา)</option>
                             <option value="receipt" disabled>ใบเสร็จรับเงิน (กำลังพัฒนา)</option>
                         </select>

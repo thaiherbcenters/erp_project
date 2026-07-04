@@ -133,6 +133,30 @@ const ContractManagement = ({ onViewDocument }) => {
         setLinkedDocs([]);
     };
 
+    const handleToggleForm = () => {
+        if (!showForm) {
+            // Auto generate contract number: CT-YYMMDD-XXX
+            const d = new Date();
+            const yy = d.getFullYear().toString().slice(-2);
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const prefix = `CT-${yy}${mm}${dd}-`;
+            
+            // Find how many contracts exist today to increment
+            const countToday = contracts.filter(c => c.ContractNo?.startsWith(prefix)).length;
+            const nextNum = String(countToday + 1).padStart(3, '0');
+            
+            setFormData({ 
+                contractNo: `${prefix}${nextNum}`, 
+                contractName: '', 
+                startDate: '', 
+                endDate: '', 
+                status: 'กำลังดำเนินการ' 
+            });
+        }
+        setShowForm(!showForm);
+    };
+
     const filteredContracts = contracts.filter(c => 
         c.ContractNo?.toLowerCase().includes(searchTerm.toLowerCase()) || 
         c.ContractName?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -161,9 +185,8 @@ const ContractManagement = ({ onViewDocument }) => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <button className="search-btn">ค้นหา</button>
                 </div>
-                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setShowForm(!showForm)}>
+                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={handleToggleForm}>
                     <Plus size={16} /> {showForm ? 'ยกเลิก' : 'เพิ่มสัญญาใหม่'}
                 </button>
             </div>
@@ -174,7 +197,7 @@ const ContractManagement = ({ onViewDocument }) => {
                     <div className="contract-form-grid">
                         <div className="form-group">
                             <label>เลขที่สัญญา *</label>
-                            <input type="text" name="contractNo" value={formData.contractNo} onChange={handleChange} placeholder="เช่น CT-001" required />
+                            <input type="text" name="contractNo" value={formData.contractNo} onChange={handleChange} placeholder="เช่น CT-001" required readOnly style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed', color: '#64748b' }} title="สร้างให้อัตโนมัติ" />
                         </div>
                         <div className="form-group">
                             <label>ชื่อโปรเจกต์/สัญญา *</label>
@@ -277,7 +300,7 @@ const ContractManagement = ({ onViewDocument }) => {
                                     <tbody>
                                         {linkedDocs.map(doc => (
                                             <tr key={doc.DocumentID}>
-                                                <td>{doc.DocumentType === 'poa' ? 'หนังสือมอบอำนาจ' : doc.DocumentType}</td>
+                                                <td>{doc.DocumentType === 'poa' ? 'ขึ้นทะเบียน (POA)' : doc.DocumentType}</td>
                                                 <td>{doc.DocumentNo || '-'}</td>
                                                 <td>{doc.DocumentDate ? new Date(doc.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
                                                 <td><span className="status-badge progress">{doc.Status}</span></td>

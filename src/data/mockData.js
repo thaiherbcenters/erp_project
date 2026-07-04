@@ -70,7 +70,7 @@ export const ALL_PAGES = [
         id: 'home_stats', name: 'สถิติภาพรวม',
         sections: [
           { id: 'home_stats_revenue', name: 'รายได้รวม' },
-          { id: 'home_stats_orders', name: 'คำสั่งซื้อ' },
+          { id: 'home_stats_orders', name: 'คำสั่งขาย' },
           { id: 'home_stats_products', name: 'สินค้า' },
           { id: 'home_stats_customers', name: 'ลูกค้า' },
         ],
@@ -101,12 +101,7 @@ export const ALL_PAGES = [
           { id: 'customer_list_table', name: 'ตารางลูกค้า' },
         ],
       },
-      {
-        id: 'customer_history', name: 'ประวัติ',
-        sections: [
-          { id: 'customer_history_view', name: 'ดูประวัติ' },
-        ],
-      },
+
     ],
   },
 
@@ -145,7 +140,7 @@ export const ALL_PAGES = [
         id: 'sales_dashboard', name: 'Sales Dashboard',
         sections: [
           { id: 'sales_dashboard_revenue', name: 'ยอดขายรวม' },
-          { id: 'sales_dashboard_orders', name: 'จำนวนคำสั่งซื้อ' },
+          { id: 'sales_dashboard_orders', name: 'จำนวนคำสั่งขาย' },
           { id: 'sales_dashboard_customers', name: 'จำนวนลูกค้า' },
           { id: 'sales_dashboard_quotations', name: 'ใบเสนอราคา' },
         ],
@@ -160,8 +155,8 @@ export const ALL_PAGES = [
       {
         id: 'sales_orders', name: 'Sales Order',
         sections: [
-          { id: 'sales_orders_search', name: 'ค้นหาคำสั่งซื้อ' },
-          { id: 'sales_orders_table', name: 'ตารางคำสั่งซื้อ' },
+          { id: 'sales_orders_search', name: 'ค้นหาคำสั่งขาย' },
+          { id: 'sales_orders_table', name: 'ตารางคำสั่งขาย' },
         ],
       },
       {
@@ -171,9 +166,9 @@ export const ALL_PAGES = [
         ],
       },
       {
-        id: 'sales_poa', name: 'หนังสือมอบอำนาจ',
+        id: 'sales_poa', name: 'ขึ้นทะเบียน',
         sections: [
-          { id: 'sales_poa_form', name: 'ฟอร์มหนังสือมอบอำนาจ' },
+          { id: 'sales_poa_form', name: 'ฟอร์มขึ้นทะเบียน' },
         ],
       },
       {
@@ -689,7 +684,7 @@ export const MOCK_QUOTATIONS = [
   { id: 5, number: 'QT-2026-005', customer: 'บริษัท JKL จำกัด', items: 1, total: 200000, date: '2026-03-04', validUntil: '2026-04-03', status: 'อนุมัติ' },
 ];
 
-// 5c. คำสั่งซื้อ (Sales Orders)
+// 5c. คำสั่งขาย (Sales Orders)
 // status: 'รอดำเนินการ', 'กำลังดำเนินการ', 'จัดส่งแล้ว', 'เสร็จสิ้น'
 export const MOCK_SALES_ORDERS = [
   { id: 1, number: 'SO-2026-001', customer: 'บริษัท ABC จำกัด', product: 'Laptop Dell XPS 15', qty: 5, total: 225000, date: '2026-02-15', status: 'เสร็จสิ้น' },

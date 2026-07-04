@@ -1,7 +1,8 @@
 /**
  * Customer.jsx — หน้าจัดการข้อมูลลูกค้า (Real DB)
  */
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { searchAddressByDistrict, searchAddressByAmphoe, searchAddressByZipcode } from 'thai-address-database';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
@@ -62,16 +63,56 @@ export default function Customer() {
 
     const openCreate = () => {
         setEditingCustomer(null);
-        setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', taxId: '', typeId: 1, statusId: 1 });
+        setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', houseNo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zipCode: '', taxId: '', taxBranch: 'head_office', branchNo: '', typeId: 1, statusId: 1 });
         setShowModal(true);
+    };
+
+    const parseThaiAddress = (addr) => {
+        if (!addr) return { houseNo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zipCode: '' };
+        let remaining = addr.trim();
+        let houseNo = '', soi = '', road = '', subDistrict = '', district = '', province = '', zipCode = '';
+
+        // Extract zipCode (5 digits at end)
+        const zipMatch = remaining.match(/\s(\d{5})$/);
+        if (zipMatch) { zipCode = zipMatch[1]; remaining = remaining.replace(/\s\d{5}$/, '').trim(); }
+
+        // Extract จ.province
+        const provMatch = remaining.match(/จ\.([^\s]+)/);
+        if (provMatch) { province = provMatch[1]; remaining = remaining.replace(/จ\.[^\s]+/, '').trim(); }
+
+        // Extract อ.district
+        const distMatch = remaining.match(/อ\.([^\s]+)/);
+        if (distMatch) { district = distMatch[1]; remaining = remaining.replace(/อ\.[^\s]+/, '').trim(); }
+
+        // Extract ต.subDistrict
+        const subMatch = remaining.match(/ต\.([^\s]+)/);
+        if (subMatch) { subDistrict = subMatch[1]; remaining = remaining.replace(/ต\.[^\s]+/, '').trim(); }
+
+        // Extract ถ.road
+        const roadMatch = remaining.match(/ถ\.([^\s]+)/);
+        if (roadMatch) { road = roadMatch[1]; remaining = remaining.replace(/ถ\.[^\s]+/, '').trim(); }
+
+        // Extract ซ.soi
+        const soiMatch = remaining.match(/ซ\.([^\s]+)/);
+        if (soiMatch) { soi = soiMatch[1]; remaining = remaining.replace(/ซ\.[^\s]+/, '').trim(); }
+
+        // Whatever is left is houseNo
+        houseNo = remaining.trim();
+
+        return { houseNo, soi, road, subDistrict, district, province, zipCode };
     };
 
     const openEdit = (c) => {
         setEditingCustomer(c);
+        const parsed = parseThaiAddress(c.Address || '');
         setForm({
             name: c.CustomerName || '', contactPerson: c.ContactPerson || '',
             phone: c.Phone || '', email: c.Email || '', address: c.Address || '',
-            taxId: c.TaxID || '', typeId: c.CustomerTypeID || 1, statusId: c.CustomerStatusID || 1
+            houseNo: parsed.houseNo, soi: parsed.soi, road: parsed.road,
+            subDistrict: parsed.subDistrict, district: parsed.district,
+            province: parsed.province, zipCode: parsed.zipCode,
+            taxId: c.TaxID || '', taxBranch: c.TaxBranch || 'head_office', branchNo: c.BranchNo || '', 
+            typeId: c.CustomerTypeID || 1, statusId: c.CustomerStatusID || 1
         });
         setShowModal(true);
     };
@@ -89,12 +130,28 @@ export default function Customer() {
 
     const handleSave = async () => {
         if (!form.name.trim()) return showAlert('ข้อผิดพลาด', 'กรุณากรอกชื่อลูกค้า', 'error');
+        
+        let finalAddress = form.address;
+        if (form.houseNo || form.soi || form.road || form.subDistrict || form.district || form.province || form.zipCode) {
+            const parts = [];
+            if (form.houseNo) parts.push(form.houseNo);
+            if (form.soi) parts.push(`ซ.${form.soi}`);
+            if (form.road) parts.push(`ถ.${form.road}`);
+            if (form.subDistrict) parts.push(`ต.${form.subDistrict}`);
+            if (form.district) parts.push(`อ.${form.district}`);
+            if (form.province) parts.push(`จ.${form.province}`);
+            if (form.zipCode) parts.push(form.zipCode);
+            finalAddress = parts.join(' ');
+        }
+        
+        const payload = { ...form, address: finalAddress };
+
         try {
             const url = editingCustomer ? `${API_BASE}/customers/${editingCustomer.CustomerID}` : `${API_BASE}/customers`;
             const method = editingCustomer ? 'PUT' : 'POST';
             const res = await fetch(url, {
                 method, headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form)
+                body: JSON.stringify(payload)
             });
             const json = await res.json();
             if (json.success) {
@@ -118,6 +175,83 @@ export default function Customer() {
         } catch (err) { showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการลบ', 'error'); }
     };
 
+    const [addressSuggestions, setAddressSuggestions] = useState([]);
+    const [activeAddressField, setActiveAddressField] = useState(null);
+
+    const handleAddressChange = (field, value) => {
+        setForm({ ...form, [field]: value });
+        if (value && value.length >= 2) {
+            let res = [];
+            if (field === 'zipCode') res = searchAddressByZipcode(value);
+            else if (field === 'subDistrict') res = searchAddressByDistrict(value);
+            else if (field === 'district') res = searchAddressByAmphoe(value);
+            else if (field === 'province') res = searchAddressByProvince(value);
+
+            // Deduplicate based on the active field
+            let uniqueRes = [];
+            if (field === 'province') {
+                const seen = new Set();
+                res.forEach(item => {
+                    if (!seen.has(item.province)) {
+                        seen.add(item.province);
+                        uniqueRes.push(item);
+                    }
+                });
+            } else if (field === 'district') {
+                const seen = new Set();
+                res.forEach(item => {
+                    const key = `${item.amphoe}-${item.province}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        uniqueRes.push(item);
+                    }
+                });
+            } else if (field === 'zipCode') {
+                const seen = new Set();
+                res.forEach(item => {
+                    const key = `${item.zipcode}-${item.amphoe}-${item.province}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        uniqueRes.push(item);
+                    }
+                });
+            } else {
+                uniqueRes = res;
+            }
+
+            setAddressSuggestions(uniqueRes.slice(0, 50));
+            setActiveAddressField(field);
+        } else {
+            setAddressSuggestions([]);
+            setActiveAddressField(null);
+        }
+    };
+
+    const handleSelectAddress = (item, field) => {
+        const nextForm = { ...form };
+        
+        if (field === 'subDistrict') {
+            nextForm.subDistrict = item.district || '';
+            nextForm.district = item.amphoe || '';
+            nextForm.province = item.province || '';
+            nextForm.zipCode = item.zipcode || '';
+        } else if (field === 'district') {
+            nextForm.district = item.amphoe || '';
+            nextForm.province = item.province || '';
+            if (!nextForm.zipCode) nextForm.zipCode = item.zipcode || '';
+        } else if (field === 'province') {
+            nextForm.province = item.province || '';
+        } else if (field === 'zipCode') {
+            nextForm.zipCode = item.zipcode || '';
+            nextForm.province = item.province || '';
+            if (!nextForm.district) nextForm.district = item.amphoe || '';
+        }
+
+        setForm(nextForm);
+        setAddressSuggestions([]);
+        setActiveAddressField(null);
+    };
+
     const getStatusClass = (s) => {
         if (s === 'Active') return 'badge-success';
         if (s === 'Inactive' || s === 'Suspended' || s === 'Blacklist') return 'badge-danger';
@@ -131,18 +265,19 @@ export default function Customer() {
     };
 
     const getSourceThai = (s) => {
-        const map = { manual: 'กรอกเอง', sales_order: 'จากใบสั่งซื้อ', quotation: 'จากใบเสนอราคา', online: 'ออนไลน์' };
+        const map = { manual: 'กรอกเอง', sales_order: 'จากใบสั่งขาย', quotation: 'จากใบเสนอราคา', online: 'ออนไลน์' };
         return map[s] || s || '-';
     };
 
     const getTypeClass = (t) => {
         if (!t) return 'badge-neutral';
-        if (t.includes('OEM')) return 'badge-warning'; // ส้ม
-        return 'badge-info'; // น้ำเงิน
+        if (t.includes('OEM')) return 'badge-warning'; // สีส้ม
+        if (t.includes('ขึ้นทะเบียน')) return 'badge-success'; // สีเขียว
+        return 'badge-info'; // สีน้ำเงิน (ทั่วไป)
     };
 
-    const getPageTitle = () => activeTab === 'customer_history' ? 'ประวัติลูกค้าและการสั่งซื้อ' : 'รายชื่อลูกค้า';
-    const getPageDesc = () => activeTab === 'customer_history' ? 'ตรวจสอบประวัติการสั่งซื้อ และเอกสารต่างๆ ของลูกค้าแต่ละราย' : 'จัดการฐานข้อมูลลูกค้า เพิ่มหรือแก้ไขข้อมูลการติดต่อ';
+    const getPageTitle = () => 'รายชื่อลูกค้า';
+    const getPageDesc = () => 'จัดการฐานข้อมูลลูกค้า เพิ่มหรือแก้ไขข้อมูลการติดต่อ';
 
     return (
         <div className="page-container customer-page page-enter">
@@ -213,12 +348,7 @@ export default function Customer() {
                 </div>
             )}
 
-            {/* ── Tab: Customer History ── */}
-            {(activeTab === 'customer_history' && hasSubPermission('customer_history')) && (
-                <div className="subpage-content" key="customer_history">
-                    <div className="card"><p style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>เลือกลูกค้าจากหน้ารายชื่อ แล้วกดปุ่ม "ดูรายละเอียด" เพื่อดูประวัติการสั่งซื้อ</p></div>
-                </div>
-            )}
+
 
             {/* ── Modal: Create/Edit ── */}
             {showModal && (
@@ -247,15 +377,83 @@ export default function Customer() {
                                     <input style={inputStyle} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="email@company.com" />
                                 </div>
                             </div>
-                            <div>
-                                <label style={labelStyle}>ที่อยู่</label>
-                                <textarea style={{ ...inputStyle, minHeight: '60px', resize: 'vertical' }} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} placeholder="ที่อยู่สำหรับจัดส่งเอกสารหรือสินค้า" />
+                            
+                            <div style={{ marginBottom: '10px' }}>
+                                <label style={labelStyle}>บ้านเลขที่ / อาคาร / หมู่</label>
+                                <input style={inputStyle} value={form.houseNo || ''} onChange={e => setForm({ ...form, houseNo: e.target.value })} placeholder="เช่น 123/45 ม.9" />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+                                <div>
+                                    <label style={labelStyle}>ตรอก / ซอย</label>
+                                    <input style={inputStyle} value={form.soi || ''} onChange={e => setForm({ ...form, soi: e.target.value })} placeholder="เช่น สุขุมวิท 1" />
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>ถนน</label>
+                                    <input style={inputStyle} value={form.road || ''} onChange={e => setForm({ ...form, road: e.target.value })} placeholder="เช่น สุขุมวิท" />
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
+                                <div style={{ position: 'relative' }}>
+                                    <label style={labelStyle}>ตำบล / แขวง</label>
+                                    <input style={inputStyle} value={form.subDistrict || ''} onChange={e => handleAddressChange('subDistrict', e.target.value)} onFocus={() => { if(form.subDistrict?.length >= 2) handleAddressChange('subDistrict', form.subDistrict); }} onBlur={() => setTimeout(() => setActiveAddressField(null), 200)} placeholder="ตำบล/แขวง" />
+                                    {activeAddressField === 'subDistrict' && addressSuggestions.length > 0 && (
+                                        <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '150px', overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', zIndex: 1000, margin: 0, padding: 0, listStyle: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                                            {addressSuggestions.map((item, i) => (
+                                                <li key={i} onClick={() => handleSelectAddress(item, activeAddressField)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }} onMouseEnter={e => e.target.style.background = '#f5f5f5'} onMouseLeave={e => e.target.style.background = 'transparent'}>
+                                                    ต.{item.district} อ.{item.amphoe} จ.{item.province} {item.zipcode}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                                <div style={{ position: 'relative' }}>
+                                    <label style={labelStyle}>อำเภอ / เขต</label>
+                                    <input style={inputStyle} value={form.district || ''} onChange={e => handleAddressChange('district', e.target.value)} onFocus={() => { if(form.district?.length >= 2) handleAddressChange('district', form.district); }} onBlur={() => setTimeout(() => setActiveAddressField(null), 200)} placeholder="อำเภอ/เขต" />
+                                    {activeAddressField === 'district' && addressSuggestions.length > 0 && (
+                                        <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '150px', overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', zIndex: 1000, margin: 0, padding: 0, listStyle: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                                            {addressSuggestions.map((item, i) => (
+                                                <li key={i} onClick={() => handleSelectAddress(item, activeAddressField)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }} onMouseEnter={e => e.target.style.background = '#f5f5f5'} onMouseLeave={e => e.target.style.background = 'transparent'}>
+                                                    อ.{item.amphoe} จ.{item.province} {item.zipcode}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div>
-                                    <label style={labelStyle}>เลขประจำตัวผู้เสียภาษี</label>
-                                    <input style={inputStyle} value={form.taxId} onChange={e => setForm({ ...form, taxId: e.target.value })} placeholder="0-xxxx-xxxxx-xx-x" />
+                                <div style={{ position: 'relative' }}>
+                                    <label style={labelStyle}>จังหวัด</label>
+                                    <input style={inputStyle} value={form.province || ''} onChange={e => handleAddressChange('province', e.target.value)} onFocus={() => { if(form.province?.length >= 2) handleAddressChange('province', form.province); }} onBlur={() => setTimeout(() => setActiveAddressField(null), 200)} placeholder="จังหวัด" />
+                                    {activeAddressField === 'province' && addressSuggestions.length > 0 && (
+                                        <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '150px', overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', zIndex: 1000, margin: 0, padding: 0, listStyle: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                                            {addressSuggestions.map((item, i) => (
+                                                <li key={i} onClick={() => handleSelectAddress(item, activeAddressField)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }} onMouseEnter={e => e.target.style.background = '#f5f5f5'} onMouseLeave={e => e.target.style.background = 'transparent'}>
+                                                    จ.{item.province} {item.zipcode}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
+                                <div style={{ position: 'relative' }}>
+                                    <label style={labelStyle}>รหัสไปรษณีย์</label>
+                                    <input style={inputStyle} value={form.zipCode || ''} onChange={e => handleAddressChange('zipCode', e.target.value)} onFocus={() => { if(form.zipCode?.length >= 2) handleAddressChange('zipCode', form.zipCode); }} onBlur={() => setTimeout(() => setActiveAddressField(null), 200)} placeholder="เช่น 10110" maxLength={5} />
+                                    {activeAddressField === 'zipCode' && addressSuggestions.length > 0 && (
+                                        <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '150px', overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', zIndex: 1000, margin: 0, padding: 0, listStyle: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                                            {addressSuggestions.map((item, i) => (
+                                                <li key={i} onClick={() => handleSelectAddress(item, activeAddressField)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }} onMouseEnter={e => e.target.style.background = '#f5f5f5'} onMouseLeave={e => e.target.style.background = 'transparent'}>
+                                                    {item.zipcode} ต.{item.district} อ.{item.amphoe} จ.{item.province}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+                            <div>
+                                <label style={labelStyle}>เลขประจำตัวผู้เสียภาษี</label>
+                                <input style={inputStyle} value={form.taxId} onChange={e => setForm({ ...form, taxId: e.target.value })} placeholder="0-xxxx-xxxxx-xx-x" />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div>
                                     <label style={labelStyle}>ประเภทลูกค้า *</label>
                                     <select style={inputStyle} value={form.typeId} onChange={e => setForm({ ...form, typeId: parseInt(e.target.value) })}>
