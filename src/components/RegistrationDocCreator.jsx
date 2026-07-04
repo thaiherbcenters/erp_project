@@ -76,23 +76,39 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
             try {
                 // ถ้าใน data มี documentId อยู่แล้วแปลว่าเป็นการอัปเดต (PUT)
                 // ถ้าไม่มีแปลว่าเป็นการสร้างใหม่ (POST)
-                const isUpdate = !!data.documentId;
-                const method = isUpdate ? 'PUT' : 'POST';
+                let isUpdate = !!data.documentId;
+                let method = isUpdate ? 'PUT' : 'POST';
                 let endpointBase = `${API_BASE}/legal-documents`;
                 if (type === 'herbal_cert') {
                     endpointBase = `${API_BASE}/herbal-cert-documents`;
                 }
 
+                let targetId = data.documentId;
+
+                // Check if we should automatically create a new version
+                if (isUpdate && status !== 'พรีวิว' && (status === 'ลูกค้าขอแก้ไข' || docStatus === 'ลูกค้าขอแก้ไข' || docStatus === 'ลูกค้าลงนามแล้ว')) {
+                    try {
+                        const verRes = await fetch(`${endpointBase}/${targetId}/version`, { method: 'POST' });
+                        const verData = await verRes.json();
+                        if (verData.success) {
+                            targetId = verData.documentId;
+                            method = 'PUT'; // Update the newly created version
+                            data.documentId = targetId; // Important for payload
+                            setDocVersion(verData.version);
+                        }
+                    } catch (err) {
+                        console.error('Error creating new version', err);
+                    }
+                }
+
                 const url = isUpdate 
-                    ? `${endpointBase}/${data.documentId}` 
+                    ? `${endpointBase}/${targetId}` 
                     : `${endpointBase}`;
                     
                 // กำหนดสถานะตามที่ผู้ใช้เลือก (ยกเว้นกรณีพิมพ์พรีวิวสำหรับเอกสารเดิม จะไม่เปลี่ยนสถานะ)
                 const payload = { ...data, documentType: type };
                 if (status) {
                     if (isUpdate && status === 'พรีวิว') {
-                        // ถ้าเป็นการอัปเดตเอกสารเดิม แล้วกดพิมพ์พรีวิว ไม่ต้องเปลี่ยนสถานะให้กลายเป็นพรีวิว 
-                        // ให้ใช้สถานะเดิมจาก dropdown หรือคงค่าเดิมไว้
                         payload.status = docStatus;
                     } else {
                         payload.status = status;

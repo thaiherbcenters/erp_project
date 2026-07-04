@@ -314,7 +314,8 @@ export default function Sales() {
                 const fileInput = document.getElementById('upload-file-input');
                 if (fileInput) fileInput.value = '';
                 
-                handleViewDocHistory(historyDocumentNo);
+                // Keep the attachments popup open after successful upload
+                handleViewDocHistory(historyDocumentNo, 'poa', 'attachments');
                 setLocalPOAs(prev => prev.map(p => 
                     p.DocumentNo === historyDocumentNo ? { ...p, Status: 'ลูกค้าลงนามแล้ว' } : p
                 ));
@@ -1304,7 +1305,11 @@ export default function Sales() {
                     <div className="pdf-preview-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', height: 'auto', padding: '24px', maxHeight: '80vh', overflowY: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                             <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <History size={18} /> ประวัติเอกสาร {historyDocumentNo}
+                                {historyTab === 'versions' ? (
+                                    <><History size={18} /> ประวัติเวอร์ชันเอกสาร {historyDocumentNo}</>
+                                ) : (
+                                    <><UploadCloud size={18} /> อัปโหลดไฟล์สแกน {historyDocumentNo}</>
+                                )}
                             </h3>
                             <button onClick={() => setShowDocHistoryModal(false)} className="doc-action-btn" style={{ width: '30px', height: '30px', background: '#f1f5f9', borderRadius: '6px' }}>
                                 <X size={16} />
@@ -1315,36 +1320,7 @@ export default function Sales() {
                             <div style={{ textAlign: 'center', padding: '40px' }}><div className="loading-spinner"></div></div>
                         ) : (
                             <div>
-                                <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
-                                    <button 
-                                        onClick={() => setHistoryTab('versions')}
-                                        style={{ 
-                                            padding: '8px 4px', 
-                                            background: 'none', 
-                                            border: 'none', 
-                                            borderBottom: historyTab === 'versions' ? '2px solid #2563eb' : '2px solid transparent',
-                                            color: historyTab === 'versions' ? '#2563eb' : '#64748b',
-                                            fontWeight: historyTab === 'versions' ? 600 : 400,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        ประวัติการแก้ไข
-                                    </button>
-                                    <button 
-                                        onClick={() => setHistoryTab('attachments')}
-                                        style={{ 
-                                            padding: '8px 4px', 
-                                            background: 'none', 
-                                            border: 'none', 
-                                            borderBottom: historyTab === 'attachments' ? '2px solid #2563eb' : '2px solid transparent',
-                                            color: historyTab === 'attachments' ? '#2563eb' : '#64748b',
-                                            fontWeight: historyTab === 'attachments' ? 600 : 400,
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        เอกสารอัปโหลด {docAttachments.length > 0 && `(${docAttachments.length})`}
-                                    </button>
-                                </div>
+                                {/* Tab buttons removed to separate popups */}
 
                                 {historyTab === 'versions' ? (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
