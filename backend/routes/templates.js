@@ -89,6 +89,31 @@ router.post('/upload', upload.any(), (req, res) => {
                 if (jsonFile) {
                     fs.writeFileSync(path.join(tempDir, `page${newIndex}_config.json`), jsonFile.buffer);
                 }
+            } else if (item.type === 'mixed') {
+                const oldPdfPath = path.join(dir, `page${item.originalIndex}_base.pdf`);
+                const oldConfigPath = path.join(dir, `page${item.originalIndex}_config.json`);
+                
+                const legacyPdfPath = path.join(dir, `${docType}_base.pdf`);
+                const legacyConfigPath = path.join(dir, `${docType}_config.json`);
+                
+                const pdfFile = req.files ? req.files.find(f => f.fieldname === `basePdf_${item.fileIndex}`) : null;
+                const jsonFile = req.files ? req.files.find(f => f.fieldname === `configJson_${item.fileIndex}`) : null;
+
+                if (pdfFile) {
+                    fs.writeFileSync(path.join(tempDir, `page${newIndex}_base.pdf`), pdfFile.buffer);
+                } else if (fs.existsSync(oldPdfPath)) {
+                    fs.copyFileSync(oldPdfPath, path.join(tempDir, `page${newIndex}_base.pdf`));
+                } else if (fs.existsSync(legacyPdfPath)) {
+                    fs.copyFileSync(legacyPdfPath, path.join(tempDir, `page${newIndex}_base.pdf`));
+                }
+
+                if (jsonFile) {
+                    fs.writeFileSync(path.join(tempDir, `page${newIndex}_config.json`), jsonFile.buffer);
+                } else if (fs.existsSync(oldConfigPath)) {
+                    fs.copyFileSync(oldConfigPath, path.join(tempDir, `page${newIndex}_config.json`));
+                } else if (fs.existsSync(legacyConfigPath)) {
+                    fs.copyFileSync(legacyConfigPath, path.join(tempDir, `page${newIndex}_config.json`));
+                }
             }
         });
 

@@ -193,6 +193,15 @@ router.post('/', async (req, res) => {
                                 color: rgb(0, 0, 0),
                             });
                         }
+                    } else if (field.type === 'strikeout') {
+                        if (value.toLowerCase() === 'true' || value === '1') {
+                            pdfPage.drawLine({
+                                start: { x: x, y: y + (boxHeight / 2) },
+                                end: { x: x + boxWidth, y: y + (boxHeight / 2) },
+                                thickness: 1,
+                                color: rgb(0.15, 0.15, 0.15),
+                            });
+                        }
                     } else if (field.type === 'comb' && (field.combCount || field.combFormat)) {
                         const chars = value.replace(/\s+/g, '').split('');
                         let boxes = [];
@@ -254,6 +263,12 @@ router.post('/', async (req, res) => {
                             currentX += activeFont.widthOfTextAtSize(chars[i], fieldFontSize) + spacing;
                         }
                     } else {
+                        // Auto-shrink font size if text overflows the bounding box
+                        const textWidth = activeFont.widthOfTextAtSize(value, fieldFontSize);
+                        if (textWidth > boxWidth && boxWidth > 0) {
+                            fieldFontSize = fieldFontSize * (boxWidth / textWidth);
+                        }
+
                         // Fix for Thai Sara Am and Tone Marks in pdf-lib (Sarabun font)
                         // This intercepts clusters like น้ำ and draws นำ first to maintain kerning,
                         // then explicitly overlays the tone mark ้ at the correct X coordinate.

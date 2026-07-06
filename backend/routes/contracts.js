@@ -49,11 +49,16 @@ router.get('/:id/documents', async (req, res) => {
         const result = await pool.request()
             .input('ContractID', sql.Int, id)
             .query(`
-                SELECT DocumentID, DocumentNo, DocumentDate, DocumentType, Status, CreatedAt,
-                       CAST(CASE WHEN EXISTS(SELECT 1 FROM LegalDocumentAttachments a WHERE a.DocumentNo = LegalDocuments.DocumentNo) THEN 1 ELSE 0 END AS BIT) AS HasAttachment,
-                       (SELECT TOP 1 FilePath FROM LegalDocumentAttachments a WHERE a.DocumentNo = LegalDocuments.DocumentNo ORDER BY UploadedAt DESC) AS AttachmentPath
-                FROM LegalDocuments
-                WHERE ContractID = @ContractID AND Status != 'พรีวิว'
+                SELECT DocumentID, DocumentNo, DocumentDate, DocumentType, Status, CreatedAt, HasAttachment, AttachmentPath
+                FROM (
+                    SELECT DocumentID, DocumentNo, DocumentDate, DocumentType, Status, CreatedAt,
+                           CAST(CASE WHEN EXISTS(SELECT 1 FROM LegalDocumentAttachments a WHERE a.DocumentNo = LegalDocuments.DocumentNo) THEN 1 ELSE 0 END AS BIT) AS HasAttachment,
+                           (SELECT TOP 1 FilePath FROM LegalDocumentAttachments a WHERE a.DocumentNo = LegalDocuments.DocumentNo ORDER BY UploadedAt DESC) AS AttachmentPath,
+                           ROW_NUMBER() OVER(PARTITION BY DocumentNo ORDER BY Version DESC) as rn
+                    FROM LegalDocuments
+                    WHERE ContractID = @ContractID AND Status != 'พรีวิว'
+                ) docs
+                WHERE rn = 1
                 
                 UNION ALL
                 

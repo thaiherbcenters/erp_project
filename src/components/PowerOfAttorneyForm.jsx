@@ -135,9 +135,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
         submitterIsOr: false,
         productNameAlt: '',
         hasRegNo: false,
-        regNo: '',
         hasRegDetail: false,
-        regDetailNo: '',
         hasNoticeNo: false,
         regNoticeNo: '',
 
@@ -207,7 +205,6 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                 ...prev,
                 licenseeName: customerData.CustomerName || '',
                 citizenId: customerData.TaxID || '',
-                establishmentName: customerData.CustomerName || '',
                 estPhone: customerData.Phone || '',
                 estEmail: customerData.Email || '',
             }));
@@ -301,9 +298,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                             submitterIsOr: d.SubmitterIsOr || false,
                             productNameAlt: d.ProductNameAlt || '',
                             hasRegNo: d.HasRegNo || false,
-                            regNo: d.RegNo || '',
                             hasRegDetail: d.HasRegDetail || false,
-                            regDetailNo: d.RegDetailNo || '',
                             hasNoticeNo: d.HasNoticeNo || false,
                             regNoticeNo: d.RegNoticeNo || '',
                             
@@ -827,26 +822,16 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                                     <input type="checkbox" name="hasRegNo" checked={form.hasRegNo} onChange={handleChange} />
                                     เลขทะเบียนที่
                                 </label>
-                                {form.hasRegNo && (
-                                    <input type="text" name="regNo" value={form.regNo} onChange={handleChange}
-                                        style={{ width: '120px', padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }}
-                                    />
-                                )}
                                 <label className="poa-checkbox-item">
                                     <input type="checkbox" name="hasRegDetail" checked={form.hasRegDetail || false} onChange={handleChange} />
                                     แจ้งรายละเอียดที่
                                 </label>
-                                {form.hasRegDetail && (
-                                    <input type="text" name="regDetailNo" value={form.regDetailNo} onChange={handleChange}
-                                        style={{ width: '120px', padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }}
-                                    />
-                                )}
                                 <label className="poa-checkbox-item">
                                     <input type="checkbox" name="hasNoticeNo" checked={form.hasNoticeNo || false} onChange={handleChange} />
                                     เลขรับจดแจ้งที่
                                 </label>
                                 {form.hasNoticeNo && (
-                                    <input type="text" name="regNoticeNo" value={form.regNoticeNo} onChange={handleChange}
+                                    <input type="text" name="regNoticeNo" value={form.regNoticeNo || ''} onChange={handleChange}
                                         style={{ width: '120px', padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: '4px', fontSize: '13px', fontFamily: 'inherit' }}
                                     />
                                 )}
@@ -984,21 +969,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
 
 
 
-            {/* ════════════════════════════════════════════════════════════════ */}
-            {/* เอกสารแนบ                                                        */}
-            {/* ════════════════════════════════════════════════════════════════ */}
-            <div className="poa-info-box green" style={{ marginTop: '24px' }}>
-                <div className="poa-section-subtitle" style={{ marginTop: 0, fontWeight: 700 }}>พร้อมแนบเอกสารหลักฐาน เรื่องสมบูรณ์ดังนี้</div>
-                <div className="poa-attach-list">
-                    <label className="poa-attach-item">
-                        <input type="checkbox" name="attachLicenseCopy" checked={form.attachLicenseCopy} onChange={handleChange} />
-                        1. สำเนาใบอนุญาตผลิต / นำเข้า ผลิตภัณฑ์สมุนไพร
-                    </label>
-                </div>
-                <p style={{ fontSize: '12px', color: '#dc2626', fontWeight: 600, marginTop: '8px' }}>
-                    *** รับรองสำเนาเอกสารโดยผู้มอบอำนาจ ทุกหน้า ***
-                </p>
-            </div>
+
 
             {/* ── Version ── */}
             <div className="poa-version">ver001 261264</div>

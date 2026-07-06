@@ -199,9 +199,7 @@ router.post('/', async (req, res) => {
             .input('SubmitterIsOr', sql.Bit, data.submitterIsOr ? 1 : 0)
             .input('ProductNameAlt', sql.NVarChar, data.productNameAlt || null)
             .input('HasRegNo', sql.Bit, data.hasRegNo ? 1 : 0)
-            .input('RegNo', sql.NVarChar, data.regNo || null)
             .input('HasRegDetail', sql.Bit, data.hasRegDetail ? 1 : 0)
-            .input('RegDetailNo', sql.NVarChar, data.regDetailNo || null)
             .input('HasNoticeNo', sql.Bit, data.hasNoticeNo ? 1 : 0)
             .input('RegNoticeNo', sql.NVarChar, data.regNoticeNo || null)
             
@@ -246,7 +244,7 @@ router.post('/', async (req, res) => {
                     IsProducer, IsImporter, ProdTypeHerbalMedicine, ProdTypeTraditionalMed, ProdTypeDevMed, ProdTypeHealthProduct, ProdTypeCosmetic, ProdTypeDetail,
                     RequestType, ReqTypeRegister, ReqTypeNotifyDetail, ReqTypeNotify, ReqTypeRenew, 
                     SubmitterIsIn, SubmitFormType, SubmitFormTypeAmend, SubmitFormTypeReplace, SubmitFormTypeOtherCheck, SubmitFormOther, 
-                    ProductName, ProductReceiveNo, SubmitterIsOr, ProductNameAlt, HasRegNo, RegNo, HasRegDetail, RegDetailNo, HasNoticeNo, RegNoticeNo,
+                    ProductName, ProductReceiveNo, SubmitterIsOr, ProductNameAlt, HasRegNo, HasRegDetail, HasNoticeNo, RegNoticeNo,
                     GranteePrefix, GranteeName, GranteeAge, GranteeCitizenID, GranteeIDExpiryDate, GranteeAddressNo, GranteeMoo, GranteeSoi, GranteeRoad, GranteeSubDistrict, GranteeDistrict, GranteeProvince, GranteePhone, GranteeEmail,
                     ScopeSubmit, ScopeAmend, ScopeAll, ScopeStartDate, ScopeOther, ScopeStartDay, ScopeStartMonth, ScopeStartYear,
                     AttachLicenseCopy, GrantorSignName, GranteeSignName, Witness1Name, Witness2Name,
@@ -260,7 +258,7 @@ router.post('/', async (req, res) => {
                     @IsProducer, @IsImporter, @ProdTypeHerbalMedicine, @ProdTypeTraditionalMed, @ProdTypeDevMed, @ProdTypeHealthProduct, @ProdTypeCosmetic, @ProdTypeDetail,
                     @RequestType, @ReqTypeRegister, @ReqTypeNotifyDetail, @ReqTypeNotify, @ReqTypeRenew,
                     @SubmitterIsIn, @SubmitFormType, @SubmitFormTypeAmend, @SubmitFormTypeReplace, @SubmitFormTypeOtherCheck, @SubmitFormOther,
-                    @ProductName, @ProductReceiveNo, @SubmitterIsOr, @ProductNameAlt, @HasRegNo, @RegNo, @HasRegDetail, @RegDetailNo, @HasNoticeNo, @RegNoticeNo,
+                    @ProductName, @ProductReceiveNo, @SubmitterIsOr, @ProductNameAlt, @HasRegNo, @HasRegDetail, @HasNoticeNo, @RegNoticeNo,
                     @GranteePrefix, @GranteeName, @GranteeAge, @GranteeCitizenID, @GranteeIDExpiryDate, @GranteeAddressNo, @GranteeMoo, @GranteeSoi, @GranteeRoad, @GranteeSubDistrict, @GranteeDistrict, @GranteeProvince, @GranteePhone, @GranteeEmail,
                     @ScopeSubmit, @ScopeAmend, @ScopeAll, @ScopeStartDate, @ScopeOther, @ScopeStartDay, @ScopeStartMonth, @ScopeStartYear,
                     @AttachLicenseCopy, @GrantorSignName, @GranteeSignName, @Witness1Name, @Witness2Name,
@@ -343,9 +341,7 @@ router.put('/:id', async (req, res) => {
             .input('SubmitterIsOr', sql.Bit, data.submitterIsOr ? 1 : 0)
             .input('ProductNameAlt', sql.NVarChar, data.productNameAlt || null)
             .input('HasRegNo', sql.Bit, data.hasRegNo ? 1 : 0)
-            .input('RegNo', sql.NVarChar, data.regNo || null)
             .input('HasRegDetail', sql.Bit, data.hasRegDetail ? 1 : 0)
-            .input('RegDetailNo', sql.NVarChar, data.regDetailNo || null)
             .input('HasNoticeNo', sql.Bit, data.hasNoticeNo ? 1 : 0)
             .input('RegNoticeNo', sql.NVarChar, data.regNoticeNo || null)
             
@@ -389,7 +385,7 @@ router.put('/:id', async (req, res) => {
         const oldDoc = checkDoc.recordset[0];
 
         let queryStr = '';
-        if (oldDoc.Status === 'เสร็จสมบูรณ์' && data.status !== 'พรีวิว') {
+        if (data.status === 'ลูกค้าขอแก้ไข' && oldDoc.Status !== 'ลูกค้าขอแก้ไข') {
             sqlReq.input('Version', sql.Int, oldDoc.Version + 1);
             sqlReq.input('RefDocumentID', sql.Int, oldDoc.RefDocumentID || id);
             queryStr = `
@@ -401,7 +397,7 @@ router.put('/:id', async (req, res) => {
                     IsProducer, IsImporter, ProdTypeHerbalMedicine, ProdTypeTraditionalMed, ProdTypeDevMed, ProdTypeHealthProduct, ProdTypeCosmetic, ProdTypeDetail,
                     RequestType, ReqTypeRegister, ReqTypeNotifyDetail, ReqTypeNotify, ReqTypeRenew, 
                     SubmitterIsIn, SubmitFormType, SubmitFormTypeAmend, SubmitFormTypeReplace, SubmitFormTypeOtherCheck, SubmitFormOther, 
-                    ProductName, ProductReceiveNo, SubmitterIsOr, ProductNameAlt, HasRegNo, RegNo, HasRegDetail, RegDetailNo, HasNoticeNo, RegNoticeNo,
+                    ProductName, ProductReceiveNo, SubmitterIsOr, ProductNameAlt, HasRegNo, HasRegDetail, HasNoticeNo,
                     GranteePrefix, GranteeName, GranteeAge, GranteeCitizenID, GranteeIDExpiryDate, GranteeAddressNo, GranteeMoo, GranteeSoi, GranteeRoad, GranteeSubDistrict, GranteeDistrict, GranteeProvince, GranteePhone, GranteeEmail,
                     ScopeSubmit, ScopeAmend, ScopeAll, ScopeStartDate, ScopeOther, ScopeStartDay, ScopeStartMonth, ScopeStartYear,
                     AttachLicenseCopy, GrantorSignName, GranteeSignName, Witness1Name, Witness2Name,
@@ -415,7 +411,7 @@ router.put('/:id', async (req, res) => {
                     @IsProducer, @IsImporter, @ProdTypeHerbalMedicine, @ProdTypeTraditionalMed, @ProdTypeDevMed, @ProdTypeHealthProduct, @ProdTypeCosmetic, @ProdTypeDetail,
                     @RequestType, @ReqTypeRegister, @ReqTypeNotifyDetail, @ReqTypeNotify, @ReqTypeRenew,
                     @SubmitterIsIn, @SubmitFormType, @SubmitFormTypeAmend, @SubmitFormTypeReplace, @SubmitFormTypeOtherCheck, @SubmitFormOther,
-                    @ProductName, @ProductReceiveNo, @SubmitterIsOr, @ProductNameAlt, @HasRegNo, @RegNo, @HasRegDetail, @RegDetailNo, @HasNoticeNo, @RegNoticeNo,
+                    @ProductName, @ProductReceiveNo, @SubmitterIsOr, @ProductNameAlt, @HasRegNo, @HasRegDetail, @HasNoticeNo,
                     @GranteePrefix, @GranteeName, @GranteeAge, @GranteeCitizenID, @GranteeIDExpiryDate, @GranteeAddressNo, @GranteeMoo, @GranteeSoi, @GranteeRoad, @GranteeSubDistrict, @GranteeDistrict, @GranteeProvince, @GranteePhone, @GranteeEmail,
                     @ScopeSubmit, @ScopeAmend, @ScopeAll, @ScopeStartDate, @ScopeOther, @ScopeStartDay, @ScopeStartMonth, @ScopeStartYear,
                     @AttachLicenseCopy, @GrantorSignName, @GranteeSignName, @Witness1Name, @Witness2Name,
@@ -478,9 +474,7 @@ router.put('/:id', async (req, res) => {
                     SubmitterIsOr = @SubmitterIsOr,
                     ProductNameAlt = @ProductNameAlt,
                     HasRegNo = @HasRegNo,
-                    RegNo = @RegNo,
                     HasRegDetail = @HasRegDetail,
-                    RegDetailNo = @RegDetailNo,
                     HasNoticeNo = @HasNoticeNo,
                     RegNoticeNo = @RegNoticeNo,
                     GranteePrefix = @GranteePrefix,
@@ -536,7 +530,7 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
         await pool.request()
             .input('DocumentID', sql.Int, id)
-            .query(`DELETE FROM LegalDocuments WHERE DocumentID = @DocumentID`);
+            .query(`DELETE FROM LegalDocuments WHERE DocumentNo = (SELECT DocumentNo FROM LegalDocuments WHERE DocumentID = @DocumentID)`);
         res.json({ success: true, message: 'Deleted successfully' });
     } catch (err) {
         console.error('Error deleting document:', err);
@@ -628,9 +622,7 @@ router.post('/:id/version', async (req, res) => {
             .input('SubmitterIsOr', sql.Bit, oldDoc.SubmitterIsOr)
             .input('ProductNameAlt', sql.NVarChar, oldDoc.ProductNameAlt)
             .input('HasRegNo', sql.Bit, oldDoc.HasRegNo)
-            .input('RegNo', sql.NVarChar, oldDoc.RegNo)
             .input('HasRegDetail', sql.Bit, oldDoc.HasRegDetail)
-            .input('RegDetailNo', sql.NVarChar, oldDoc.RegDetailNo)
             .input('HasNoticeNo', sql.Bit, oldDoc.HasNoticeNo)
             .input('RegNoticeNo', sql.NVarChar, oldDoc.RegNoticeNo)
             
@@ -676,7 +668,7 @@ router.post('/:id/version', async (req, res) => {
                     IsProducer, IsImporter, ProdTypeHerbalMedicine, ProdTypeTraditionalMed, ProdTypeDevMed, ProdTypeHealthProduct, ProdTypeCosmetic, ProdTypeDetail,
                     RequestType, ReqTypeRegister, ReqTypeNotifyDetail, ReqTypeNotify, ReqTypeRenew, 
                     SubmitterIsIn, SubmitFormType, SubmitFormTypeAmend, SubmitFormTypeReplace, SubmitFormTypeOtherCheck, SubmitFormOther, 
-                    ProductName, ProductReceiveNo, SubmitterIsOr, ProductNameAlt, HasRegNo, RegNo, HasRegDetail, RegDetailNo, HasNoticeNo, RegNoticeNo,
+                    ProductName, ProductReceiveNo, SubmitterIsOr, ProductNameAlt, HasRegNo, HasRegDetail, HasNoticeNo,
                     GranteePrefix, GranteeName, GranteeAge, GranteeCitizenID, GranteeIDExpiryDate, GranteeAddressNo, GranteeMoo, GranteeSoi, GranteeRoad, GranteeSubDistrict, GranteeDistrict, GranteeProvince, GranteePhone, GranteeEmail,
                     ScopeSubmit, ScopeAmend, ScopeAll, ScopeStartDate, ScopeOther, ScopeStartDay, ScopeStartMonth, ScopeStartYear,
                     AttachLicenseCopy, GrantorSignName, GranteeSignName, Witness1Name, Witness2Name,
@@ -690,7 +682,7 @@ router.post('/:id/version', async (req, res) => {
                     @IsProducer, @IsImporter, @ProdTypeHerbalMedicine, @ProdTypeTraditionalMed, @ProdTypeDevMed, @ProdTypeHealthProduct, @ProdTypeCosmetic, @ProdTypeDetail,
                     @RequestType, @ReqTypeRegister, @ReqTypeNotifyDetail, @ReqTypeNotify, @ReqTypeRenew,
                     @SubmitterIsIn, @SubmitFormType, @SubmitFormTypeAmend, @SubmitFormTypeReplace, @SubmitFormTypeOtherCheck, @SubmitFormOther,
-                    @ProductName, @ProductReceiveNo, @SubmitterIsOr, @ProductNameAlt, @HasRegNo, @RegNo, @HasRegDetail, @RegDetailNo, @HasNoticeNo, @RegNoticeNo,
+                    @ProductName, @ProductReceiveNo, @SubmitterIsOr, @ProductNameAlt, @HasRegNo, @HasRegDetail, @HasNoticeNo,
                     @GranteePrefix, @GranteeName, @GranteeAge, @GranteeCitizenID, @GranteeIDExpiryDate, @GranteeAddressNo, @GranteeMoo, @GranteeSoi, @GranteeRoad, @GranteeSubDistrict, @GranteeDistrict, @GranteeProvince, @GranteePhone, @GranteeEmail,
                     @ScopeSubmit, @ScopeAmend, @ScopeAll, @ScopeStartDate, @ScopeOther, @ScopeStartDay, @ScopeStartMonth, @ScopeStartYear,
                     @AttachLicenseCopy, @GrantorSignName, @GranteeSignName, @Witness1Name, @Witness2Name,

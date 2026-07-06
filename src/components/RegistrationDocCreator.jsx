@@ -85,21 +85,6 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
 
                 let targetId = data.documentId;
 
-                // Check if we should automatically create a new version
-                if (isUpdate && status !== 'พรีวิว' && (status === 'ลูกค้าขอแก้ไข' || docStatus === 'ลูกค้าขอแก้ไข' || docStatus === 'ลูกค้าลงนามแล้ว')) {
-                    try {
-                        const verRes = await fetch(`${endpointBase}/${targetId}/version`, { method: 'POST' });
-                        const verData = await verRes.json();
-                        if (verData.success) {
-                            targetId = verData.documentId;
-                            method = 'PUT'; // Update the newly created version
-                            data.documentId = targetId; // Important for payload
-                            setDocVersion(verData.version);
-                        }
-                    } catch (err) {
-                        console.error('Error creating new version', err);
-                    }
-                }
 
                 const url = isUpdate 
                     ? `${endpointBase}/${targetId}` 
@@ -411,10 +396,12 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
     };
 
     // Filter customers for dropdown
-    const filteredCustomers = customers.filter(c =>
-        (c.CustomerName || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
-        (c.CustomerCode || '').toLowerCase().includes(customerSearch.toLowerCase())
-    );
+    const filteredCustomers = (customerData && customerSearch === customerData.CustomerName)
+        ? customers // If input perfectly matches the selected customer, show all to allow re-selection
+        : customers.filter(c =>
+            (c.CustomerName || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
+            (c.CustomerCode || '').toLowerCase().includes(customerSearch.toLowerCase())
+        );
 
     const cardStyle = {
         background: '#fff',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, FileJson, CheckCircle, AlertCircle, Plus, Trash2, Check, RefreshCw, GripVertical } from 'lucide-react';
+import { Upload, FileText, FileJson, CheckCircle, AlertCircle, Plus, Trash2, Check, RefreshCw, GripVertical, X } from 'lucide-react';
 import API_BASE from '../config';
 import './TemplateUploader.css';
 
@@ -59,6 +59,8 @@ export default function TemplateUploader() {
                     const existingPages = data.pages.map((p, index) => ({
                         id: `existing_${index}`,
                         isExisting: true,
+                        existingPdf: true,
+                        existingJson: true,
                         originalIndex: p.originalIndex,
                         basePdfName: p.basePdfName,
                         configJsonName: p.configJsonName,
@@ -90,6 +92,16 @@ export default function TemplateUploader() {
         setPages(pages.filter(p => p.id !== id));
     };
 
+    const handleRemoveExistingFile = (id, type) => {
+        setPages(pages.map(p => {
+            if (p.id === id) {
+                if (type === 'pdf') return { ...p, existingPdf: false };
+                if (type === 'json') return { ...p, existingJson: false };
+            }
+            return p;
+        }));
+    };
+
     const handleFileChange = (id, field, file) => {
         setPages(pages.map(p => p.id === id ? { ...p, [field]: file } : p));
     };
@@ -101,6 +113,15 @@ export default function TemplateUploader() {
             if (!page.isExisting) {
                 if (!page.basePdf || !page.configJson) {
                     setStatus({ type: 'error', message: `กรุณาเลือกไฟล์ให้ครบทั้ง PDF และ JSON ในหน้าที่ ${i + 1}` });
+                    return;
+                }
+            } else {
+                if (!page.existingPdf && !page.basePdf) {
+                    setStatus({ type: 'error', message: `กรุณาเลือกไฟล์ PDF ใหม่สำหรับหน้าที่ ${i + 1}` });
+                    return;
+                }
+                if (!page.existingJson && !page.configJson) {
+                    setStatus({ type: 'error', message: `กรุณาเลือกไฟล์ JSON ใหม่สำหรับหน้าที่ ${i + 1}` });
                     return;
                 }
             }
@@ -121,7 +142,13 @@ export default function TemplateUploader() {
         
         pages.forEach((page, index) => {
             if (page.isExisting) {
-                layout.push({ type: 'existing', originalIndex: page.originalIndex });
+                if (page.existingPdf && page.existingJson) {
+                    layout.push({ type: 'existing', originalIndex: page.originalIndex });
+                } else {
+                    layout.push({ type: 'mixed', originalIndex: page.originalIndex, fileIndex: index });
+                    if (!page.existingPdf && page.basePdf) formData.append(`basePdf_${index}`, page.basePdf);
+                    if (!page.existingJson && page.configJson) formData.append(`configJson_${index}`, page.configJson);
+                }
             } else {
                 layout.push({ type: 'new', fileIndex: index });
                 formData.append(`basePdf_${index}`, page.basePdf);
@@ -225,8 +252,17 @@ export default function TemplateUploader() {
                             
                             <div className="template-uploader-grid">
                                 {/* PDF File */}
-                                {page.isExisting ? (
-                                    <div className="template-uploader-dropzone pdf bg-green-50 border-green-200 cursor-default hover:bg-green-50 hover:border-green-200 hover:transform-none">
+                                {page.isExisting && page.existingPdf ? (
+                                    <div className="template-uploader-dropzone pdf bg-green-50 border-green-200 cursor-default hover:bg-green-50 hover:border-green-200 hover:transform-none relative group" style={{ position: 'relative' }}>
+                                        <button 
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); handleRemoveExistingFile(page.id, 'pdf'); }}
+                                            className="template-uploader-btn-delete-item absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors p-1 z-10"
+                                            title="ลบไฟล์เดิมเพื่ออัปโหลดใหม่"
+                                            style={{ position: 'absolute', top: '12px', right: '12px', background: 'transparent', border: 'none', boxShadow: 'none' }}
+                                        >
+                                            <X style={{ width: '16px', height: '16px', margin: 0 }} />
+                                        </button>
                                         <Check className="text-green-500 mb-2" size={40} />
                                         <span className="template-uploader-dropzone-title text-green-700">
                                             ไฟล์ PDF เดิม
@@ -255,14 +291,23 @@ export default function TemplateUploader() {
                                 )}
 
                                 {/* JSON File */}
-                                {page.isExisting ? (
-                                    <div className="template-uploader-dropzone json bg-green-50 border-green-200 cursor-default hover:bg-green-50 hover:border-green-200 hover:transform-none">
+                                {page.isExisting && page.existingJson ? (
+                                    <div className="template-uploader-dropzone json bg-green-50 border-green-200 cursor-default hover:bg-green-50 hover:border-green-200 hover:transform-none relative group" style={{ position: 'relative' }}>
+                                        <button 
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); handleRemoveExistingFile(page.id, 'json'); }}
+                                            className="template-uploader-btn-delete-item absolute top-2 right-2 text-gray-400 hover:text-red-500 transition-colors p-1 z-10"
+                                            title="ลบไฟล์เดิมเพื่ออัปโหลดใหม่"
+                                            style={{ position: 'absolute', top: '12px', right: '12px', background: 'transparent', border: 'none', boxShadow: 'none' }}
+                                        >
+                                            <X style={{ width: '16px', height: '16px', margin: 0 }} />
+                                        </button>
                                         <Check className="text-green-500 mb-2" size={40} />
                                         <span className="template-uploader-dropzone-title text-green-700">
                                             ไฟล์ตั้งค่าเดิม
                                         </span>
                                         <span className="template-uploader-dropzone-desc text-green-600">
-                                            {page.configJsonName || `ไม่มีไฟล์ Config`}
+                                            {page.configJsonName}
                                         </span>
                                     </div>
                                 ) : (
