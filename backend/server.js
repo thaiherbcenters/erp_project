@@ -102,6 +102,7 @@ app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/herbal-cert-documents', herbalCertDocumentRoutes);
 app.use('/api/contracts', contractRoutes);
 app.use('/api/templates', templateRoutes);
+app.use('/api/torbor1-documents', require('./routes/torbor1Documents'));
 
 app.get('/', (req, res) => {
     res.send('API is running...');

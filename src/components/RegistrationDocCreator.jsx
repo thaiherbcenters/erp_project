@@ -4,6 +4,7 @@ import { useAlert } from './CustomAlert';
 import API_BASE from '../config';
 import PowerOfAttorneyForm from './PowerOfAttorneyForm';
 import HerbalCertForm from './HerbalCertForm';
+import TorBor1Form from './TorBor1Form';
 
 /**
  * RegistrationDocCreator.jsx
@@ -17,6 +18,7 @@ import HerbalCertForm from './HerbalCertForm';
 const DOC_TYPES = [
     { id: 'poa', name: 'หนังสือมอบอำนาจ', icon: '📜', description: 'หนังสือมอบอำนาจสำหรับผลิตภัณฑ์สมุนไพร' },
     { id: 'herbal_cert', name: 'คำรับรอง (อ้างอิงแม่แบบ)', icon: '📝', description: 'คำรับรองสำหรับผู้ยื่นคำขอขึ้นทะเบียนตำรับผลิตภัณฑ์สมุนไพร' },
+    { id: 'torbor1', name: 'แบบ ทบ.๑', icon: '📋', description: 'คำขอขึ้นทะเบียนตำรับผลิตภัณฑ์สมุนไพร' },
 ];
 
 const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = null }) => {
@@ -55,6 +57,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
     // Refs สำหรับดึงข้อมูลจากแต่ละฟอร์ม
     const poaFormRef = useRef(null);
     const herbalCertFormRef = useRef(null);
+    const torbor1FormRef = useRef(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isPrinting, setIsPrinting] = useState(false);
 
@@ -65,6 +68,10 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
         }
         if (selectedDocTypes.includes('herbal_cert') && herbalCertFormRef.current) {
             collectedData.push(herbalCertFormRef.current.getFormData());
+        }
+        
+        if (selectedDocTypes.includes('torbor1') && torbor1FormRef.current) {
+            collectedData.push(torbor1FormRef.current.getFormData());
         }
         return collectedData;
     };
@@ -81,6 +88,8 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                 let endpointBase = `${API_BASE}/legal-documents`;
                 if (type === 'herbal_cert') {
                     endpointBase = `${API_BASE}/herbal-cert-documents`;
+                } else if (type === 'torbor1') {
+                    endpointBase = `${API_BASE}/torbor1-documents`;
                 }
 
                 let targetId = data.documentId;
@@ -700,6 +709,24 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                     <HerbalCertForm
                                         ref={herbalCertFormRef}
                                         documentId={editingDocType === 'herbal_cert' ? editingDocId : null}
+                                        customerData={customerData}
+                                        contractId={selectedContractId}
+                                        embedded={true}
+                                        sharedFormData={sharedFormData}
+                                        onSharedDataChange={handleSharedDataChange}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="doc-tab-content" style={{ display: activeTabId === 'torbor1' ? 'block' : 'none' }}>
+                        {selectedDocTypes.includes('torbor1') && (
+                            <div className="print-page-break" style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: '4px solid #1d4ed8' }}>
+                                <div style={{ padding: '0' }}>
+                                    <TorBor1Form
+                                        ref={torbor1FormRef}
+                                        documentId={editingDocType === 'torbor1' ? editingDocId : null}
                                         customerData={customerData}
                                         contractId={selectedContractId}
                                         embedded={true}

@@ -77,7 +77,8 @@ export default function Sales() {
     const [showPOAForm, setShowPOAForm] = useState(false);
     const [localPOAs, setLocalPOAs] = useState([]);
     const [editingPOAId, setEditingPOAId] = useState(null);
-    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [editingPOAType, setEditingPOAType] = useState(null);
+    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
     const [poaSearch, setPoaSearch] = useState('');
     const [appliedPoaSearch, setAppliedPoaSearch] = useState('');
 
@@ -154,37 +155,71 @@ export default function Sales() {
         const fetchPOAs = async () => {
             if (activeTab !== 'sales_poa') return;
             try {
-                const res = await fetch(`${API_BASE}/legal-documents?type=poa&page=${poaPagination.page}&limit=${poaPagination.limit}`);
-                const json = await res.json();
-                if (json.success) {
-                    setLocalPOAs(json.data || []);
-                    if (json.pagination) setPoaPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                const [poaRes, herbalRes, torbor1Res] = await Promise.all([
+                    fetch(`${API_BASE}/legal-documents?type=poa&page=${poaPagination.page}&limit=${poaPagination.limit}`),
+                    fetch(`${API_BASE}/herbal-cert-documents?page=${poaPagination.page}&limit=${poaPagination.limit}`),
+                    fetch(`${API_BASE}/torbor1-documents?page=${poaPagination.page}&limit=${poaPagination.limit}`)
+                ]);
+                
+                const poaJson = await poaRes.json();
+                const herbalJson = await herbalRes.json();
+                const torbor1Json = await torbor1Res.json();
+                
+                let combined = [];
+                if (poaJson.success) {
+                    combined = [...combined, ...(poaJson.data || [])];
                 }
+                if (herbalJson.success) {
+                    const herbalMapped = (herbalJson.data || []).map(d => ({
+                        ...d,
+                        GrantorName: d.ApplicantName,
+                        GranteeName: d.ProductName,
+                        documentTypeLabel: 'คำรับรอง'
+                    }));
+                    combined = [...combined, ...herbalMapped];
+                }
+                if (torbor1Json.success) {
+                    const torbor1Mapped = (torbor1Json.data || []).map(d => ({
+                        ...d,
+                        GrantorName: d.AppNaturalName || d.AppJuristicName || 'ต่างด้าว',
+                        GranteeName: d.ProductNameThai,
+                        documentTypeLabel: 'แบบ ทบ.๑'
+                    }));
+                    combined = [...combined, ...torbor1Mapped];
+                }
+                
+                // Sort by CreatedAt desc
+                combined.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt));
+                
+                setLocalPOAs(combined);
+                // Simplify pagination for combined list (just use poa's for now, ideally backend should aggregate)
+                if (poaJson.pagination) setPoaPagination(prev => ({ ...prev, totalPages: Math.max(poaJson.pagination.totalPages, herbalJson.pagination?.totalPages || 1, torbor1Json.pagination?.totalPages || 1) }));
             } catch (err) { console.error('Error fetching POAs:', err); }
         };
         fetchPOAs();
     }, [activeTab, poaPagination.page, showPOAForm]);
 
-    // ── Delete POA ──
-    const handleDeletePOA = async (id) => {
+    // ── Delete Registration Doc ──
+    const handleDeletePOA = async (id, docType) => {
         const confirmed = await showConfirm('ยืนยันการลบ', 'คุณต้องการลบเอกสารขึ้นทะเบียนนี้ใช่หรือไม่?');
         if (!confirmed) return;
         try {
-            const res = await fetch(`${API_BASE}/legal-documents/${id}`, { method: 'DELETE' });
+            let endpoint = `${API_BASE}/legal-documents/${id}`;
+            if (docType === 'herbal_cert') endpoint = `${API_BASE}/herbal-cert-documents/${id}`;
+            else if (docType === 'torbor1') endpoint = `${API_BASE}/torbor1-documents/${id}`;
+            
+            const res = await fetch(endpoint, { method: 'DELETE' });
             const json = await res.json();
             if (json.success) {
                 showAlert('สำเร็จ', 'ลบเอกสารเรียบร้อยแล้ว', 'success');
-                // Fetch list directly
-                const resList = await fetch(`${API_BASE}/legal-documents?type=poa&page=${poaPagination.page}&limit=${poaPagination.limit}`);
-                const jsonList = await resList.json();
-                if (jsonList.success) {
-                    setLocalPOAs(jsonList.data || []);
-                    if (jsonList.pagination) setPoaPagination(prev => ({ ...prev, totalPages: jsonList.pagination.totalPages }));
-                }
+                // The fetchPOAs effect will not re-trigger automatically just from this, 
+                // but we can manually trigger a re-fetch by flipping a state or just calling fetchPOAs logic again.
+                // For simplicity, we just reload window or we can force update:
+                setPoaPagination(prev => ({ ...prev })); // trigger effect
                 
                 // If the modal was open and we deleted a document from it, we should refresh the modal
                 if (showDocHistoryModal && historyDocumentNo) {
-                    handleViewDocHistory(historyDocumentNo, 'poa');
+                    handleViewDocHistory(historyDocumentNo, docType);
                 }
             } else {
                 showAlert('ข้อผิดพลาด', json.message, 'error');
@@ -194,16 +229,21 @@ export default function Sales() {
         }
     };
 
-    const handleCreateVersionPOA = async (id) => {
+    const handleCreateVersionPOA = async (id, docType) => {
         const confirmed = await showConfirm('สร้างเวอร์ชันใหม่', 'คุณต้องการสร้างเอกสารนี้เป็นเวอร์ชันใหม่ (สถานะร่าง) ใช่หรือไม่?');
         if (!confirmed) return;
         try {
-            const res = await fetch(`${API_BASE}/legal-documents/${id}/version`, { method: 'POST' });
+            let endpoint = `${API_BASE}/legal-documents/${id}/version`;
+            if (docType === 'herbal_cert') endpoint = `${API_BASE}/herbal-cert-documents/${id}/version`;
+            else if (docType === 'torbor1') endpoint = `${API_BASE}/torbor1-documents/${id}/version`;
+
+            const res = await fetch(endpoint, { method: 'POST' });
             const json = await res.json();
             if (json.success) {
                 showAlert('สำเร็จ', 'สร้างเวอร์ชันใหม่เรียบร้อยแล้ว', 'success');
                 setPoaPagination(prev => ({ ...prev, page: 1 }));
                 setEditingPOAId(json.documentId);
+                setEditingPOAType(docType || 'poa');
                 setShowPOAForm(true);
             } else {
                 showAlert('ข้อผิดพลาด', json.message, 'error');
@@ -213,10 +253,10 @@ export default function Sales() {
         }
     };
 
-    const handlePrintPOA = async (documentId) => {
+    const handlePrintPOA = async (documentId, docType = 'poa') => {
         try {
             showAlert('รอสักครู่', 'กำลังสร้างเอกสาร PDF...', 'info');
-            const printPayload = { documentType: 'poa', documentId };
+            const printPayload = { documentType: docType, documentId };
             const printResponse = await fetch(`${API_BASE}/print`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -262,7 +302,10 @@ export default function Sales() {
         setDocAttachments([]);
         setHistoryTab(defaultTab);
         try {
-            const endpoint = type === 'herbal' ? `${API_BASE}/herbal-cert-documents/history/${encodeURIComponent(documentNo)}` : `${API_BASE}/legal-documents/history/${encodeURIComponent(documentNo)}`;
+            let endpoint = `${API_BASE}/legal-documents/history/${encodeURIComponent(documentNo)}`;
+            if (type === 'herbal_cert') endpoint = `${API_BASE}/herbal-cert-documents/history/${encodeURIComponent(documentNo)}`;
+            else if (type === 'torbor1') endpoint = `${API_BASE}/torbor1-documents/${encodeURIComponent(documentNo)}/versions`;
+            
             const res = await fetch(endpoint);
             const json = await res.json();
             if (json.success) {
@@ -1102,9 +1145,9 @@ export default function Sales() {
                 showPOAForm ? (
                     <div className="subpage-content" key="sales_poa_form">
                         <RegistrationDocCreator
-                            onBack={() => { setShowPOAForm(false); setEditingPOAId(null); }}
+                            onBack={() => { setShowPOAForm(false); setEditingPOAId(null); setEditingPOAType(null); }}
                             editingDocId={editingPOAId}
-                            editingDocType={editingPOAId ? 'poa' : null}
+                            editingDocType={editingPOAType}
                         />
                     </div>
                 ) : (
@@ -1191,13 +1234,13 @@ export default function Sales() {
                                                             <History size={16} />
                                                         </button>
                                                     )}
-                                                    <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" style={{ color: '#2563eb' }} title="ดู/พิมพ์ PDF" onClick={() => handlePrintPOA(p.DocumentID)}>
+                                                    <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" style={{ color: '#2563eb' }} title="ดู/พิมพ์ PDF" onClick={() => handlePrintPOA(p.DocumentID, p.DocumentType || 'poa')}>
                                                         <FileText size={16} />
                                                     </button>
-                                                    <button className="btn-icon" style={{ color: '#f59e0b' }} title="แก้ไข" onClick={() => { setEditingPOAId(p.DocumentID); setShowPOAForm(true); }}>
+                                                    <button className="btn-icon" style={{ color: '#f59e0b' }} title="แก้ไข" onClick={() => { setEditingPOAId(p.DocumentID); setEditingPOAType(p.DocumentType || 'poa'); setShowPOAForm(true); }}>
                                                         <Edit size={16} />
                                                     </button>
-                                                    <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" style={{ color: '#dc2626' }} title="ลบ" onClick={() => handleDeletePOA(p.DocumentID)}>
+                                                    <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" style={{ color: '#dc2626' }} title="ลบ" onClick={() => handleDeletePOA(p.DocumentID, p.DocumentType || 'poa')}>
                                                         <Trash2 size={16} />
                                                     </button>
                                                 </div>
