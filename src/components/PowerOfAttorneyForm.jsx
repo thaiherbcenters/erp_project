@@ -81,47 +81,47 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
     const [form, setForm] = useState({
         // ── ข้อมูลทั่วไป ──
         contractId: '',
-        writtenAt: '',
-        documentDate: '',
+        writtenAt: 'บริษัท ไทยเฮิร์บ จำกัด',
+        documentDate: new Date().toISOString().split('T')[0],
 
         // ── ส่วนที่ 1: ผู้รับอนุญาต (ผู้มอบอำนาจ) ──
-        licenseeName: '',
-        licenseNo: '',
+        licenseeName: 'บริษัท ทดสอบสมุนไพร จำกัด',
+        licenseNo: '10-1-6500012345',
         // ประเภทผู้รับอนุญาต
         isProducer: false,
         isImporter: false,
         // ประเภทผลิตภัณฑ์สมุนไพร
-        prodTypeHerbalMedicine: false,
+        prodTypeHerbalMedicine: true,
         prodTypeTraditionalMed: false,
         prodTypeDevMed: false,
         prodTypeHealthProduct: false,
         prodTypeCosmetic: false,
-        prodTypeDetail: '',
+        prodTypeDetail: 'ยาดมสมุนไพร',
         // ประเภทบุคคล
-        personType: 'natural', // 'natural' | 'juristic'
+        personType: 'juristic', // 'natural' | 'juristic'
         citizenId: '',
         citizenIdExpiry: '',
-        juristicId: '',
-        juristicIdExpiry: '',
+        juristicId: '0105555555555',
+        juristicIdExpiry: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
         // ผู้ดำเนินกิจการ
-        operatorPrefix: '',
-        operatorName: '',
-        operatorCitizenId: '',
-        operatorIdExpiry: '',
+        operatorPrefix: 'นาย',
+        operatorName: 'สมชาย รักษาดี',
+        operatorCitizenId: '1100000000000',
+        operatorIdExpiry: new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().split('T')[0],
 
         // ── สถานที่ประกอบการ ──
-        establishmentName: '',
-        estAddressNo: '',
-        estSoi: '',
-        estMoo: '',
-        estRoad: '',
-        estSubDistrict: '',
-        estDistrict: '',
-        estProvince: '',
-        estPostcode: '',
-        estPhone: '',
-        estFax: '',
-        estEmail: '',
+        establishmentName: 'โรงงานไทยเฮิร์บ',
+        estAddressNo: '123',
+        estSoi: 'สุขุมวิท 1',
+        estMoo: '1',
+        estRoad: 'สุขุมวิท',
+        estSubDistrict: 'คลองเตย',
+        estDistrict: 'คลองเตย',
+        estProvince: 'กรุงเทพมหานคร',
+        estPostcode: '10110',
+        estPhone: '02-123-4567',
+        estFax: '02-123-4568',
+        estEmail: 'test@thaiherb.com',
 
         // ── ประเภทคำขอ ──
         reqType: '',  // 'register' | 'notifyDetail' | 'notify' | 'renew'
@@ -140,20 +140,20 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
         regNoticeNo: '',
 
         // ── ส่วนที่ 2: ผู้รับมอบอำนาจ ──
-        granteePrefix: '',
-        granteeName: '',
-        granteeAge: '',
-        granteeCitizenId: '',
-        granteeIdExpiry: '',
-        granteeAddressNo: '',
-        granteeMoo: '',
+        granteePrefix: 'นาย',
+        granteeName: 'ธวัช จรุงพิรวงศ์',
+        granteeAge: '45',
+        granteeCitizenId: '3259900200422',
+        granteeIdExpiry: new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().split('T')[0],
+        granteeAddressNo: '6/10',
+        granteeMoo: '2',
         granteeSoi: '',
         granteeRoad: '',
-        granteeSubDistrict: '',
-        granteeDistrict: '',
-        granteeProvince: '',
-        granteePhone: '',
-        granteeEmail: '',
+        granteeSubDistrict: 'ไทรม้า',
+        granteeDistrict: 'เมืองนนทบุรี',
+        granteeProvince: 'นนทบุรี',
+        granteePhone: '081-999-9999',
+        granteeEmail: 'grantee@thaiherb.com',
 
         // ── ขอบเขตอำนาจ ──
         scopeSubmit: true,

@@ -1,0 +1,10 @@
+{
+  "ignore": [
+    "pdf_templates/*",
+    "uploads/*",
+    "__tests__/*",
+    "*.test.js",
+    "*.log"
+  ],
+  "ext": "js,mjs,cjs,json"
+}

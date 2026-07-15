@@ -5,7 +5,7 @@ const path = require('path');
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const { poolPromise } = require('../config/db');
-
+const { drawThaiText, wrapThaiText } = require('../utils/thaiShaper');
 // GET /check-template/:documentType
 // ตรวจสอบว่ามีแฟ้มแม่แบบสำหรับประเภทเอกสารนี้หรือไม่
 router.get('/check-template/:documentType', (req, res) => {
@@ -81,27 +81,34 @@ router.post('/', async (req, res) => {
 
         // Font Loading (Cache to avoid re-fetching per page)
         const fontUrls = {
-            'Sarabun': 'https://github.com/google/fonts/raw/main/ofl/sarabun/Sarabun-Regular.ttf',
-            'Kanit': 'https://github.com/google/fonts/raw/main/ofl/kanit/Kanit-Regular.ttf',
-            'Prompt': 'https://github.com/google/fonts/raw/main/ofl/prompt/Prompt-Regular.ttf'
+            'Sarabun': { regular: 'https://github.com/google/fonts/raw/main/ofl/sarabun/Sarabun-Regular.ttf', bold: 'https://github.com/google/fonts/raw/main/ofl/sarabun/Sarabun-Bold.ttf' },
+            'Kanit': { regular: 'https://github.com/google/fonts/raw/main/ofl/kanit/Kanit-Regular.ttf', bold: 'https://github.com/google/fonts/raw/main/ofl/kanit/Kanit-Bold.ttf' },
+            'Prompt': { regular: 'https://github.com/google/fonts/raw/main/ofl/prompt/Prompt-Regular.ttf', bold: 'https://github.com/google/fonts/raw/main/ofl/prompt/Prompt-Bold.ttf' }
         };
 
-        const neededFonts = new Set();
+        const neededFonts = { regular: new Set(), bold: new Set() };
         // Read all configs to find all needed fonts
         for (const page of pages) {
             const configData = JSON.parse(fs.readFileSync(page.configPath, 'utf-8'));
             const templateFontFamily = (configData.templateConfig && configData.templateConfig.defaultFontFamily) || 'Sarabun';
-            neededFonts.add(templateFontFamily);
+            const templateFontWeight = (configData.templateConfig && configData.templateConfig.defaultFontWeight) || 'normal';
+            neededFonts[templateFontWeight === 'bold' || templateFontWeight === '700' ? 'bold' : 'regular'].add(templateFontFamily);
             for (const f of configData.fields) {
-                if (f.fontFamily && fontUrls[f.fontFamily]) neededFonts.add(f.fontFamily);
+                const fFamily = f.fontFamily || templateFontFamily;
+                const fWeight = f.fontWeight || (f.isBold ? 'bold' : templateFontWeight);
+                if (fontUrls[fFamily]) {
+                    neededFonts[fWeight === 'bold' || fWeight === '700' ? 'bold' : 'regular'].add(fFamily);
+                }
             }
         }
 
-        const fontBytesCache = {};
-        for (const family of neededFonts) {
-            const url = fontUrls[family] || fontUrls['Sarabun'];
-            const response = await fetch(url);
-            fontBytesCache[family] = await response.arrayBuffer();
+        const fontBytesCache = { regular: {}, bold: {} };
+        for (const style of ['regular', 'bold']) {
+            for (const family of neededFonts[style]) {
+                const url = fontUrls[family] ? fontUrls[family][style] : fontUrls['Sarabun'][style];
+                const response = await fetch(url);
+                fontBytesCache[style][family] = await response.arrayBuffer();
+            }
         }
 
         // Final Merged PDF
@@ -121,10 +128,14 @@ router.post('/', async (req, res) => {
             const templateFontFamily = templateConfig.defaultFontFamily || 'Sarabun';
             const defaultFontSize = templateConfig.defaultFontSize || 14;
 
-            const loadedFonts = {};
-            for (const family of neededFonts) {
-                if (fontBytesCache[family]) {
-                    loadedFonts[family] = await pdfDoc.embedFont(fontBytesCache[family]);
+            const templateFontWeight = templateConfig.defaultFontWeight || 'normal';
+
+            const loadedFonts = { regular: {}, bold: {} };
+            for (const style of ['regular', 'bold']) {
+                for (const family of neededFonts[style]) {
+                    if (fontBytesCache[style][family]) {
+                        loadedFonts[style][family] = await pdfDoc.embedFont(fontBytesCache[style][family]);
+                    }
                 }
             }
 
@@ -136,8 +147,18 @@ router.post('/', async (req, res) => {
                     let tableName = 'LegalDocuments';
                     if (documentType === 'herbal_cert') {
                         tableName = 'HerbalCertDocuments';
+                    } else if (documentType === 'torbor1') {
+                        tableName = 'TorBor1Documents';
+                    } else if (documentType === 'contract_mfg') {
+                        tableName = 'ContractMfgDocuments';
+                    } else if (documentType === 'pdpa_consent') {
+                        tableName = 'PdpaConsentDocuments';
+                    } else if (documentType === 'corp_rep') {
+                        tableName = 'CorpRepDocuments';
+                    } else if (documentType === 'safety_cert') {
+                        tableName = 'SafetyCertDocuments';
                     }
-                    queryStr = queryStr.replace(/FROM\s+[A-Za-z_]+[\s\S]*$/i, `FROM ${tableName} WHERE DocumentID = ${documentId}`);
+                    queryStr = queryStr.replace(/FROM\s+[A-Za-z_0-9_]+(\s+WHERE\s+.*)?$/i, `FROM ${tableName} WHERE DocumentID = ${documentId}`);
                 }
 
                 const result = await pool.request().query(queryStr);
@@ -179,9 +200,12 @@ router.post('/', async (req, res) => {
                     }
                     
                     const fieldFontFamily = field.fontFamily || templateFontFamily;
-                    const activeFont = loadedFonts[fieldFontFamily] || loadedFonts[templateFontFamily];
+                    const fieldWeight = field.fontWeight || (field.isBold ? 'bold' : templateFontWeight);
+                    const isBold = fieldWeight === 'bold' || fieldWeight === '700';
+                    const activeFont = loadedFonts[isBold ? 'bold' : 'regular'][fieldFontFamily] || loadedFonts[isBold ? 'bold' : 'regular'][templateFontFamily];
 
-                    const adjustedY = y + 3;
+                    // Set adjustedY to y + 1 to give a tiny bit of breathing room from the bottom line
+                    const adjustedY = y + 1;
 
                     if (field.type === 'checkbox') {
                         if (value.toLowerCase() === 'true' || value === '1') {
@@ -263,61 +287,46 @@ router.post('/', async (req, res) => {
                             currentX += activeFont.widthOfTextAtSize(chars[i], fieldFontSize) + spacing;
                         }
                     } else {
-                        // Auto-shrink font size if text overflows the bounding box
-                        const textWidth = activeFont.widthOfTextAtSize(value, fieldFontSize);
-                        if (textWidth > boxWidth && boxWidth > 0) {
-                            fieldFontSize = fieldFontSize * (boxWidth / textWidth);
-                        }
-
-                        // Fix for Thai Sara Am and Tone Marks in pdf-lib (Sarabun font)
-                        // This intercepts clusters like น้ำ and draws นำ first to maintain kerning,
-                        // then explicitly overlays the tone mark ้ at the correct X coordinate.
-                        const amToneRegex = /([ก-ฮ][ัิ-ู]?)([\u0E48-\u0E4C])\u0E33|([ก-ฮ][ัิ-ู]?)\u0E33([\u0E48-\u0E4C])/g;
-                        if (amToneRegex.test(value)) {
-                            amToneRegex.lastIndex = 0;
-                            let currentX = x;
-                            let lastIndex = 0;
-                            let match;
+                        // Check if field is explicitly marked as multiline in the JSON template
+                        const isMultiline = field.type === 'multi-line' || field.type === 'multiline' || field.multiline === true;
+                        
+                        // For single-line fields, replace newlines with spaces to avoid rendering glitches
+                        const finalValue = isMultiline ? value : value.replace(/\r?\n/g, ' ');
+                        
+                        if (isMultiline && boxWidth > 0) {
+                            // Wrap the text line by line
+                            let currentFontSize = fieldFontSize;
+                            let lines = wrapThaiText(finalValue, boxWidth, currentFontSize, activeFont);
+                            let lineHeight = currentFontSize * 1.2;
+                            let totalHeight = lines.length * lineHeight;
                             
-                            while ((match = amToneRegex.exec(value)) !== null) {
-                                // Draw preceding text normally
-                                const beforeStr = value.substring(lastIndex, match.index);
-                                if (beforeStr) {
-                                    pdfPage.drawText(beforeStr, { x: currentX, y: adjustedY, size: fieldFontSize, font: activeFont, color: rgb(0.15, 0.15, 0.15) });
-                                    currentX += activeFont.widthOfTextAtSize(beforeStr, fieldFontSize);
+                            // Auto-shrink font size if multiline text exceeds box height
+                            if (boxHeight > 0) {
+                                while (totalHeight > boxHeight && currentFontSize > 2) {
+                                    currentFontSize -= 0.5;
+                                    lines = wrapThaiText(finalValue, boxWidth, currentFontSize, activeFont);
+                                    lineHeight = currentFontSize * 1.2;
+                                    totalHeight = lines.length * lineHeight;
                                 }
-                                
-                                const base = match[1] || match[3];
-                                const tone = match[2] || match[4];
-                                
-                                // Draw base + ำ (e.g. นำ) to preserve the negative left bearing kerning of ำ
-                                const baseAm = base + '\u0E33';
-                                pdfPage.drawText(baseAm, { x: currentX, y: adjustedY, size: fieldFontSize, font: activeFont, color: rgb(0.15, 0.15, 0.15) });
-                                
-                                // Tone marks have negative left bearings in Thai TTF fonts.
-                                // Drawing it at currentX + width(base) places it perfectly over the base.
-                                const toneX = currentX + activeFont.widthOfTextAtSize(base, fieldFontSize);
-                                // Shift Tone Mark UP by 25% of font size to avoid vertical overlap with Sara Am's circle
-                                const toneY = adjustedY + (fieldFontSize * 0.25);
-                                pdfPage.drawText(tone, { x: toneX, y: toneY, size: fieldFontSize, font: activeFont, color: rgb(0.15, 0.15, 0.15) });
-                                
-                                currentX += activeFont.widthOfTextAtSize(baseAm, fieldFontSize);
-                                lastIndex = amToneRegex.lastIndex;
                             }
                             
-                            const remaining = value.substring(lastIndex);
-                            if (remaining) {
-                                pdfPage.drawText(remaining, { x: currentX, y: adjustedY, size: fieldFontSize, font: activeFont, color: rgb(0.15, 0.15, 0.15) });
+                            // adjustedY is typically the bottom of the box. 
+                            // For multiline, we should start rendering from the top of the box.
+                            const startLineY = (adjustedY + boxHeight) - lineHeight;
+                            
+                            for (let i = 0; i < lines.length; i++) {
+                                const lineY = startLineY - (i * lineHeight);
+                                drawThaiText(pdfPage, lines[i], x, lineY, currentFontSize, activeFont, rgb(0.15, 0.15, 0.15));
                             }
                         } else {
-                            // Standard rendering
-                            pdfPage.drawText(value, {
-                                x: x,
-                                y: adjustedY,
-                                size: fieldFontSize,
-                                font: activeFont,
-                                color: rgb(0.15, 0.15, 0.15),
-                            });
+                            // Auto-shrink font size if text overflows the bounding box for single line
+                            const textWidth = activeFont.widthOfTextAtSize(finalValue, fieldFontSize);
+                            if (textWidth > boxWidth && boxWidth > 0) {
+                                fieldFontSize = fieldFontSize * (boxWidth / textWidth);
+                            }
+
+                            // Apply Custom Thai Renderer to fix Sara Am, floating vowels, and tone marks
+                            drawThaiText(pdfPage, finalValue, x, adjustedY, fieldFontSize, activeFont, rgb(0.15, 0.15, 0.15));
                         }
                     }
                 }

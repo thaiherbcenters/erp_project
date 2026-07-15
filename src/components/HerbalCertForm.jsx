@@ -16,16 +16,16 @@ const HerbalCertForm = forwardRef(({ documentId, customerData, contractId, embed
     const [currentDocId, setCurrentDocId] = useState(documentId || null);
 
     const [form, setForm] = useState({
-        writtenAt: '',
-        documentDate: '',
+        writtenAt: 'บริษัท ไทยเฮิร์บ จำกัด',
+        documentDate: new Date().toISOString().split('T')[0],
         applicantPrefix: 'นิติบุคคล',
-        applicantName: '',
-        productName: '',
-        receiptNo: '',
-        refProductNameThai: '',
-        refRegistrationNo: '',
-        certificateHolder: '',
-        signDate: '',
+        applicantName: 'บริษัท ทดสอบสมุนไพร จำกัด',
+        productName: 'ยาดมสมุนไพรตราทดสอบ',
+        receiptNo: '12345/2567',
+        refProductNameThai: 'ยาหม่องสมุนไพร',
+        refRegistrationNo: 'G 123/67',
+        certificateHolder: 'นายธวัช จรุงพิรวงศ์',
+        signDate: new Date().toISOString().split('T')[0],
     });
 
     // Auto-fill from customer data

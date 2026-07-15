@@ -52,72 +52,89 @@ const applicantTypes = [
 const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = null, onStatusChange, customerData, contractId, embedded, sharedFormData, onSharedDataChange }, ref) => {
     const { showAlert } = useAlert();
     const [form, setForm] = useState({
+        // สำหรับเจ้าหน้าที่ (Official Use)
+        ReceiptNo: 'ร.1234/2567',
+        ReceiptDate: '2024-01-15',
+        ReceiverName: 'นายเจ้าหน้าที่ ทดสอบ',
+
         documentId: null,
         DocumentDate: new Date().toISOString().split('T')[0],
-        ContractID: '',
-        ReqMedicineFromHerb: false,
-        ReqMedType: '',
+        // ๑. ความประสงค์
+        ReqMedicineFromHerb: true,
+        ReqMedType: 'ยาแผนไทย',
+        ReqMedTypeOther: '',
         ReqHealthProduct: false,
-        TypeProduce: false,
+        TypeProduce: true,
         TypeImport: false,
         TypeExportOnly: false,
-        ProductNameThai: '',
-        ProductNameEng: '',
-        ApplicantType: '',
-        AppNaturalName: '', AppNaturalAge: '', AppNaturalNationality: '', AppNaturalCitizenID: '',
-        AppNaturalAddressNo: '', AppNaturalBuilding: '', AppNaturalMoo: '', AppNaturalSoi: '',
-        AppNaturalRoad: '', AppNaturalSubDistrict: '', AppNaturalDistrict: '', AppNaturalProvince: '',
-        AppNaturalPostcode: '', AppNaturalFax: '', AppNaturalPhone: '', AppNaturalEmail: '',
-        AppJuristicName: '', AppJuristicID: '',
-        AppJuristicAddressNo: '', AppJuristicBuilding: '', AppJuristicMoo: '', AppJuristicSoi: '',
-        AppJuristicRoad: '', AppJuristicSubDistrict: '', AppJuristicDistrict: '', AppJuristicProvince: '',
-        AppJuristicPostcode: '', AppJuristicFax: '', AppJuristicPhone: '', AppJuristicEmail: '',
-        AppJuristicRepName: '', AppJuristicRepAge: '', AppJuristicRepNationality: '', AppJuristicRepCitizenID: '',
-        AppForeignPassportNo: '', AppForeignPassportExpiry: '',
-        AppForeignResCertNo: '', AppForeignResCertDate: '',
-        AppForeignWorkPermitNo: '', AppForeignWorkPermitExpiry: '',
+        ProductNameThai: 'ยาสมุนไพรไทยตราเทส',
+        ProductNameEng: 'Thai Herb Test Brand',
+        ApplicantType: 'นิติบุคคล',
+        AppNaturalName: 'นายทดสอบ บุคคลธรรมดา', AppNaturalAge: '35', AppNaturalNationality: 'ไทย', AppNaturalCitizenID: '1234567890123',
+        AppNaturalAddressNo: '111', AppNaturalBuilding: 'ตึกเทส', AppNaturalMoo: '1', AppNaturalSoi: 'ซอยทดสอบ',
+        AppNaturalRoad: 'ถนนทดสอบ', AppNaturalSubDistrict: 'แขวงเทส', AppNaturalDistrict: 'เขตเทส', AppNaturalProvince: 'กรุงเทพมหานคร',
+        AppNaturalPostcode: '10000', AppNaturalFax: '02-111-1111', AppNaturalPhone: '081-111-1111', AppNaturalEmail: 'test@test.com',
+        AppJuristicName: 'บริษัท ทดสอบ จำกัด', AppJuristicID: '0105555555555',
+        AppJuristicAddressNo: '222', AppJuristicBuilding: 'ตึกบริษัท', AppJuristicMoo: '2', AppJuristicSoi: 'ซอยออฟฟิศ',
+        AppJuristicRoad: 'ถนนออฟฟิศ', AppJuristicSubDistrict: 'แขวงบริษัท', AppJuristicDistrict: 'เขตบริษัท', AppJuristicProvince: 'กรุงเทพมหานคร',
+        AppJuristicPostcode: '10000', AppJuristicFax: '02-222-2222', AppJuristicPhone: '082-222-2222', AppJuristicEmail: 'company@test.com',
+        AppJuristicRepName: 'นายตัวแทน นิติบุคคล', AppJuristicRepAge: '40', AppJuristicRepNationality: 'ไทย', AppJuristicRepCitizenID: '9876543210987',
+        AppForeignPassportNo: 'A12345678', AppForeignPassportExpiry: '2030-12-31',
+        AppForeignResCertNo: 'R87654321', AppForeignResCertDate: '2020-05-10',
+        AppForeignWorkPermitNo: 'W11223344', AppForeignWorkPermitExpiry: '2025-05-10',
         
-        AppForeignBizLicenseNo: '', AppForeignBizLicenseDate: '',
-        AppForeignBizCertNo: '', AppForeignBizCertDate: '',
+        AppForeignBizLicenseNo: 'FL-998877', AppForeignBizLicenseDate: '2021-01-01',
+        AppForeignBizCertNo: 'FC-112233', AppForeignBizCertDate: '2021-01-15',
 
         // ๓. ข้อมูลสถานที่ผลิต หรือนำเข้า
-        ProductionType: '', // 'ผลิตในประเทศ', 'นำเข้า'
+        ProductionType: 'ผลิตในประเทศ', // 'ผลิตในประเทศ', 'นำเข้า'
 
         // กรณีผลิตในประเทศ
-        ProdLicenseeName: '', ProdLicenseNo: '',
-        ProdOperatorName: '', ProdPlaceName: '',
-        ProdAddressNo: '', ProdSoi: '', ProdRoad: '', ProdMoo: '', ProdSubDistrict: '',
-        ProdDistrict: '', ProdProvince: '', ProdPostcode: '', ProdPhone: '',
+        ProdLicenseeName: 'บริษัท โรงงานผลิตเทส จำกัด', ProdLicenseNo: 'ผ.123/2560',
+        ProdOperatorName: 'นายผู้ดำเนิน โรงงาน', ProdPlaceName: 'โรงงานสมุนไพรเทส',
+        ProdAddressNo: '333', ProdSoi: 'ซอยโรงงาน', ProdRoad: 'ถนนโรงงาน', ProdMoo: '3', ProdSubDistrict: 'ตำบลโรงงาน',
+        ProdDistrict: 'อำเภอโรงงาน', ProdProvince: 'ปทุมธานี', ProdPostcode: '12000', ProdPhone: '02-333-3333',
 
         // กรณีแบ่งบรรจุ
-        RepackRegNo: '',
+        RepackRegNo: 'บ.999/2567',
 
         // กรณีนำเข้า
-        ImportLicenseeName: '', ImportLicenseNo: '',
-        ImportOperatorName: '', ImportPlaceName: '',
-        ImportAddressNo: '', ImportSoi: '', ImportRoad: '',
-        ImportMoo: '', ImportSubDistrict: '', ImportDistrict: '', ImportProvince: '',
-        ImportPostcode: '', ImportPhone: '',
-        ImportForeignMfgName: '', ImportForeignMfgAddress: '',
+        ImportLicenseeName: 'บริษัท นำเข้าเทส จำกัด', ImportLicenseNo: 'น.456/2560',
+        ImportOperatorName: 'นางผู้นำเข้า ทดสอบ', ImportPlaceName: 'โกดังนำเข้าเทส',
+        ImportAddressNo: '444', ImportSoi: 'ซอยโกดัง', ImportRoad: 'ถนนนำเข้า',
+        ImportMoo: '4', ImportSubDistrict: 'ตำบลโกดัง', ImportDistrict: 'อำเภอโกดัง', ImportProvince: 'สมุทรปราการ',
+        ImportPostcode: '10270', ImportPhone: '02-444-4444',
+        ImportForeignMfgName: 'Foreign Test Co., Ltd.', ImportForeignMfgAddress: '123 Fake St, Test City, Test Country',
 
         // ๔. รายละเอียดผู้ผลิตอื่นที่เกี่ยวข้อง (Stored as JSON string)
-        RelatedManufacturers: [{ name: '', licenseNo: '', responsibility: '' }],
+        RelatedManufacturers: [
+            { name: 'บริษัท ซัพพลายเออร์ 1 จำกัด (ที่อยู่ 111)', licenseNo: 'ส.111/2560', responsibility: 'บรรจุผลิตภัณฑ์' },
+            { name: 'บริษัท ซัพพลายเออร์ 2 จำกัด (ที่อยู่ 222)', licenseNo: 'ส.222/2560', responsibility: 'เตรียมผลิตภัณฑ์กึ่งสำเร็จรูป' }
+        ],
 
         // ๔ (ต่อ). รายละเอียดของตำรับผลิตภัณฑ์สมุนไพร
-        RecipeOtherName: '', RecipeFormat: '', RecipeQuantity: '',
-        RecipeActiveIngredients: [{ thaiName: '', engName: '', latinName: '', partUsed: '', quantity: '' }],
-        RecipeExtracts: [{ extractName: '', latinName: '', partUsed: '', solvent: '', ratio: '', quantity: '' }],
-        RecipeExcipients: [{ name: '', casNumber: '', function: '', quantity: '' }],
+        RecipeOtherName: 'Test Recipe Alternative Name', RecipeFormat: 'แคปซูล (Capsule)', RecipeQuantity: '1000 แคปซูล',
+        RecipeActiveIngredients: [
+            { thaiName: 'ขมิ้นชัน', engName: 'Turmeric', latinName: 'Curcuma longa', partUsed: 'เหง้า', quantity: '250 mg' },
+            { thaiName: 'พริกไทยดำ', engName: 'Black Pepper', latinName: 'Piper nigrum', partUsed: 'ผล', quantity: '50 mg' }
+        ],
+        RecipeExtracts: [
+            { extractName: 'สารสกัดฟ้าทะลายโจร', latinName: 'Andrographis paniculata', partUsed: 'ใบ', solvent: 'เอทานอล', ratio: '10:1', quantity: '100 mg' }
+        ],
+        RecipeExcipients: [
+            { name: 'แป้งข้าวโพด', casNumber: '9005-25-8', function: 'สารเติมเต็ม (Filler)', quantity: '100 mg' },
+            { name: 'แมกนีเซียมสเตียเรต', casNumber: '557-04-0', function: 'สารหล่อลื่น (Lubricant)', quantity: '5 mg' }
+        ],
 
         // ๕. รายละเอียดของผลิตภัณฑ์สมุนไพร
-        ProductAppearance: '', ProductPackSize: '', ProductMfgProcess: '', ProductIndication: '',
-        ProductDosage: '', ProductPreparation: '', ProductCondition: '', ProductStorage: '',
-        ProductContraindication: '', ProductWarning: '', ProductPrecaution: '', ProductAdverseReaction: '',
-        SalesChannel: '', ProductSummary: '',
+        ProductAppearance: 'แคปซูลสีเขียว-ขาว บรรจุผงสีน้ำตาล', ProductPackSize: 'กระปุกละ 60 แคปซูล, แผงละ 10 แคปซูล', ProductMfgProcess: 'ผสมสารสกัดและสมุนไพรบดหยาบ นำเข้าเครื่องบรรจุแคปซูล', ProductIndication: 'บรรเทาอาการท้องอืด ท้องเฟ้อ ช่วยย่อยอาหาร',
+        ProductDosage: 'รับประทานครั้งละ 1-2 แคปซูล วันละ 3 ครั้ง', ProductPreparation: 'ไม่ต้องเตรียม', ProductCondition: 'รับประทานหลังอาหารทันที', ProductStorage: 'เก็บในที่แห้ง อุณหภูมิต่ำกว่า 30 องศาเซลเซียส / อายุ 2 ปี',
+        ProductContraindication: 'ห้ามใช้ในสตรีมีครรภ์และผู้ป่วยท่อน้ำดีอุดตัน', ProductWarning: 'หากมีอาการแพ้ควรหยุดใช้ทันที', ProductPrecaution: 'ควรระวังการใช้ร่วมกับยาต้านการแข็งตัวของเลือด', ProductAdverseReaction: 'อาจเกิดอาการระคายเคืองกระเพาะอาหาร',
+        SalesChannel: 'ผลิตภัณฑ์สมุนไพรขายทั่วไป', ProductSummary: 'ผลิตภัณฑ์มีคุณภาพผ่านเกณฑ์มาตรฐาน สมุนไพรมีความปลอดภัยตามเอกสารอ้างอิง และมีประสิทธิภาพในการบรรเทาอาการท้องอืด',
         AttachedDocuments: {
-            doc1: false, doc2: false, doc3: false, doc4: false, doc5: false,
-            doc6_1: false, doc6_2: false, doc6_3: false, doc6_4: false, doc6_5: false, doc6_6: false,
-            doc7: false, doc8: false, doc9: false
+            doc1: true, doc2: true, doc3: true, doc4: false, doc5: false,
+            doc6_1: true, doc6_2: true, doc6_3: true, doc6_4: false, doc6_5: false, doc6_6: false,
+            doc7: true, doc8: false, doc9: true
         }
     });
 
@@ -315,6 +332,18 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                 </div>
             </div>
 
+            {/* ── สำหรับเจ้าหน้าที่ (Official Use) ── */}
+            <div style={{ ...cardStyle, borderLeft: `4px solid ${colors.border}`, marginBottom: '16px', background: '#f8fafc' }}>
+                <h4 style={{ ...sectionTitleStyle, borderBottom: 'none', marginBottom: '12px', fontSize: '13px', color: colors.textMuted }}>
+                    สำหรับเจ้าหน้าที่ (ส่วนบนขวาของเอกสาร)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                    <InputField label="เลขรับที่" name="ReceiptNo" value={form.ReceiptNo} disabled={readOnly} placeholder="เช่น ร.1234/2567" />
+                    <InputField label="วันที่ (รับ)" name="ReceiptDate" type="date" value={form.ReceiptDate} disabled={readOnly} />
+                    <InputField label="ลงชื่อ (ผู้รับคำขอ)" name="ReceiverName" value={form.ReceiverName} disabled={readOnly} placeholder="ชื่อเจ้าหน้าที่" />
+                </div>
+            </div>
+
             {/* ── Section 1: ชนิดคำขอ + ประเภท ── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 {/* ชนิด */}
@@ -343,12 +372,24 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                             transition: 'opacity 0.2s',
                         }}>
                             {['ยาแผนไทย', 'ยาตามองค์ความรู้การแพทย์แผนทางเลือก', 'ยาพัฒนาจากสมุนไพร'].map(opt => (
-                                <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: colors.textLabel, paddingLeft: '8px' }}>
-                                    <input type="radio" name="ReqMedType" value={opt} checked={form.ReqMedType === opt}
-                                        onChange={handleChange} disabled={readOnly || !form.ReqMedicineFromHerb}
-                                        style={{ accentColor: colors.primary }} />
-                                    {opt}
-                                </label>
+                                <div key={opt}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: colors.textLabel, paddingLeft: '8px' }}>
+                                        <input type="radio" name="ReqMedType" value={opt} checked={form.ReqMedType === opt}
+                                            onChange={handleChange} disabled={readOnly || !form.ReqMedicineFromHerb}
+                                            style={{ accentColor: colors.primary }} />
+                                        {opt}
+                                    </label>
+                                    {opt === 'ยาตามองค์ความรู้การแพทย์แผนทางเลือก' && form.ReqMedType === opt && (
+                                        <div style={{ marginTop: '8px', paddingLeft: '34px' }}>
+                                            <InputField 
+                                                name="ReqMedTypeOther" 
+                                                value={form.ReqMedTypeOther} 
+                                                disabled={readOnly || !form.ReqMedicineFromHerb} 
+                                                placeholder="โปรดระบุ..." 
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             ))}
                         </div>
                     </div>

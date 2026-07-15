@@ -1,0 +1,165 @@
+{
+  "templateName": "7 แบบคำรับรองและหนังสือให้ความยินยอมสำหร.pdf",
+  "templateConfig": {
+    "defaultFontSize": 7,
+    "defaultFontFamily": "Sarabun"
+  },
+  "fields": [
+    {
+      "id": "nlp_1784108840288_ifvnhq",
+      "name": "Auto Field 1",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 69.45886678165184,
+      "yPercent": 17.69730140630939,
+      "widthPct": 21.00828365844773,
+      "heightPct": 1.8,
+      "query": "SELECT WrittenAt FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "nlp_1784108840288_a56gk1",
+      "name": "Auto Field 2",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 68.66245155793177,
+      "yPercent": 21.032535157734696,
+      "widthPct": 21.8046988821678,
+      "heightPct": 1.8,
+      "query": "SELECT CONVERT(varchar, DocumentDate, 103) FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "nlp_1784108840288_aqdlvi",
+      "name": "Auto Field 3",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 56.814499703613784,
+      "yPercent": 26.505739262637782,
+      "widthPct": 33.67895591689279,
+      "heightPct": 1.8,
+      "query": "SELECT OwnerName FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "nlp_cb_1784108840288_tkep5v",
+      "name": "Auto Checkbox 4",
+      "type": "checkbox",
+      "pageIndex": 1,
+      "xPercent": 26.187596586709667,
+      "yPercent": 29.153601292284296,
+      "widthPct": 2.388691796008869,
+      "heightPct": 1.8,
+      "query": "SELECT ReqTypeRegistration FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "nlp_cb_1784108840288_vf4baj",
+      "name": "Auto Checkbox 5",
+      "type": "checkbox",
+      "pageIndex": 1,
+      "xPercent": 25.98602432305314,
+      "yPercent": 31.66215317369821,
+      "widthPct": 2.388691796008869,
+      "heightPct": 1.8,
+      "query": "SELECT ReqTypeDetailNotification FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "nlp_cb_1784108840288_dc9zh3",
+      "name": "Auto Checkbox 6",
+      "type": "checkbox",
+      "pageIndex": 1,
+      "xPercent": 59.798091782570715,
+      "yPercent": 31.66215317369821,
+      "widthPct": 2.3886917960088736,
+      "heightPct": 1.8,
+      "query": "SELECT ReqTypeNotification FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "nlp_1784108840288_zpfspj",
+      "name": "Auto Field 7",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 32.62432074225409,
+      "yPercent": 34.76311675689539,
+      "widthPct": 57.86912479963932,
+      "heightPct": 1.8,
+      "query": "SELECT ProductName FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "nlp_1784108840288_ftwdhi",
+      "name": "Auto Field 8",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 25.362483553861335,
+      "yPercent": 37.17064804256936,
+      "widthPct": 65.13099558340939,
+      "heightPct": 1.8,
+      "query": "SELECT ReceiptNo FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "nlp_1784108840289_n5m46o",
+      "name": "Auto Field 10",
+      "type": "text",
+      "pageIndex": 1,
+      "xPercent": 60.19387241838041,
+      "yPercent": 79.46564044089699,
+      "widthPct": 19.699668236620465,
+      "heightPct": 1.8,
+      "query": "SELECT OwnerName FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "f6be2f1d-9bfe-457a-b6ea-2198a5ffb6ea",
+      "name": "Auto Field 10",
+      "type": "strikeout",
+      "pageIndex": 1,
+      "xPercent": 32.709768599822745,
+      "yPercent": 26.55331390072601,
+      "widthPct": 3.25079909893645,
+      "heightPct": 0.5,
+      "query": "SELECT CASE WHEN OwnerPrefix != 'นาย' THEN 1 ELSE 0 END FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "l84z3g",
+      "name": "Auto Field 10_copy",
+      "type": "strikeout",
+      "pageIndex": 1,
+      "xPercent": 36.36458555590205,
+      "yPercent": 26.564191576843807,
+      "widthPct": 3.25079909893645,
+      "heightPct": 0.5,
+      "query": "SELECT CASE WHEN OwnerPrefix != 'นาง' THEN 1 ELSE 0 END FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "db7rw8",
+      "name": "Auto Field 10_copy_copy",
+      "type": "strikeout",
+      "pageIndex": 1,
+      "xPercent": 40.019397382976635,
+      "yPercent": 26.516569068441772,
+      "widthPct": 5.650285993303572,
+      "heightPct": 0.5,
+      "query": "SELECT CASE WHEN OwnerPrefix != 'นางสาว' THEN 1 ELSE 0 END FROM SafetyCertDocuments",
+      "multiline": false
+    },
+    {
+      "id": "a97d7q",
+      "name": "Auto Field 10_copy_copy_copy",
+      "type": "strikeout",
+      "pageIndex": 1,
+      "xPercent": 46.239168054917286,
+      "yPercent": 26.527450371128566,
+      "widthPct": 8.877173672203257,
+      "heightPct": 0.5,
+      "query": "SELECT CASE WHEN OwnerPrefix != 'นิติบุคคล' THEN 1 ELSE 0 END FROM SafetyCertDocuments",
+      "multiline": false
+    }
+  ]
+}

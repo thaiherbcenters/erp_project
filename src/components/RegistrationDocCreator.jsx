@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, FileText, Users, FileSignature, ChevronDown, Check, Save, Printer, Loader2 } from 'lucide-react';
 import { useAlert } from './CustomAlert';
+import { PDFDocument } from 'pdf-lib';
 import API_BASE from '../config';
 import PowerOfAttorneyForm from './PowerOfAttorneyForm';
 import HerbalCertForm from './HerbalCertForm';
 import TorBor1Form from './TorBor1Form';
+import ContractMfgForm from './ContractMfgForm';
+import PdpaConsentForm from './PdpaConsentForm';
+import CorpRepForm from './CorpRepForm';
+import SafetyCertForm from './SafetyCertForm';
 
 /**
  * RegistrationDocCreator.jsx
@@ -14,12 +19,7 @@ import TorBor1Form from './TorBor1Form';
  * - เลือกประเภทเอกสาร (multi-select)
  * - แสดงฟอร์มตามประเภทที่เลือก
  */
-
-const DOC_TYPES = [
-    { id: 'poa', name: 'หนังสือมอบอำนาจ', icon: '📜', description: 'หนังสือมอบอำนาจสำหรับผลิตภัณฑ์สมุนไพร' },
-    { id: 'herbal_cert', name: 'คำรับรอง (อ้างอิงแม่แบบ)', icon: '📝', description: 'คำรับรองสำหรับผู้ยื่นคำขอขึ้นทะเบียนตำรับผลิตภัณฑ์สมุนไพร' },
-    { id: 'torbor1', name: 'แบบ ทบ.๑', icon: '📋', description: 'คำขอขึ้นทะเบียนตำรับผลิตภัณฑ์สมุนไพร' },
-];
+import { DOC_TYPES } from '../constants';
 
 const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = null }) => {
     const { showAlert, showConfirm, showLoading, hideLoading } = useAlert();
@@ -58,21 +58,35 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
     const poaFormRef = useRef(null);
     const herbalCertFormRef = useRef(null);
     const torbor1FormRef = useRef(null);
+    const contractMfgFormRef = useRef(null);
+    const pdpaConsentFormRef = useRef(null);
+    const corpRepFormRef = useRef(null);
+    const safetyCertFormRef = useRef(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isPrinting, setIsPrinting] = useState(false);
 
     const collectAllFormData = () => {
         const collectedData = [];
-        if (selectedDocTypes.includes('poa') && poaFormRef.current) {
-            collectedData.push(poaFormRef.current.getFormData());
-        }
-        if (selectedDocTypes.includes('herbal_cert') && herbalCertFormRef.current) {
-            collectedData.push(herbalCertFormRef.current.getFormData());
+        
+        // เรียงลำดับเอกสารตาม selectedDocTypes ซึ่งเรียงตาม Tab ที่ผู้ใช้จัดเรียงไว้
+        for (const typeId of selectedDocTypes) {
+            if (typeId === 'poa' && poaFormRef.current) {
+                collectedData.push(poaFormRef.current.getFormData());
+            } else if (typeId === 'herbal_cert' && herbalCertFormRef.current) {
+                collectedData.push(herbalCertFormRef.current.getFormData());
+            } else if (typeId === 'torbor1' && torbor1FormRef.current) {
+                collectedData.push(torbor1FormRef.current.getFormData());
+            } else if (typeId === 'contract_mfg' && contractMfgFormRef.current) {
+                collectedData.push(contractMfgFormRef.current.getFormData());
+            } else if (typeId === 'pdpa_consent' && pdpaConsentFormRef.current) {
+                collectedData.push(pdpaConsentFormRef.current.getFormData());
+            } else if (typeId === 'corp_rep' && corpRepFormRef.current) {
+                collectedData.push(corpRepFormRef.current.getFormData());
+            } else if (typeId === 'safety_cert' && safetyCertFormRef.current) {
+                collectedData.push(safetyCertFormRef.current.getFormData());
+            }
         }
         
-        if (selectedDocTypes.includes('torbor1') && torbor1FormRef.current) {
-            collectedData.push(torbor1FormRef.current.getFormData());
-        }
         return collectedData;
     };
 
@@ -90,6 +104,14 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                     endpointBase = `${API_BASE}/herbal-cert-documents`;
                 } else if (type === 'torbor1') {
                     endpointBase = `${API_BASE}/torbor1-documents`;
+                } else if (type === 'contract_mfg') {
+                    endpointBase = `${API_BASE}/contract-mfg-documents`;
+                } else if (type === 'pdpa_consent') {
+                    endpointBase = `${API_BASE}/pdpa-consent-documents`;
+                } else if (type === 'corp_rep') {
+                    endpointBase = `${API_BASE}/corp-rep-documents`;
+                } else if (type === 'safety_cert') {
+                    endpointBase = `${API_BASE}/safety-cert-documents`;
                 }
 
                 let targetId = data.documentId;
@@ -124,6 +146,15 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                     }
                     if (type === 'herbal_cert' && herbalCertFormRef.current && herbalCertFormRef.current.setCurrentDocId) {
                         herbalCertFormRef.current.setCurrentDocId(savedId);
+                    }
+                    if (type === 'pdpa_consent' && pdpaConsentFormRef.current && pdpaConsentFormRef.current.setCurrentDocId) {
+                        pdpaConsentFormRef.current.setCurrentDocId(savedId);
+                    }
+                    if (type === 'corp_rep' && corpRepFormRef.current && corpRepFormRef.current.setCurrentDocId) {
+                        corpRepFormRef.current.setCurrentDocId(savedId);
+                    }
+                    if (type === 'safety_cert' && safetyCertFormRef.current && safetyCertFormRef.current.setCurrentDocId) {
+                        safetyCertFormRef.current.setCurrentDocId(savedId);
                     }
                     
                     results.push({ type, documentId: savedId });
@@ -196,9 +227,10 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                 return;
             }
 
-            // 2. ข้อมูลลง DB แล้ว ค่อยเรียก Print API ไปดึงข้อมูลมาออกเป็น PDF
+            // 2. ข้อมูลลง DB แล้ว ค่อยเรียก Print API ไปดึงข้อมูลมาออกเป็น PDF แล้วนำมารวมกัน
             let successCount = 0;
             const errorMessages = [];
+            const mergedPdf = await PDFDocument.create();
 
             for (const doc of savedDocs) {
                 if (!doc.documentId) continue;
@@ -213,9 +245,10 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                     });
 
                     if (printResponse.ok) {
-                        const blob = await printResponse.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        window.open(url, '_blank');
+                        const arrayBuffer = await printResponse.arrayBuffer();
+                        const pdfDoc = await PDFDocument.load(arrayBuffer);
+                        const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                        copiedPages.forEach((page) => mergedPdf.addPage(page));
                         successCount++;
                     } else {
                         try {
@@ -232,14 +265,21 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                 }
             }
             
+            if (successCount > 0) {
+                const mergedPdfBytes = await mergedPdf.save();
+                const blob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
+                const url = window.URL.createObjectURL(blob);
+                window.open(url, '_blank');
+            }
+
             if (errorMessages.length > 0) {
                 if (successCount > 0) {
-                    showAlert('พิมพ์เอกสารสำเร็จบางส่วน', `เปิดเอกสารสำเร็จ ${successCount} ฉบับ\n\nแต่พบปัญหาดังนี้:\n${errorMessages.join('\n')}`, 'warning');
+                    showAlert('พิมพ์เอกสารสำเร็จบางส่วน', `รวม PDF สำเร็จ ${successCount} ฉบับ\n\nแต่พบปัญหาดังนี้:\n${errorMessages.join('\n')}`, 'warning');
                 } else {
                     showAlert('ไม่สามารถสร้างเอกสารได้', `พบปัญหาดังนี้:\n${errorMessages.join('\n')}`, 'error');
                 }
             } else if (successCount > 0) {
-                showAlert('สำเร็จ', `เปิด PDF เอกสารจำนวน ${successCount} ฉบับเรียบร้อยแล้ว`, 'success');
+                showAlert('สำเร็จ', `รวม PDF เอกสารจำนวน ${successCount} ฉบับเรียบร้อยแล้ว`, 'success');
             }
             
         } catch (error) {
@@ -648,7 +688,10 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                             
                             const typeColors = {
                                 poa: '#1e40af',
-                                herbal_cert: '#047857'
+                                herbal_cert: '#047857',
+                                contract_mfg: '#0369a1',
+                                pdpa_consent: '#d97706',
+                                corp_rep: '#7c3aed'
                             };
                             const color = typeColors[typeId] || '#2563eb';
                             
@@ -727,6 +770,78 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                     <TorBor1Form
                                         ref={torbor1FormRef}
                                         documentId={editingDocType === 'torbor1' ? editingDocId : null}
+                                        customerData={customerData}
+                                        contractId={selectedContractId}
+                                        embedded={true}
+                                        sharedFormData={sharedFormData}
+                                        onSharedDataChange={handleSharedDataChange}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="doc-tab-content" style={{ display: activeTabId === 'contract_mfg' ? 'block' : 'none' }}>
+                        {selectedDocTypes.includes('contract_mfg') && (
+                            <div className="print-page-break" style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: '4px solid #0369a1' }}>
+                                <div style={{ padding: '0' }}>
+                                    <ContractMfgForm
+                                        ref={contractMfgFormRef}
+                                        documentId={editingDocType === 'contract_mfg' ? editingDocId : null}
+                                        customerData={customerData}
+                                        contractId={selectedContractId}
+                                        embedded={true}
+                                        sharedFormData={sharedFormData}
+                                        onSharedDataChange={handleSharedDataChange}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="doc-tab-content" style={{ display: activeTabId === 'pdpa_consent' ? 'block' : 'none' }}>
+                        {selectedDocTypes.includes('pdpa_consent') && (
+                            <div className="print-page-break" style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: '4px solid #d97706' }}>
+                                <div style={{ padding: '0' }}>
+                                    <PdpaConsentForm
+                                        ref={pdpaConsentFormRef}
+                                        documentId={editingDocType === 'pdpa_consent' ? editingDocId : null}
+                                        customerData={customerData}
+                                        contractId={selectedContractId}
+                                        embedded={true}
+                                        sharedFormData={sharedFormData}
+                                        onSharedDataChange={handleSharedDataChange}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="doc-tab-content" style={{ display: activeTabId === 'corp_rep' ? 'block' : 'none' }}>
+                        {selectedDocTypes.includes('corp_rep') && (
+                            <div className="print-page-break" style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: '4px solid #7c3aed' }}>
+                                <div style={{ padding: '0' }}>
+                                    <CorpRepForm
+                                        ref={corpRepFormRef}
+                                        documentId={editingDocType === 'corp_rep' ? editingDocId : null}
+                                        customerData={customerData}
+                                        contractId={selectedContractId}
+                                        embedded={true}
+                                        sharedFormData={sharedFormData}
+                                        onSharedDataChange={handleSharedDataChange}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="doc-tab-content" style={{ display: activeTabId === 'safety_cert' ? 'block' : 'none' }}>
+                        {selectedDocTypes.includes('safety_cert') && (
+                            <div className="print-page-break" style={{ ...cardStyle, padding: 0, overflow: 'hidden', marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: '4px solid #10b981' }}>
+                                <div style={{ padding: '0' }}>
+                                    <SafetyCertForm
+                                        ref={safetyCertFormRef}
+                                        documentId={editingDocType === 'safety_cert' ? editingDocId : null}
                                         customerData={customerData}
                                         contractId={selectedContractId}
                                         embedded={true}

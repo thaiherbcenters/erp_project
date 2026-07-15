@@ -12,8 +12,24 @@ const bindFields = (req, data, isUpdate = false, oldDoc = {}) => {
         req.input('DocumentDate', sql.Date, data.DocumentDate || new Date());
         req.input('ContractID', sql.Int, data.ContractID || null);
     }
+    
+    // Receipt Fields (For Official Use)
+    req.input('ReceiptNo', sql.NVarChar, data.ReceiptNo || null);
+    req.input('ReceiptDate', sql.Date, data.ReceiptDate || null);
+    req.input('ReceiverName', sql.NVarChar, data.ReceiverName || null);
     req.input('ReqMedicineFromHerb', sql.Bit, data.ReqMedicineFromHerb ? 1 : 0);
     req.input('ReqMedType', sql.NVarChar, data.ReqMedType || null);
+    
+    // Auto-calculate the 3 separate boolean fields based on the selected ReqMedType string
+    const isThai = data.ReqMedType === 'ยาแผนไทย';
+    const isAlt = data.ReqMedType === 'ยาตามองค์ความรู้การแพทย์แผนทางเลือก';
+    const isDev = data.ReqMedType === 'ยาพัฒนาจากสมุนไพร';
+    
+    req.input('ReqMedTypeThai', sql.Bit, isThai ? 1 : 0);
+    req.input('ReqMedTypeAlternative', sql.Bit, isAlt ? 1 : 0);
+    req.input('ReqMedTypeDeveloped', sql.Bit, isDev ? 1 : 0);
+    
+    req.input('ReqMedTypeOther', sql.NVarChar, data.ReqMedTypeOther || null);
     req.input('ReqHealthProduct', sql.Bit, data.ReqHealthProduct ? 1 : 0);
     req.input('TypeProduce', sql.Bit, data.TypeProduce ? 1 : 0);
     req.input('TypeImport', sql.Bit, data.TypeImport ? 1 : 0);
@@ -24,6 +40,17 @@ const bindFields = (req, data, isUpdate = false, oldDoc = {}) => {
     // Applicant
     req.input('ApplicantType', sql.NVarChar, data.ApplicantType || null);
     
+    // Auto-calculate the separate boolean fields for ApplicantType
+    const isAppNatural = data.ApplicantType === 'บุคคลธรรมดา';
+    const isAppJuristic = data.ApplicantType === 'นิติบุคคล';
+    const isAppForeign = data.ApplicantType === 'ต่างด้าว' || data.ApplicantType === 'บุคคลธรรมดาต่างด้าว';
+    const isAppForeignJuristic = data.ApplicantType === 'นิติบุคคลต่างด้าว';
+    
+    req.input('IsAppNatural', sql.Bit, isAppNatural ? 1 : 0);
+    req.input('IsAppJuristic', sql.Bit, isAppJuristic ? 1 : 0);
+    req.input('IsAppForeign', sql.Bit, isAppForeign ? 1 : 0);
+    req.input('IsAppForeignJuristic', sql.Bit, isAppForeignJuristic ? 1 : 0);
+
     // Natural
     const naturalFields = ['AppNaturalName', 'AppNaturalNationality', 'AppNaturalCitizenID', 'AppNaturalAddressNo', 'AppNaturalBuilding', 'AppNaturalMoo', 'AppNaturalSoi', 'AppNaturalRoad', 'AppNaturalSubDistrict', 'AppNaturalDistrict', 'AppNaturalProvince', 'AppNaturalPostcode', 'AppNaturalFax', 'AppNaturalPhone', 'AppNaturalEmail'];
     naturalFields.forEach(f => req.input(f, sql.NVarChar, data[f] || null));
@@ -87,9 +114,10 @@ const bindFields = (req, data, isUpdate = false, oldDoc = {}) => {
 
 const getInsertFieldsStr = () => `
     DocumentNo, DocumentDate, DocumentType, ContractID,
-    ReqMedicineFromHerb, ReqMedType, ReqHealthProduct,
+    ReceiptNo, ReceiptDate, ReceiverName,
+    ReqMedicineFromHerb, ReqMedType, ReqMedTypeThai, ReqMedTypeAlternative, ReqMedTypeDeveloped, ReqMedTypeOther, ReqHealthProduct,
     TypeProduce, TypeImport, TypeExportOnly,
-    ProductNameThai, ProductNameEng, ApplicantType,
+    ProductNameThai, ProductNameEng, ApplicantType, IsAppNatural, IsAppJuristic, IsAppForeign, IsAppForeignJuristic,
     AppNaturalName, AppNaturalAge, AppNaturalNationality, AppNaturalCitizenID, AppNaturalAddressNo, AppNaturalBuilding, AppNaturalMoo, AppNaturalSoi, AppNaturalRoad, AppNaturalSubDistrict, AppNaturalDistrict, AppNaturalProvince, AppNaturalPostcode, AppNaturalFax, AppNaturalPhone, AppNaturalEmail,
     AppJuristicName, AppJuristicID, AppJuristicAddressNo, AppJuristicBuilding, AppJuristicMoo, AppJuristicSoi, AppJuristicRoad, AppJuristicSubDistrict, AppJuristicDistrict, AppJuristicProvince, AppJuristicPostcode, AppJuristicFax, AppJuristicPhone, AppJuristicEmail, AppJuristicRepName, AppJuristicRepAge, AppJuristicRepNationality, AppJuristicRepCitizenID,
     AppForeignPassportNo, AppForeignPassportExpiry, AppForeignResCertNo, AppForeignResCertDate, AppForeignWorkPermitNo, AppForeignWorkPermitExpiry, AppForeignBizLicenseNo, AppForeignBizLicenseDate, AppForeignBizCertNo, AppForeignBizCertDate,
@@ -104,10 +132,11 @@ const getInsertFieldsStr = () => `
 
 const getInsertValuesStr = (hasVersion = false) => `
     @DocumentNo, @DocumentDate, @DocumentType, @ContractID,
+    @ReceiptNo, @ReceiptDate, @ReceiverName,
     ${hasVersion ? '@Version, @RefDocumentID,' : ''}
-    @ReqMedicineFromHerb, @ReqMedType, @ReqHealthProduct,
+    @ReqMedicineFromHerb, @ReqMedType, @ReqMedTypeThai, @ReqMedTypeAlternative, @ReqMedTypeDeveloped, @ReqMedTypeOther, @ReqHealthProduct,
     @TypeProduce, @TypeImport, @TypeExportOnly,
-    @ProductNameThai, @ProductNameEng, @ApplicantType,
+    @ProductNameThai, @ProductNameEng, @ApplicantType, @IsAppNatural, @IsAppJuristic, @IsAppForeign, @IsAppForeignJuristic,
     @AppNaturalName, @AppNaturalAge, @AppNaturalNationality, @AppNaturalCitizenID, @AppNaturalAddressNo, @AppNaturalBuilding, @AppNaturalMoo, @AppNaturalSoi, @AppNaturalRoad, @AppNaturalSubDistrict, @AppNaturalDistrict, @AppNaturalProvince, @AppNaturalPostcode, @AppNaturalFax, @AppNaturalPhone, @AppNaturalEmail,
     @AppJuristicName, @AppJuristicID, @AppJuristicAddressNo, @AppJuristicBuilding, @AppJuristicMoo, @AppJuristicSoi, @AppJuristicRoad, @AppJuristicSubDistrict, @AppJuristicDistrict, @AppJuristicProvince, @AppJuristicPostcode, @AppJuristicFax, @AppJuristicPhone, @AppJuristicEmail, @AppJuristicRepName, @AppJuristicRepAge, @AppJuristicRepNationality, @AppJuristicRepCitizenID,
     @AppForeignPassportNo, @AppForeignPassportExpiry, @AppForeignResCertNo, @AppForeignResCertDate, @AppForeignWorkPermitNo, @AppForeignWorkPermitExpiry, @AppForeignBizLicenseNo, @AppForeignBizLicenseDate, @AppForeignBizCertNo, @AppForeignBizCertDate,
@@ -122,9 +151,10 @@ const getInsertValuesStr = (hasVersion = false) => `
 
 const getUpdateFieldsStr = () => `
     DocumentDate = @DocumentDate, ContractID = @ContractID,
-    ReqMedicineFromHerb = @ReqMedicineFromHerb, ReqMedType = @ReqMedType, ReqHealthProduct = @ReqHealthProduct,
+    ReceiptNo = @ReceiptNo, ReceiptDate = @ReceiptDate, ReceiverName = @ReceiverName,
+    ReqMedicineFromHerb = @ReqMedicineFromHerb, ReqMedType = @ReqMedType, ReqMedTypeThai = @ReqMedTypeThai, ReqMedTypeAlternative = @ReqMedTypeAlternative, ReqMedTypeDeveloped = @ReqMedTypeDeveloped, ReqMedTypeOther = @ReqMedTypeOther, ReqHealthProduct = @ReqHealthProduct,
     TypeProduce = @TypeProduce, TypeImport = @TypeImport, TypeExportOnly = @TypeExportOnly,
-    ProductNameThai = @ProductNameThai, ProductNameEng = @ProductNameEng, ApplicantType = @ApplicantType,
+    ProductNameThai = @ProductNameThai, ProductNameEng = @ProductNameEng, ApplicantType = @ApplicantType, IsAppNatural = @IsAppNatural, IsAppJuristic = @IsAppJuristic, IsAppForeign = @IsAppForeign, IsAppForeignJuristic = @IsAppForeignJuristic,
     AppNaturalName = @AppNaturalName, AppNaturalAge = @AppNaturalAge, AppNaturalNationality = @AppNaturalNationality, AppNaturalCitizenID = @AppNaturalCitizenID, AppNaturalAddressNo = @AppNaturalAddressNo, AppNaturalBuilding = @AppNaturalBuilding, AppNaturalMoo = @AppNaturalMoo, AppNaturalSoi = @AppNaturalSoi, AppNaturalRoad = @AppNaturalRoad, AppNaturalSubDistrict = @AppNaturalSubDistrict, AppNaturalDistrict = @AppNaturalDistrict, AppNaturalProvince = @AppNaturalProvince, AppNaturalPostcode = @AppNaturalPostcode, AppNaturalFax = @AppNaturalFax, AppNaturalPhone = @AppNaturalPhone, AppNaturalEmail = @AppNaturalEmail,
     AppJuristicName = @AppJuristicName, AppJuristicID = @AppJuristicID, AppJuristicAddressNo = @AppJuristicAddressNo, AppJuristicBuilding = @AppJuristicBuilding, AppJuristicMoo = @AppJuristicMoo, AppJuristicSoi = @AppJuristicSoi, AppJuristicRoad = @AppJuristicRoad, AppJuristicSubDistrict = @AppJuristicSubDistrict, AppJuristicDistrict = @AppJuristicDistrict, AppJuristicProvince = @AppJuristicProvince, AppJuristicPostcode = @AppJuristicPostcode, AppJuristicFax = @AppJuristicFax, AppJuristicPhone = @AppJuristicPhone, AppJuristicEmail = @AppJuristicEmail, AppJuristicRepName = @AppJuristicRepName, AppJuristicRepAge = @AppJuristicRepAge, AppJuristicRepNationality = @AppJuristicRepNationality, AppJuristicRepCitizenID = @AppJuristicRepCitizenID,
     AppForeignPassportNo = @AppForeignPassportNo, AppForeignPassportExpiry = @AppForeignPassportExpiry, AppForeignResCertNo = @AppForeignResCertNo, AppForeignResCertDate = @AppForeignResCertDate, AppForeignWorkPermitNo = @AppForeignWorkPermitNo, AppForeignWorkPermitExpiry = @AppForeignWorkPermitExpiry, AppForeignBizLicenseNo = @AppForeignBizLicenseNo, AppForeignBizLicenseDate = @AppForeignBizLicenseDate, AppForeignBizCertNo = @AppForeignBizCertNo, AppForeignBizCertDate = @AppForeignBizCertDate,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, FileJson, CheckCircle, AlertCircle, Plus, Trash2, Check, RefreshCw, GripVertical, X } from 'lucide-react';
 import API_BASE from '../config';
+import { DOC_TYPES } from '../constants';
 import './TemplateUploader.css';
 
 export default function TemplateUploader() {
@@ -209,8 +210,9 @@ export default function TemplateUploader() {
                             onChange={(e) => setDocumentType(e.target.value)}
                             className="template-uploader-select flex-1"
                         >
-                            <option value="poa">หนังสือมอบอำนาจ (poa)</option>
-                            <option value="herbal_cert">คำรับรองอ้างอิงแม่แบบ (herbal_cert)</option>
+                            {DOC_TYPES.map(type => (
+                                <option key={type.id} value={type.id}>{type.name} ({type.id})</option>
+                            ))}
                             <option value="certificate" disabled>ใบรับรอง (กำลังพัฒนา)</option>
                             <option value="receipt" disabled>ใบเสร็จรับเงิน (กำลังพัฒนา)</option>
                         </select>
