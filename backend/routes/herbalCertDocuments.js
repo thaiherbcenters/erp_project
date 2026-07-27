@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
 
         const result = await request.query(`
             WITH RankedDocs AS (
-                SELECT DocumentID, DocumentNo, DocumentDate, DocumentType, ApplicantName, Status, CreatedAt, Version,
+                SELECT DocumentID, DocumentNo, DocumentDate, DocumentType, ApplicantName, ProductName, Status, CreatedAt, Version,
                        ROW_NUMBER() OVER(PARTITION BY DocumentNo ORDER BY Version DESC) as rn
                 FROM HerbalCertDocuments
                 ${whereClause}
@@ -104,7 +104,11 @@ router.post('/', async (req, res) => {
 
         let finalDocumentNo = data.documentNo;
         if (!finalDocumentNo) {
-            finalDocumentNo = await generateSequence(pool, 'HerbalCertDocuments', 'DocumentNo', `HBC-${getDatePrefix()}`, 3);
+            if (data.status === 'พรีวิว') {
+                finalDocumentNo = `PREV-HBC-${Date.now()}`;
+            } else {
+                finalDocumentNo = await generateSequence(pool, 'HerbalCertDocuments', 'DocumentNo', `HBC-${getDatePrefix()}`, 3);
+            }
         }
 
         const result = await pool.request()
@@ -225,18 +229,28 @@ router.put('/:id', async (req, res) => {
         const pool = await poolPromise;
         const { id } = req.params;
         const data = req.body;
+        const checkDoc = await pool.request().input('CheckDocumentID', sql.Int, id).query(`SELECT * FROM HerbalCertDocuments WHERE DocumentID = @CheckDocumentID`);
+        if (checkDoc.recordset.length === 0) {
+            return res.status(404).json({ success: false, message: 'Document not found' });
+        }
+        const oldDoc = checkDoc.recordset[0];
 
-        const result = await pool.request()
+        let finalDocumentNo = data.documentNo !== undefined ? (data.documentNo || null) : (oldDoc.DocumentNo || null);
+        if (oldDoc.Status === 'พรีวิว' && data.status !== 'พรีวิว' && (!finalDocumentNo || finalDocumentNo.startsWith('PREV-'))) {
+            finalDocumentNo = await generateSequence(pool, 'HerbalCertDocuments', 'DocumentNo', `HBC-${getDatePrefix()}`, 3);
+        }
+
+        const sqlReq = pool.request()
             .input('DocumentID', sql.Int, id)
-            .input('DocumentNo', sql.NVarChar, data.documentNo || null)
-            .input('WrittenAt', sql.NVarChar, data.writtenAt || null)
-            .input('DocumentDate', sql.Date, data.documentDate || null)
+            .input('DocumentNo', sql.NVarChar, finalDocumentNo)
+            .input('WrittenAt', sql.NVarChar, data.writtenAt !== undefined ? (data.writtenAt || null) : (oldDoc.WrittenAt || null))
+            .input('DocumentDate', sql.Date, data.documentDate !== undefined ? (data.documentDate || null) : (oldDoc.DocumentDate || null))
             .input('DocumentType', sql.NVarChar, data.documentType || 'herbal_cert')
-            .input('ContractID', sql.Int, data.contractId || null)
+            .input('ContractID', sql.Int, data.contractId !== undefined ? (data.contractId || null) : (oldDoc.ContractID || null))
             
-            .input('ApplicantType', sql.NVarChar, data.personType || data.grantorType || null)
-            .input('ApplicantPrefix', sql.NVarChar, data.applicantPrefix || null)
-            .input('ApplicantName', sql.NVarChar, data.applicantName || data.licenseeName || data.grantorName || null)
+            .input('ApplicantType', sql.NVarChar, data.personType !== undefined ? (data.personType || null) : (data.grantorType !== undefined ? (data.grantorType || null) : (oldDoc.ApplicantType || null)))
+            .input('ApplicantPrefix', sql.NVarChar, data.applicantPrefix !== undefined ? (data.applicantPrefix || null) : (oldDoc.ApplicantPrefix || null))
+            .input('ApplicantName', sql.NVarChar, data.applicantName !== undefined ? (data.applicantName || null) : (data.licenseeName !== undefined ? (data.licenseeName || null) : (data.grantorName !== undefined ? (data.grantorName || null) : (oldDoc.ApplicantName || null))))
             .input('ApplicantCitizenID', sql.NVarChar, data.citizenId || data.grantorCitizenId || null)
             .input('ApplicantCitizenIDExpiryDate', sql.Date, data.citizenIdExpiry || data.grantorCitizenIdExpiryDate || null)
             .input('ApplicantJuristicID', sql.NVarChar, data.juristicId || data.grantorJuristicId || null)
@@ -283,10 +297,10 @@ router.put('/:id', async (req, res) => {
             .input('SubmitFormTypeReplace', sql.Bit, data.submitFormType === 'replace' ? 1 : 0)
             .input('SubmitFormTypeOtherCheck', sql.Bit, data.submitFormType === 'other' ? 1 : 0)
             .input('SubmitFormOther', sql.NVarChar, data.submitFormOther || null)
-            .input('ProductName', sql.NVarChar, data.productName || null)
+            .input('ProductName', sql.NVarChar, data.productName !== undefined ? (data.productName || null) : (oldDoc.ProductName || null))
             .input('ProductReceiveNo', sql.NVarChar, data.productReceiveNo || null)
             .input('SubmitterIsOr', sql.Bit, data.submitterIsOr ? 1 : 0)
-            .input('ProductNameAlt', sql.NVarChar, data.productNameAlt || null)
+            .input('ProductNameAlt', sql.NVarChar, data.productNameAlt !== undefined ? (data.productNameAlt || null) : (oldDoc.ProductNameAlt || null))
             .input('HasRegNo', sql.Bit, data.hasRegNo ? 1 : 0)
             .input('RegNo', sql.NVarChar, data.regNo || null)
             .input('HasRegDetail', sql.Bit, data.hasRegDetail ? 1 : 0)
@@ -302,8 +316,49 @@ router.put('/:id', async (req, res) => {
             
             .input('AttachLicenseCopy', sql.Bit, data.attachLicenseCopy ? 1 : 0)
             
-            .input('Status', sql.NVarChar, data.status || 'ร่าง')
-            .query(`
+            .input('Status', sql.NVarChar, data.status || 'ร่าง');
+
+        if (data.status === 'ลูกค้าขอแก้ไข' && oldDoc.Status !== 'ลูกค้าขอแก้ไข') {
+            const maxVerResult = await pool.request()
+                .input('VerDocNo', sql.NVarChar, oldDoc.DocumentNo)
+                .query(`SELECT MAX(Version) as maxVer FROM HerbalCertDocuments WHERE DocumentNo = @VerDocNo`);
+            const newVersion = (maxVerResult.recordset[0].maxVer || 1) + 1;
+
+            sqlReq.input('Version', sql.Int, newVersion);
+            sqlReq.input('RefDocumentID', sql.Int, oldDoc.RefDocumentID || id);
+
+            const result = await sqlReq.query(`
+                INSERT INTO HerbalCertDocuments (
+                    DocumentNo, WrittenAt, DocumentDate, DocumentType, ContractID,
+                    ApplicantType, ApplicantPrefix, ApplicantName, ApplicantCitizenID, ApplicantCitizenIDExpiryDate, ApplicantJuristicID, LicenseNo, JuristicIDExpiryDate,
+                    OperatorPrefix, OperatorName, OperatorCitizenID, OperatorIDExpiryDate,
+                    EstablishmentName, EstAddressNo, EstBuilding, EstMoo, EstSoi, EstRoad, EstSubDistrict, EstDistrict, EstProvince, EstPostcode, EstPhone, EstFax, EstEmail,
+                    IsProducer, IsImporter, ProdTypeHerbalMedicine, ProdTypeTraditionalMed, ProdTypeDevMed, ProdTypeHealthProduct, ProdTypeCosmetic, ProdTypeDetail,
+                    RequestType, ReqTypeRegister, ReqTypeNotifyDetail, ReqTypeNotify, ReqTypeRenew,
+                    SubmitterIsIn, SubmitFormType, SubmitFormTypeAmend, SubmitFormTypeReplace, SubmitFormTypeOtherCheck, SubmitFormOther,
+                    ProductName, ProductReceiveNo, SubmitterIsOr, ProductNameAlt, HasRegNo, RegNo, HasRegDetail, RegDetailNo, HasNoticeNo, RegNoticeNo,
+                    ReceiptNo, RefProductNameThai, RefRegistrationNo, CertificateHolder, SignDate,
+                    AttachLicenseCopy,
+                    Version, RefDocumentID, Status, CreatedAt, UpdatedAt
+                ) OUTPUT INSERTED.DocumentID
+                VALUES (
+                    @DocumentNo, @WrittenAt, @DocumentDate, @DocumentType, @ContractID,
+                    @ApplicantType, @ApplicantPrefix, @ApplicantName, @ApplicantCitizenID, @ApplicantCitizenIDExpiryDate, @ApplicantJuristicID, @LicenseNo, @JuristicIDExpiryDate,
+                    @OperatorPrefix, @OperatorName, @OperatorCitizenID, @OperatorIDExpiryDate,
+                    @EstablishmentName, @EstAddressNo, @EstBuilding, @EstMoo, @EstSoi, @EstRoad, @EstSubDistrict, @EstDistrict, @EstProvince, @EstPostcode, @EstPhone, @EstFax, @EstEmail,
+                    @IsProducer, @IsImporter, @ProdTypeHerbalMedicine, @ProdTypeTraditionalMed, @ProdTypeDevMed, @ProdTypeHealthProduct, @ProdTypeCosmetic, @ProdTypeDetail,
+                    @RequestType, @ReqTypeRegister, @ReqTypeNotifyDetail, @ReqTypeNotify, @ReqTypeRenew,
+                    @SubmitterIsIn, @SubmitFormType, @SubmitFormTypeAmend, @SubmitFormTypeReplace, @SubmitFormTypeOtherCheck, @SubmitFormOther,
+                    @ProductName, @ProductReceiveNo, @SubmitterIsOr, @ProductNameAlt, @HasRegNo, @RegNo, @HasRegDetail, @RegDetailNo, @HasNoticeNo, @RegNoticeNo,
+                    @ReceiptNo, @RefProductNameThai, @RefRegistrationNo, @CertificateHolder, @SignDate,
+                    @AttachLicenseCopy,
+                    @Version, @RefDocumentID, @Status, GETDATE(), GETDATE()
+                )
+            `);
+            
+            return res.json({ success: true, message: 'Document updated (new version) successfully', documentId: result.recordset[0].DocumentID });
+        } else {
+            const result = await sqlReq.query(`
                 UPDATE HerbalCertDocuments SET
                     DocumentNo = @DocumentNo,
                     WrittenAt = @WrittenAt,
@@ -385,10 +440,11 @@ router.put('/:id', async (req, res) => {
                 WHERE DocumentID = @DocumentID
             `);
 
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ success: false, message: 'Document not found' });
+            if (result.rowsAffected[0] === 0) {
+                return res.status(404).json({ success: false, message: 'Document not found' });
+            }
+            res.json({ success: true, message: 'Document updated successfully' });
         }
-        res.json({ success: true, message: 'Document updated successfully' });
     } catch (err) {
         console.error('Error updating herbal cert document:', err);
         res.status(500).json({ success: false, message: 'Server error updating document', error: err.message });
@@ -402,7 +458,11 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
         const result = await pool.request()
             .input('DocumentID', sql.Int, id)
-            .query(`DELETE FROM HerbalCertDocuments WHERE DocumentID = @DocumentID`);
+            .query(`
+                DECLARE @RefID INT;
+                SELECT @RefID = ISNULL(RefDocumentID, DocumentID) FROM HerbalCertDocuments WHERE DocumentID = @DocumentID;
+                DELETE FROM HerbalCertDocuments WHERE DocumentID = @RefID OR RefDocumentID = @RefID;
+            `);
 
         if (result.rowsAffected[0] === 0) {
             return res.status(404).json({ success: false, message: 'Document not found' });
@@ -540,6 +600,39 @@ router.post('/:id/version', async (req, res) => {
     } catch (err) {
         console.error('Error creating new version:', err);
         res.status(500).json({ success: false, message: 'Server error creating new version', error: err.message });
+    }
+});
+
+
+// GET history by Document ID
+router.get('/history-by-id/:id', async (req, res) => {
+    try {
+        const { poolPromise, sql } = require('../config/db');
+        const pool = await poolPromise;
+        
+        // Ensure DocumentType exists in table structure or mock it
+        let docTypeField = 'DocumentType';
+        if ('HerbalCertDocuments' === 'SafetyCertDocuments' || 'HerbalCertDocuments' === 'PdpaConsentDocuments') {
+            docTypeField = 'NULL as DocumentType';
+        }
+        
+        const result = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`
+                DECLARE @RefID INT;
+                SELECT @RefID = ISNULL(RefDocumentID, DocumentID) FROM HerbalCertDocuments WHERE DocumentID = @id;
+                
+                SELECT DocumentID as DocumentID, Status, CreatedAt, Version
+                FROM HerbalCertDocuments
+                WHERE DocumentID = @RefID OR RefDocumentID = @RefID
+                ORDER BY Version DESC
+            `);
+        
+        // Since some tables don't have DocumentType column, we just return the row
+        res.json({ success: true, data: result.recordset });
+    } catch (err) {
+        console.error('Error fetching history by ID:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

@@ -7,7 +7,11 @@ router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT * FROM CorpRepDocuments 
+            SELECT * FROM (
+                SELECT *, ROW_NUMBER() OVER(PARTITION BY ISNULL(RefDocumentID, documentId) ORDER BY Version DESC) as rn
+                FROM CorpRepDocuments 
+            ) docs
+            WHERE rn = 1
             ORDER BY CreatedAt DESC
         `);
         res.json(result.recordset);
@@ -115,7 +119,7 @@ router.post('/', async (req, res) => {
                 RepPrefix, RepName, RepIdCard, RepCardExpiry,
                 RepAddrNo, RepBuilding, RepMoo, RepSoi, RepRoad,
                 RepSubDistrict, RepDistrict, RepProvince, RepZip,
-                RepPhone, RepEmail, EffectiveDate, Status
+                RepPhone, RepEmail, EffectiveDate, Status, Version
             )
             OUTPUT inserted.documentId, inserted.*
             VALUES (
@@ -132,7 +136,7 @@ router.post('/', async (req, res) => {
                 @RepPrefix, @RepName, @RepIdCard, @RepCardExpiry,
                 @RepAddrNo, @RepBuilding, @RepMoo, @RepSoi, @RepRoad,
                 @RepSubDistrict, @RepDistrict, @RepProvince, @RepZip,
-                @RepPhone, @RepEmail, @EffectiveDate, @Status
+                @RepPhone, @RepEmail, @EffectiveDate, @Status, 1
             )
         `;
         
@@ -151,10 +155,18 @@ router.put('/:id', async (req, res) => {
         const data = req.body;
         const pool = await poolPromise;
         
+        // Fetch current document
+        const currentDocResult = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT * FROM CorpRepDocuments WHERE documentId = @id`);
+        if (currentDocResult.recordset.length === 0) {
+            return res.status(404).json({ success: false, error: 'Document not found' });
+        }
+        const oldDoc = currentDocResult.recordset[0];
+
         const request = pool.request();
         
         request
-            .input('id', sql.Int, id)
             .input('contractId', sql.Int, data.contractId || null)
             .input('customerId', sql.Int, data.customerId || null)
             .input('WrittenAt', sql.NVarChar, data.writtenAt || null)
@@ -211,47 +223,151 @@ router.put('/:id', async (req, res) => {
             .input('EffectiveDate', sql.Date, data.effectiveDate || null)
             .input('Status', sql.NVarChar, data.status || 'ร่าง');
 
-        const updateQuery = `
-            UPDATE CorpRepDocuments
-            SET 
-                contractId = @contractId, customerId = @customerId,
-                WrittenAt = @WrittenAt, DocumentDate = @DocumentDate,
-                JuristicName = @JuristicName, JuristicRegNo = @JuristicRegNo, JuristicRegDate = @JuristicRegDate,
-                OfficeAddrNo = @OfficeAddrNo, OfficeBuilding = @OfficeBuilding, OfficeMoo = @OfficeMoo,
-                OfficeSoi = @OfficeSoi, OfficeRoad = @OfficeRoad,
-                OfficeSubDistrict = @OfficeSubDistrict, OfficeDistrict = @OfficeDistrict,
-                OfficeProvince = @OfficeProvince, OfficeZip = @OfficeZip,
-                OfficePhone = @OfficePhone, OfficeFax = @OfficeFax, OfficeEmail = @OfficeEmail,
-                SignatoryCount = @SignatoryCount,
-                Signatory1Prefix = @Signatory1Prefix, Signatory1Name = @Signatory1Name, Signatory1IdCard = @Signatory1IdCard, Signatory1CardExpiry = @Signatory1CardExpiry,
-                Signatory2Prefix = @Signatory2Prefix, Signatory2Name = @Signatory2Name, Signatory2IdCard = @Signatory2IdCard, Signatory2CardExpiry = @Signatory2CardExpiry,
-                Signatory3Prefix = @Signatory3Prefix, Signatory3Name = @Signatory3Name, Signatory3IdCard = @Signatory3IdCard, Signatory3CardExpiry = @Signatory3CardExpiry,
-                ReqTypeTorBor1 = @ReqTypeTorBor1, ReqTypeJorRor1 = @ReqTypeJorRor1,
-                ReqTypeJorJor1 = @ReqTypeJorJor1, ReqTypeTorOr = @ReqTypeTorOr,
-                ProductName = @ProductName, ReceiptNo = @ReceiptNo,
-                RepPrefix = @RepPrefix, RepName = @RepName, RepIdCard = @RepIdCard, RepCardExpiry = @RepCardExpiry,
-                RepAddrNo = @RepAddrNo, RepBuilding = @RepBuilding, RepMoo = @RepMoo,
-                RepSoi = @RepSoi, RepRoad = @RepRoad,
-                RepSubDistrict = @RepSubDistrict, RepDistrict = @RepDistrict,
-                RepProvince = @RepProvince, RepZip = @RepZip,
-                RepPhone = @RepPhone, RepEmail = @RepEmail,
-                EffectiveDate = @EffectiveDate,
-                Status = @Status,
-                UpdatedAt = GETDATE()
-            OUTPUT inserted.*
-            WHERE documentId = @id
-        `;
-        
-        const result = await request.query(updateQuery);
-        
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ success: false, error: 'Document not found' });
+        let queryStr = '';
+        if (data.status === 'ลูกค้าขอแก้ไข' && oldDoc.Status !== 'ลูกค้าขอแก้ไข') {
+            const refId = oldDoc.RefDocumentID || id;
+            const maxVerResult = await pool.request()
+                .input('refId', sql.Int, refId)
+                .query(`SELECT MAX(Version) as maxVer FROM CorpRepDocuments WHERE RefDocumentID = @refId OR documentId = @refId`);
+            const newVersion = (maxVerResult.recordset[0].maxVer || 1) + 1;
+            
+            request.input('Version', sql.Int, newVersion);
+            request.input('RefDocumentID', sql.Int, refId);
+
+            queryStr = `
+                INSERT INTO CorpRepDocuments (
+                    contractId, customerId, WrittenAt, DocumentDate,
+                    JuristicName, JuristicRegNo, JuristicRegDate,
+                    OfficeAddrNo, OfficeBuilding, OfficeMoo, OfficeSoi, OfficeRoad,
+                    OfficeSubDistrict, OfficeDistrict, OfficeProvince, OfficeZip,
+                    OfficePhone, OfficeFax, OfficeEmail,
+                    SignatoryCount, Signatory1Prefix, Signatory1Name, Signatory1IdCard, Signatory1CardExpiry,
+                    Signatory2Prefix, Signatory2Name, Signatory2IdCard, Signatory2CardExpiry,
+                    Signatory3Prefix, Signatory3Name, Signatory3IdCard, Signatory3CardExpiry,
+                    ReqTypeTorBor1, ReqTypeJorRor1, ReqTypeJorJor1, ReqTypeTorOr,
+                    ProductName, ReceiptNo,
+                    RepPrefix, RepName, RepIdCard, RepCardExpiry,
+                    RepAddrNo, RepBuilding, RepMoo, RepSoi, RepRoad,
+                    RepSubDistrict, RepDistrict, RepProvince, RepZip,
+                    RepPhone, RepEmail, EffectiveDate, Status, Version, RefDocumentID
+                )
+                OUTPUT inserted.*
+                VALUES (
+                    @contractId, @customerId, @WrittenAt, @DocumentDate,
+                    @JuristicName, @JuristicRegNo, @JuristicRegDate,
+                    @OfficeAddrNo, @OfficeBuilding, @OfficeMoo, @OfficeSoi, @OfficeRoad,
+                    @OfficeSubDistrict, @OfficeDistrict, @OfficeProvince, @OfficeZip,
+                    @OfficePhone, @OfficeFax, @OfficeEmail,
+                    @SignatoryCount, @Signatory1Prefix, @Signatory1Name, @Signatory1IdCard, @Signatory1CardExpiry,
+                    @Signatory2Prefix, @Signatory2Name, @Signatory2IdCard, @Signatory2CardExpiry,
+                    @Signatory3Prefix, @Signatory3Name, @Signatory3IdCard, @Signatory3CardExpiry,
+                    @ReqTypeTorBor1, @ReqTypeJorRor1, @ReqTypeJorJor1, @ReqTypeTorOr,
+                    @ProductName, @ReceiptNo,
+                    @RepPrefix, @RepName, @RepIdCard, @RepCardExpiry,
+                    @RepAddrNo, @RepBuilding, @RepMoo, @RepSoi, @RepRoad,
+                    @RepSubDistrict, @RepDistrict, @RepProvince, @RepZip,
+                    @RepPhone, @RepEmail, @EffectiveDate, @Status, @Version, @RefDocumentID
+                )
+            `;
+        } else {
+            request.input('id', sql.Int, id);
+            request.input('Version', sql.Int, oldDoc.Version || 1);
+            
+            queryStr = `
+                UPDATE CorpRepDocuments
+                SET 
+                    contractId = @contractId, customerId = @customerId,
+                    WrittenAt = @WrittenAt, DocumentDate = @DocumentDate,
+                    JuristicName = @JuristicName, JuristicRegNo = @JuristicRegNo, JuristicRegDate = @JuristicRegDate,
+                    OfficeAddrNo = @OfficeAddrNo, OfficeBuilding = @OfficeBuilding, OfficeMoo = @OfficeMoo,
+                    OfficeSoi = @OfficeSoi, OfficeRoad = @OfficeRoad,
+                    OfficeSubDistrict = @OfficeSubDistrict, OfficeDistrict = @OfficeDistrict,
+                    OfficeProvince = @OfficeProvince, OfficeZip = @OfficeZip,
+                    OfficePhone = @OfficePhone, OfficeFax = @OfficeFax, OfficeEmail = @OfficeEmail,
+                    SignatoryCount = @SignatoryCount,
+                    Signatory1Prefix = @Signatory1Prefix, Signatory1Name = @Signatory1Name, Signatory1IdCard = @Signatory1IdCard, Signatory1CardExpiry = @Signatory1CardExpiry,
+                    Signatory2Prefix = @Signatory2Prefix, Signatory2Name = @Signatory2Name, Signatory2IdCard = @Signatory2IdCard, Signatory2CardExpiry = @Signatory2CardExpiry,
+                    Signatory3Prefix = @Signatory3Prefix, Signatory3Name = @Signatory3Name, Signatory3IdCard = @Signatory3IdCard, Signatory3CardExpiry = @Signatory3CardExpiry,
+                    ReqTypeTorBor1 = @ReqTypeTorBor1, ReqTypeJorRor1 = @ReqTypeJorRor1,
+                    ReqTypeJorJor1 = @ReqTypeJorJor1, ReqTypeTorOr = @ReqTypeTorOr,
+                    ProductName = @ProductName, ReceiptNo = @ReceiptNo,
+                    RepPrefix = @RepPrefix, RepName = @RepName, RepIdCard = @RepIdCard, RepCardExpiry = @RepCardExpiry,
+                    RepAddrNo = @RepAddrNo, RepBuilding = @RepBuilding, RepMoo = @RepMoo,
+                    RepSoi = @RepSoi, RepRoad = @RepRoad,
+                    RepSubDistrict = @RepSubDistrict, RepDistrict = @RepDistrict,
+                    RepProvince = @RepProvince, RepZip = @RepZip,
+                    RepPhone = @RepPhone, RepEmail = @RepEmail,
+                    EffectiveDate = @EffectiveDate,
+                    Status = @Status,
+                    Version = @Version,
+                    UpdatedAt = GETDATE()
+                OUTPUT inserted.*
+                WHERE documentId = @id
+            `;
         }
         
-        res.status(200).json({ success: true, documentId: id, data: result.recordset[0] });
+        const result = await request.query(queryStr);
+        const returnedId = result.recordset[0].documentId;
+        
+        res.status(200).json({ success: true, documentId: returnedId, data: result.recordset[0] });
     } catch (err) {
         console.error('Error updating corp rep document:', err);
         res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+
+// GET history of a specific document number
+router.get('/history/:documentNo', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { documentNo } = req.params;
+        const result = await pool.request()
+            .input('DocumentNo', require('mssql').NVarChar, documentNo)
+            .query(`
+                SELECT ${idCol} as DocumentID, ${noCol} as DocumentNo, Status, CreatedAt, Version ${docTypeSelect}
+                FROM ${route.table}
+                WHERE ${noCol} = @DocumentNo
+                ORDER BY Version DESC
+            `);
+        
+        res.json({ success: true, data: result.recordset });
+    } catch (err) {
+        console.error('Error fetching document history:', err);
+        res.status(500).json({ success: false, message: 'Server error fetching document history', error: err.message });
+    }
+});
+
+
+// GET history by Document ID
+router.get('/history-by-id/:id', async (req, res) => {
+    try {
+        const { poolPromise, sql } = require('../config/db');
+        const pool = await poolPromise;
+        
+        // Ensure DocumentType exists in table structure or mock it
+        let docTypeField = 'DocumentType';
+        if ('CorpRepDocuments' === 'SafetyCertDocuments' || 'CorpRepDocuments' === 'PdpaConsentDocuments') {
+            docTypeField = 'NULL as DocumentType';
+        }
+        
+        const result = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`
+                DECLARE @RefID INT;
+                SELECT @RefID = ISNULL(RefDocumentID, documentId) FROM CorpRepDocuments WHERE documentId = @id;
+                
+                SELECT documentId as DocumentID, Status, CreatedAt, Version
+                FROM CorpRepDocuments
+                WHERE documentId = @RefID OR RefDocumentID = @RefID
+                ORDER BY Version DESC
+            `);
+        
+        // Since some tables don't have DocumentType column, we just return the row
+        res.json({ success: true, data: result.recordset });
+    } catch (err) {
+        console.error('Error fetching history by ID:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

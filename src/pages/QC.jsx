@@ -15,6 +15,7 @@ import { useProduction } from '../context/ProductionContext';
 import { useRnD } from '../context/RnDContext';
 import API_BASE from '../config';
 import { Search } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 import './QC.css';
 
@@ -672,12 +673,12 @@ export default function QC() {
                                     <div className="rnd-modal-info-grid">
                                         <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                             <label>สูตรที่ทดสอบ <span style={{ color: '#ef4444' }}>*</span></label>
-                                            <select style={fmtInput} value={testFormData.formulaId} onChange={e => setTestFormData({ ...testFormData, formulaId: e.target.value })}>
+                                            <CustomSelect style={fmtInput} value={testFormData.formulaId} onChange={e => setTestFormData({ ...testFormData, formulaId: e.target.value })}>
                                                 <option value="">-- เลือกสูตร --</option>
                                                 {formulas.filter(f => f.status === 'รอทดสอบ' || f.status === 'ร่าง' || f.status === 'ทดสอบไม่ผ่าน').map(f => (
                                                     <option key={f.id} value={f.id}>{f.id} — {f.name} [{f.status}]</option>
                                                 ))}
-                                            </select>
+                                            </CustomSelect>
                                         </div>
                                         <div className="rnd-modal-info-item">
                                             <label>ผู้ทดสอบ</label>
@@ -709,11 +710,11 @@ export default function QC() {
                                         </div>
                                         <div className="rnd-modal-info-item">
                                             <label>ผลรวม <span style={{ color: '#ef4444' }}>*</span></label>
-                                            <select style={fmtInput} value={testFormData.overallResult} onChange={e => setTestFormData({ ...testFormData, overallResult: e.target.value })}>
+                                            <CustomSelect style={fmtInput} value={testFormData.overallResult} onChange={e => setTestFormData({ ...testFormData, overallResult: e.target.value })}>
                                                 <option value="">-- เลือกผล --</option>
                                                 <option value="ผ่าน">✅ ผ่าน</option>
                                                 <option value="ไม่ผ่าน">❌ ไม่ผ่าน</option>
-                                            </select>
+                                            </CustomSelect>
                                         </div>
                                         <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                             <label>หมายเหตุ / รายละเอียดเพิ่มเติม</label>

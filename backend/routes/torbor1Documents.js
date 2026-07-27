@@ -243,12 +243,17 @@ router.post('/', async (req, res) => {
         const day = String(date.getDate()).padStart(2, '0');
         const prefix = `TB1-${year}${month}${day}-`;
         
-        const countResult = await pool.request()
-            .input('Prefix', sql.NVarChar, `${prefix}%`)
-            .query('SELECT COUNT(*) as count FROM TorBor1Documents WHERE DocumentNo LIKE @Prefix');
-        
-        const count = countResult.recordset[0].count + 1;
-        const documentNo = `${prefix}${String(count).padStart(3, '0')}`;
+        let documentNo;
+        if (data.status === 'พรีวิว') {
+            documentNo = `PREV-TB1-${Date.now()}`;
+        } else {
+            const countResult = await pool.request()
+                .input('Prefix', sql.NVarChar, `${prefix}%`)
+                .query('SELECT COUNT(*) as count FROM TorBor1Documents WHERE DocumentNo LIKE @Prefix');
+            
+            const count = countResult.recordset[0].count + 1;
+            documentNo = `${prefix}${String(count).padStart(3, '0')}`;
+        }
 
         const sqlReq = pool.request();
         sqlReq.input('DocumentNo', sql.NVarChar, documentNo);
@@ -287,6 +292,22 @@ router.put('/:id', async (req, res) => {
         }
         const oldDoc = docResult.recordset[0];
         
+        let finalDocumentNo = oldDoc.DocumentNo;
+        if (oldDoc.Status === 'พรีวิว' && data.status !== 'พรีวิว' && finalDocumentNo && finalDocumentNo.startsWith('PREV-')) {
+            const date = new Date();
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const prefix = `TB1-${year}${month}${day}-`;
+            
+            const countResult = await pool.request()
+                .input('Prefix', sql.NVarChar, `${prefix}%`)
+                .query('SELECT COUNT(*) as count FROM TorBor1Documents WHERE DocumentNo LIKE @Prefix');
+            
+            const count = countResult.recordset[0].count + 1;
+            finalDocumentNo = `${prefix}${String(count).padStart(3, '0')}`;
+        }
+        
         let queryStr = '';
         const sqlReq = pool.request();
         
@@ -294,9 +315,13 @@ router.put('/:id', async (req, res) => {
         
         if (data.status === 'ลูกค้าขอแก้ไข' && oldDoc.Status !== 'ลูกค้าขอแก้ไข') {
             // Auto versioning
-            sqlReq.input('Version', sql.Int, oldDoc.Version + 1);
+            const maxVerResult = await pool.request()
+                .input('VerDocNo', sql.NVarChar, oldDoc.DocumentNo || finalDocumentNo)
+                .query(`SELECT MAX(Version) as maxVer FROM TorBor1Documents WHERE DocumentNo = @VerDocNo`);
+            const newVersion = (maxVerResult.recordset[0].maxVer || 1) + 1;
+            sqlReq.input('Version', sql.Int, newVersion);
             sqlReq.input('RefDocumentID', sql.Int, oldDoc.RefDocumentID || id);
-            sqlReq.input('DocumentNo', sql.NVarChar, oldDoc.DocumentNo);
+            sqlReq.input('DocumentNo', sql.NVarChar, finalDocumentNo);
             sqlReq.input('DocumentType', sql.NVarChar, oldDoc.DocumentType);
             
             bindFields(sqlReq, data, true, oldDoc);
@@ -308,8 +333,9 @@ router.put('/:id', async (req, res) => {
             `;
         } else {
             sqlReq.input('DocumentID', sql.Int, id);
+            sqlReq.input('DocumentNo', sql.NVarChar, finalDocumentNo);
             bindFields(sqlReq, data, true, oldDoc);
-            queryStr = `UPDATE TorBor1Documents SET ${getUpdateFieldsStr()} WHERE DocumentID = @DocumentID`;
+            queryStr = `UPDATE TorBor1Documents SET DocumentNo = @DocumentNo, ${getUpdateFieldsStr()} WHERE DocumentID = @DocumentID`;
         }
 
         const result = await sqlReq.query(queryStr);
@@ -329,7 +355,11 @@ router.delete('/:id', async (req, res) => {
         const { id } = req.params;
         await pool.request()
             .input('DocumentID', sql.Int, id)
-            .query('DELETE FROM TorBor1Documents WHERE DocumentID = @DocumentID OR RefDocumentID = @DocumentID');
+            .query(`
+                DECLARE @RefID INT;
+                SELECT @RefID = ISNULL(RefDocumentID, DocumentID) FROM TorBor1Documents WHERE DocumentID = @DocumentID;
+                DELETE FROM TorBor1Documents WHERE DocumentID = @RefID OR RefDocumentID = @RefID;
+            `);
         res.json({ success: true, message: 'Document deleted' });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Server error', error: err.message });
@@ -389,6 +419,61 @@ router.get('/:documentNo/versions', async (req, res) => {
         res.json({ success: true, data: result.recordset });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    }
+});
+
+
+// GET history of a specific document number
+router.get('/history/:documentNo', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { documentNo } = req.params;
+        const result = await pool.request()
+            .input('DocumentNo', require('mssql').NVarChar, documentNo)
+            .query(`
+                SELECT DocumentID, DocumentNo, Status, CreatedAt, Version, DocumentType
+                FROM TorBor1Documents
+                WHERE DocumentNo = @DocumentNo
+                ORDER BY Version DESC
+            `);
+        
+        res.json({ success: true, data: result.recordset });
+    } catch (err) {
+        console.error('Error fetching document history:', err);
+        res.status(500).json({ success: false, message: 'Server error fetching document history', error: err.message });
+    }
+});
+
+
+// GET history by Document ID
+router.get('/history-by-id/:id', async (req, res) => {
+    try {
+        const { poolPromise, sql } = require('../config/db');
+        const pool = await poolPromise;
+        
+        // Ensure DocumentType exists in table structure or mock it
+        let docTypeField = 'DocumentType';
+        if ('TorBor1Documents' === 'SafetyCertDocuments' || 'TorBor1Documents' === 'PdpaConsentDocuments') {
+            docTypeField = 'NULL as DocumentType';
+        }
+        
+        const result = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`
+                DECLARE @RefID INT;
+                SELECT @RefID = ISNULL(RefDocumentID, DocumentID) FROM TorBor1Documents WHERE DocumentID = @id;
+                
+                SELECT DocumentID as DocumentID, Status, CreatedAt, Version
+                FROM TorBor1Documents
+                WHERE DocumentID = @RefID OR RefDocumentID = @RefID
+                ORDER BY Version DESC
+            `);
+        
+        // Since some tables don't have DocumentType column, we just return the row
+        res.json({ success: true, data: result.recordset });
+    } catch (err) {
+        console.error('Error fetching history by ID:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

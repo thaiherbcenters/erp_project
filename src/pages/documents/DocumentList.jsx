@@ -4,7 +4,8 @@ import { Search, ChevronDown, UploadCloud, Edit2, Loader, Eye, Download, Trash2,
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../components/CustomAlert';
 import { DOCUMENT_PARTS, DOCUMENT_CATEGORIES } from '../documentData';
-import API_BASE from '../../config';
+import API_BASE from '../../config';import CustomSelect from '../../components/CustomSelect';
+
 
 // Shared Utilities
 export const getCategoryShortName = (catId) => {
@@ -619,7 +620,7 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                                     <div className="doc-upload-form-group">
                                         <label className="doc-upload-label">หมวดเอกสาร <span className="required">*</span></label>
-                                        <select
+                                        <CustomSelect
                                             className="doc-upload-input"
                                             value={uploadCategory}
                                             onChange={(e) => setUploadCategory(e.target.value)}
@@ -629,11 +630,11 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                                             {DOCUMENT_CATEGORIES.map(cat => (
                                                 <option key={cat.id} value={cat.id}>{cat.shortName} — {cat.name}</option>
                                             ))}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="doc-upload-form-group">
                                         <label className="doc-upload-label">ประเภทเอกสาร</label>
-                                        <select
+                                        <CustomSelect
                                             className="doc-upload-input"
                                             value={uploadTypeTag}
                                             onChange={(e) => setUploadTypeTag(e.target.value)}
@@ -642,7 +643,7 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                                             <option value="SOP">SOP</option>
                                             <option value="WI">WI</option>
                                             <option value="Form">Form</option>
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                 </div>
 
@@ -650,7 +651,7 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '14px' }}>
                                     <div className="doc-upload-form-group">
                                         <label className="doc-upload-label">มาตรฐาน</label>
-                                        <select
+                                        <CustomSelect
                                             className="doc-upload-input"
                                             value={uploadStandard}
                                             onChange={(e) => setUploadStandard(e.target.value)}
@@ -659,7 +660,7 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                                             {availableStandards.map(std => (
                                                 <option key={std} value={std}>{std}</option>
                                             ))}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="doc-upload-form-group">
                                         <label className="doc-upload-label">Rev.</label>

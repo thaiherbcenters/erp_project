@@ -1,30 +1,28 @@
 const sql = require('mssql');
-require('dotenv').config({ path: './.env' });
+require('dotenv').config();
+
 const config = {
-    server: process.env.DB_SERVER,
-    database: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
-    options: { trustServerCertificate: true, encrypt: false }
+    server: process.env.DB_SERVER,
+    database: process.env.DB_NAME,
+    options: {
+        encrypt: false,
+        trustServerCertificate: true
+    }
 };
 
-async function fix() {
+async function main() {
     try {
-        const pool = await sql.connect(config);
-        
-        // Rename folder_id to id in DocumentLibraryFolders
-        await pool.request().query("EXEC sp_rename 'DocumentLibraryFolders.folder_id', 'id', 'COLUMN';");
-        console.log('Renamed folder_id -> id in DocumentLibraryFolders');
-
-        // Rename document_id to id in DocumentLibrary
-        await pool.request().query("EXEC sp_rename 'DocumentLibrary.document_id', 'id', 'COLUMN';");
-        console.log('Renamed document_id -> id in DocumentLibrary');
+        let pool = await sql.connect(config);
+        await pool.request().query('ALTER TABLE TaxInvoice ADD Revision INT NOT NULL DEFAULT 0, UpdatedAt DATETIME NULL');
+        console.log("Success adding Revision and UpdatedAt to TaxInvoice");
         
         process.exit(0);
-    } catch (e) {
-        // Ignore errors if already renamed
-        console.log(e.message);
-        process.exit(0);
+    } catch (err) {
+        console.error("Error:", err);
+        process.exit(1);
     }
 }
-fix();
+
+main();

@@ -19,8 +19,10 @@ import {
 } from 'lucide-react';
 import PermissionManager from './PermissionManager';
 import TemplateUploader from '../components/TemplateUploader';
+import CustomDatePicker from '../components/CustomDatePicker';
 import './Settings.css';
-import API_BASE from '../config';
+import API_BASE from '../config';import CustomSelect from '../components/CustomSelect';
+
 const API = API_BASE;
 
 
@@ -732,7 +734,7 @@ function UserFormModal({ title, departments, roles, user, onClose, onSave, isCre
                     )}
                     <div className="settings-field">
                         <label>แผนก</label>
-                        <select value={form.department} onChange={e => {
+                        <CustomSelect value={form.department} onChange={e => {
                             const newDept = e.target.value;
                             const deptRoles = getAvailableRoles(newDept);
                             const newRole = deptRoles.some(r => r.role_code === form.role)
@@ -744,16 +746,16 @@ function UserFormModal({ title, departments, roles, user, onClose, onSave, isCre
                             {departments.map(d => (
                                 <option key={d.dept_code} value={d.dept_code}>{d.dept_code} — {d.dept_name}</option>
                             ))}
-                        </select>
+                        </CustomSelect>
                     </div>
                     <div className="settings-field">
                         <label>ตำแหน่ง (Role)</label>
-                        <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
+                        <CustomSelect value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
                             <option value="">— เลือกตำแหน่ง —</option>
                             {availableRoles.map(r => (
                                 <option key={r.role_code} value={r.role_code}>{r.role_name}</option>
                             ))}
-                        </select>
+                        </CustomSelect>
                     </div>
                 </div>
                 <div className="settings-modal-footer">
@@ -1018,7 +1020,7 @@ function AuditLogTab() {
                         onChange={e => setFilters({ ...filters, username: e.target.value })}
                         onKeyDown={e => e.key === 'Enter' && handleFilter()} />
                 </div>
-                <select className="settings-filter-select" value={filters.action}
+                <CustomSelect className="settings-filter-select" value={filters.action}
                     onChange={e => { setFilters({ ...filters, action: e.target.value }); setPage(1); }}>
                     <option value="">ทุก Action</option>
                     <option value="LOGIN">LOGIN</option>
@@ -1027,19 +1029,19 @@ function AuditLogTab() {
                     <option value="CREATE">CREATE</option>
                     <option value="UPDATE">UPDATE</option>
                     <option value="DELETE">DELETE</option>
-                </select>
-                <select className="settings-filter-select" value={filters.module}
+                </CustomSelect>
+                <CustomSelect className="settings-filter-select" value={filters.module}
                     onChange={e => { setFilters({ ...filters, module: e.target.value }); setPage(1); }}>
                     <option value="">ทุก Module</option>
                     <option value="auth">auth</option>
                     <option value="quotations">quotations</option>
                     <option value="stock">stock</option>
                     <option value="users">users</option>
-                </select>
-                <input type="date" className="settings-filter-date" value={filters.from}
+                </CustomSelect>
+                <CustomDatePicker className="settings-filter-date" value={filters.from}
                     onChange={e => setFilters({ ...filters, from: e.target.value })} />
                 <span style={{ color: '#94a3b8', alignSelf: 'center' }}>ถึง</span>
-                <input type="date" className="settings-filter-date" value={filters.to}
+                <CustomDatePicker className="settings-filter-date" value={filters.to}
                     onChange={e => setFilters({ ...filters, to: e.target.value })} />
                 <button className="settings-add-btn" onClick={handleFilter} style={{ padding: '8px 16px' }}>
                     <Search size={14} /> ค้นหา

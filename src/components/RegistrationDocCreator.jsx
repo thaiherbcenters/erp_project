@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ArrowLeft, FileText, Users, FileSignature, ChevronDown, Check, Save, Printer, Loader2 } from 'lucide-react';
 import { useAlert } from './CustomAlert';
 import { PDFDocument } from 'pdf-lib';
@@ -20,22 +20,28 @@ import SafetyCertForm from './SafetyCertForm';
  * - แสดงฟอร์มตามประเภทที่เลือก
  */
 import { DOC_TYPES } from '../constants';
+import CustomSelect from './CustomSelect';
 
-const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = null }) => {
+const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = null, editingDocGroup = null }) => {
     const { showAlert, showConfirm, showLoading, hideLoading } = useAlert();
     const [customers, setCustomers] = useState([]);
     const [contracts, setContracts] = useState([]);
     const [selectedCustomerId, setSelectedCustomerId] = useState('');
     const [selectedContractId, setSelectedContractId] = useState('');
-    const [selectedDocTypes, setSelectedDocTypes] = useState(editingDocType ? [editingDocType] : []);
-    const [activeTabId, setActiveTabId] = useState(editingDocType || '');
+    const [selectedDocTypes, setSelectedDocTypes] = useState(
+        editingDocGroup ? editingDocGroup.map(g => g.type) : (editingDocType ? [editingDocType] : [])
+    );
+    const [activeTabId, setActiveTabId] = useState(
+        editingDocGroup && editingDocGroup.length > 0 ? editingDocGroup[0].type : (editingDocType || '')
+    );
     const [customerData, setCustomerData] = useState(null);
     const [customerSearch, setCustomerSearch] = useState('');
     const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-    const [sharedFormData, setSharedFormData] = useState({ writtenAt: '', documentDate: '' });
+    const [sharedFormData, setSharedFormData] = useState({ writtenAt: undefined, documentDate: undefined });
     const [draggedTab, setDraggedTab] = useState(null);
     const [docVersion, setDocVersion] = useState(1);
     const [docStatus, setDocStatus] = useState('ร่าง');
+    const [initialStatus, setInitialStatus] = useState('ร่าง');
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
     const statusDropdownRef = useRef(null);
     
@@ -64,12 +70,16 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
     const safetyCertFormRef = useRef(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isPrinting, setIsPrinting] = useState(false);
+    const [showPrintModal, setShowPrintModal] = useState(false);
 
-    const collectAllFormData = () => {
+    const collectAllFormData = (mode = 'all') => {
         const collectedData = [];
         
-        // เรียงลำดับเอกสารตาม selectedDocTypes ซึ่งเรียงตาม Tab ที่ผู้ใช้จัดเรียงไว้
-        for (const typeId of selectedDocTypes) {
+        // ถ้าพิมพ์หน้าปัจจุบัน ให้ดึงแค่หน้าเดียว
+        const tabsToCollect = mode === 'current' ? [activeTabId] : selectedDocTypes;
+        
+        // เรียงลำดับเอกสารตาม tabsToCollect
+        for (const typeId of tabsToCollect) {
             if (typeId === 'poa' && poaFormRef.current) {
                 collectedData.push(poaFormRef.current.getFormData());
             } else if (typeId === 'herbal_cert' && herbalCertFormRef.current) {
@@ -122,7 +132,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                     : `${endpointBase}`;
                     
                 // กำหนดสถานะตามที่ผู้ใช้เลือก (ยกเว้นกรณีพิมพ์พรีวิวสำหรับเอกสารเดิม จะไม่เปลี่ยนสถานะ)
-                const payload = { ...data, documentType: type };
+                const payload = { ...data, documentType: type, contractId: selectedContractId || null, ContractID: selectedContractId || null, customerId: selectedCustomerId || null, CustomerID: selectedCustomerId || null };
                 if (status) {
                     if (isUpdate && status === 'พรีวิว') {
                         payload.status = docStatus;
@@ -168,8 +178,9 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
         return results;
     };
 
-    const handlePrintAll = async () => {
-        const allData = collectAllFormData();
+    const handlePrint = async (mode = 'all') => {
+        setShowPrintModal(false);
+        const allData = collectAllFormData(mode);
         if (allData.length === 0) {
             showAlert('แจ้งเตือน', 'กรุณาเลือกประเภทเอกสารที่ต้องการพิมพ์', 'warning');
             return;
@@ -186,10 +197,12 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                 try {
                     const checkRes = await fetch(`${API_BASE}/print/check-template/${item.type}`);
                     const checkData = await checkRes.json();
-                    if (checkData.exists) {
-                        validData.push(item);
-                    } else {
+                    if (checkRes.ok && checkData.exists === false) {
                         missingTemplates.push(`• ${docName}`);
+                    } else {
+                        // If it exists, or if there's an API error (e.g. 401 token expired),
+                        // we let it pass to validData. The actual error will be caught during the print POST request.
+                        validData.push(item);
                     }
                 } catch (e) {
                     // ถ้าเช็คไม่ได้ สมมติว่ามีไปก่อนแล้วค่อยไปดักตอน error สร้าง PDF ทีหลัง
@@ -346,7 +359,13 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
         try {
             const res = await fetch(`${API_BASE}/customers/${customer.CustomerID}`);
             const json = await res.json();
-            if (json.success) setCustomerData(json.data);
+            if (json.success) {
+                setCustomerData(json.data);
+                // ถ้าเป็น OEM บุคคลธรรมดา → เอา corp_rep ออกจากรายการที่เลือกไว้ (ถ้ามี)
+                if (json.data.CustomerTypeName === 'OEM บุคคลธรรมดา') {
+                    setSelectedDocTypes(prev => prev.filter(id => id !== 'corp_rep'));
+                }
+            }
         } catch (err) { console.error('Error:', err); }
     };
 
@@ -362,54 +381,82 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
 
     // Fetch document data if editing
     useEffect(() => {
-        if (editingDocId && editingDocType) {
-            const fetchDoc = async () => {
-                try {
-                    let endpoint = `${API_BASE}/legal-documents`;
-                    if (editingDocType === 'herbal_cert') {
-                        endpoint = `${API_BASE}/herbal-cert-documents`;
-                    }
-                    const res = await fetch(`${endpoint}/${editingDocId}`);
-                    const json = await res.json();
-                    if (json.success && json.data) {
-                        const doc = json.data;
-                        setDocVersion(doc.Version || 1);
-                        setDocStatus(doc.Status || 'ร่าง');
-                        if (doc.ContractID) {
-                            setSelectedContractId(doc.ContractID);
-                        }
-                        const name = doc.GrantorName || doc.ApplicantName || (doc.Data && (doc.Data.licenseeName || doc.Data.applicantName));
-                        if (name) {
-                            setCustomerSearch(name);
-                            // Fetch customers to find full details
-                            fetch(`${API_BASE}/customers`)
-                                .then(res => res.json())
-                                .then(cJson => {
-                                    if (cJson.success) {
-                                        const cust = cJson.data.find(c => c.CustomerName === name);
-                                        if (cust) {
-                                            setSelectedCustomerId(cust.CustomerID);
-                                            fetch(`${API_BASE}/customers/${cust.CustomerID}`)
-                                                .then(r => r.json())
-                                                .then(d => {
-                                                    if (d.success) setCustomerData(d.data);
-                                                });
-                                        } else {
-                                            setCustomerData({ CustomerName: name });
-                                        }
-                                    }
-                                }).catch(() => {
-                                    setCustomerData({ CustomerName: name });
-                                });
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error fetching edit doc:', err);
+        const fetchDocData = async (docId, docType) => {
+            try {
+                let endpoint = `${API_BASE}/legal-documents`;
+                if (docType === 'herbal_cert') {
+                    endpoint = `${API_BASE}/herbal-cert-documents`;
+                } else if (docType === 'torbor1') {
+                    endpoint = `${API_BASE}/torbor1-documents`;
+                } else if (docType === 'safety_cert') {
+                    endpoint = `${API_BASE}/safety-cert-documents`;
+                } else if (docType === 'pdpa_consent') {
+                    endpoint = `${API_BASE}/pdpa-consent-documents`;
+                } else if (docType === 'contract_mfg') {
+                    endpoint = `${API_BASE}/contract-mfg-documents`;
                 }
-            };
-            fetchDoc();
+                const res = await fetch(`${endpoint}/${docId}`);
+                const json = await res.json();
+                if (json.success && json.data) {
+                    const doc = json.data;
+                    setDocVersion(doc.Version || 1);
+                    setDocStatus(doc.Status || 'ร่าง');
+                    setInitialStatus(doc.Status || 'ร่าง');
+                    if (doc.ContractID) {
+                        setSelectedContractId(doc.ContractID);
+                    }
+                    
+                    // Set shared form data
+                    setSharedFormData({
+                        writtenAt: doc.WrittenAt || doc.WrittenAtCompany || undefined,
+                        documentDate: doc.DocumentDate ? new Date(doc.DocumentDate).toISOString().split('T')[0] : undefined
+                    });
+
+                    const name = doc.GrantorName || doc.ApplicantName || (doc.Data && (doc.Data.licenseeName || doc.Data.applicantName)) || doc.EmployerName;
+                    if (name) {
+                        setCustomerSearch(name);
+                        // Fetch customers to find full details
+                        fetch(`${API_BASE}/customers`)
+                            .then(res => res.json())
+                            .then(cJson => {
+                                if (cJson.success) {
+                                    const cust = cJson.data.find(c => c.CustomerName === name);
+                                    if (cust) {
+                                        setSelectedCustomerId(cust.CustomerID);
+                                        fetch(`${API_BASE}/customers/${cust.CustomerID}`)
+                                            .then(r => r.json())
+                                            .then(d => {
+                                                if (d.success) setCustomerData(d.data);
+                                            });
+                                    } else {
+                                        setCustomerData({ CustomerName: name });
+                                    }
+                                }
+                            }).catch(() => {
+                                setCustomerData({ CustomerName: name });
+                            });
+                    }
+                }
+            } catch (err) {
+                console.error('Error fetching edit doc:', err);
+            }
+        };
+
+        if (editingDocGroup && editingDocGroup.length > 0) {
+            const firstDoc = editingDocGroup[0];
+            fetchDocData(firstDoc.id, firstDoc.type);
+        } else if (editingDocId && editingDocType) {
+            fetchDocData(editingDocId, editingDocType);
         }
-    }, [editingDocId, editingDocType]);
+    }, [editingDocId, editingDocType, editingDocGroup]);
+
+    const getEditingDocId = (type) => {
+        if (editingDocGroup) {
+            const found = editingDocGroup.find(g => g.type === type);
+            return found ? found.id : null;
+        }
+        return editingDocType === type ? editingDocId : null;
+    };
 
     // Handle document type togglection
     const toggleDocType = (typeId) => {
@@ -451,6 +498,17 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
             (c.CustomerName || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
             (c.CustomerCode || '').toLowerCase().includes(customerSearch.toLowerCase())
         );
+
+    // Filter doc types based on customer type
+    const filteredDocTypes = useMemo(() => {
+        if (!customerData || !customerData.CustomerTypeName) return DOC_TYPES;
+        const typeName = customerData.CustomerTypeName;
+        // OEM บุคคลธรรมดา → ไม่แสดง "หนังสือแต่งตั้งผู้แทนนิติบุคคล" (corp_rep)
+        if (typeName === 'OEM บุคคลธรรมดา') {
+            return DOC_TYPES.filter(dt => dt.id !== 'corp_rep');
+        }
+        return DOC_TYPES;
+    }, [customerData]);
 
     const cardStyle = {
         background: '#fff',
@@ -547,9 +605,18 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
             <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
                 <button
                     onClick={onBack}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', fontSize: '14px', color: '#475569' }}
+                    style={{ 
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', 
+                        fontSize: '16px', fontWeight: 'bold', 
+                        backgroundColor: '#f59e0b', color: '#ffffff', 
+                        border: 'none', borderRadius: '8px', cursor: 'pointer',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d97706'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f59e0b'}
                 >
-                    <ArrowLeft size={16} /> กลับ
+                    <ArrowLeft size={20} /> กลับสู่หน้ารายการ
                 </button>
                 <div>
                     <h2 style={{ margin: 0, fontSize: '22px', fontWeight: '700', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -601,7 +668,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                     {/* Contract Dropdown */}
                     <div>
                         <label style={labelStyle}>อ้างอิงสัญญา (เลือกจากระบบ)</label>
-                        <select
+                        <CustomSelect
                             style={{ ...inputStyle, appearance: 'auto' }}
                             value={selectedContractId}
                             onChange={e => setSelectedContractId(e.target.value)}
@@ -612,7 +679,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                     {c.ContractNo} - {c.ContractName}
                                 </option>
                             ))}
-                        </select>
+                        </CustomSelect>
                     </div>
                 </div>
 
@@ -622,10 +689,11 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                         <div style={{ fontSize: '13px', fontWeight: '600', color: '#0369a1', marginBottom: '8px' }}>📋 ข้อมูลลูกค้าที่เลือก</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '13px', color: '#334155' }}>
                             <div><b>ชื่อ:</b> {customerData.CustomerName}</div>
+                            <div><b>ประเภท:</b> <span style={{ padding: '2px 8px', borderRadius: '4px', background: '#dbeafe', color: '#1e40af', fontWeight: '600', fontSize: '12px' }}>{customerData.CustomerTypeName || '-'}</span></div>
                             <div><b>โทร:</b> {customerData.Phone || '-'}</div>
                             <div><b>อีเมล:</b> {customerData.Email || '-'}</div>
                             <div><b>เลขภาษี:</b> {customerData.TaxID || '-'}</div>
-                            <div style={{ gridColumn: '2 / 4' }}><b>ที่อยู่:</b> {customerData.Address || '-'}</div>
+                            <div><b>ที่อยู่:</b> {customerData.Address || '-'}</div>
                         </div>
                     </div>
                 )}
@@ -638,7 +706,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                     สามารถเลือกได้มากกว่า 1 ประเภท ฟอร์มจะแสดงด้านล่างตามที่เลือก
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                    {DOC_TYPES.map(dt => {
+                    {filteredDocTypes.map(dt => {
                         const isSelected = selectedDocTypes.includes(dt.id);
                         return (
                             <div
@@ -664,7 +732,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                 </div>
                                 <div>
                                     <div style={{ fontSize: '15px', fontWeight: '600', color: '#1e293b' }}>
-                                        {dt.icon} {dt.name}
+                                        {dt.name}
                                     </div>
                                     <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
                                         {dt.description}
@@ -719,7 +787,6 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                         position: 'relative'
                                     }}
                                 >
-                                    <span style={{ fontSize: '18px' }}>{dt.icon}</span> 
                                     <span style={{ fontSize: '15px' }}>{dt.name}</span>
                                 </div>
                             );
@@ -732,7 +799,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                 <div style={{ padding: '0' }}>
                                     <PowerOfAttorneyForm
                                         ref={poaFormRef}
-                                        documentId={editingDocType === 'poa' ? editingDocId : null}
+                                        documentId={getEditingDocId('poa')}
                                         onBack={null}
                                         customerData={customerData}
                                         contractId={selectedContractId}
@@ -751,7 +818,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                 <div style={{ padding: '0' }}>
                                     <HerbalCertForm
                                         ref={herbalCertFormRef}
-                                        documentId={editingDocType === 'herbal_cert' ? editingDocId : null}
+                                        documentId={getEditingDocId('herbal_cert')}
                                         customerData={customerData}
                                         contractId={selectedContractId}
                                         embedded={true}
@@ -769,7 +836,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                 <div style={{ padding: '0' }}>
                                     <TorBor1Form
                                         ref={torbor1FormRef}
-                                        documentId={editingDocType === 'torbor1' ? editingDocId : null}
+                                        documentId={getEditingDocId('torbor1')}
                                         customerData={customerData}
                                         contractId={selectedContractId}
                                         embedded={true}
@@ -787,7 +854,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                 <div style={{ padding: '0' }}>
                                     <ContractMfgForm
                                         ref={contractMfgFormRef}
-                                        documentId={editingDocType === 'contract_mfg' ? editingDocId : null}
+                                        documentId={getEditingDocId('contract_mfg')}
                                         customerData={customerData}
                                         contractId={selectedContractId}
                                         embedded={true}
@@ -805,7 +872,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                 <div style={{ padding: '0' }}>
                                     <PdpaConsentForm
                                         ref={pdpaConsentFormRef}
-                                        documentId={editingDocType === 'pdpa_consent' ? editingDocId : null}
+                                        documentId={getEditingDocId('pdpa_consent')}
                                         customerData={customerData}
                                         contractId={selectedContractId}
                                         embedded={true}
@@ -823,7 +890,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                 <div style={{ padding: '0' }}>
                                     <CorpRepForm
                                         ref={corpRepFormRef}
-                                        documentId={editingDocType === 'corp_rep' ? editingDocId : null}
+                                        documentId={getEditingDocId('corp_rep')}
                                         customerData={customerData}
                                         contractId={selectedContractId}
                                         embedded={true}
@@ -841,7 +908,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                 <div style={{ padding: '0' }}>
                                     <SafetyCertForm
                                         ref={safetyCertFormRef}
-                                        documentId={editingDocType === 'safety_cert' ? editingDocId : null}
+                                        documentId={getEditingDocId('safety_cert')}
                                         customerData={customerData}
                                         contractId={selectedContractId}
                                         embedded={true}
@@ -849,6 +916,24 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                                         onSharedDataChange={handleSharedDataChange}
                                     />
                                 </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="doc-tab-content" style={{ display: activeTabId === 'product_photo' ? 'block' : 'none' }}>
+                        {selectedDocTypes.includes('product_photo') && (
+                            <div className="print-page-break" style={{ ...cardStyle, padding: '40px', textAlign: 'center', marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: '4px solid #6366f1' }}>
+                                <h3>📸 รูปถ่ายผลิตภัณฑ์สมุนไพร</h3>
+                                <p style={{ color: '#64748b', marginTop: '10px' }}>อยู่ระหว่างการพัฒนา (กำลังพัฒนา)</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <div className="doc-tab-content" style={{ display: activeTabId === 'product_label' ? 'block' : 'none' }}>
+                        {selectedDocTypes.includes('product_label') && (
+                            <div className="print-page-break" style={{ ...cardStyle, padding: '40px', textAlign: 'center', marginTop: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTop: '4px solid #f43f5e' }}>
+                                <h3>🏷️ ฉลากผลิตภัณฑ์</h3>
+                                <p style={{ color: '#64748b', marginTop: '10px' }}>อยู่ระหว่างการพัฒนา (กำลังพัฒนา)</p>
                             </div>
                         )}
                     </div>
@@ -991,12 +1076,14 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                             )}
                         </div>
                     </div>
-                    <button onClick={handlePrintAll} disabled={isSaving || isPrinting} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>
-                        <Printer size={18} /> {isPrinting ? 'กำลังสร้าง PDF...' : 'พรีวิว / พิมพ์ทั้งหมด'}
+                    <button onClick={() => setShowPrintModal(true)} disabled={isSaving || isPrinting} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>
+                        <Printer size={18} /> {isPrinting ? 'กำลังสร้าง PDF...' : 'พรีวิว / พิมพ์'}
                     </button>
-                    <button onClick={handleSaveAll} disabled={isSaving || isPrinting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>
-                        <Save size={18} /> {isSaving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
-                    </button>
+                    {!(initialStatus === 'ลูกค้าลงนามแล้ว' && docStatus === 'ลูกค้าลงนามแล้ว') && (
+                        <button onClick={handleSaveAll} disabled={isSaving || isPrinting} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>
+                            <Save size={18} /> {isSaving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -1034,6 +1121,26 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                             <div style={{ fontSize: '14px', color: '#64748b' }}>
                                 กรุณารอสักครู่ ระบบกำลังประมวลผล
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Print Options Modal */}
+            {showPrintModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '8px', minWidth: '350px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                        <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '18px', color: '#333' }}>เลือกรูปแบบการพิมพ์</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <button onClick={() => handlePrint('current')} className="btn-primary" style={{ padding: '10px', fontSize: '16px', fontWeight: 'bold' }}>
+                                พิมพ์เฉพาะหน้าปัจจุบัน
+                            </button>
+                            <button onClick={() => handlePrint('all')} className="btn-secondary" style={{ padding: '10px', fontSize: '16px', fontWeight: 'bold' }}>
+                                พิมพ์เอกสารทั้งหมด
+                            </button>
+                            <button onClick={() => setShowPrintModal(false)} style={{ padding: '10px', backgroundColor: '#f1f1f1', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', marginTop: '8px', fontSize: '16px' }}>
+                                ยกเลิก
+                            </button>
                         </div>
                     </div>
                 </div>

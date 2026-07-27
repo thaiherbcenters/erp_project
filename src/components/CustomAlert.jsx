@@ -36,6 +36,12 @@ export function AlertProvider({ children }) {
         });
     }, []);
 
+    const showPrompt = useCallback((title, message, defaultValue = '', type = 'info') => {
+        return new Promise((resolve) => {
+            setModal({ title, message, type, mode: 'prompt', resolve, defaultValue });
+        });
+    }, []);
+
     const showLoading = useCallback((title = 'กำลังโหลด...', message = 'กรุณารอสักครู่') => {
         setModal({ title, message, type: 'info', mode: 'loading' });
     }, []);
@@ -60,14 +66,14 @@ export function AlertProvider({ children }) {
     };
 
     return (
-        <AlertContext.Provider value={{ showAlert, showConfirm, showLoading, hideLoading }}>
+        <AlertContext.Provider value={{ showAlert, showConfirm, showPrompt, showLoading, hideLoading }}>
             {children}
             {modal && (
-                <div className="custom-alert-overlay" onClick={() => handleClose(false)}>
+                <div className="custom-alert-overlay" onClick={() => modal.mode !== 'loading' && handleClose(modal.mode === 'prompt' ? null : false)}>
                     <div className={`custom-alert-modal custom-alert-${modal.type}`} onClick={(e) => e.stopPropagation()}>
                         {/* Close button - Hide if loading */}
                         {modal.mode !== 'loading' && (
-                            <button className="custom-alert-close" onClick={() => handleClose(false)}>
+                            <button className="custom-alert-close" onClick={() => handleClose(modal.mode === 'prompt' ? null : false)}>
                                 <X size={18} />
                             </button>
                         )}
@@ -81,20 +87,40 @@ export function AlertProvider({ children }) {
                         <div className="custom-alert-content">
                             <h3 className="custom-alert-title">{modal.title}</h3>
                             <p className="custom-alert-message">{modal.message}</p>
+                            {modal.mode === 'prompt' && (
+                                <input
+                                    type="text"
+                                    id="custom-prompt-input"
+                                    defaultValue={modal.defaultValue}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleClose(e.target.value);
+                                        if (e.key === 'Escape') handleClose(null);
+                                    }}
+                                    autoFocus
+                                    style={{ marginTop: '12px', width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', outline: 'none' }}
+                                />
+                            )}
                         </div>
 
                         {/* Buttons - Hide if loading */}
                         {modal.mode !== 'loading' && (
                             <div className="custom-alert-actions">
-                                {modal.mode === 'confirm' && (
-                                    <button className="custom-alert-btn custom-alert-btn-cancel" onClick={() => handleClose(false)}>
+                                {(modal.mode === 'confirm' || modal.mode === 'prompt') && (
+                                    <button className="custom-alert-btn custom-alert-btn-cancel" onClick={() => handleClose(modal.mode === 'prompt' ? null : false)}>
                                         ยกเลิก
                                     </button>
                                 )}
                                 <button
                                     className={`custom-alert-btn custom-alert-btn-${modal.type}`}
-                                    onClick={() => handleClose(true)}
-                                    autoFocus
+                                    onClick={() => {
+                                        if (modal.mode === 'prompt') {
+                                            const val = document.getElementById('custom-prompt-input')?.value;
+                                            handleClose(val !== undefined ? val : null);
+                                        } else {
+                                            handleClose(true);
+                                        }
+                                    }}
+                                    autoFocus={modal.mode !== 'prompt'}
                                 >
                                     {modal.mode === 'confirm' ? 'ยืนยัน' : 'ตกลง'}
                                 </button>

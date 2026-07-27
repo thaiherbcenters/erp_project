@@ -62,9 +62,52 @@ router.get('/:id/documents', async (req, res) => {
                 
                 UNION ALL
                 
+                SELECT DocumentID, DocumentNo, DocumentDate, DocumentType, Status, CreatedAt,
+                       CAST(0 AS BIT) AS HasAttachment, NULL AS AttachmentPath
+                FROM (
+                    SELECT DocumentID, DocumentNo, DocumentDate, DocumentType, Status, CreatedAt,
+                           ROW_NUMBER() OVER(PARTITION BY DocumentNo ORDER BY Version DESC) as rn
+                    FROM TorBor1Documents
+                    WHERE ContractID = @ContractID AND Status != 'พรีวิว'
+                ) tb1docs
+                WHERE rn = 1
+                
+                UNION ALL
+                
+                SELECT DocumentID, DocumentNo, DocumentDate, 'herbal_cert' AS DocumentType, Status, CreatedAt,
+                       CAST(0 AS BIT) AS HasAttachment, NULL AS AttachmentPath
+                FROM (
+                    SELECT DocumentID, DocumentNo, DocumentDate, Status, CreatedAt,
+                           ROW_NUMBER() OVER(PARTITION BY DocumentNo ORDER BY Version DESC) as rn
+                    FROM HerbalCertDocuments
+                    WHERE ContractID = @ContractID AND Status != 'พรีวิว'
+                ) hcdocs
+                WHERE rn = 1
+                
+                UNION ALL
+                
+                SELECT DocumentID, DocumentNo, DocumentDate, 'safety_cert' AS DocumentType, Status, CreatedAt,
+                       CAST(0 AS BIT) AS HasAttachment, NULL AS AttachmentPath
+                FROM (
+                    SELECT documentId as DocumentID, 'SFTY-' + RIGHT('0000' + CAST(documentId AS VARCHAR(10)), 4) as DocumentNo, DocumentDate, Status, CreatedAt,
+                           ROW_NUMBER() OVER(PARTITION BY documentId ORDER BY Version DESC) as rn
+                    FROM SafetyCertDocuments
+                    WHERE contractId = @ContractID AND Status != 'พรีวิว'
+                ) scdocs
+                WHERE rn = 1
+                
+                UNION ALL
+                
                 SELECT QuotationID as DocumentID, QuotationNo as DocumentNo, BillDate as DocumentDate, N'ใบเสนอราคา' as DocumentType, Status, CreatedAt,
                        CAST(0 AS BIT) AS HasAttachment, NULL AS AttachmentPath
                 FROM Quotation
+                WHERE ContractID = @ContractID AND (DocType IS NULL OR DocType NOT LIKE '%billing_invoice%')
+                
+                UNION ALL
+                
+                SELECT BillingInvoiceID as DocumentID, BillingInvoiceNo as DocumentNo, BillDate as DocumentDate, N'ใบวางบิล/ใบแจ้งหนี้' as DocumentType, Status, CreatedAt,
+                       CAST(0 AS BIT) AS HasAttachment, NULL AS AttachmentPath
+                FROM BillingInvoice
                 WHERE ContractID = @ContractID
                 
                 UNION ALL
@@ -74,6 +117,27 @@ router.get('/:id/documents', async (req, res) => {
                 FROM SalesOrder
                 WHERE ContractID = @ContractID
                 
+                UNION ALL
+                  
+                SELECT DeliveryOrderID as DocumentID, DeliveryOrderNo as DocumentNo, BillDate as DocumentDate, N'ใบส่งสินค้า' as DocumentType, Status, CreatedAt,
+                       CAST(0 AS BIT) AS HasAttachment, NULL AS AttachmentPath
+                FROM DeliveryOrder
+                WHERE ContractID = @ContractID
+                  
+                UNION ALL
+                  
+                SELECT TaxInvoiceID as DocumentID, TaxInvoiceNo as DocumentNo, BillDate as DocumentDate, N'ใบแจ้งหนี้/ใบส่งสินค้า' as DocumentType, Status, CreatedAt,
+                       CAST(0 AS BIT) AS HasAttachment, NULL AS AttachmentPath
+                FROM TaxInvoice
+                WHERE ContractID = @ContractID
+                  
+                UNION ALL
+                  
+                SELECT ReceiptID as DocumentID, ReceiptNo as DocumentNo, BillDate as DocumentDate, N'ใบเสร็จรับเงิน' as DocumentType, Status, CreatedAt,
+                       CAST(0 AS BIT) AS HasAttachment, NULL AS AttachmentPath
+                FROM Receipt
+                WHERE ContractID = @ContractID
+                  
                 ORDER BY CreatedAt DESC
             `);
         

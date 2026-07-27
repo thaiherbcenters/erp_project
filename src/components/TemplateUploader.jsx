@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Upload, FileText, FileJson, CheckCircle, AlertCircle, Plus, Trash2, Check, RefreshCw, GripVertical, X } from 'lucide-react';
 import API_BASE from '../config';
 import { DOC_TYPES } from '../constants';
+import CustomSelect from './CustomSelect';
 import './TemplateUploader.css';
 
 export default function TemplateUploader() {
@@ -205,7 +206,7 @@ export default function TemplateUploader() {
                         รหัสประเภทเอกสาร (Document Type)
                     </label>
                     <div className="flex items-center">
-                        <select
+                        <CustomSelect
                             value={documentType}
                             onChange={(e) => setDocumentType(e.target.value)}
                             className="template-uploader-select flex-1"
@@ -215,7 +216,7 @@ export default function TemplateUploader() {
                             ))}
                             <option value="certificate" disabled>ใบรับรอง (กำลังพัฒนา)</option>
                             <option value="receipt" disabled>ใบเสร็จรับเงิน (กำลังพัฒนา)</option>
-                        </select>
+                        </CustomSelect>
                         {isLoading && (
                             <div className="ml-3 text-blue-500">
                                 <RefreshCw className="animate-spin" size={20} />

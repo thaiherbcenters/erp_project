@@ -21,6 +21,7 @@ import { ALL_PAGES } from '../data/mockData';
 import { ShieldCheck, Users, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, UserPlus, X, Trash2, Globe, Building2, User } from 'lucide-react';
 import './PermissionManager.css';
 import API_BASE from '../config';
+import CustomSelect from '../components/CustomSelect';
 
 // Scope options config
 const SCOPE_OPTIONS = [
@@ -570,7 +571,7 @@ export default function PermissionManager({ isEmbed = false }) {
 
                             <div className="perm-form-group">
                                 <label>Department (แผนก)</label>
-                                <select
+                                <CustomSelect
                                     value={newUserForm.department}
                                     onChange={e => setNewUserForm({ ...newUserForm, department: e.target.value })}
                                 >
@@ -580,19 +581,19 @@ export default function PermissionManager({ isEmbed = false }) {
                                             {dept.dept_name}
                                         </option>
                                     ))}
-                                </select>
+                                </CustomSelect>
                             </div>
 
                             <div className="perm-form-group">
                                 <label>Role (ตำแหน่ง/กลุ่มสิทธิ์ประจำ)</label>
-                                <select
+                                <CustomSelect
                                     value={newUserForm.role}
                                     onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })}
                                 >
                                     <option value="user">User (ผู้ใช้งานทั่วไป)</option>
                                     <option value="manager">Manager (ผู้จัดการ)</option>
                                     <option value="admin">Admin (ผู้ดูแลระบบ)</option>
-                                </select>
+                                </CustomSelect>
                             </div>
 
                             <div className="perm-modal-footer">

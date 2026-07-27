@@ -16,7 +16,8 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { MOCK_AR, MOCK_AP } from '../data/mockData';
-import { Search } from 'lucide-react';
+import { Search } from 'lucide-react';import CustomSelect from '../components/CustomSelect';
+
 import './PageCommon.css';
 
 export default function Accounts() {
@@ -177,7 +178,7 @@ export default function Accounts() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            <select
+                            <CustomSelect
                                 className="filter-select"
                                 value={arFilter}
                                 onChange={(e) => setArFilter(e.target.value)}
@@ -187,7 +188,7 @@ export default function Accounts() {
                                 <option value="invoice">Invoice</option>
                                 <option value="payment">Receive Payment</option>
                                 <option value="credit_note">Credit Note</option>
-                            </select>
+                            </CustomSelect>
                             <button className="btn-primary">+ สร้าง Invoice</button>
                         </div>
                     )}
@@ -252,7 +253,7 @@ export default function Accounts() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            <select
+                            <CustomSelect
                                 className="filter-select"
                                 value={apFilter}
                                 onChange={(e) => setApFilter(e.target.value)}
@@ -262,7 +263,7 @@ export default function Accounts() {
                                 <option value="invoice">Invoice</option>
                                 <option value="payment">Payment</option>
                                 <option value="credit_note">Credit Note</option>
-                            </select>
+                            </CustomSelect>
                             <button className="btn-primary">+ สร้าง Bill</button>
                         </div>
                     )}

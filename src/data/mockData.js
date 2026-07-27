@@ -153,18 +153,41 @@ export const ALL_PAGES = [
         ],
       },
       {
+        id: 'sales_billing_invoice', name: 'Billing Note/Invoice',
+        sections: [
+          { id: 'sales_billing_invoice_search', name: 'ค้นหาใบวางบิล/ใบแจ้งหนี้' },
+          { id: 'sales_billing_invoice_table', name: 'ตารางใบวางบิล/ใบแจ้งหนี้' },
+        ],
+      },
+      {
+        id: 'sales_tax_invoice', name: 'Invoice/Delivery Order',
+        sections: [
+          { id: 'sales_tax_invoice_search', name: 'ค้นหาใบแจ้งหนี้/ใบส่งสินค้า' },
+          { id: 'sales_tax_invoice_table', name: 'ตารางใบแจ้งหนี้/ใบส่งสินค้า' },
+        ],
+      },
+      {
+        id: 'sales_delivery_order', name: 'Delivery Order',
+        sections: [
+          { id: 'sales_delivery_order_search', name: 'ค้นหาใบส่งสินค้า' },
+          { id: 'sales_delivery_order_table', name: 'ตารางใบส่งสินค้า' },
+        ],
+      },
+      {
+        id: 'sales_receipt', name: 'Receipt',
+        sections: [
+          { id: 'sales_receipt_search', name: 'ค้นหาใบเสร็จรับเงิน' },
+          { id: 'sales_receipt_table', name: 'ตารางใบเสร็จรับเงิน' },
+        ],
+      },
+      {
         id: 'sales_orders', name: 'Sales Order',
         sections: [
           { id: 'sales_orders_search', name: 'ค้นหาคำสั่งขาย' },
           { id: 'sales_orders_table', name: 'ตารางคำสั่งขาย' },
         ],
       },
-      {
-        id: 'sales_billing', name: 'ออกบิล/เอกสาร',
-        sections: [
-          { id: 'sales_billing_form', name: 'ฟอร์มออกเอกสาร' },
-        ],
-      },
+
       {
         id: 'sales_poa', name: 'ขึ้นทะเบียน',
         sections: [

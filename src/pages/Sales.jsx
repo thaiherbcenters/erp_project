@@ -21,7 +21,10 @@ import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashb
 import { MOCK_CUSTOMERS } from '../data/mockData';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
-import BillingForm from '../components/BillingForm';
+import BillingInvoiceForm from '../components/BillingInvoiceForm';
+import TaxInvoiceForm from '../components/TaxInvoiceForm';
+import DeliveryOrderForm from '../components/DeliveryOrderForm';
+import ReceiptForm from '../components/ReceiptForm';
 import PowerOfAttorneyForm from '../components/PowerOfAttorneyForm';
 import RegistrationDocCreator from '../components/RegistrationDocCreator';
 import ContractManagement from '../components/ContractManagement';
@@ -49,9 +52,11 @@ export default function Sales() {
     const [editingQuotationId, setEditingQuotationId] = useState(null);
     const [isViewOnly, setIsViewOnly] = useState(false);
     const [isHistoryView, setIsHistoryView] = useState(false); // To pass to form
+    const [previewQuotationId, setPreviewQuotationId] = useState(null);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [historyList, setHistoryList] = useState([]);
     const [historyItemNo, setHistoryItemNo] = useState('');
+    const [historyDocType, setHistoryDocType] = useState('Quotation');
     
     // ── States สำหรับ Doc History (POA/Herbal) ──
     const [showDocHistoryModal, setShowDocHistoryModal] = useState(false);
@@ -86,9 +91,36 @@ export default function Sales() {
     const [showBillingForm, setShowBillingForm] = useState(false);
     const [localBillings, setLocalBillings] = useState([]);
     const [editingBillingId, setEditingBillingId] = useState(null);
+    const [previewBillingId, setPreviewBillingId] = useState(null);
     const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
     const [billingSearch, setBillingSearch] = useState('');
     const [appliedBillingSearch, setAppliedBillingSearch] = useState('');
+
+    // ── State: Tax Invoice ──
+    const [showTaxInvoiceForm, setShowTaxInvoiceForm] = useState(false);
+    const [localTaxInvoices, setLocalTaxInvoices] = useState([]);
+    const [editingTaxInvoiceId, setEditingTaxInvoiceId] = useState(null);
+    const [taxInvoicePagination, setTaxInvoicePagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [taxInvoiceSearch, setTaxInvoiceSearch] = useState('');
+    const [appliedTaxInvoiceSearch, setAppliedTaxInvoiceSearch] = useState('');
+
+    // ── State: Delivery Order ──
+    const [showDeliveryOrderForm, setShowDeliveryOrderForm] = useState(false);
+    const [localDeliveryOrders, setLocalDeliveryOrders] = useState([]);
+    const [editingDeliveryOrderId, setEditingDeliveryOrderId] = useState(null);
+    const [deliveryOrderPagination, setDeliveryOrderPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [deliveryOrderSearch, setDeliveryOrderSearch] = useState('');
+    const [appliedDeliveryOrderSearch, setAppliedDeliveryOrderSearch] = useState('');
+
+    // ── State: Receipt ──
+    const [showReceiptForm, setShowReceiptForm] = useState(false);
+    const [receipts, setReceipts] = useState([]);
+    const [editDocId, setEditDocId] = useState(null);
+    const [receiptPagination, setReceiptPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [receiptSearch, setReceiptSearch] = useState('');
+    const [appliedReceiptSearch, setAppliedReceiptSearch] = useState('');
+
+    const [previewDocModal, setPreviewDocModal] = useState(null);
 
     // ── Auto-search Debounce ──
     useEffect(() => {
@@ -100,6 +132,21 @@ export default function Sales() {
         const t = setTimeout(() => { setAppliedBillingSearch(billingSearch); setBillingPagination(p => ({...p, page: 1})); }, 400);
         return () => clearTimeout(t);
     }, [billingSearch]);
+
+    useEffect(() => {
+        const t = setTimeout(() => { setAppliedTaxInvoiceSearch(taxInvoiceSearch); setTaxInvoicePagination(p => ({...p, page: 1})); }, 400);
+        return () => clearTimeout(t);
+    }, [taxInvoiceSearch]);
+
+    useEffect(() => {
+        const t = setTimeout(() => { setAppliedDeliveryOrderSearch(deliveryOrderSearch); setDeliveryOrderPagination(p => ({...p, page: 1})); }, 400);
+        return () => clearTimeout(t);
+    }, [deliveryOrderSearch]);
+
+    useEffect(() => {
+        const t = setTimeout(() => { setAppliedReceiptSearch(receiptSearch); setReceiptPagination(p => ({...p, page: 1})); }, 400);
+        return () => clearTimeout(t);
+    }, [receiptSearch]);
 
     useEffect(() => {
         const t = setTimeout(() => { setAppliedPoaSearch(poaSearch); setPoaPagination(p => ({...p, page: 1})); }, 400);
@@ -137,9 +184,9 @@ export default function Sales() {
     // ── Fetch ข้อมูล Billing ──
     useEffect(() => {
         const fetchBillings = async () => {
-            if (activeTab !== 'sales_billing') return;
+            if (activeTab !== 'sales_billing_invoice') return;
             try {
-                const res = await fetch(`${API_BASE}/quotations?category=billing&page=${billingPagination.page}&limit=${billingPagination.limit}&search=${encodeURIComponent(appliedBillingSearch)}`);
+                const res = await fetch(`${API_BASE}/billing-invoices?page=${billingPagination.page}&limit=${billingPagination.limit}&search=${encodeURIComponent(appliedBillingSearch)}`);
                 const json = await res.json();
                 if (json.success) {
                     setLocalBillings(json.data || []);
@@ -149,6 +196,54 @@ export default function Sales() {
         };
         fetchBillings();
     }, [activeTab, billingPagination.page, appliedBillingSearch, showBillingForm]);
+
+    // ── Fetch ข้อมูล Tax Invoice ──
+    useEffect(() => {
+        const fetchTaxInvoices = async () => {
+            if (activeTab !== 'sales_tax_invoice') return;
+            try {
+                const res = await fetch(`${API_BASE}/tax-invoices?page=${taxInvoicePagination.page}&limit=${taxInvoicePagination.limit}&search=${encodeURIComponent(appliedTaxInvoiceSearch)}`);
+                const json = await res.json();
+                if (json.success) {
+                    setLocalTaxInvoices(json.data || []);
+                    if (json.pagination) setTaxInvoicePagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                }
+            } catch (err) { console.error('Error fetching tax invoices:', err); }
+        };
+        fetchTaxInvoices();
+    }, [activeTab, taxInvoicePagination.page, appliedTaxInvoiceSearch, showTaxInvoiceForm]);
+
+    // ── Fetch ข้อมูล Delivery Order ──
+    useEffect(() => {
+        const fetchDeliveryOrders = async () => {
+            if (activeTab !== 'sales_delivery_order') return;
+            try {
+                const res = await fetch(`${API_BASE}/delivery-orders?page=${deliveryOrderPagination.page}&limit=${deliveryOrderPagination.limit}&search=${encodeURIComponent(appliedDeliveryOrderSearch)}`);
+                const json = await res.json();
+                if (json.success) {
+                    setLocalDeliveryOrders(json.data || []);
+                    if (json.pagination) setDeliveryOrderPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                }
+            } catch (err) { console.error('Error fetching delivery orders:', err); }
+        };
+        fetchDeliveryOrders();
+    }, [activeTab, deliveryOrderPagination.page, appliedDeliveryOrderSearch, showDeliveryOrderForm]);
+
+    // ── Fetch ข้อมูล Receipt ──
+    useEffect(() => {
+        const fetchReceipts = async () => {
+            if (activeTab !== 'sales_receipt') return;
+            try {
+                const res = await fetch(`${API_BASE}/receipts?page=${receiptPagination.page}&limit=${receiptPagination.limit}&search=${encodeURIComponent(appliedReceiptSearch)}`);
+                const json = await res.json();
+                if (json.success) {
+                    setReceipts(json.data || []);
+                    if (json.pagination) setReceiptPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                }
+            } catch (err) { console.error('Error fetching receipts:', err); }
+        };
+        fetchReceipts();
+    }, [activeTab, receiptPagination.page, appliedReceiptSearch, showReceiptForm]);
 
     // ── Fetch ข้อมูล POA ──
     useEffect(() => {
@@ -278,11 +373,18 @@ export default function Sales() {
     };
 
     // ── Fetch History List ──
-    const handleViewHistory = async (id) => {
+    const handleViewHistory = async (id, docType = 'Quotation') => {
         try {
-            const res = await fetch(`${API_BASE}/quotations/${id}/history`);
+            let endpoint = `${API_BASE}/quotations/${id}/history`;
+            if (docType === 'BillingInvoice') endpoint = `${API_BASE}/billing-invoices/${id}/history`;
+            else if (docType === 'TaxInvoice') endpoint = `${API_BASE}/tax-invoices/${id}/history`;
+            else if (docType === 'Receipt') endpoint = `${API_BASE}/receipts/${id}/history`;
+            else if (docType === 'DeliveryOrder') endpoint = `${API_BASE}/delivery-orders/${id}/history`;
+            
+            const res = await fetch(endpoint);
             const json = await res.json();
             if (json.success) {
+                setHistoryDocType(docType);
                 setHistoryList(json.data);
                 setShowHistoryModal(true);
             } else {
@@ -402,8 +504,45 @@ export default function Sales() {
             const json = await res.json();
             if (json.success) {
                 setLocalQuotations(prev => prev.filter(q => (q.QuotationID || q.id) !== id));
-            } else { alert('ลบไม่สำเร็จ: ' + json.message); }
-        } catch (err) { console.error('Error deleting quotation:', err); alert('เกิดข้อผิดพลาดในการลบ'); }
+                showAlert('ลบสำเร็จ', 'ลบใบเสนอราคาเรียบร้อยแล้ว', 'success');
+            } else { showAlert('ข้อผิดพลาด', 'ลบไม่สำเร็จ: ' + json.message, 'error'); }
+        } catch (err) { console.error('Error deleting quotation:', err); showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการลบ', 'error'); }
+    };
+
+    const handleDeleteBilling = async (id) => {
+        const ok = await showConfirm('ยืนยันการลบ', 'คุณต้องการลบใบวางบิล/ใบแจ้งหนี้นี้ใช่หรือไม่?', 'warning');
+        if (!ok) return;
+        try {
+            const res = await fetch(`${API_BASE}/billing-invoices/${id}`, { method: 'DELETE' });
+            const json = await res.json();
+            if (json.success) {
+                setLocalBillings(prev => prev.filter(b => (b.BillingInvoiceID || b.id) !== id));
+                showAlert('ลบสำเร็จ', 'ลบใบวางบิล/ใบแจ้งหนี้เรียบร้อยแล้ว', 'success');
+            } else { showAlert('ข้อผิดพลาด', 'ลบไม่สำเร็จ: ' + json.message, 'error'); }
+        } catch (err) { console.error('Error deleting billing:', err); showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการลบ', 'error'); }
+    };
+
+    const handleDelete = async (id, docType) => {
+        const ok = await showConfirm('ยืนยันการลบ', 'คุณต้องการลบเอกสารนี้ใช่หรือไม่?', 'warning');
+        if (!ok) return;
+        
+        let endpoint = '';
+        if (docType === 'TaxInvoice') endpoint = `${API_BASE}/tax-invoices/${id}`;
+        else if (docType === 'DeliveryOrder') endpoint = `${API_BASE}/delivery-orders/${id}`;
+        else if (docType === 'Receipt') endpoint = `${API_BASE}/receipts/${id}`;
+        
+        if (!endpoint) return;
+
+        try {
+            const res = await fetch(endpoint, { method: 'DELETE' });
+            const json = await res.json();
+            if (json.success) {
+                if (docType === 'TaxInvoice') setLocalTaxInvoices(prev => prev.filter(item => (item.TaxInvoiceID || item.id) !== id));
+                else if (docType === 'DeliveryOrder') setLocalDeliveryOrders(prev => prev.filter(item => (item.DeliveryOrderID || item.id) !== id));
+                else if (docType === 'Receipt') setReceipts(prev => prev.filter(item => (item.ReceiptID || item.id) !== id));
+                showAlert('ลบสำเร็จ', 'ลบเอกสารเรียบร้อยแล้ว', 'success');
+            } else { showAlert('ข้อผิดพลาด', 'ลบไม่สำเร็จ: ' + json.message, 'error'); }
+        } catch (err) { console.error(`Error deleting ${docType}:`, err); showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการลบ', 'error'); }
     };
 
     const handleDeleteSO = async (id) => {
@@ -762,7 +901,14 @@ export default function Sales() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filteredQuotations.map((q, idx) => (
+                                        {filteredQuotations.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                                                    ไม่มีข้อมูลใบเสนอราคา
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredQuotations.map((q, idx) => (
                                             <tr key={q.QuotationID || q.id}>
                                                 <td>{idx + 1}</td>
                                                 <td>v.{q.Revision || 0}</td>
@@ -781,12 +927,7 @@ export default function Sales() {
                                                         <button 
                                                             className="doc-action-btn"
                                                             title="ดูรายละเอียด"
-                                                            onClick={() => {
-                                                                setEditingQuotationId(q.QuotationID || q.id);
-                                                                setIsViewOnly(true);
-                                                                setIsHistoryView(false);
-                                                                setShowQuotationForm(true);
-                                                            }}
+                                                            onClick={() => setPreviewQuotationId(q.QuotationID || q.id)}
                                                         >
                                                             <Eye size={15} />
                                                         </button>
@@ -821,7 +962,8 @@ export default function Sales() {
                                                     </div>
                                                 </td>
                                             </tr>
-                                        ))}
+                                        ))
+                                        )}
                                     </tbody>
                                 </table>
 
@@ -849,72 +991,501 @@ export default function Sales() {
                                 )}
                             </div>
                         )}
+                    </div>
+                )
+            )}
 
-                        {/* History Modal */}
-                        {showHistoryModal && (
-                            <div className="pdf-preview-overlay" onClick={() => setShowHistoryModal(false)}>
-                                <div className="pdf-preview-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', height: 'auto', padding: '24px', maxHeight: '80vh', overflowY: 'auto' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                                        <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <History size={18} /> ประวัติการแก้ไข
-                                        </h3>
-                                        <button onClick={() => setShowHistoryModal(false)} className="doc-action-btn" style={{ width: '30px', height: '30px', background: '#f1f5f9', borderRadius: '6px' }}>
-                                            <X size={16} />
-                                        </button>
+            {/* ── Tab: ใบแจ้งหนี้/ใบส่งสินค้า (Tax Invoice/Delivery Order) ── */}
+            {(activeTab === 'sales_tax_invoice' && hasSubPermission('sales_tax_invoice')) && (
+                showTaxInvoiceForm ? (
+                    <div className="subpage-content" key="sales_tax_invoice_form">
+                        <TaxInvoiceForm
+                            editId={editingTaxInvoiceId}
+                            onBack={() => {
+                                setShowTaxInvoiceForm(false);
+                                setEditingTaxInvoiceId(null);
+                            }}
+                            onSave={() => {
+                                setShowTaxInvoiceForm(false);
+                                setEditingTaxInvoiceId(null);
+                            }}
+                        />
+                    </div>
+                ) : (
+                    <div className="subpage-content" key="sales_tax_invoice">
+                        <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                    <FileText size={24} color="#1e40af" />
+                                    ใบแจ้งหนี้/ใบส่งสินค้า
+                                </h1>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการข้อมูลเอกสารใบแจ้งหนี้/ใบส่งสินค้า</p>
+                            </div>
+                        </div>
+                        
+                        {hasSectionPermission('sales_tax_invoice_search') && (
+                            <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+                                <div className="search-group">
+                                    <div className="search-input-wrap">
+                                        <Search size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="ค้นหาใบแจ้งหนี้/ใบส่งสินค้า..."
+                                            value={taxInvoiceSearch}
+                                            onChange={(e) => setTaxInvoiceSearch(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    setTaxInvoicePagination(prev => ({ ...prev, page: 1 }));
+                                                    setAppliedTaxInvoiceSearch(taxInvoiceSearch);
+                                                }
+                                            }}
+                                        />
                                     </div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                        {historyList.length === 0 ? (
-                                            <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>ไม่มีประวัติการแก้ไขสำหรับเอกสารนี้</p>
-                                        ) : (
-                                            historyList.map((h, i) => (
-                                                <div key={h.HistoryID} style={{
-                                                    padding: '14px 16px',
-                                                    border: '1px solid var(--border)',
-                                                    borderRadius: '8px',
-                                                    background: i === 0 ? '#f0fdf4' : 'var(--bg)',
-                                                }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <span style={{ fontWeight: 600, fontSize: '13px' }}>
-                                                                {h.Revision === 0 ? 'ต้นฉบับ' : `v.${h.Revision}`}
-                                                            </span>
-                                                            {i === 0 && h.Revision > 0 && (
-                                                                <span style={{ fontSize: '10px', color: '#64748b' }}>ถูกแทนที่ (v.{h.Revision + 1})</span>
-                                                            )}
-                                                            <span className={`badge ${getQuotationStatusClass(h.Status)}`} style={{ fontSize: '10px' }}>
-                                                                {h.Status}
-                                                            </span>
-                                                        </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                                                #{h.HistoryID}
-                                                            </span>
-                                                            <button
-                                                                className="doc-action-btn"
-                                                                title="ดูเอกสาร"
-                                                                style={{ background: '#e0f2fe', color: '#0284c7', width: '24px', height: '24px' }}
-                                                                onClick={() => {
-                                                                    setShowHistoryModal(false);
-                                                                    setEditingQuotationId(`history-${h.HistoryID}`);
-                                                                    setIsViewOnly(true);
-                                                                    setIsHistoryView(true);
-                                                                    setShowQuotationForm(true);
-                                                                }}
-                                                            >
-                                                                <Eye size={12} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                                                        ยอดรวมสุทธิ ฿{(h.GrandTotal || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})} — {new Date(h.ArchivedAt).toLocaleString('th-TH')}
-                                                    </div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
+                                    <button className="search-btn" onClick={() => {
+                                        setTaxInvoicePagination(prev => ({ ...prev, page: 1 }));
+                                        setAppliedTaxInvoiceSearch(taxInvoiceSearch);
+                                    }}>ค้นหา</button>
                                 </div>
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
+                                    setEditingTaxInvoiceId(null);
+                                    setShowTaxInvoiceForm(true);
+                                }}>
+                                    <Plus size={16} /> สร้างใบแจ้งหนี้/ใบส่งสินค้า
+                                </button>
                             </div>
                         )}
+                        {hasSectionPermission('sales_tax_invoice_table') && (
+                            <div className="table-card card">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ลำดับ</th>
+                                            <th>เวอร์ชั่น</th>
+                                            <th>เลขที่</th>
+                                            <th>ลูกค้า</th>
+                                            <th>ยอดเงินรวม</th>
+                                            <th>วันที่</th>
+                                            <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                            <th style={{ textAlign: 'center' }}>จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {localTaxInvoices.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
+                                                    ไม่มีข้อมูลใบแจ้งหนี้/ใบส่งสินค้า
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            localTaxInvoices.map((q, idx) => (
+                                                <tr key={q.TaxInvoiceID}>
+                                                    <td>{idx + 1}</td>
+                                                    <td>v.{q.Revision || 0}</td>
+                                                    <td className="text-bold">{q.TaxInvoiceNo || '-'}</td>
+                                                    <td>{q.CustomerName}</td>
+                                                    <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                                    <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span className="status-badge status-approved">
+                                                            {q.Status || 'Active'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                            <button
+                                                                onClick={() => setPreviewDocModal({ type: 'TaxInvoice', id: q.TaxInvoiceID })}
+                                                                className="doc-action-btn"
+                                                                title="ดูรายละเอียด"
+                                                            >
+                                                                <Eye size={15} />
+                                                            </button>
+                                                            {(q.Revision > 0) && (
+                                                                <button
+                                                                    onClick={() => handleViewHistory(q.TaxInvoiceID, 'TaxInvoice')}
+                                                                    className="doc-action-btn"
+                                                                    title="ประวัติ"
+                                                                >
+                                                                    <Clock size={15} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingTaxInvoiceId(q.TaxInvoiceID);
+                                                                    setShowTaxInvoiceForm(true);
+                                                                }}
+                                                                className="doc-action-btn"
+                                                                title="แก้ไข"
+                                                            >
+                                                                <Edit size={15} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(q.TaxInvoiceID, 'TaxInvoice')}
+                                                                className="doc-action-btn doc-action-btn-danger"
+                                                                title="ลบ"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                            {taxInvoicePagination.totalPages > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px', borderTop: '1px solid var(--border)', gap: '12px', alignItems: 'center' }}>
+                                    <button
+                                        className="btn-secondary"
+                                        disabled={taxInvoicePagination.page === 1}
+                                        onClick={() => setTaxInvoicePagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                        style={{ padding: '6px 12px' }}
+                                    >
+                                        ก่อนหน้า
+                                    </button>
+                                    <span style={{ fontSize: '14px', color: 'var(--text-light)' }}>
+                                        หน้า {taxInvoicePagination.page} จาก {taxInvoicePagination.totalPages}
+                                    </span>
+                                    <button
+                                        className="btn-secondary"
+                                        disabled={taxInvoicePagination.page === taxInvoicePagination.totalPages}
+                                        onClick={() => setTaxInvoicePagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                        style={{ padding: '6px 12px' }}
+                                    >
+                                        ถัดไป
+                                    </button>
+                                </div>
+                            )}
+                    </div>
+                )
+            )}
+
+            {/* ── Tab: Delivery Order (ใบส่งสินค้า) ── */}
+            {(activeTab === 'sales_delivery_order' && hasSubPermission('sales_delivery_order')) && (
+                showDeliveryOrderForm ? (
+                    <div className="subpage-content" key="sales_delivery_order_form">
+                        <DeliveryOrderForm
+                            editId={editingDeliveryOrderId}
+                            onBack={() => {
+                                setShowDeliveryOrderForm(false);
+                                setEditingDeliveryOrderId(null);
+                            }}
+                            onSave={() => {
+                                setShowDeliveryOrderForm(false);
+                                setEditingDeliveryOrderId(null);
+                            }}
+                        />
+                    </div>
+                ) : (
+                    <div className="subpage-content" key="sales_delivery_order">
+                        <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                    <FileText size={24} color="#1e40af" />
+                                    ใบส่งสินค้า (Delivery Order)
+                                </h1>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการข้อมูลเอกสารใบส่งสินค้า</p>
+                            </div>
+                        </div>
+                        
+                        {hasSectionPermission('sales_delivery_order_search') && (
+                            <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+                                <div className="search-group">
+                                    <div className="search-input-wrap">
+                                        <Search size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="ค้นหาใบส่งสินค้า..."
+                                            value={deliveryOrderSearch}
+                                            onChange={(e) => setDeliveryOrderSearch(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    setDeliveryOrderPagination(prev => ({ ...prev, page: 1 }));
+                                                    setAppliedDeliveryOrderSearch(deliveryOrderSearch);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <button className="search-btn" onClick={() => {
+                                        setDeliveryOrderPagination(prev => ({ ...prev, page: 1 }));
+                                        setAppliedDeliveryOrderSearch(deliveryOrderSearch);
+                                    }}>ค้นหา</button>
+                                </div>
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
+                                    setEditingDeliveryOrderId(null);
+                                    setShowDeliveryOrderForm(true);
+                                }}>
+                                    <Plus size={16} /> สร้างใบส่งสินค้า
+                                </button>
+                            </div>
+                        )}
+                        {hasSectionPermission('sales_delivery_order_table') && (
+                            <div className="table-card card">
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ลำดับ</th>
+                                            <th>เวอร์ชั่น</th>
+                                            <th>เลขที่</th>
+                                            <th>เลขที่สัญญา</th>
+                                            <th>ลูกค้า</th>
+                                            <th>ยอดรวม (บาท)</th>
+                                            <th>วันที่</th>
+                                            <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                            <th style={{ textAlign: 'center' }}>จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {localDeliveryOrders.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
+                                                    ไม่มีข้อมูลใบส่งสินค้า
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            localDeliveryOrders.map((q, idx) => (
+                                                <tr key={q.DeliveryOrderID}>
+                                                    <td>{idx + 1}</td>
+                                                    <td>v.{q.Revision || 0}</td>
+                                                    <td className="text-bold">{q.DeliveryOrderNo || '-'}</td>
+                                                    <td>{q.ContractID || '-'}</td>
+                                                    <td>{q.CustomerName}</td>
+                                                    <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                                    <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span className="status-badge status-approved">
+                                                            {q.Status || 'Active'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                            <button
+                                                                onClick={() => setPreviewDocModal({ type: 'DeliveryOrder', id: q.DeliveryOrderID })}
+                                                                className="doc-action-btn"
+                                                                title="ดูรายละเอียด"
+                                                            >
+                                                                <Eye size={15} />
+                                                            </button>
+                                                            {(q.Revision > 0) && (
+                                                                <button
+                                                                    onClick={() => handleViewHistory(q.DeliveryOrderID, 'DeliveryOrder')}
+                                                                    className="doc-action-btn"
+                                                                    title="ประวัติ"
+                                                                >
+                                                                    <Clock size={15} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingDeliveryOrderId(q.DeliveryOrderID);
+                                                                    setShowDeliveryOrderForm(true);
+                                                                }}
+                                                                className="doc-action-btn"
+                                                                title="แก้ไข"
+                                                            >
+                                                                <Edit size={15} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(q.DeliveryOrderID, 'DeliveryOrder')}
+                                                                className="doc-action-btn doc-action-btn-danger"
+                                                                title="ลบ"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                            {deliveryOrderPagination.totalPages > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px', borderTop: '1px solid var(--border)', gap: '12px', alignItems: 'center' }}>
+                                    <button
+                                        className="btn-secondary"
+                                        disabled={deliveryOrderPagination.page === 1}
+                                        onClick={() => setDeliveryOrderPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                        style={{ padding: '6px 12px' }}
+                                    >
+                                        ก่อนหน้า
+                                    </button>
+                                    <span style={{ fontSize: '14px', color: 'var(--text-light)' }}>
+                                        หน้า {deliveryOrderPagination.page} จาก {deliveryOrderPagination.totalPages}
+                                    </span>
+                                    <button
+                                        className="btn-secondary"
+                                        disabled={deliveryOrderPagination.page === deliveryOrderPagination.totalPages}
+                                        onClick={() => setDeliveryOrderPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                        style={{ padding: '6px 12px' }}
+                                    >
+                                        ถัดไป
+                                    </button>
+                                </div>
+                            )}
+                    </div>
+                )
+            )}
+
+            {/* ── Tab: ใบเสร็จรับเงิน (Receipt) ── */}
+            {(activeTab === 'sales_receipt' && hasSubPermission('sales_receipt')) && (
+                showReceiptForm ? (
+                    <ReceiptForm
+                        editId={editDocId}
+                        onBack={() => {
+                            setShowReceiptForm(false);
+                            setEditDocId(null);
+                        }}
+                        onSave={() => {
+                            setShowReceiptForm(false);
+                            setEditDocId(null);
+                        }}
+                    />
+                ) : (
+                    <div className="subpage-content" key="sales_receipt">
+                        <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                            <div>
+                                <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
+                                    <FileText size={24} color="#1e40af" />
+                                    ใบเสร็จรับเงิน (Receipt)
+                                </h1>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>สร้างและจัดการข้อมูลเอกสารใบเสร็จรับเงิน</p>
+                            </div>
+                        </div>
+                        
+                        <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+                            <div className="search-group">
+                                <div className="search-input-wrap">
+                                    <Search size={18} />
+                                    <input
+                                        type="text"
+                                        placeholder="ค้นหาใบเสร็จรับเงิน..."
+                                        value={receiptSearch}
+                                        onChange={(e) => setReceiptSearch(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                setReceiptPagination(prev => ({ ...prev, page: 1 }));
+                                                setAppliedReceiptSearch(receiptSearch);
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <button className="search-btn" onClick={() => {
+                                    setReceiptPagination(prev => ({ ...prev, page: 1 }));
+                                    setAppliedReceiptSearch(receiptSearch);
+                                }}>ค้นหา</button>
+                            </div>
+                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
+                                setEditDocId(null);
+                                setShowReceiptForm(true);
+                            }}>
+                                <Plus size={16} /> สร้างใบเสร็จรับเงิน
+                            </button>
+                        </div>
+
+                        <div className="table-card card">
+                            <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ลำดับ</th>
+                                            <th>เวอร์ชั่น</th>
+                                            <th>เลขที่</th>
+                                            <th>ลูกค้า</th>
+                                            <th>ยอดเงินรวม</th>
+                                            <th>วันที่</th>
+                                            <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                            <th style={{ textAlign: 'center' }}>จัดการ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {receipts.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
+                                                    ไม่มีข้อมูลใบเสร็จรับเงิน
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            receipts.map((q, idx) => (
+                                                <tr key={q.ReceiptID}>
+                                                    <td>{idx + 1}</td>
+                                                    <td>v.{q.Revision || 0}</td>
+                                                    <td className="text-bold">{q.ReceiptNo || '-'}</td>
+                                                    <td>{q.CustomerName}</td>
+                                                    <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                                    <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <span className="status-badge status-approved">
+                                                            {q.Status || 'Active'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                            <button
+                                                                onClick={() => setPreviewDocModal({ type: 'Receipt', id: q.ReceiptID })}
+                                                                className="doc-action-btn"
+                                                                title="ดูรายละเอียด"
+                                                            >
+                                                                <Eye size={15} />
+                                                            </button>
+                                                            {(q.Revision > 0) && (
+                                                                <button
+                                                                    onClick={() => handleViewHistory(q.ReceiptID, 'Receipt')}
+                                                                    className="doc-action-btn"
+                                                                    title="ประวัติ"
+                                                                >
+                                                                    <Clock size={15} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditDocId(q.ReceiptID);
+                                                                    setShowReceiptForm(true);
+                                                                }}
+                                                                className="doc-action-btn"
+                                                                title="แก้ไข"
+                                                            >
+                                                                <Edit size={15} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(q.ReceiptID, 'Receipt')}
+                                                                className="doc-action-btn doc-action-btn-danger"
+                                                                title="ลบ"
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {receiptPagination.totalPages > 1 && (
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px', borderTop: '1px solid var(--border)', gap: '12px', alignItems: 'center' }}>
+                                    <button
+                                        className="btn-secondary"
+                                        disabled={receiptPagination.page === 1}
+                                        onClick={() => setReceiptPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+                                        style={{ padding: '6px 12px' }}
+                                    >
+                                        ก่อนหน้า
+                                    </button>
+                                    <span style={{ fontSize: '14px', color: 'var(--text-light)' }}>
+                                        หน้า {receiptPagination.page} จาก {receiptPagination.totalPages}
+                                    </span>
+                                    <button
+                                        className="btn-secondary"
+                                        disabled={receiptPagination.page === receiptPagination.totalPages}
+                                        onClick={() => setReceiptPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+                                        style={{ padding: '6px 12px' }}
+                                    >
+                                        ถัดไป
+                                    </button>
+                                </div>
+                            )}
                     </div>
                 )
             )}
@@ -1028,17 +1599,24 @@ export default function Sales() {
             )}
 
             {/* ── Tab: Billing ── */}
-            {(activeTab === 'sales_billing' && hasSubPermission('sales_billing')) && (
+            {(activeTab === 'sales_billing_invoice' && hasSubPermission('sales_billing_invoice')) && (
                 showBillingForm ? (
                     <div className="subpage-content" key="sales_billing_form">
-                        <BillingForm onBack={() => { 
+                        <BillingInvoiceForm 
+                            editId={editingBillingId}
+                            onBack={() => { 
                             setShowBillingForm(false); 
                             setEditingBillingId(null);
                             if (returnTab) {
                                 setSearchParams({ tab: returnTab });
                                 setReturnTab(null);
                             }
-                        }} />
+                        }}
+                        onSave={() => {
+                            setShowBillingForm(false);
+                            setEditingBillingId(null);
+                        }} 
+                        />
                     </div>
                 ) : (
                     <div className="subpage-content" key="sales_billing">
@@ -1046,9 +1624,9 @@ export default function Sales() {
                             <div>
                                 <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
                                     <Receipt size={24} color="#1e40af" />
-                                    ออกบิล/เอกสาร (Billing)
+                                    ใบวางบิล/ใบแจ้งหนี้ (Billing Note/Invoice)
                                 </h1>
-                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>จัดการบิลและเอกสารฝ่ายขาย</p>
+                                <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>จัดการใบวางบิลและใบแจ้งหนี้ฝ่ายขาย</p>
                             </div>
                         </div>
                         <div className="toolbar" style={{ justifyContent: 'space-between' }}>
@@ -1082,32 +1660,63 @@ export default function Sales() {
                             <table className="data-table">
                                 <thead>
                                     <tr>
+                                        <th>ลำดับ</th>
+                                        <th>เวอร์ชั่น</th>
                                         <th>เลขที่บิล</th>
-                                        <th>วันที่บิล</th>
                                         <th>ลูกค้า</th>
-                                        <th>ยอดรวม</th>
+                                        <th>ยอดรวม (บาท)</th>
+                                        <th>วันที่บิล</th>
                                         <th>สถานะ</th>
-                                        <th style={{ textAlign: 'center' }}>การจัดการ</th>
+                                        <th style={{ textAlign: 'center' }}>จัดการ</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {localBillings.length === 0 ? (
-                                        <tr><td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลบิล/เอกสาร</td></tr>
-                                    ) : localBillings.map(b => (
-                                        <tr key={b.QuotationID || b.id}>
-                                            <td>{b.QuotationNo || '-'}</td>
-                                            <td>{b.BillDate ? new Date(b.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                        <tr><td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลใบวางบิล/ใบแจ้งหนี้</td></tr>
+                                    ) : localBillings.map((b, idx) => (
+                                        <tr key={b.BillingInvoiceID || b.id}>
+                                            <td>{idx + 1}</td>
+                                            <td>v.{b.Revision || 0}</td>
+                                            <td className="text-bold">{b.BillingInvoiceNo || '-'}</td>
                                             <td>{b.CustomerName || '-'}</td>
-                                            <td>฿{((b.GrandTotal) || 0).toLocaleString()}</td>
+                                            <td>{((b.GrandTotal) || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+                                            <td>{b.BillDate ? new Date(b.BillDate).toLocaleDateString('th-TH') : '-'}</td>
                                             <td>
                                                 <span className={`badge ${b.Status === 'อนุมัติ' ? 'badge-success' : b.Status === 'รอตรวจสอบ' ? 'badge-info' : 'badge-neutral'}`}>
                                                     {b.Status || 'ร่าง'}
                                                 </span>
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
-                                                <div className="action-buttons justify-center">
-                                                    <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดูเอกสาร" onClick={() => { setEditingBillingId(b.QuotationID); setShowBillingForm(true); }}>
-                                                        <Eye size={16} />
+                                                <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                    <button 
+                                                        className="doc-action-btn"
+                                                        title="ดูรายละเอียด"
+                                                        onClick={() => setPreviewBillingId(b.BillingInvoiceID)}
+                                                    >
+                                                        <Eye size={15} />
+                                                    </button>
+                                                    {(b.Revision > 0) && (
+                                                        <button 
+                                                            className="doc-action-btn"
+                                                            title="ประวัติ"
+                                                            onClick={() => handleViewHistory(b.BillingInvoiceID, 'BillingInvoice')}
+                                                        >
+                                                            <Clock size={15} />
+                                                        </button>
+                                                    )}
+                                                    <button 
+                                                        className="doc-action-btn"
+                                                        title="แก้ไข"
+                                                        onClick={() => { setEditingBillingId(b.BillingInvoiceID); setShowBillingForm(true); }}
+                                                    >
+                                                        <Edit size={15} />
+                                                    </button>
+                                                    <button 
+                                                        className="doc-action-btn doc-action-btn-danger"
+                                                        title="ลบ"
+                                                        onClick={() => handleDeleteBilling(b.BillingInvoiceID)}
+                                                    >
+                                                        <Trash2 size={15} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -1296,17 +1905,15 @@ export default function Sales() {
                 <div className="subpage-content" key="sales_contracts">
                     <ContractManagement onViewDocument={(docType, docId) => {
                         if (docType === 'Quotation' || docType === 'ใบเสนอราคา') {
-                            setEditingQuotationId(docId);
-                            setIsViewOnly(true);
-                            setShowQuotationForm(true);
-                            setReturnTab('sales_contracts');
-                            setSearchParams({ tab: 'sales_quotation' });
-                        } else if (docType === 'Billing' || docType === 'ใบวางบิล' || docType === 'ใบแจ้งหนี้') {
-                            setEditingBillingId(docId);
-                            setIsViewOnly(true);
-                            setShowBillingForm(true);
-                            setReturnTab('sales_contracts');
-                            setSearchParams({ tab: 'sales_billing' });
+                            setPreviewQuotationId(docId);
+                        } else if (docType === 'Billing' || docType === 'ใบวางบิล' || docType === 'ใบวางบิล/ใบแจ้งหนี้') {
+                            setPreviewBillingId(docId);
+                        } else if (docType === 'TaxInvoice' || docType === 'ใบแจ้งหนี้/ใบส่งสินค้า') {
+                            setPreviewDocModal({ type: 'TaxInvoice', id: docId });
+                        } else if (docType === 'DeliveryOrder' || docType === 'ใบส่งสินค้า') {
+                            setPreviewDocModal({ type: 'DeliveryOrder', id: docId });
+                        } else if (docType === 'Receipt' || docType === 'ใบเสร็จรับเงิน') {
+                            setPreviewDocModal({ type: 'Receipt', id: docId });
                         } else if (docType === 'Sales Order' || docType === 'ใบสั่งขาย' || docType === 'ใบสั่งซื้อ') {
                             setEditingSOId(docId);
                             setIsSOViewOnly(true);
@@ -1528,6 +2135,241 @@ export default function Sales() {
                     </div>
                 </div>
             )}
+            
+            {/* ── Global History Modal ── */}
+            {showHistoryModal && (
+                <div className="pdf-preview-overlay" onClick={() => setShowHistoryModal(false)} style={{ zIndex: 3000, position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="pdf-preview-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%', height: 'auto', padding: '24px', maxHeight: '80vh', overflowY: 'auto', background: '#fff', borderRadius: '12px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <History size={18} /> ประวัติการแก้ไข
+                            </h3>
+                            <button onClick={() => setShowHistoryModal(false)} className="doc-action-btn" style={{ width: '30px', height: '30px', background: '#f1f5f9', borderRadius: '6px' }}>
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {historyList.length === 0 ? (
+                                <p style={{ textAlign: 'center', color: '#64748b', padding: '20px' }}>ไม่มีประวัติการแก้ไขสำหรับเอกสารนี้</p>
+                            ) : (
+                                historyList.map((h, i) => (
+                                    <div key={h.HistoryID} style={{
+                                        padding: '14px 16px',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '8px',
+                                        background: i === 0 ? '#f0fdf4' : 'var(--bg)',
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontWeight: 600, fontSize: '13px' }}>
+                                                    {h.Revision === 0 ? 'ต้นฉบับ' : `v.${h.Revision}`}
+                                                </span>
+                                                {i === 0 && h.Revision > 0 && (
+                                                    <span style={{ fontSize: '10px', color: '#64748b' }}>ถูกแทนที่ (v.{h.Revision + 1})</span>
+                                                )}
+                                                <span className={`badge ${getQuotationStatusClass(h.Status)}`} style={{ fontSize: '10px' }}>
+                                                    {h.Status}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                                    #{h.HistoryID}
+                                                </span>
+                                                <button
+                                                    className="doc-action-btn"
+                                                    title="ดูเอกสาร"
+                                                    style={{ background: '#e0f2fe', color: '#0284c7', width: '24px', height: '24px' }}
+                                                    onClick={() => {
+                                                        setShowHistoryModal(false);
+                                                        if (historyDocType === 'BillingInvoice') {
+                                                            setPreviewBillingId(`history-${h.HistoryID}`);
+                                                        } else if (historyDocType === 'TaxInvoice' || historyDocType === 'DeliveryOrder' || historyDocType === 'Receipt') {
+                                                            setPreviewDocModal({ type: historyDocType, id: `history-${h.HistoryID}` });
+                                                        } else {
+                                                            setPreviewQuotationId(`history-${h.HistoryID}`);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Eye size={12} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            ยอดรวมสุทธิ ฿{(h.GrandTotal || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})} — {new Date(h.ArchivedAt).toLocaleString('th-TH')}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Preview Quotation Popup Modal ── */}
+            {previewQuotationId && (
+                <div className="pdf-preview-overlay" onClick={() => setPreviewQuotationId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: '12px', width: '95%', maxWidth: '900px', height: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Eye size={18} /> พรีวิวใบเสนอราคา
+                            </h3>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {!String(previewQuotationId).startsWith('history-') && (
+                                <button
+                                    onClick={() => {
+                                        const id = previewQuotationId;
+                                        setPreviewQuotationId(null);
+                                        setEditingQuotationId(id);
+                                        setIsViewOnly(false);
+                                        setIsHistoryView(false);
+                                        setShowQuotationForm(true);
+                                    }}
+                                    style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <Edit size={14} /> แก้ไข
+                                </button>
+                                )}
+                                <button
+                                    onClick={() => setPreviewQuotationId(null)}
+                                    style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                                >
+                                    ✕ ปิด
+                                </button>
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+                            <QuotationForm
+                                editId={previewQuotationId}
+                                viewOnly={true}
+                                isHistory={String(previewQuotationId).startsWith('history-')}
+                                hideControls={true}
+                                onBack={() => setPreviewQuotationId(null)}
+                                onSave={() => setPreviewQuotationId(null)}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Preview Billing Popup Modal ── */}
+            {previewBillingId && (
+                <div className="pdf-preview-overlay" onClick={() => setPreviewBillingId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: '12px', width: '95%', maxWidth: '900px', height: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Eye size={18} /> พรีวิวใบวางบิล
+                            </h3>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {!String(previewBillingId).startsWith('history-') && (
+                                <button
+                                    onClick={() => {
+                                        const id = previewBillingId;
+                                        setPreviewBillingId(null);
+                                        setEditingBillingId(id);
+                                        setShowBillingForm(true);
+                                    }}
+                                    style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <Edit size={14} /> แก้ไข
+                                </button>
+                                )}
+                                <button
+                                    onClick={() => setPreviewBillingId(null)}
+                                    style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                                >
+                                    ✕ ปิด
+                                </button>
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+                            <BillingInvoiceForm
+                                editId={previewBillingId}
+                                viewOnly={true}
+                                isHistory={String(previewBillingId).startsWith('history-')}
+                                hideControls={true}
+                                onBack={() => setPreviewBillingId(null)}
+                                onSave={() => setPreviewBillingId(null)}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Preview Other Docs Popup Modal ── */}
+            {previewDocModal && (
+                <div className="pdf-preview-overlay" onClick={() => setPreviewDocModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: '12px', width: '95%', maxWidth: '900px', height: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Eye size={18} /> พรีวิวเอกสาร
+                            </h3>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {!String(previewDocModal.id).startsWith('history-') && (
+                                <button
+                                    onClick={() => {
+                                        const type = previewDocModal.type;
+                                        const id = previewDocModal.id;
+                                        setPreviewDocModal(null);
+                                        if (type === 'TaxInvoice') {
+                                            setEditingTaxInvoiceId(id);
+                                            setShowTaxInvoiceForm(true);
+                                        } else if (type === 'DeliveryOrder') {
+                                            setEditingDeliveryOrderId(id);
+                                            setShowDeliveryOrderForm(true);
+                                        } else if (type === 'Receipt') {
+                                            setEditDocId(id);
+                                            setShowReceiptForm(true);
+                                        }
+                                    }}
+                                    style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <Edit size={14} /> แก้ไข
+                                </button>
+                                )}
+                                <button
+                                    onClick={() => setPreviewDocModal(null)}
+                                    style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                                >
+                                    ✕ ปิด
+                                </button>
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+                            {previewDocModal.type === 'TaxInvoice' && (
+                                <TaxInvoiceForm
+                                    editId={previewDocModal.id}
+                                    viewOnly={true}
+                                    isHistory={String(previewDocModal.id).startsWith('history-')}
+                                    hideControls={true}
+                                    onBack={() => setPreviewDocModal(null)}
+                                    onSave={() => setPreviewDocModal(null)}
+                                />
+                            )}
+                            {previewDocModal.type === 'DeliveryOrder' && (
+                                <DeliveryOrderForm
+                                    editId={previewDocModal.id}
+                                    viewOnly={true}
+                                    isHistory={String(previewDocModal.id).startsWith('history-')}
+                                    hideControls={true}
+                                    onBack={() => setPreviewDocModal(null)}
+                                    onSave={() => setPreviewDocModal(null)}
+                                />
+                            )}
+                            {previewDocModal.type === 'Receipt' && (
+                                <ReceiptForm
+                                    editId={previewDocModal.id}
+                                    viewOnly={true}
+                                    isHistory={String(previewDocModal.id).startsWith('history-')}
+                                    hideControls={true}
+                                    onBack={() => setPreviewDocModal(null)}
+                                    onSave={() => setPreviewDocModal(null)}
+                                />
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };

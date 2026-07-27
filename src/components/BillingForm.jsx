@@ -4,6 +4,9 @@ import BillingPrintContainer from './BillingPrintContainer';
 import './BillingForm.css';
 import { Save, Printer, ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import API_BASE from '../config';
+import CustomDatePicker from './CustomDatePicker';
+import TaxIdInput from './TaxIdInput';
+import CustomSelect from './CustomSelect';
 
 const BillingForm = ({ onBack }) => {
     const [formData, setFormData] = useState({
@@ -221,9 +224,9 @@ const BillingForm = ({ onBack }) => {
 
             <div className="form-group">
                 <label>ประเภทเอกสาร</label>
-                <select name="docType" value={formData.docType} onChange={handleChange} className="form-control">
+                <CustomSelect name="docType" value={formData.docType} onChange={handleChange} className="form-control">
                     {DOC_TYPES.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
+                </CustomSelect>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
@@ -233,7 +236,7 @@ const BillingForm = ({ onBack }) => {
                 </div>
                 <div className="form-group">
                     <label>วันที่</label>
-                    <input type="date" name="billDate" value={formData.billDate} onChange={handleChange} className="form-control" />
+                    <CustomDatePicker name="billDate" value={formData.billDate} onChange={handleChange} className="form-control" />
                 </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                     <label>ชื่อลูกค้า / บริษัท <span style={{color: 'red'}}>*</span></label>
@@ -247,9 +250,9 @@ const BillingForm = ({ onBack }) => {
                     <label>เบอร์โทรศัพท์</label>
                     <input type="text" name="phone" value={formData.phone} onChange={handleChange} className="form-control" />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                     <label>เลขประจำตัวผู้เสียภาษี</label>
-                    <input type="text" name="taxId" value={formData.taxId} onChange={handleChange} className="form-control" />
+                    <TaxIdInput name="taxId" value={formData.taxId} onChange={handleChange} />
                 </div>
             </div>
 
@@ -273,7 +276,7 @@ const BillingForm = ({ onBack }) => {
                     </div>
                     <div className="form-group">
                         <label>วันครบกำหนดชำระ</label>
-                        <input type="date" name="dueDate" value={formData.dueDate} onChange={handleChange} className="form-control" />
+                        <CustomDatePicker name="dueDate" value={formData.dueDate} onChange={handleChange} className="form-control" />
                     </div>
                     <div className="form-group">
                         <label>พนักงานขาย</label>
@@ -297,9 +300,9 @@ const BillingForm = ({ onBack }) => {
                         <input type="number" value={product.quantity} onChange={(e) => handleProductChange(product.id, 'quantity', e.target.value)} className="form-control" placeholder="จำนวน" />
                     </div>
                     <div style={{ width: '80px' }}>
-                        <select value={product.unit} onChange={(e) => handleProductChange(product.id, 'unit', e.target.value)} className="form-control">
+                        <CustomSelect value={product.unit} onChange={(e) => handleProductChange(product.id, 'unit', e.target.value)} className="form-control">
                             {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
+                        </CustomSelect>
                     </div>
                     <div style={{ width: '120px' }}>
                         <input type="number" value={product.unitPrice} onChange={(e) => handleProductChange(product.id, 'unitPrice', e.target.value)} className="form-control" placeholder="ราคา/หน่วย" />
@@ -350,10 +353,10 @@ const BillingForm = ({ onBack }) => {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <span>VAT:</span>
-                        <select name="vatType" value={formData.vatType} onChange={handleChange} className="form-control" style={{ width: '120px' }}>
+                        <CustomSelect name="vatType" value={formData.vatType} onChange={handleChange} className="form-control" style={{ width: '120px' }}>
                             <option value="0">ไม่มี VAT</option>
                             <option value="7">VAT 7%</option>
-                        </select>
+                        </CustomSelect>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                         <span>ค่าจัดส่ง:</span>

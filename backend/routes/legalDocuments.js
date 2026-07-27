@@ -136,7 +136,12 @@ router.post('/', async (req, res) => {
             let prefix = 'DOC-';
             if (data.documentType === 'poa') prefix = 'POA-';
             else if (data.documentType === 'corp_rep') prefix = 'CRP-';
-            finalDocumentNo = await generateSequence(pool, 'LegalDocuments', 'DocumentNo', `${prefix}${getDatePrefix()}`, 3);
+            
+            if (data.status === 'พรีวิว') {
+                finalDocumentNo = `PREV-${prefix}${Date.now()}`;
+            } else {
+                finalDocumentNo = await generateSequence(pool, 'LegalDocuments', 'DocumentNo', `${prefix}${getDatePrefix()}`, 3);
+            }
         }
 
         const result = await pool.request()
@@ -280,16 +285,30 @@ router.put('/:id', async (req, res) => {
         const { id } = req.params;
         const data = req.body;
 
+        const checkDoc = await pool.request().input('CheckDocumentID', sql.Int, id).query(`SELECT * FROM LegalDocuments WHERE DocumentID = @CheckDocumentID`);
+        if (checkDoc.recordset.length === 0) {
+            return res.status(404).json({ success: false, message: 'Document not found' });
+        }
+        const oldDoc = checkDoc.recordset[0];
+        
+        let finalDocumentNo = data.documentNo !== undefined ? (data.documentNo || null) : (oldDoc.DocumentNo || null);
+        if (oldDoc.Status === 'พรีวิว' && data.status !== 'พรีวิว' && (!finalDocumentNo || finalDocumentNo.startsWith('PREV-'))) {
+            let prefix = 'DOC-';
+            if (data.documentType === 'poa') prefix = 'POA-';
+            else if (data.documentType === 'corp_rep') prefix = 'CRP-';
+            finalDocumentNo = await generateSequence(pool, 'LegalDocuments', 'DocumentNo', `${prefix}${getDatePrefix()}`, 3);
+        }
+
         const sqlReq = pool.request()
             .input('DocumentID', sql.Int, id)
-            .input('DocumentNo', sql.NVarChar, data.documentNo || null)
-            .input('WrittenAt', sql.NVarChar, data.writtenAt || null)
-            .input('DocumentDate', sql.Date, data.documentDate || null)
+            .input('DocumentNo', sql.NVarChar, finalDocumentNo)
+            .input('WrittenAt', sql.NVarChar, data.writtenAt !== undefined ? (data.writtenAt || null) : (oldDoc.WrittenAt || null))
+            .input('DocumentDate', sql.Date, data.documentDate !== undefined ? (data.documentDate || null) : (oldDoc.DocumentDate || null))
             .input('DocumentType', sql.NVarChar, data.documentType || 'poa')
-            .input('ContractID', sql.Int, data.contractId || null)
+            .input('ContractID', sql.Int, data.contractId !== undefined ? (data.contractId || null) : (oldDoc.ContractID || null))
             
-            .input('GrantorType', sql.NVarChar, data.personType || data.grantorType || null)
-            .input('GrantorName', sql.NVarChar, data.licenseeName || data.grantorName || null)
+            .input('GrantorType', sql.NVarChar, data.personType !== undefined ? (data.personType || null) : (data.grantorType !== undefined ? (data.grantorType || null) : (oldDoc.GrantorType || null)))
+            .input('GrantorName', sql.NVarChar, data.licenseeName !== undefined ? (data.licenseeName || null) : (data.grantorName !== undefined ? (data.grantorName || null) : (oldDoc.GrantorName || null)))
             .input('GrantorCitizenID', sql.NVarChar, data.citizenId || data.grantorCitizenId || null)
             .input('GrantorCitizenIDExpiryDate', sql.Date, data.citizenIdExpiry || data.grantorCitizenIdExpiryDate || null)
             .input('GrantorJuristicID', sql.NVarChar, data.juristicId || data.grantorJuristicId || null)
@@ -345,11 +364,11 @@ router.put('/:id', async (req, res) => {
             .input('HasNoticeNo', sql.Bit, data.hasNoticeNo ? 1 : 0)
             .input('RegNoticeNo', sql.NVarChar, data.regNoticeNo || null)
             
-            .input('GranteePrefix', sql.NVarChar, data.granteePrefix || null)
-            .input('GranteeName', sql.NVarChar, data.granteeName || null)
-            .input('GranteeAge', sql.Int, data.granteeAge || null)
-            .input('GranteeCitizenID', sql.NVarChar, data.granteeCitizenId || null)
-            .input('GranteeIDExpiryDate', sql.Date, data.granteeIdExpiry || data.granteeIdExpiryDate || null)
+            .input('GranteePrefix', sql.NVarChar, data.granteePrefix !== undefined ? (data.granteePrefix || null) : (oldDoc.GranteePrefix || null))
+            .input('GranteeName', sql.NVarChar, data.granteeName !== undefined ? (data.granteeName || null) : (oldDoc.GranteeName || null))
+            .input('GranteeAge', sql.Int, data.granteeAge !== undefined ? (data.granteeAge || null) : (oldDoc.GranteeAge || null))
+            .input('GranteeCitizenID', sql.NVarChar, data.granteeCitizenId !== undefined ? (data.granteeCitizenId || null) : (oldDoc.GranteeCitizenID || null))
+            .input('GranteeIDExpiryDate', sql.Date, data.granteeIdExpiry !== undefined ? (data.granteeIdExpiry || null) : (data.granteeIdExpiryDate !== undefined ? (data.granteeIdExpiryDate || null) : (oldDoc.GranteeIDExpiryDate || null)))
             .input('GranteeAddressNo', sql.NVarChar, data.granteeAddressNo || null)
             .input('GranteeMoo', sql.NVarChar, data.granteeMoo || null)
             .input('GranteeSoi', sql.NVarChar, data.granteeSoi || null)
@@ -377,16 +396,15 @@ router.put('/:id', async (req, res) => {
             .input('Witness2Name', sql.NVarChar, data.witness2Name || null)
             
             .input('Status', sql.NVarChar, data.status || 'ร่าง');
-
-        const checkDoc = await pool.request().input('CheckDocumentID', sql.Int, id).query(`SELECT Status, Version, DocumentNo, RefDocumentID FROM LegalDocuments WHERE DocumentID = @CheckDocumentID`);
-        if (checkDoc.recordset.length === 0) {
-            return res.status(404).json({ success: false, message: 'Document not found' });
-        }
-        const oldDoc = checkDoc.recordset[0];
-
         let queryStr = '';
+        // ถ้าสถานะเป็น "ลูกค้าขอแก้ไข" → สร้างเวอร์ชันใหม่ทุกครั้งที่บันทึก
         if (data.status === 'ลูกค้าขอแก้ไข' && oldDoc.Status !== 'ลูกค้าขอแก้ไข') {
-            sqlReq.input('Version', sql.Int, oldDoc.Version + 1);
+            // หาเวอร์ชันสูงสุดของเอกสารเลขที่นี้
+            const maxVerResult = await pool.request()
+                .input('VerDocNo', sql.NVarChar, oldDoc.DocumentNo)
+                .query(`SELECT MAX(Version) as maxVer FROM LegalDocuments WHERE DocumentNo = @VerDocNo`);
+            const newVersion = (maxVerResult.recordset[0].maxVer || 1) + 1;
+            sqlReq.input('Version', sql.Int, newVersion);
             sqlReq.input('RefDocumentID', sql.Int, oldDoc.RefDocumentID || id);
             queryStr = `
                 INSERT INTO LegalDocuments (
@@ -516,7 +534,13 @@ router.put('/:id', async (req, res) => {
             return res.status(404).json({ success: false, message: 'Document not found' });
         }
 
-        res.json({ success: true, message: 'Document updated successfully', documentId: id });
+        // ถ้าเป็นการสร้างเวอร์ชันใหม่ (INSERT) ให้คืน DocumentID ใหม่
+        let returnedId = id;
+        if (data.status === 'ลูกค้าขอแก้ไข' && updateResult.recordset && updateResult.recordset.length > 0) {
+            returnedId = updateResult.recordset[0].DocumentID;
+        }
+
+        res.json({ success: true, message: 'Document updated successfully', documentId: returnedId });
     } catch (err) {
         console.error('Error updating legal document:', err);
         res.status(500).json({ success: false, message: 'Server error updating document', error: err.message });
@@ -783,6 +807,39 @@ router.delete('/attachments/:id', async (req, res) => {
     } catch (err) {
         console.error('Error deleting attachment:', err);
         res.status(500).json({ success: false, message: 'Server error deleting attachment', error: err.message });
+    }
+});
+
+
+// GET history by Document ID
+router.get('/history-by-id/:id', async (req, res) => {
+    try {
+        const { poolPromise, sql } = require('../config/db');
+        const pool = await poolPromise;
+        
+        // Ensure DocumentType exists in table structure or mock it
+        let docTypeField = 'DocumentType';
+        if ('LegalDocuments' === 'SafetyCertDocuments' || 'LegalDocuments' === 'PdpaConsentDocuments') {
+            docTypeField = 'NULL as DocumentType';
+        }
+        
+        const result = await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query(`
+                DECLARE @RefID INT;
+                SELECT @RefID = ISNULL(RefDocumentID, DocumentID) FROM LegalDocuments WHERE DocumentID = @id;
+                
+                SELECT DocumentID as DocumentID, Status, CreatedAt, Version
+                FROM LegalDocuments
+                WHERE DocumentID = @RefID OR RefDocumentID = @RefID
+                ORDER BY Version DESC
+            `);
+        
+        // Since some tables don't have DocumentType column, we just return the row
+        res.json({ success: true, data: result.recordset });
+    } catch (err) {
+        console.error('Error fetching history by ID:', err);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
 

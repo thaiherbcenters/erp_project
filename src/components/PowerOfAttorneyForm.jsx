@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } f
 import { Save, Printer, ArrowLeft, FileSignature } from 'lucide-react';
 import { useAlert } from './CustomAlert';
 import API_BASE from '../config';
+import IdCardInput from './IdCardInput';
+import CustomDatePicker from './CustomDatePicker';
 import './PowerOfAttorneyForm.css';
 
 /**
@@ -19,57 +21,6 @@ import './PowerOfAttorneyForm.css';
  * =============================================================================
  */
 
-/* ── Helper: ID card input boxes ── */
-const IdCardInput = ({ value = '', onChange, pattern = '1-4-5-2-1' }) => {
-    const groups = pattern.split('-').map(Number);
-    const totalDigits = groups.reduce((a, b) => a + b, 0);
-    const digits = (value || '').padEnd(totalDigits, '').split('');
-    const inputRefs = useRef([]);
-
-    const handleDigitChange = (globalIdx, val) => {
-        const newDigits = [...digits];
-        newDigits[globalIdx] = val.slice(-1);
-        const newValue = newDigits.join('').replace(/\s/g, '');
-        onChange(newValue);
-
-        // Auto-focus next input
-        if (val && globalIdx < totalDigits - 1) {
-            inputRefs.current[globalIdx + 1]?.focus();
-        }
-    };
-
-    const handleKeyDown = (globalIdx, e) => {
-        if (e.key === 'Backspace' && !digits[globalIdx]?.trim() && globalIdx > 0) {
-            inputRefs.current[globalIdx - 1]?.focus();
-        }
-    };
-
-    let globalIdx = 0;
-    return (
-        <div className="poa-id-boxes">
-            {groups.map((count, gIdx) => (
-                <React.Fragment key={gIdx}>
-                    {gIdx > 0 && <span className="poa-id-separator">-</span>}
-                    {Array.from({ length: count }).map((_, dIdx) => {
-                        const idx = globalIdx++;
-                        return (
-                            <input
-                                key={idx}
-                                ref={el => inputRefs.current[idx] = el}
-                                type="text"
-                                maxLength={1}
-                                value={digits[idx]?.trim() || ''}
-                                onChange={e => handleDigitChange(idx, e.target.value)}
-                                onKeyDown={e => handleKeyDown(idx, e)}
-                                inputMode="numeric"
-                            />
-                        );
-                    })}
-                </React.Fragment>
-            ))}
-        </div>
-    );
-};
 
 const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, contractId: externalContractId, embedded, sharedFormData, onSharedDataChange }, ref) => {
     const { showAlert, showConfirm, showLoading, hideLoading } = useAlert();
@@ -79,55 +30,51 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
     const [currentDocId, setCurrentDocId] = useState(documentId || null);
 
     const [form, setForm] = useState({
-        // ── ข้อมูลทั่วไป ──
         contractId: '',
-        writtenAt: 'บริษัท ไทยเฮิร์บ จำกัด',
+        writtenAt: '',
         documentDate: new Date().toISOString().split('T')[0],
 
-        // ── ส่วนที่ 1: ผู้รับอนุญาต (ผู้มอบอำนาจ) ──
-        licenseeName: 'บริษัท ทดสอบสมุนไพร จำกัด',
-        licenseNo: '10-1-6500012345',
-        // ประเภทผู้รับอนุญาต
-        isProducer: false,
+        licenseeName: 'นายธวัช จรุงพิรวงศ์',
+        licenseNo: 'HB 12-1-67-1',
+        isProducer: true,
         isImporter: false,
-        // ประเภทผลิตภัณฑ์สมุนไพร
-        prodTypeHerbalMedicine: true,
+        prodTypeHerbalMedicine: false,
         prodTypeTraditionalMed: false,
         prodTypeDevMed: false,
         prodTypeHealthProduct: false,
         prodTypeCosmetic: false,
-        prodTypeDetail: 'ยาดมสมุนไพร',
+        prodTypeDetail: '',
         // ประเภทบุคคล
-        personType: 'juristic', // 'natural' | 'juristic'
-        citizenId: '',
+        personType: 'natural', // 'natural' | 'juristic'
+        citizenId: '3259900200422',
         citizenIdExpiry: '',
-        juristicId: '0105555555555',
-        juristicIdExpiry: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+        juristicId: '',
+        juristicIdExpiry: '',
         // ผู้ดำเนินกิจการ
-        operatorPrefix: 'นาย',
-        operatorName: 'สมชาย รักษาดี',
-        operatorCitizenId: '1100000000000',
-        operatorIdExpiry: new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().split('T')[0],
+        operatorPrefix: '',
+        operatorName: '',
+        operatorCitizenId: '',
+        operatorIdExpiry: '',
 
         // ── สถานที่ประกอบการ ──
-        establishmentName: 'โรงงานไทยเฮิร์บ',
-        estAddressNo: '123',
-        estSoi: 'สุขุมวิท 1',
-        estMoo: '1',
-        estRoad: 'สุขุมวิท',
-        estSubDistrict: 'คลองเตย',
-        estDistrict: 'คลองเตย',
-        estProvince: 'กรุงเทพมหานคร',
-        estPostcode: '10110',
-        estPhone: '02-123-4567',
-        estFax: '02-123-4568',
-        estEmail: 'test@thaiherb.com',
+        establishmentName: '',
+        estAddressNo: '',
+        estSoi: '',
+        estMoo: '',
+        estRoad: '',
+        estSubDistrict: '',
+        estDistrict: '',
+        estProvince: '',
+        estPostcode: '',
+        estPhone: '',
+        estFax: '',
+        estEmail: '',
 
         // ── ประเภทคำขอ ──
         reqType: '',  // 'register' | 'notifyDetail' | 'notify' | 'renew'
 
         // ── ผู้ยื่น ──
-        submitterIsIn: true,
+        submitterIsIn: false,
         submitFormType: '',  // 'amend' | 'replace' | 'other'
         submitFormOther: '',
         productName: '',
@@ -140,30 +87,30 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
         regNoticeNo: '',
 
         // ── ส่วนที่ 2: ผู้รับมอบอำนาจ ──
-        granteePrefix: 'นาย',
-        granteeName: 'ธวัช จรุงพิรวงศ์',
-        granteeAge: '45',
-        granteeCitizenId: '3259900200422',
-        granteeIdExpiry: new Date(new Date().setFullYear(new Date().getFullYear() + 5)).toISOString().split('T')[0],
-        granteeAddressNo: '6/10',
-        granteeMoo: '2',
+        granteePrefix: '',
+        granteeName: '',
+        granteeAge: '',
+        granteeCitizenId: '',
+        granteeIdExpiry: '',
+        granteeAddressNo: '',
+        granteeMoo: '',
         granteeSoi: '',
         granteeRoad: '',
-        granteeSubDistrict: 'ไทรม้า',
-        granteeDistrict: 'เมืองนนทบุรี',
-        granteeProvince: 'นนทบุรี',
-        granteePhone: '081-999-9999',
-        granteeEmail: 'grantee@thaiherb.com',
+        granteeSubDistrict: '',
+        granteeDistrict: '',
+        granteeProvince: '',
+        granteePhone: '',
+        granteeEmail: '',
 
         // ── ขอบเขตอำนาจ ──
-        scopeSubmit: true,
-        scopeAmend: true,
-        scopeAll: true,
+        scopeSubmit: false,
+        scopeAmend: false,
+        scopeAll: false,
         scopeOther: '',
         scopeStartDate: '',
 
         // ── เอกสารแนบ ──
-        attachLicenseCopy: true,
+        attachLicenseCopy: false,
 
         // ── ลายเซ็น ──
         grantorSignName: '',
@@ -198,15 +145,71 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
         fetchContracts();
     }, []);
 
-    // Auto-fill customer data when provided from parent
+    // Auto-fill customer data into Grantee (ผู้รับมอบอำนาจ)
     useEffect(() => {
         if (customerData && !currentDocId) {
+            const customerAddress = customerData.Address || '';
+            const customerTaxId = customerData.TaxID || customerData.IDCard || '';
+            const customerName = customerData.CustomerName || '';
+            const customerPhone = customerData.Phone || '';
+            const customerEmail = customerData.Email || '';
+            
+            const parseAddress = (addr) => {
+                if (!addr) return { no: '-', moo: '-', soi: '-', road: '-', subDistrict: '-', district: '-', province: '-', zip: '-' };
+                let remaining = addr.trim();
+                let no = '-', moo = '-', soi = '-', road = '-', subDistrict = '-', district = '-', province = '-', zip = '-';
+
+                const zipMatch = remaining.match(/\s?(\d{5})$/);
+                if (zipMatch) { zip = zipMatch[1]; remaining = remaining.replace(/\s?\d{5}$/, '').trim(); }
+
+                const provMatch = remaining.match(/(?:จ\.|จังหวัด)\s*([^\s]+)/);
+                if (provMatch) { province = provMatch[1]; remaining = remaining.replace(/(?:จ\.|จังหวัด)\s*[^\s]+/, '').trim(); }
+
+                const distMatch = remaining.match(/(?:อ\.|อำเภอ|เขต)\s*([^\s]+)/);
+                if (distMatch) { district = distMatch[1]; remaining = remaining.replace(/(?:อ\.|อำเภอ|เขต)\s*[^\s]+/, '').trim(); }
+
+                const subMatch = remaining.match(/(?:ต\.|ตำบล|แขวง)\s*([^\s]+)/);
+                if (subMatch) { subDistrict = subMatch[1]; remaining = remaining.replace(/(?:ต\.|ตำบล|แขวง)\s*[^\s]+/, '').trim(); }
+
+                const roadMatch = remaining.match(/(?:ถ\.|ถนน)\s*([^\s]+)/);
+                if (roadMatch) { road = roadMatch[1]; remaining = remaining.replace(/(?:ถ\.|ถนน)\s*[^\s]+/, '').trim(); }
+
+                const soiMatch = remaining.match(/(?:ซ\.|ซอย)\s*([^\s]+)/);
+                if (soiMatch) { soi = soiMatch[1]; remaining = remaining.replace(/(?:ซ\.|ซอย)\s*[^\s]+/, '').trim(); }
+
+                const mooMatch = remaining.match(/(?:ม\.|หมู่|หมู่ที่)\s*([0-9]+)/);
+                if (mooMatch) { moo = mooMatch[1]; remaining = remaining.replace(/(?:ม\.|หมู่|หมู่ที่)\s*[0-9]+/, '').trim(); }
+
+                remaining = remaining.replace(/เลขที่\s*/, '').trim();
+                no = remaining || '-';
+                
+                return { no, moo, soi, road, subDistrict, district, province, zip };
+            };
+            const addr = parseAddress(customerAddress);
+            const fallback = (val) => val ? val : '-';
+
+            // Check if name has prefix to extract it
+            let prefix = '';
+            let nameWithoutPrefix = customerName;
+            if (customerName.startsWith('นาย')) { prefix = 'นาย'; nameWithoutPrefix = customerName.replace(/^นาย\s*/, ''); }
+            else if (customerName.startsWith('นางสาว')) { prefix = 'นางสาว'; nameWithoutPrefix = customerName.replace(/^นางสาว\s*/, ''); }
+            else if (customerName.startsWith('นาง')) { prefix = 'นาง'; nameWithoutPrefix = customerName.replace(/^นาง\s*/, ''); }
+
             setForm(prev => ({
                 ...prev,
-                licenseeName: customerData.CustomerName || '',
-                citizenId: customerData.TaxID || '',
-                estPhone: customerData.Phone || '',
-                estEmail: customerData.Email || '',
+                granteePrefix: prefix,
+                granteeName: nameWithoutPrefix || '-',
+                granteeCitizenId: customerTaxId || '',
+                granteeAddressNo: addr.no,
+                granteeMoo: addr.moo,
+                granteeSoi: addr.soi,
+                granteeRoad: addr.road,
+                granteeSubDistrict: addr.subDistrict,
+                granteeDistrict: addr.district,
+                granteeProvince: addr.province,
+                granteePostcode: addr.zip === '-' ? '' : addr.zip,
+                granteePhone: fallback(customerPhone),
+                granteeEmail: fallback(customerEmail),
             }));
         }
     }, [customerData, currentDocId]);
@@ -490,7 +493,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
     };
 
     return (
-        <div className={!embedded ? "print-page-break card" : "poa-form-wrapper"} style={!embedded ? { padding: 0, overflow: 'hidden', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' } : {}}>
+        <div className="poa-form-wrapper" style={!embedded ? { padding: 0, paddingBottom: 80, overflow: 'hidden', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' } : { paddingBottom: 80 }}>
             {/* ════════════════════════════════════════════════════════════════ */}
             {/* Header                                                         */}
             {/* ════════════════════════════════════════════════════════════════ */}
@@ -506,7 +509,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                 </div>
             )}
 
-            <div className={!embedded ? "poa-form-wrapper" : ""} style={!embedded ? { boxShadow: 'none' } : {}}>
+            <div className="poa-form-wrapper" style={!embedded ? { boxShadow: 'none' } : {}}>
                 <p style={{ fontSize: '12px', color: '#64748b', marginBottom: '16px', lineHeight: 1.6 }}>
                     สำหรับการมอบอำนาจ (ฉบับจะ = คำขอ) ของผู้รับอนุญาตผลิต/นำเข้าผลิตภัณฑ์สมุนไพร
                     (ตามแบบ ทบ.๑/จร.๑/ขจ.๑ / ทบ.๑ จร.๑ ขจ.๑ /บท./ลล.)
@@ -517,19 +520,6 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
             {/* ════════════════════════════════════════════════════════════════ */}
             <div className="poa-info-box gray">
                 <div className="poa-section-subtitle" style={{ marginTop: 0 }}>ข้อมูลเอกสาร</div>
-                <div className="poa-row" style={{ marginBottom: '12px' }}>
-                    <div className="poa-field medium">
-                        <label>อ้างอิงสัญญา <span style={{fontSize: '11px', color: '#64748b', fontWeight: 'normal'}}>(เลือกจากระบบ)</span></label>
-                        <select name="contractId" value={form.contractId} onChange={handleChange} style={{ padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px', width: '100%' }}>
-                            <option value="">-- ไม่ระบุสัญญา / ไม่ได้เชื่อมโยง --</option>
-                            {contracts.map(c => (
-                                <option key={c.ContractID} value={c.ContractID}>
-                                    {c.ContractNo} : {c.ContractName}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
                 <div className="poa-row">
                     <div className="poa-field">
                         <label>เขียนที่</label>
@@ -537,7 +527,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                     </div>
                     <div className="poa-field medium">
                         <label>วันที่เอกสาร</label>
-                        <input type="date" name="documentDate" value={form.documentDate} onChange={handleChange} />
+                        <CustomDatePicker name="documentDate" value={form.documentDate} onChange={handleChange} />
                     </div>
                 </div>
             </div>
@@ -640,7 +630,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                         <div className="poa-row" style={{ marginTop: '12px' }}>
                             <div className="poa-field medium">
                                 <label>(วันที่บัตรหมดอายุ)</label>
-                                <input type="date" name="citizenIdExpiry" value={form.citizenIdExpiry} onChange={handleChange} />
+                                <CustomDatePicker name="citizenIdExpiry" value={form.citizenIdExpiry} onChange={handleChange} />
                             </div>
                         </div>
                     </div>
@@ -655,34 +645,36 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
             </div>
 
             {/* ── ผู้ดำเนินกิจการ ── */}
-            <div className="poa-info-box gray" style={{ marginTop: '12px' }}>
-                <div className="poa-section-subtitle" style={{ marginTop: 0 }}>มีผู้ดำเนินกิจการ ตามที่ระบุที่ใบอนุญาต</div>
-                <div className="poa-row">
-                    <div className="poa-field" style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>ชื่อ</span>
-                            <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
-                                <input type="radio" name="operatorPrefix" value="นาย" checked={form.operatorPrefix === 'นาย'} onChange={handleChange} /> นาย
-                            </label>
-                            <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
-                                <input type="radio" name="operatorPrefix" value="นาง" checked={form.operatorPrefix === 'นาง'} onChange={handleChange} /> นาง
-                            </label>
-                            <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
-                                <input type="radio" name="operatorPrefix" value="นางสาว" checked={form.operatorPrefix === 'นางสาว'} onChange={handleChange} /> นางสาว
-                            </label>
+            {form.personType === 'juristic' && (
+                <div className="poa-info-box gray" style={{ marginTop: '12px' }}>
+                    <div className="poa-section-subtitle" style={{ marginTop: 0 }}>มีผู้ดำเนินกิจการ ตามที่ระบุที่ใบอนุญาต</div>
+                    <div className="poa-row">
+                        <div className="poa-field" style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>ชื่อ</span>
+                                <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
+                                    <input type="radio" name="operatorPrefix" value='นาย' checked={form.operatorPrefix === 'นาย'} onChange={handleChange} /> นาย
+                                </label>
+                                <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
+                                    <input type="radio" name="operatorPrefix" value='นาง' checked={form.operatorPrefix === 'นาง'} onChange={handleChange} /> นาง
+                                </label>
+                                <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
+                                    <input type="radio" name="operatorPrefix" value='นางสาว' checked={form.operatorPrefix === 'นางสาว'} onChange={handleChange} /> นางสาว
+                                </label>
+                            </div>
+                            <input type="text" name="operatorName" value={form.operatorName} onChange={handleChange} placeholder="ชื่อ-นามสกุล" />
                         </div>
-                        <input type="text" name="operatorName" value={form.operatorName} onChange={handleChange} placeholder="ชื่อ-นามสกุล" />
+                    </div>
+                    <div className="poa-section-subtitle">บัตรประจำตัวประชาชนเลขที่</div>
+                    <IdCardInput value={form.operatorCitizenId} onChange={handleIdChange('operatorCitizenId')} pattern="1-4-5-2-1" />
+                    <div className="poa-row" style={{ marginTop: '10px' }}>
+                        <div className="poa-field medium">
+                            <label>วันที่บัตรหมดอายุ</label>
+                            <CustomDatePicker name="operatorIdExpiry" value={form.operatorIdExpiry} onChange={handleChange} />
+                        </div>
                     </div>
                 </div>
-                <div className="poa-section-subtitle">บัตรประจำตัวประชาชนเลขที่</div>
-                <IdCardInput value={form.operatorCitizenId} onChange={handleIdChange('operatorCitizenId')} pattern="1-4-5-2-1" />
-                <div className="poa-row" style={{ marginTop: '10px' }}>
-                    <div className="poa-field medium">
-                        <label>วันที่บัตรหมดอายุ</label>
-                        <input type="date" name="operatorIdExpiry" value={form.operatorIdExpiry} onChange={handleChange} />
-                    </div>
-                </div>
-            </div>
+            )}
 
             {/* ── สถานที่ประกอบการ ── */}
             <div className="poa-section-subtitle" style={{ marginTop: '16px', fontWeight: 700, color: '#1e3a5f' }}>มีสถานที่ประกอบการที่ระบุในใบอนุญาตชื่อ</div>
@@ -856,13 +848,13 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
                         <span style={{ fontSize: '13px', fontWeight: 600, color: '#475569' }}>คำนำหน้า <span className="required">*</span></span>
                         <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
-                            <input type="radio" name="granteePrefix" value="นาย" checked={form.granteePrefix === 'นาย'} onChange={handleChange} /> นาย
+                            <input type="radio" name="granteePrefix" value='นาง' checked={form.granteePrefix === 'นาง'} onChange={handleChange} /> นาย
                         </label>
                         <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
-                            <input type="radio" name="granteePrefix" value="นาง" checked={form.granteePrefix === 'นาง'} onChange={handleChange} /> นาง
+                            <input type="radio" name="granteePrefix" value='นางสาว' checked={form.granteePrefix === 'นางสาว'} onChange={handleChange} /> นาง
                         </label>
                         <label className="poa-radio-item" style={{ fontSize: '13px', margin: 0 }}>
-                            <input type="radio" name="granteePrefix" value="นางสาว" checked={form.granteePrefix === 'นางสาว'} onChange={handleChange} /> นางสาว
+                            <input type="radio" name="granteePrefix" value='นาง' checked={form.granteePrefix === 'นาง'} onChange={handleChange} /> นางสาว
                         </label>
                     </div>
                     <input type="text" name="granteeName" value={form.granteeName} onChange={handleChange} placeholder="ชื่อ-นามสกุล" />
@@ -878,7 +870,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                 <IdCardInput value={form.granteeCitizenId} onChange={handleIdChange('granteeCitizenId')} pattern="1-4-5-2-1" />
                 <div className="poa-id-expiry">
                     <span>(วันที่บัตรหมดอายุ</span>
-                    <input type="date" name="granteeIdExpiry" value={form.granteeIdExpiry} onChange={handleChange} />
+                    <CustomDatePicker name="granteeIdExpiry" value={form.granteeIdExpiry} onChange={handleChange} />
                     <span>)</span>
                 </div>
             </div>
@@ -1009,3 +1001,5 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
 });
 
 export default PowerOfAttorneyForm;
+
+

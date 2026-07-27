@@ -1,99 +1,138 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import API_BASE from '../config';
 import './PowerOfAttorneyForm.css';
+import './PowerOfAttorneyForm.css';
+import IdCardInput from './IdCardInput';
+import CustomDatePicker from './CustomDatePicker';
 
 const safeJSONParse = (str, fallback = {}) => {
     try {
         if (!str) return fallback;
         if (typeof str === 'object') return str;
         if (str.startsWith('{')) return JSON.parse(str);
+        
+        let no = '', moo = '', soi = '', road = '', subDistrict = '', district = '', province = '', zip = '';
+        
+        const zipMatch = str.match(/\d{5}/);
+        if (zipMatch) zip = zipMatch[0];
+        
+        const provMatch = str.match(/(?:จ\.|จังหวัด)\s*([ก-๙]+)/);
+        if (provMatch) province = provMatch[1];
+        
+        const distMatch = str.match(/(?:อ\.|เขต|อำเภอ)\s*([ก-๙]+)/);
+        if (distMatch) district = distMatch[1];
+        
+        const subDistMatch = str.match(/(?:ต\.|แขวง|ตำบล)\s*([ก-๙]+)/);
+        if (subDistMatch) subDistrict = subDistMatch[1];
+        
+        const roadMatch = str.match(/(?:ถ\.|ถนน)\s*([ก-๙0-9\-]+)/);
+        if (roadMatch) road = roadMatch[1] === '-' ? '' : roadMatch[1];
+        
+        const soiMatch = str.match(/(?:ซ\.|ซอย)\s*([ก-๙0-9\-]+)/);
+        if (soiMatch) soi = soiMatch[1] === '-' ? '' : soiMatch[1];
+        
+        const mooMatch = str.match(/(?:ม\.|หมู่|หมู่ที่)\s*([0-9\-]+)/);
+        if (mooMatch) moo = mooMatch[1] === '-' ? '-' : mooMatch[1];
+        
+        const noMatch = str.match(/^([\d\/]+)/);
+        if (noMatch) no = noMatch[1];
+        
+        if (no || subDistrict || province || district || zip) {
+            return { 
+                no: no || '-', 
+                moo: moo || '-', 
+                soi: soi || '-', 
+                road: road || '-', 
+                subDistrict: subDistrict || '-', 
+                district: district || '-', 
+                province: province || '-', 
+                zip: zip || '-', 
+                raw: str 
+            };
+        }
+        
         return { ...fallback, raw: str };
     } catch (e) {
         return { ...fallback, raw: str };
     }
 };
 
-const NameInputWithTitle = ({ value, onChange, placeholder }) => {
-    const titles = ['นาย', 'นางสาว', 'นาง'];
-    
-    const getParsed = (val) => {
-        if (!val) return { title: '', name: '' };
-        for (let t of titles) {
-            if (val.startsWith(t)) {
-                return { title: t, name: val.substring(t.length).trim() };
-            }
-        }
-        return { title: '', name: val };
-    };
+import NameInputWithTitle from './NameInputWithTitle';
 
-    const parsed = getParsed(value);
 
-    const handleTitleChange = (e) => {
-        const newTitle = e.target.value;
-        onChange(newTitle + parsed.name);
-    };
-
-    const handleNameChange = (e) => {
-        onChange(parsed.title + e.target.value);
-    };
-
-    return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ display: 'flex', gap: '15px', alignItems: 'center', fontSize: '14px', color: '#334155' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontWeight: 'normal', margin: 0 }}>
-                    <input type="radio" value="นาย" checked={parsed.title === 'นาย'} onChange={handleTitleChange} /> นาย
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontWeight: 'normal', margin: 0 }}>
-                    <input type="radio" value="นาง" checked={parsed.title === 'นาง'} onChange={handleTitleChange} /> นาง
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', fontWeight: 'normal', margin: 0 }}>
-                    <input type="radio" value="นางสาว" checked={parsed.title === 'นางสาว'} onChange={handleTitleChange} /> นางสาว
-                </label>
-            </div>
-            <input 
-                type="text" 
-                value={parsed.name} 
-                onChange={handleNameChange} 
-                placeholder={placeholder} 
-                style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}
-            />
-        </div>
-    );
-};
-
-const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = null, sharedData = {} }, ref) => {
+const ContractMfgForm = forwardRef(({ documentId, customerData, contractData, initialData = null, sharedFormData = {}, onSharedDataChange }, ref) => {
+    const [currentDocId, setCurrentDocId] = useState(documentId || null);
     const [formData, setFormData] = useState({
-        ContractNo: 'TEST-001/2567',
-        WrittenAt: 'บริษัท ไทยเฮิร์บ จำกัด',
+        ContractNo: '',
+        WrittenAt: '',
         DocumentDate: new Date().toISOString().split('T')[0],
-        EmployerName: 'บจก. ลูกค้าทดสอบ',
-        EmployerID: '0105555555555',
-        EmployerRep: 'นายสมชาย รักษาดี',
-        EmployerRepID: '1100000000000',
-        EmployerAddress: initialData?.EmployerAddress ? safeJSONParse(initialData.EmployerAddress, { no: '123', moo: '1', soi: 'สุขุมวิท 1', road: 'สุขุมวิท', subDistrict: 'คลองเตย', district: 'คลองเตย', province: 'กรุงเทพมหานคร', zip: '10110' }) : { no: '123', moo: '1', soi: 'สุขุมวิท 1', road: 'สุขุมวิท', subDistrict: 'คลองเตย', district: 'คลองเตย', province: 'กรุงเทพมหานคร', zip: '10110' },
-        EmployerRepAddress: initialData?.EmployerRepAddress ? safeJSONParse(initialData.EmployerRepAddress, { no: '99', moo: '9', soi: 'ลาดพร้าว 99', road: 'ลาดพร้าว', subDistrict: 'จอมพล', district: 'จตุจักร', province: 'กรุงเทพมหานคร', zip: '10900' }) : { no: '99', moo: '9', soi: 'ลาดพร้าว 99', road: 'ลาดพร้าว', subDistrict: 'จอมพล', district: 'จตุจักร', province: 'กรุงเทพมหานคร', zip: '10900' },
+        EmployerName: '',
+        EmployerID: '',
+        EmployerRep: '',
+        EmployerRepID: '',
+        EmployerAddress: initialData?.EmployerAddress ? safeJSONParse(initialData.EmployerAddress, { no: '', moo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zip: '' }) : { no: '', moo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zip: '' },
+        EmployerRepAddress: initialData?.EmployerRepAddress ? safeJSONParse(initialData.EmployerRepAddress, { no: '', moo: '9', soi: '', road: '', subDistrict: '', district: '', province: '', zip: '' }) : { no: '', moo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zip: '' },
         ContractorName: 'นายธวัช จรุงพิรวงศ์',
         ContractorID: '3259900200422',
         ContractorRep: '',
         ContractorRepOf: 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์',
         ContractorLicense: 'HB 12-1-67-1',
         ContractorAddress: initialData?.ContractorAddress ? safeJSONParse(initialData.ContractorAddress, { no: '6/10', moo: '2', subDistrict: 'ไทรม้า', district: 'เมืองนนทบุรี', province: 'นนทบุรี', zip: '11000' }) : { no: '6/10', moo: '2', subDistrict: 'ไทรม้า', district: 'เมืองนนทบุรี', province: 'นนทบุรี', zip: '11000' },
-        Witness1: 'นางสาวทดสอบ พยานที่หนึ่ง',
+        Witness1: '',
         Witness2: 'นางสาวขวัญอารักษ์ อนุภัทรเหมรัตน์',
         ProductsData: [
-            { id: Date.now(), regNo: '10-1-6500012345', brandName: 'เฮิร์บไทย', productName: 'ยาดมสมุนไพร' },
-            { id: Date.now() + 1, regNo: '10-1-6500054321', brandName: 'เฮิร์บไทย', productName: 'ยาหม่องสมุนไพร' }
+            { id: Date.now(), regNo: '', brandName: '', productName: '' }
         ],
         ...initialData
     });
 
+    // Fetch saved data when editing
     useEffect(() => {
-        if (sharedData.writtenAt && !formData.WrittenAt) {
-            handleChange('WrittenAt', sharedData.writtenAt);
+        if (!documentId) return;
+        setCurrentDocId(documentId);
+        const fetchData = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/contract-mfg-documents/${documentId}`);
+                const json = await res.json();
+                if (json.success && json.data) {
+                    const d = json.data;
+                    setFormData(prev => ({
+                        ...prev,
+                        ContractNo: d.ContractNo || prev.ContractNo,
+                        WrittenAt: d.WrittenAt || prev.WrittenAt,
+                        DocumentDate: d.DocumentDate ? new Date(d.DocumentDate).toISOString().split('T')[0] : prev.DocumentDate,
+                        EmployerName: d.EmployerName || prev.EmployerName,
+                        EmployerID: d.EmployerID || prev.EmployerID,
+                        EmployerRep: d.EmployerRep || prev.EmployerRep,
+                        EmployerRepID: d.EmployerRepID || prev.EmployerRepID,
+                        EmployerAddress: d.EmployerAddress ? safeJSONParse(d.EmployerAddress, prev.EmployerAddress) : prev.EmployerAddress,
+                        EmployerRepAddress: d.EmployerRepAddress ? safeJSONParse(d.EmployerRepAddress, prev.EmployerRepAddress) : prev.EmployerRepAddress,
+                        ContractorName: d.ContractorName || prev.ContractorName,
+                        ContractorID: d.ContractorID || prev.ContractorID,
+                        ContractorRep: d.ContractorRep || prev.ContractorRep,
+                        ContractorRepOf: d.ContractorRepOf || prev.ContractorRepOf,
+                        ContractorLicense: d.ContractorLicense || prev.ContractorLicense,
+                        ContractorAddress: d.ContractorAddress ? safeJSONParse(d.ContractorAddress, prev.ContractorAddress) : prev.ContractorAddress,
+                        Witness1: d.Witness1 || prev.Witness1,
+                        Witness2: d.Witness2 || prev.Witness2,
+                        ProductsData: d.ProductsData ? (typeof d.ProductsData === 'string' ? JSON.parse(d.ProductsData) : d.ProductsData) : prev.ProductsData,
+                    }));
+                }
+            } catch (err) {
+                console.error('Error fetching data:', err);
+            }
+        };
+        fetchData();
+    }, [documentId]);
+
+    useEffect(() => {
+        if (sharedFormData.writtenAt && !formData.WrittenAt) {
+            handleChange('WrittenAt', sharedFormData.writtenAt);
         }
-        if (sharedData.documentDate && !formData.DocumentDate) {
-            handleChange('DocumentDate', sharedData.documentDate);
+        if (sharedFormData.documentDate && !formData.DocumentDate) {
+            handleChange('DocumentDate', sharedFormData.documentDate);
         }
-    }, [sharedData.writtenAt, sharedData.documentDate]);
+    }, [sharedFormData.writtenAt, sharedFormData.documentDate]);
 
     useEffect(() => {
         if (!initialData) {
@@ -106,7 +145,7 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
                     ...prev,
                     EmployerName: customerName,
                     EmployerID: customerTaxId,
-                    EmployerAddress: { no: '', moo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zip: '', raw: customerAddress },
+                    EmployerAddress: safeJSONParse(customerAddress, { no: '', moo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zip: '', raw: customerAddress }),
                 }));
             }
         }
@@ -115,6 +154,7 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
     useImperativeHandle(ref, () => ({
         getFormData: () => {
             const dataToSave = { ...formData };
+            if (currentDocId) dataToSave.documentId = currentDocId;
             dataToSave.EmployerAddress = typeof dataToSave.EmployerAddress === 'object' ? JSON.stringify(dataToSave.EmployerAddress) : dataToSave.EmployerAddress;
             dataToSave.ContractorAddress = typeof dataToSave.ContractorAddress === 'object' ? JSON.stringify(dataToSave.ContractorAddress) : dataToSave.ContractorAddress;
             dataToSave.EmployerRepAddress = typeof dataToSave.EmployerRepAddress === 'object' ? JSON.stringify(dataToSave.EmployerRepAddress) : dataToSave.EmployerRepAddress;
@@ -129,7 +169,13 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
     }));
 
     const handleChange = (field, value) => {
-        setFormData(prev => ({ ...prev, [field]: value }));
+        setFormData(prev => {
+            const next = { ...prev, [field]: value };
+            if (field === 'EmployerRep') {
+                next.Witness1 = value;
+            }
+            return next;
+        });
     };
 
     const handleNestedChange = (parentField, childField, value) => {
@@ -143,10 +189,19 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
     };
 
     const handleProductChange = (id, field, value) => {
-        setFormData(prev => ({
-            ...prev,
-            ProductsData: prev.ProductsData.map(p => p.id === id ? { ...p, [field]: value } : p)
-        }));
+        setFormData(prev => {
+            const newProducts = prev.ProductsData.map(p => p.id === id ? { ...p, [field]: value } : p);
+            
+            // Sync product name to shared form data if it's the first product and onSharedDataChange is provided
+            if (field === 'productName' && newProducts.length > 0 && newProducts[0].id === id && onSharedDataChange) {
+                onSharedDataChange({ productName: value });
+            }
+            
+            return {
+                ...prev,
+                ProductsData: newProducts
+            };
+        });
     };
 
     const addProductRow = () => {
@@ -165,7 +220,7 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
     };
 
     return (
-        <div className={!initialData ? "poa-form-wrapper" : ""} style={!initialData ? { boxShadow: 'none' } : {}}>
+        <div className="poa-form-wrapper" style={!initialData ? { boxShadow: 'none' } : {}}>
             <h3 className="poa-section-title" style={{ marginTop: 0 }}>แบบฟอร์มสัญญาจ้างผลิตสินค้า</h3>
             
             <div className="poa-info-box gray" style={{ marginBottom: '20px' }}>
@@ -183,8 +238,8 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
 
                     <div className="poa-field medium">
                         <label>วันที่ทำสัญญา</label>
-                        <input
-                            type="date"
+                        <CustomDatePicker
+                            name="DocumentDate"
                             value={formData.DocumentDate ? formData.DocumentDate.split('T')[0] : ''}
                             onChange={(e) => handleChange('DocumentDate', e.target.value)}
                         />
@@ -205,10 +260,9 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
                     </div>
                     <div className="poa-field">
                         <label>เลขประจำตัวประชาชน / นิติบุคคล</label>
-                        <input
-                            type="text"
+                        <IdCardInput
                             value={formData.ContractorID || ''}
-                            onChange={(e) => handleChange('ContractorID', e.target.value)}
+                            onChange={(val) => handleChange('ContractorID', val)}
                         />
                     </div>
                 </div>
@@ -260,10 +314,9 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
                     </div>
                     <div className="poa-field">
                         <label>เลขประจำตัวประชาชน / นิติบุคคล</label>
-                        <input
-                            type="text"
+                        <IdCardInput
                             value={formData.EmployerID || ''}
-                            onChange={(e) => handleChange('EmployerID', e.target.value)}
+                            onChange={(val) => handleChange('EmployerID', val)}
                         />
                     </div>
                 </div>
@@ -296,10 +349,9 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
                     </div>
                     <div className="poa-field">
                         <label>เลขบัตรประชาชนตัวแทน</label>
-                        <input
-                            type="text"
+                        <IdCardInput
                             value={formData.EmployerRepID || ''}
-                            onChange={(e) => handleChange('EmployerRepID', e.target.value)}
+                            onChange={(val) => handleChange('EmployerRepID', val)}
                         />
                     </div>
                 </div>
@@ -399,8 +451,8 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
                         <label>ลงชื่อ (ผู้ว่าจ้าง - ซ้ายบน)</label>
                         <input
                             type="text"
-                            value={formData.EmployerRep || ''}
-                            onChange={(e) => handleChange('EmployerRep', e.target.value)}
+                            value={formData.EmployerName || ''}
+                            onChange={(e) => handleChange('EmployerName', e.target.value)}
                             placeholder="ชื่อ-นามสกุล..."
                         />
                     </div>
@@ -440,3 +492,5 @@ const ContractMfgForm = forwardRef(({ customerData, contractData, initialData = 
 });
 
 export default ContractMfgForm;
+
+

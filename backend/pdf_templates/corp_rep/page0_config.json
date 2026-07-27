@@ -1,8 +1,8 @@
 {
   "templateName": "5 Appoint legal person-แแบฟอร์มแต่งตั้งนิติบุคคล(กรณีนิ.pdf",
   "templateConfig": {
-    "defaultFontSize": 7,
-    "defaultFontFamily": "Sarabun"
+    "defaultFontSize": 16,
+    "defaultFontFamily": "THSarabunNew"
   },
   "fields": [
     {

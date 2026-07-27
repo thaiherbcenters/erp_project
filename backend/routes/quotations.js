@@ -63,6 +63,30 @@ router.get('/', async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to fetch quotations', error: err.message });
     }
 });
+// 1c. Get next available quotation number
+router.get('/next-number', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const docType = req.query.docType || 'quotation_thc';
+        
+        // Quotation always uses QT prefix, but we can keep it dynamic if needed
+        const prefix = 'QT';
+        const datePrefix = getDatePrefix();
+        const fullPrefix = `${prefix}${datePrefix}`;
+        
+        // Generate sequence (e.g. QT20260727-001 or QT-2026... if separator is '-')
+        // Note: The POST route uses `QT-${getDatePrefix()}`, so we must match it
+        // Wait, the POST route says: `QT-${getDatePrefix()}`
+        const fullPrefixForNext = `QT-${getDatePrefix()}`;
+        
+        const nextNo = await generateSequence(pool, 'Quotation', 'QuotationNo', fullPrefixForNext, 3);
+        
+        res.json({ success: true, nextNumber: nextNo });
+    } catch (err) {
+        console.error('Error generating next number:', err);
+        res.status(500).json({ success: false, message: 'Failed to generate next number', error: err.message });
+    }
+});
 
 // 1b. Get quotations available for SO creation (exclude already-linked ones)
 router.get('/status/approved', async (req, res) => {
@@ -118,12 +142,14 @@ router.get('/:id', async (req, res) => {
 // 3. Create new quotation
 router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchema), async (req, res) => {
     const { 
-        quotationNo, docType, bankAccount, customerTypeId, customerName, contactPerson, email, address, phone, taxId, 
+        customerId, quotationNo, docType, bankAccount, customerTypeId, customerName, contactPerson, email, address, phone, taxId, 
         billDate, validUntil, subTotal, discountPercent, discountAmount, 
         afterDiscount, vatRate, vatAmount, shippingCost, grandTotal, 
         depositPercent, depositAmount, remainingAmount, signer, notes, 
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
         designFee, showDesignFeeInPrint,
+        fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
+        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceTrademark, fdaServiceTrademarkPrice,
         status, contractId, items 
     } = req.body;
 
@@ -140,6 +166,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
         const finalQuotationNo = quotationNo || await generateSequence(pool, 'Quotation', 'QuotationNo', `QT-${getDatePrefix()}`, 3);
 
         // 1. Insert Header
+        request.input('customerId', sql.Int, customerId || null);
         request.input('quotationNo', sql.NVarChar, finalQuotationNo);
         request.input('docType', sql.NVarChar, docType);
         request.input('bankAccount', sql.NVarChar, bankAccount);
@@ -170,20 +197,30 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
         request.input('showDesignFee', sql.Bit, showDesignFeeInPrint ? 1 : 0);
         request.input('status', sql.NVarChar, status || 'ร่าง');
         request.input('contractId', sql.Int, contractId || null);
+        request.input('fdaCustomerCode', sql.NVarChar, fdaCustomerCode || null);
+        request.input('fdaEmail', sql.NVarChar, fdaEmail || null);
+        request.input('fdaProjectName', sql.NVarChar, fdaProjectName || null);
+        request.input('fdaCreditTerms', sql.NVarChar, fdaCreditTerms || null);
+        request.input('fdaServiceRegister', sql.Bit, fdaServiceRegister ? 1 : 0);
+        request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
+        request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
+        request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
 
         const headerResult = await request.query(`
             INSERT INTO Quotation (
-                QuotationNo, ContractID, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
+                CustomerID, QuotationNo, ContractID, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
-                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status
+                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
             )
             OUTPUT INSERTED.QuotationID
             VALUES (
-                @quotationNo, @contractId, @docType, @bankAccount, @customerName, @address, @phone, @taxId,
+                @customerId, @quotationNo, @contractId, @docType, @bankAccount, @customerName, @address, @phone, @taxId,
                 @billDate, @validUntil, @subTotal, @discountPercent, @discountAmount, @afterDiscount,
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
-                @remainingAmount, @signer, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status
+                @remainingAmount, @signer, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
+                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice
             )
         `);
 
@@ -267,12 +304,14 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
 router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSchema), async (req, res) => {
     const qid = req.params.id;
     const { 
-        quotationNo, docType, bankAccount, customerName, address, phone, taxId, 
+        customerId, quotationNo, docType, bankAccount, customerName, address, phone, taxId, 
         billDate, validUntil, subTotal, discountPercent, discountAmount, 
         afterDiscount, vatRate, vatAmount, shippingCost, grandTotal, 
         depositPercent, depositAmount, remainingAmount, signer, notes, 
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
         designFee, showDesignFeeInPrint,
+        fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
+        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceTrademark, fdaServiceTrademarkPrice,
         status, contractId, items 
     } = req.body;
 
@@ -287,6 +326,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSch
 
         // 1. Update Header
         request.input('id', sql.Int, qid);
+        request.input('customerId', sql.Int, customerId || null);
         request.input('quotationNo', sql.NVarChar, quotationNo);
         request.input('docType', sql.NVarChar, docType);
         request.input('bankAccount', sql.NVarChar, bankAccount);
@@ -315,25 +355,35 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSch
         request.input('showShipping', sql.Bit, showShippingInPrint ? 1 : 0);
         request.input('designFee', sql.Decimal(18,2), designFee || 0);
         request.input('showDesignFee', sql.Bit, showDesignFeeInPrint ? 1 : 0);
-        request.input('status', sql.NVarChar, status || 'ร่าง');
+        request.input('status', sql.NVarChar, status || null);
         request.input('contractId', sql.Int, contractId || null);
+        request.input('fdaCustomerCode', sql.NVarChar, fdaCustomerCode || null);
+        request.input('fdaEmail', sql.NVarChar, fdaEmail || null);
+        request.input('fdaProjectName', sql.NVarChar, fdaProjectName || null);
+        request.input('fdaCreditTerms', sql.NVarChar, fdaCreditTerms || null);
+        request.input('fdaServiceRegister', sql.Bit, fdaServiceRegister ? 1 : 0);
+        request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
+        request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
+        request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
 
         // 1. Backup Current Version to History Table before modifying
         const backupReq = new sql.Request(transaction);
         backupReq.input('id', sql.Int, qid);
         const backupResult = await backupReq.query(`
             INSERT INTO QuotationHistory (
-                QuotationID, Revision, QuotationNo, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
+                CustomerID, QuotationID, Revision, QuotationNo, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
-                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt
+                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
             )
             OUTPUT INSERTED.HistoryID
             SELECT 
-                QuotationID, Revision, QuotationNo, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
+                CustomerID, QuotationID, Revision, QuotationNo, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
-                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt
+                RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
             FROM Quotation
             WHERE QuotationID = @id
         `);
@@ -354,14 +404,17 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSch
         // 2. Update Header (increment Revision)
         await request.query(`
             UPDATE Quotation SET
-                QuotationNo = @quotationNo, DocType = @docType, BankAccount = @bankAccount,
+                CustomerID = @customerId, QuotationNo = @quotationNo, ContractID = @contractId, DocType = @docType, BankAccount = @bankAccount,
                 CustomerName = @customerName, Address = @address, Phone = @phone, TaxID = @taxId,
                 BillDate = @billDate, ValidUntil = @validUntil, SubTotal = @subTotal,
                 DiscountPercent = @discountPercent, DiscountAmount = @discountAmount, AfterDiscount = @afterDiscount,
                 VatRate = @vatRate, VatAmount = @vatAmount, ShippingCost = @shippingCost, GrandTotal = @grandTotal,
                 DepositPercent = @depositPercent, DepositAmount = @depositAmount, RemainingAmount = @remainingAmount,
                 Signer = @signer, Notes = @notes, ShowDiscountInPrint = @showDiscount, ShowVatInPrint = @showVat,
-                ShowDepositInPrint = @showDeposit, ShowShippingInPrint = @showShipping, DesignFee = @designFee, ShowDesignFeeInPrint = @showDesignFee, Status = @status,
+                ShowDepositInPrint = @showDeposit, ShowShippingInPrint = @showShipping, DesignFee = @designFee, ShowDesignFeeInPrint = @showDesignFee, Status = ISNULL(@status, Status),
+                FdaCustomerCode = @fdaCustomerCode, FdaEmail = @fdaEmail, FdaProjectName = @fdaProjectName, FdaCreditTerms = @fdaCreditTerms,
+                FdaServiceRegister = @fdaServiceRegister, FdaServiceRegisterPrice = @fdaServiceRegisterPrice,
+                FdaServiceTrademark = @fdaServiceTrademark, FdaServiceTrademarkPrice = @fdaServiceTrademarkPrice,
                 Revision = Revision + 1,
                 UpdatedAt = GETDATE()
             WHERE QuotationID = @id

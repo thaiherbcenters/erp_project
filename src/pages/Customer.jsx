@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
 import { Eye, Edit2, Trash2, X, Search } from 'lucide-react';
 import API_BASE from '../config';
+import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 
 export default function Customer() {
@@ -63,7 +64,7 @@ export default function Customer() {
 
     const openCreate = () => {
         setEditingCustomer(null);
-        setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', houseNo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zipCode: '', taxId: '', taxBranch: 'head_office', branchNo: '', typeId: 1, statusId: 1 });
+        setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', houseNo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zipCode: '', taxId: '', taxBranch: 'head_office', branchNo: '', typeId: 1, statusId: 1, projectName: '' });
         setShowModal(true);
     };
 
@@ -112,7 +113,8 @@ export default function Customer() {
             subDistrict: parsed.subDistrict, district: parsed.district,
             province: parsed.province, zipCode: parsed.zipCode,
             taxId: c.TaxID || '', taxBranch: c.TaxBranch || 'head_office', branchNo: c.BranchNo || '', 
-            typeId: c.CustomerTypeID || 1, statusId: c.CustomerStatusID || 1
+            typeId: c.CustomerTypeID || 1, statusId: c.CustomerStatusID || 1,
+            projectName: c.ProjectName || ''
         });
         setShowModal(true);
     };
@@ -155,7 +157,45 @@ export default function Customer() {
             });
             const json = await res.json();
             if (json.success) {
-                showAlert('สำเร็จ', editingCustomer ? 'แก้ไขข้อมูลลูกค้าเรียบร้อย' : 'เพิ่มลูกค้าใหม่เรียบร้อย', 'success');
+                // ถ้าเป็นการเพิ่มลูกค้าใหม่ + ประเภท OEM/ขึ้นทะเบียน → สร้างสัญญาอัตโนมัติ
+                if (!editingCustomer && [2, 3, 4].includes(form.typeId) && form.projectName?.trim()) {
+                    try {
+                        const newCustomerId = json.data?.CustomerID;
+                        const today = new Date();
+                        const nextYear = new Date(today);
+                        nextYear.setFullYear(nextYear.getFullYear() + 1);
+
+                        // สร้างเลขสัญญา CT-YYMMDD-XXX
+                        const yy = today.getFullYear().toString().slice(-2);
+                        const mm = String(today.getMonth() + 1).padStart(2, '0');
+                        const dd = String(today.getDate()).padStart(2, '0');
+                        const contractNo = `CT-${yy}${mm}${dd}-001`;
+
+                        const contractRes = await fetch(`${API_BASE}/contracts`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contractNo,
+                                contractName: form.projectName.trim(),
+                                customerId: newCustomerId,
+                                startDate: today.toISOString().split('T')[0],
+                                endDate: nextYear.toISOString().split('T')[0],
+                                status: 'กำลังดำเนินการ'
+                            })
+                        });
+                        const contractJson = await contractRes.json();
+                        if (contractJson.success) {
+                            showAlert('สำเร็จ', `เพิ่มลูกค้าใหม่และสร้างสัญญา "${form.projectName.trim()}" ให้อัตโนมัติเรียบร้อย`, 'success');
+                        } else {
+                            showAlert('สำเร็จ', 'เพิ่มลูกค้าใหม่เรียบร้อย แต่ไม่สามารถสร้างสัญญาอัตโนมัติได้', 'warning');
+                        }
+                    } catch (contractErr) {
+                        console.error('Auto-create contract error:', contractErr);
+                        showAlert('สำเร็จ', 'เพิ่มลูกค้าใหม่เรียบร้อย แต่ไม่สามารถสร้างสัญญาอัตโนมัติได้', 'warning');
+                    }
+                } else {
+                    showAlert('สำเร็จ', editingCustomer ? 'แก้ไขข้อมูลลูกค้าเรียบร้อย' : 'เพิ่มลูกค้าใหม่เรียบร้อย', 'success');
+                }
                 setShowModal(false);
                 fetchCustomers();
             } else {
@@ -456,16 +496,24 @@ export default function Customer() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div>
                                     <label style={labelStyle}>ประเภทลูกค้า *</label>
-                                    <select style={inputStyle} value={form.typeId} onChange={e => setForm({ ...form, typeId: parseInt(e.target.value) })}>
+                                    <CustomSelect style={inputStyle} value={form.typeId} onChange={e => setForm({ ...form, typeId: parseInt(e.target.value) })}>
                                         {types.map(t => <option key={t.CustomerTypeID} value={t.CustomerTypeID}>{t.CustomerTypeName}</option>)}
-                                    </select>
+                                    </CustomSelect>
                                 </div>
                             </div>
+
+                            {/* ช่องชื่อโปรเจ็ค — แสดงเฉพาะ OEM นิติบุคคล(2), OEM บุคคลธรรมดา(3), ลูกค้าขึ้นทะเบียน(4) */}
+                            {[2, 3, 4].includes(form.typeId) && (
+                                <div style={{ marginTop: '4px' }}>
+                                    <label style={labelStyle}>ชื่อโปรเจ็ค / แบรนด์</label>
+                                    <input style={inputStyle} value={form.projectName || ''} onChange={e => setForm({ ...form, projectName: e.target.value })} placeholder="เช่น แบรนด์ผลไพร, โปรเจ็คสมุนไพรไทย" />
+                                </div>
+                            )}
                             <div>
                                 <label style={labelStyle}>สถานะ</label>
-                                <select style={inputStyle} value={form.statusId} onChange={e => setForm({ ...form, statusId: parseInt(e.target.value) })}>
+                                <CustomSelect style={inputStyle} value={form.statusId} onChange={e => setForm({ ...form, statusId: parseInt(e.target.value) })}>
                                     {statuses.map(s => <option key={s.CustomerStatusID} value={s.CustomerStatusID}>{getStatusThai(s.StatusName)} ({s.StatusName})</option>)}
-                                </select>
+                                </CustomSelect>
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>

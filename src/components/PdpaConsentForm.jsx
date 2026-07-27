@@ -1,5 +1,7 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import '../pages/PageCommon.css'; // Assume common styles for inputs
+import API_BASE from '../config';
+import './PowerOfAttorneyForm.css';
+import NameInputWithTitle from './NameInputWithTitle';
 
 /**
  * PdpaConsentForm.jsx
@@ -10,19 +12,52 @@ const PdpaConsentForm = forwardRef(({ documentId, customerData, contractId, embe
     const [currentDocId, setCurrentDocId] = useState(documentId || null);
 
     const [form, setForm] = useState({
-        writtenAt: 'บริษัท ไทยเฮิร์บ จำกัด',
+        writtenAt: '',
         documentDate: new Date().toISOString().split('T')[0],
-        personPrefix: 'นาย', // 'นาย', 'นาง', 'นางสาว', 'อื่นๆ'
+        personPrefix: '', // '', '', '', 'อื่นๆ'
         personPrefixOther: '',
         personName: '',
         juristicName: '',
-        publicHealthProvince: 'นนทบุรี',
-        actName: 'ผลิตภัณฑ์สมุนไพร พ.ศ.2562',
-        actName2: 'ผลิตภัณฑ์สมุนไพร พ.ศ.2562',
-        actName3: 'ผลิตภัณฑ์สมุนไพร พ.ศ.2562',
-        keepYears: 10,
-        contactGroup: 'ผลิตภัณฑ์สมุนไพร',
+        publicHealthProvince: '',
+        actName: '',
+        actName2: '',
+        actName3: '',
+        keepYears: '',
+        contactGroup: '',
     });
+
+    // Fetch saved data when editing
+    useEffect(() => {
+        if (!documentId) return;
+        setCurrentDocId(documentId);
+        const fetchData = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/pdpa-consent-documents/${documentId}`);
+                const json = await res.json();
+                const d = json.data || json;
+                if (d && !d.error) {
+                    setForm(prev => ({
+                        ...prev,
+                        writtenAt: d.WrittenAt || prev.writtenAt,
+                        documentDate: d.DocumentDate ? new Date(d.DocumentDate).toISOString().split('T')[0] : prev.documentDate,
+                        personPrefix: d.PersonPrefix || prev.personPrefix,
+                        personPrefixOther: d.PersonPrefixOther || prev.personPrefixOther,
+                        personName: d.PersonName || prev.personName,
+                        juristicName: d.JuristicName || prev.juristicName,
+                        publicHealthProvince: d.PublicHealthProvince || prev.publicHealthProvince,
+                        actName: d.ActName || prev.actName,
+                        actName2: d.ActName2 || prev.actName2,
+                        actName3: d.ActName3 || prev.actName3,
+                        keepYears: d.KeepYears !== undefined && d.KeepYears !== null ? d.KeepYears : prev.keepYears,
+                        contactGroup: d.ContactGroup || prev.contactGroup,
+                    }));
+                }
+            } catch (err) {
+                console.error('Error fetching data:', err);
+            }
+        };
+        fetchData();
+    }, [documentId]);
 
     // Auto-fill from customer data if provided
     useEffect(() => {
@@ -75,102 +110,74 @@ const PdpaConsentForm = forwardRef(({ documentId, customerData, contractId, embe
         setCurrentDocId: (id) => setCurrentDocId(id)
     }));
 
-    const sectionTitleStyle = {
-        fontSize: '16px', fontWeight: '700', color: '#1e293b',
-        borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', marginBottom: '20px',
-        display: 'flex', alignItems: 'center', gap: '8px'
-    };
-
-    const labelStyle = { display: 'block', fontSize: '13px', fontWeight: '600', color: '#475569', marginBottom: '6px' };
-    const inputStyle = { width: '100%', padding: '10px 14px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' };
-
     return (
-        <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '12px' }}>
+        <div className="poa-form-wrapper">
             {!embedded && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0f172a' }}>หนังสือให้ความยินยอม (PDPA)</h3>
+                    <h3 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#1e293b' }}>หนังสือให้ความยินยอม (PDPA)</h3>
                 </div>
             )}
             
-            <div className="card" style={{ padding: '24px', background: '#fff', marginBottom: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <h4 style={sectionTitleStyle}><span style={{fontSize: '18px'}}>👤</span> ข้อมูลเจ้าของข้อมูลส่วนบุคคล</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-                    <div>
-                        <label style={labelStyle}>ข้าพเจ้า</label>
-                        <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', alignItems: 'center' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', cursor: 'pointer' }}>
-                                <input type="radio" name="personPrefix" value="นาย" checked={form.personPrefix === 'นาย'} onChange={handleChange} /> นาย
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', cursor: 'pointer' }}>
-                                <input type="radio" name="personPrefix" value="นาง" checked={form.personPrefix === 'นาง'} onChange={handleChange} /> นาง
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', cursor: 'pointer' }}>
-                                <input type="radio" name="personPrefix" value="นางสาว" checked={form.personPrefix === 'นางสาว'} onChange={handleChange} /> นางสาว
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', cursor: 'pointer' }}>
-                                <input type="radio" name="personPrefix" value="อื่นๆ" checked={form.personPrefix === 'อื่นๆ'} onChange={handleChange} /> อื่นๆ
-                            </label>
-                        </div>
-                        {form.personPrefix === 'อื่นๆ' && (
-                            <input
-                                type="text"
-                                name="personPrefixOther"
-                                value={form.personPrefixOther}
-                                onChange={handleChange}
-                                placeholder="ระบุคำนำหน้า..."
-                                style={{ ...inputStyle, marginBottom: '12px' }}
-                            />
-                        )}
-                        <input
-                            type="text"
-                            name="personName"
-                            value={form.personName}
-                            onChange={handleChange}
+            <div className="poa-info-box" style={{ background: '#f0f9ff', borderColor: '#bae6fd', marginBottom: '20px' }}>
+                <div className="poa-section-subtitle" style={{ color: '#0369a1', marginTop: 0 }}>👤 ข้อมูลเจ้าของข้อมูลส่วนบุคคล</div>
+                
+                <div className="poa-row">
+                    <div className="poa-field full">
+                        <label>ข้าพเจ้า</label>
+                        <NameInputWithTitle 
+                            value={(form.personPrefix && form.personPrefix !== 'อื่นๆ' ? form.personPrefix : '') + (form.personName || '')}
+                            onChange={(val) => setForm(prev => ({ ...prev, personPrefix: '', personName: val }))}
                             placeholder="ชื่อ - นามสกุล"
-                            style={inputStyle}
                         />
                     </div>
-                    <div>
-                        <label style={labelStyle}>โดย (กรณีเป็นนิติบุคคล)</label>
+                </div>
+                
+                <div className="poa-row">
+                    <div className="poa-field full">
+                        <label>โดย (กรณีเป็นนิติบุคคล)</label>
                         <input
                             type="text"
                             name="juristicName"
                             value={form.juristicName}
                             onChange={handleChange}
                             placeholder="ชื่อนิติบุคคล"
-                            style={inputStyle}
                         />
                     </div>
                 </div>
             </div>
 
-            <div className="card" style={{ padding: '24px', background: '#fff', marginBottom: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <h4 style={sectionTitleStyle}><span style={{fontSize: '18px'}}>📝</span> รายละเอียดความยินยอม</h4>
+            <div className="poa-info-box gray" style={{ marginBottom: '20px' }}>
+                <div className="poa-section-subtitle" style={{ marginTop: 0 }}>📝 รายละเอียดความยินยอม</div>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', marginBottom: '20px' }}>
-                    <div>
-                        <label style={labelStyle}>ยื่นคำขออนุญาตตามพระราชบัญญัติ</label>
-                        <input type="text" name="actName" value={form.actName} onChange={handleChange} style={inputStyle} />
+                <div className="poa-row">
+                    <div className="poa-field">
+                        <label>ยื่นคำขออนุญาตตามพระราชบัญญัติ</label>
+                        <input type="text" name="actName" value={form.actName} onChange={handleChange} />
                     </div>
-                    <div>
-                        <label style={labelStyle}>กอง/กลุ่ม</label>
-                        <input type="text" name="contactGroup" value={form.contactGroup} onChange={handleChange} placeholder="เช่น ผลิตภัณฑ์สมุนไพร" style={inputStyle} />
+                    <div className="poa-field">
+                        <label>กอง/กลุ่ม</label>
+                        <input type="text" name="contactGroup" value={form.contactGroup} onChange={handleChange} placeholder="เช่น ผลิตภัณฑ์สมุนไพร" />
                     </div>
-                    <div>
-                        <label style={labelStyle}>สำนักงานสาธารณสุขจังหวัด</label>
-                        <input type="text" name="publicHealthProvince" value={form.publicHealthProvince} onChange={handleChange} placeholder="เช่น นนทบุรี" style={inputStyle} />
+                </div>
+                
+                <div className="poa-row">
+                    <div className="poa-field">
+                        <label>สำนักงานสาธารณสุขจังหวัด</label>
+                        <input type="text" name="publicHealthProvince" value={form.publicHealthProvince} onChange={handleChange} placeholder="เช่น นนทบุรี" />
                     </div>
-                    <div>
-                        <label style={labelStyle}>ผู้อนุญาตตามพระราชบัญญัติ</label>
-                        <input type="text" name="actName2" value={form.actName2} onChange={handleChange} style={inputStyle} />
+                    <div className="poa-field">
+                        <label>ผู้อนุญาตตามพระราชบัญญัติ</label>
+                        <input type="text" name="actName2" value={form.actName2} onChange={handleChange} />
                     </div>
                 </div>
 
-                <div style={{ marginBottom: '12px' }}>
-                    <label style={labelStyle}>ระยะเวลาเก็บรวบรวม... อีกไม่เกิน (ปี)</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <input type="number" name="keepYears" value={form.keepYears} onChange={handleChange} style={{ ...inputStyle, width: '120px' }} />
-                        <span style={{ fontSize: '14px', color: '#475569' }}>ปี นับตั้งแต่ใบอนุญาตสิ้นอายุ</span>
+                <div className="poa-row">
+                    <div className="poa-field full">
+                        <label>ระยะเวลาเก็บรวบรวม... อีกไม่เกิน (ปี)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <input type="number" name="keepYears" value={form.keepYears} onChange={handleChange} style={{ width: '120px' }} />
+                            <span>ปี นับตั้งแต่ใบอนุญาตสิ้นอายุ</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -179,3 +186,5 @@ const PdpaConsentForm = forwardRef(({ documentId, customerData, contractId, embe
 });
 
 export default PdpaConsentForm;
+
+

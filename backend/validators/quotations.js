@@ -14,6 +14,7 @@ const quotationItemSchema = z.object({
 });
 
 const createQuotationSchema = z.object({
+    customerId: z.union([z.string(), z.number()]).nullable().optional(),
     quotationNo: z.string().optional(),
     docType: z.string().nullable().optional(),
     bankAccount: z.string().nullable().optional(),

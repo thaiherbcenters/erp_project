@@ -20,6 +20,8 @@ import {
     Plus, Filter, ChevronDown
 } from 'lucide-react';
 import API_BASE from '../config';
+import CustomDatePicker from '../components/CustomDatePicker';
+import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 import './HR.css';
 
@@ -508,10 +510,10 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                 <div className="hr-form-grid">
                                     <div className="hr-form-group">
                                         <label>คำนำหน้า</label>
-                                        <select value={formData.prefix} onChange={e => updateField('prefix', e.target.value)}>
+                                        <CustomSelect value={formData.prefix} onChange={e => updateField('prefix', e.target.value)}>
                                             <option value="">เลือก</option>
                                             {PREFIX_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="hr-form-group">
                                         <label>ชื่อ *</label>
@@ -527,14 +529,14 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                     </div>
                                     <div className="hr-form-group">
                                         <label>เพศ</label>
-                                        <select value={formData.gender} onChange={e => updateField('gender', e.target.value)}>
+                                        <CustomSelect value={formData.gender} onChange={e => updateField('gender', e.target.value)}>
                                             <option value="">เลือก</option>
                                             {GENDER_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="hr-form-group">
                                         <label>วันเกิด</label>
-                                        <input type="date" value={formData.date_of_birth} onChange={e => updateField('date_of_birth', e.target.value)} />
+                                        <CustomDatePicker value={formData.date_of_birth} onChange={e => updateField('date_of_birth', e.target.value)} />
                                     </div>
                                     <div className="hr-form-group">
                                         <label>เลขบัตรประชาชน</label>
@@ -561,21 +563,21 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                 <div className="hr-form-grid">
                                     <div className="hr-form-group">
                                         <label>บริษัท</label>
-                                        <select value={formData.CompanyID} onChange={e => updateField('CompanyID', e.target.value)}>
+                                        <CustomSelect value={formData.CompanyID} onChange={e => updateField('CompanyID', e.target.value)}>
                                             <option value="">เลือกบริษัท</option>
                                             {companies.map(c => (
                                                 <option key={c.CompanyID} value={c.CompanyID}>{c.CompanyName}</option>
                                             ))}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="hr-form-group">
                                         <label>แผนก</label>
-                                        <select value={formData.department_code} onChange={e => updateField('department_code', e.target.value)}>
+                                        <CustomSelect value={formData.department_code} onChange={e => updateField('department_code', e.target.value)}>
                                             <option value="">เลือกแผนก</option>
                                             {departments.map(d => (
                                                 <option key={d.dept_code} value={d.dept_code}>{d.dept_name}</option>
                                             ))}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="hr-form-group">
                                         <label>ตำแหน่ง</label>
@@ -583,21 +585,21 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                     </div>
                                     <div className="hr-form-group">
                                         <label>ประเภทพนักงาน</label>
-                                        <select value={formData.employment_type} onChange={e => updateField('employment_type', e.target.value)}>
+                                        <CustomSelect value={formData.employment_type} onChange={e => updateField('employment_type', e.target.value)}>
                                             {EMPLOYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="hr-form-group">
                                         <label>วันเริ่มงาน</label>
-                                        <input type="date" value={formData.start_date} onChange={e => updateField('start_date', e.target.value)} />
+                                        <CustomDatePicker value={formData.start_date} onChange={e => updateField('start_date', e.target.value)} />
                                     </div>
                                     <div className="hr-form-group">
                                         <label>วันสิ้นสุดสัญญา</label>
-                                        <input type="date" value={formData.end_date} onChange={e => updateField('end_date', e.target.value)} />
+                                        <CustomDatePicker value={formData.end_date} onChange={e => updateField('end_date', e.target.value)} />
                                     </div>
                                     <div className="hr-form-group">
                                         <label>วันสิ้นสุดทดลองงาน</label>
-                                        <input type="date" value={formData.probation_end_date} onChange={e => updateField('probation_end_date', e.target.value)} />
+                                        <CustomDatePicker value={formData.probation_end_date} onChange={e => updateField('probation_end_date', e.target.value)} />
                                     </div>
                                     <div className="hr-form-group">
                                         <label>เงินเดือน (บาท)</label>
@@ -605,9 +607,9 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                     </div>
                                     <div className="hr-form-group">
                                         <label>สถานะ</label>
-                                        <select value={formData.status} onChange={e => updateField('status', e.target.value)}>
+                                        <CustomSelect value={formData.status} onChange={e => updateField('status', e.target.value)}>
                                             {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                 </div>
                             </div>
@@ -618,7 +620,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                 <div className="hr-form-grid">
                                     <div className="hr-form-group">
                                         <label>ระดับการศึกษา</label>
-                                        <select value={formData.education_level} onChange={e => updateField('education_level', e.target.value)}>
+                                        <CustomSelect value={formData.education_level} onChange={e => updateField('education_level', e.target.value)}>
                                             <option value="">เลือก</option>
                                             <option value="ต่ำกว่า ม.6">ต่ำกว่า ม.6</option>
                                             <option value="ม.6 / ปวช.">ม.6 / ปวช.</option>
@@ -626,7 +628,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                             <option value="ปริญญาตรี">ปริญญาตรี</option>
                                             <option value="ปริญญาโท">ปริญญาโท</option>
                                             <option value="ปริญญาเอก">ปริญญาเอก</option>
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="hr-form-group">
                                         <label>สถาบันการศึกษา</label>
@@ -645,7 +647,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                 <div className="hr-form-grid">
                                     <div className="hr-form-group">
                                         <label>ชื่อธนาคาร</label>
-                                        <select value={formData.bank_name} onChange={e => updateField('bank_name', e.target.value)}>
+                                        <CustomSelect value={formData.bank_name} onChange={e => updateField('bank_name', e.target.value)}>
                                             <option value="">เลือก</option>
                                             <option value="กรุงไทย">กรุงไทย</option>
                                             <option value="กสิกรไทย">กสิกรไทย</option>
@@ -655,7 +657,7 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                                             <option value="ทหารไทยธนชาต">ทหารไทยธนชาต</option>
                                             <option value="ออมสิน">ออมสิน</option>
                                             <option value="อื่นๆ">อื่นๆ</option>
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                     <div className="hr-form-group">
                                         <label>เลขบัญชี</label>
@@ -1083,27 +1085,27 @@ function AttendanceTab({ hasSectionPermission }) {
                     <div className="att-toolbar-row">
                         <div className="att-filter-group">
                             <label>จาก</label>
-                            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+                            <CustomDatePicker value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
                         </div>
                         <div className="att-filter-group">
                             <label>ถึง</label>
-                            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+                            <CustomDatePicker value={dateTo} onChange={e => setDateTo(e.target.value)} />
                         </div>
                         <div className="att-filter-group">
                             <label>แผนก</label>
-                            <select value={filterDept} onChange={e => setFilterDept(e.target.value)}>
+                            <CustomSelect value={filterDept} onChange={e => setFilterDept(e.target.value)}>
                                 <option value="">ทั้งหมด</option>
                                 {departments.map(d => (
                                     <option key={d.dept_code} value={d.dept_code}>{d.dept_name}</option>
                                 ))}
-                            </select>
+                            </CustomSelect>
                         </div>
                         <div className="att-filter-group">
                             <label>สถานะ</label>
-                            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                            <CustomSelect value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
                                 <option value="">ทั้งหมด</option>
                                 {ATTENDANCE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
+                            </CustomSelect>
                         </div>
                         <div className="att-filter-group att-search-group">
                             <label>ค้นหา</label>
@@ -1255,25 +1257,25 @@ function AttendanceTab({ hasSectionPermission }) {
                                 {!editRecord && (
                                     <div className="hr-form-group full-width">
                                         <label>พนักงาน *</label>
-                                        <select value={formData.employee_id} onChange={e => setFormData(p => ({ ...p, employee_id: e.target.value }))}>
+                                        <CustomSelect value={formData.employee_id} onChange={e => setFormData(p => ({ ...p, employee_id: e.target.value }))}>
                                             <option value="">เลือกพนักงาน</option>
                                             {employees.map(emp => (
                                                 <option key={emp.employee_id} value={emp.employee_id}>
                                                     {emp.employee_code} — {emp.prefix}{emp.first_name} {emp.last_name}
                                                 </option>
                                             ))}
-                                        </select>
+                                        </CustomSelect>
                                     </div>
                                 )}
                                 <div className="hr-form-group">
                                     <label>วันที่ *</label>
-                                    <input type="date" value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} disabled={!!editRecord} />
+                                    <CustomDatePicker value={formData.date} onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} disabled={!!editRecord} />
                                 </div>
                                 <div className="hr-form-group">
                                     <label>สถานะ</label>
-                                    <select value={formData.status} onChange={e => setFormData(p => ({ ...p, status: e.target.value }))}>
+                                    <CustomSelect value={formData.status} onChange={e => setFormData(p => ({ ...p, status: e.target.value }))}>
                                         {ATTENDANCE_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
+                                    </CustomSelect>
                                 </div>
                                 <div className="hr-form-group">
                                     <label>เวลาเข้า</label>
@@ -1321,14 +1323,14 @@ function AttendanceTab({ hasSectionPermission }) {
 
                             <div className="hr-form-group" style={{ marginBottom: '16px' }}>
                                 <label>พนักงาน *</label>
-                                <select value={leaveForm.employee_id} onChange={e => { handleLeaveEmpChange(e.target.value); }}>
+                                <CustomSelect value={leaveForm.employee_id} onChange={e => { handleLeaveEmpChange(e.target.value); }}>
                                     <option value="">เลือกพนักงาน</option>
                                     {employees.map(emp => (
                                         <option key={emp.employee_id} value={emp.employee_id}>
                                             {emp.employee_code} — {emp.prefix}{emp.first_name} {emp.last_name}
                                         </option>
                                     ))}
-                                </select>
+                                </CustomSelect>
                             </div>
 
                             {/* Leave Balance Display */}
@@ -1348,9 +1350,9 @@ function AttendanceTab({ hasSectionPermission }) {
                             <div className="hr-form-grid hr-form-grid-2">
                                 <div className="hr-form-group">
                                     <label>ประเภทลา *</label>
-                                    <select value={leaveForm.leave_type} onChange={e => setLeaveForm(p => ({ ...p, leave_type: e.target.value }))}>
+                                    <CustomSelect value={leaveForm.leave_type} onChange={e => setLeaveForm(p => ({ ...p, leave_type: e.target.value }))}>
                                         {LEAVE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                    </select>
+                                    </CustomSelect>
                                 </div>
                                 <div className="hr-form-group">
                                     <label>จำนวนวัน</label>
@@ -1359,11 +1361,11 @@ function AttendanceTab({ hasSectionPermission }) {
                                 </div>
                                 <div className="hr-form-group">
                                     <label>วันเริ่มลา *</label>
-                                    <input type="date" value={leaveForm.start_date} onChange={e => setLeaveForm(p => ({ ...p, start_date: e.target.value }))} />
+                                    <CustomDatePicker value={leaveForm.start_date} onChange={e => setLeaveForm(p => ({ ...p, start_date: e.target.value }))} />
                                 </div>
                                 <div className="hr-form-group">
                                     <label>วันสิ้นสุดลา *</label>
-                                    <input type="date" value={leaveForm.end_date} onChange={e => setLeaveForm(p => ({ ...p, end_date: e.target.value }))} />
+                                    <CustomDatePicker value={leaveForm.end_date} onChange={e => setLeaveForm(p => ({ ...p, end_date: e.target.value }))} />
                                 </div>
                                 <div className="hr-form-group full-width">
                                     <label>เหตุผล</label>

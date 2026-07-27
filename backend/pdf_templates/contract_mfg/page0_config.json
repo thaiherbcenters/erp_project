@@ -1,8 +1,8 @@
 {
   "templateName": "2 แบบฟอร์มหนังสือสัญญาจ้าง -ลูกค้าเป็นเจ้า.pdf",
   "templateConfig": {
-    "defaultFontSize": 7,
-    "defaultFontFamily": "Sarabun",
+    "defaultFontSize": 16,
+    "defaultFontFamily": "THSarabunNew",
     "defaultFontWeight": "normal"
   },
   "fields": [

@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query(`
             SELECT 
-                c.CustomerID, c.CustomerCode, c.CustomerName, c.ContactPerson, c.Phone, c.Email, c.Address, c.TaxID, c.TaxBranch, c.BranchNo, c.Source, c.CreatedDate,
+                c.CustomerID, c.CustomerCode, c.CustomerName, c.ContactPerson, c.Phone, c.Email, c.Address, c.TaxID, c.TaxBranch, c.BranchNo, c.Source, c.ProjectName, c.CreatedDate,
                 t.CustomerTypeID, t.CustomerTypeName,
                 s.CustomerStatusID, s.StatusName
             FROM Customer c
@@ -85,7 +85,7 @@ router.get('/:id', async (req, res) => {
 
 // 5. Create new customer
 router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
-    const { typeId, statusId, code, name, contactPerson, phone, email, address, taxId, taxBranch, branchNo, source } = req.body;
+    const { typeId, statusId, code, name, contactPerson, phone, email, address, taxId, taxBranch, branchNo, source, projectName } = req.body;
     try {
         if (!name || !typeId) {
             return res.status(400).json({ success: false, message: 'Missing required fields (name, typeId)' });
@@ -108,10 +108,11 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
             .input('taxBranch', sql.NVarChar, taxBranch || 'head_office')
             .input('branchNo', sql.NVarChar, branchNo || null)
             .input('source', sql.NVarChar, source || 'manual')
+            .input('projectName', sql.NVarChar, projectName || null)
             .query(`
-                INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Phone, Email, Address, TaxID, TaxBranch, BranchNo, Source)
+                INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Phone, Email, Address, TaxID, TaxBranch, BranchNo, Source, ProjectName)
                 OUTPUT INSERTED.*
-                VALUES (@tid, @sid, @code, @name, @contact, @phone, @email, @address, @tax, @taxBranch, @branchNo, @source)
+                VALUES (@tid, @sid, @code, @name, @contact, @phone, @email, @address, @tax, @taxBranch, @branchNo, @source, @projectName)
             `);
         
         res.status(201).json({ success: true, message: 'Customer created successfully', data: result.recordset[0] });
@@ -123,7 +124,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
 
 // 6. Update customer
 router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
-    const { typeId, statusId, name, contactPerson, phone, email, address, taxId, taxBranch, branchNo } = req.body;
+    const { typeId, statusId, name, contactPerson, phone, email, address, taxId, taxBranch, branchNo, projectName } = req.body;
     try {
         const pool = await poolPromise;
         const result = await pool.request()
@@ -138,11 +139,12 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, re
             .input('tax', sql.NVarChar, taxId || null)
             .input('taxBranch', sql.NVarChar, taxBranch || 'head_office')
             .input('branchNo', sql.NVarChar, branchNo || null)
+            .input('projectName', sql.NVarChar, projectName || null)
             .query(`
                 UPDATE Customer 
                 SET CustomerTypeID = @tid, CustomerStatusID = @sid, CustomerName = @name, 
                     ContactPerson = @contact, Phone = @phone, Email = @email, Address = @address, TaxID = @tax,
-                    TaxBranch = @taxBranch, BranchNo = @branchNo
+                    TaxBranch = @taxBranch, BranchNo = @branchNo, ProjectName = @projectName
                 OUTPUT INSERTED.*
                 WHERE CustomerID = @id
             `);

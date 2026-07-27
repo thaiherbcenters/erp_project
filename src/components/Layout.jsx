@@ -361,7 +361,13 @@ export default function Layout() {
                                         {activeSub && (
                                             <>
                                                 <span style={{ margin: '0 8px', color: 'var(--text-muted)' }}>/</span>
-                                                <span style={{ color: 'var(--primary)' }}>{activeSub.name}</span>
+                                                <span 
+                                                    style={{ color: 'var(--primary)', cursor: 'pointer', borderBottom: '1px solid var(--primary)', paddingBottom: '1px' }}
+                                                    onClick={() => window.dispatchEvent(new CustomEvent('reset-tab-state', { detail: activeSub.id }))}
+                                                    title={`กลับสู่หน้ารายการ ${activeSub.name}`}
+                                                >
+                                                    {activeSub.name}
+                                                </span>
                                             </>
                                         )}
                                     </>

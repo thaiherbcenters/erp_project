@@ -13,7 +13,12 @@ export function PlannerProvider({ children }) {
             const res = await fetch(`${API_BASE}/planner`);
             if (res.ok) {
                 const data = await res.json();
-                setJobs(data);
+                setJobs(prevJobs => {
+                    if (JSON.stringify(prevJobs) !== JSON.stringify(data)) {
+                        return data;
+                    }
+                    return prevJobs;
+                });
             }
         } catch (err) {
             console.error('Failed to fetch planner jobs:', err);

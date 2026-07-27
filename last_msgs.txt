@@ -1,0 +1,39 @@
+﻿<USER_REQUEST>
+เเล้วช่อง ข้อมูลเพิ่มเติมเฉพาะใบกำกับภาษี/ใบส่งสินค้า  ไม่มีหรอ   ไปดูใน C:\project\googlefrom-main\bill.html ดีๆ
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-07-25T14:14:27+07:00.
+</ADDITIONAL_METADATA>
+<USER_REQUEST>
+เสร็จหรือยัง
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-07-25T14:32:09+07:00.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.1 Pro (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>
+<USER_REQUEST>
+เรียงเเถวล่ะ 2 สิ 
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-07-25T14:34:51+07:00.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Gemini 3.1 Pro (High). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>
+<USER_REQUEST>
+เกิดอะไรขึ้น
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-07-25T14:40:21+07:00.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Claude Opus 4.6 (Thinking). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>
+<USER_REQUEST>
+ข้อมูลเพิ่มเติมเฉพาะใบกำกับภาษี/ใบส่งสินค้า เรียงทีล่ะ 2 สิ
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-07-25T14:41:24+07:00.
+</ADDITIONAL_METADATA>

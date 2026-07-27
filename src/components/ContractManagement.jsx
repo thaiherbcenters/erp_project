@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Search, FileText, Eye, X, Paperclip } from 'lucide-react';
 import { useAlert } from './CustomAlert';
 import API_BASE from '../config';
+import CustomDatePicker from './CustomDatePicker';
 import './ContractManagement.css';
 
 const ContractManagement = ({ onViewDocument }) => {
@@ -96,6 +97,19 @@ const ContractManagement = ({ onViewDocument }) => {
         }
     };
 
+    const getDocTypeLabel = (type) => {
+        const types = {
+            'poa': 'ขึ้นทะเบียน (POA)',
+            'herbal_cert': 'คำรับรอง',
+            'torbor1': 'แบบ ทบ.๑',
+            'contract_mfg': 'สัญญาจ้างผลิตสินค้า',
+            'pdpa_consent': 'หนังสือให้ความยินยอม (PDPA)',
+            'corp_rep': 'หนังสือแต่งตั้งผู้แทน',
+            'safety_cert': 'คำรับรองความปลอดภัยฯ'
+        };
+        return types[type] || type;
+    };
+
     const handleViewDetails = async (contract) => {
         setViewModalData(contract);
         setIsLoadingDocs(true);
@@ -103,7 +117,49 @@ const ContractManagement = ({ onViewDocument }) => {
             const res = await fetch(`${API_BASE}/contracts/${contract.ContractID}/documents`);
             const json = await res.json();
             if (json.success) {
-                setLinkedDocs(json.data);
+                // Group by CreatedAt (within 5 seconds)
+                const groupedDocs = [];
+                (json.data || []).forEach(doc => {
+                    // Only group legal documents, not quotations/sales orders
+                    const isLegalDoc = ['poa', 'herbal_cert', 'torbor1', 'contract_mfg', 'pdpa_consent', 'corp_rep', 'safety_cert'].includes(doc.DocumentType);
+                    
+                    if (!isLegalDoc) {
+                        groupedDocs.push({
+                            ...doc,
+                            primaryDoc: doc,
+                            docs: [doc],
+                            documentTypeLabel: doc.DocumentType
+                        });
+                        return;
+                    }
+
+                    const groupIndex = groupedDocs.findIndex(g => {
+                        if (!g.CreatedAt || !doc.CreatedAt) return false;
+                        const isGLegal = ['poa', 'herbal_cert', 'torbor1', 'contract_mfg', 'pdpa_consent', 'corp_rep', 'safety_cert'].includes(g.DocumentType);
+                        if (!isGLegal) return false;
+                        return Math.abs(new Date(g.CreatedAt) - new Date(doc.CreatedAt)) < 5000;
+                    });
+                    
+                    if (groupIndex !== -1) {
+                        groupedDocs[groupIndex].docs.push(doc);
+                        groupedDocs[groupIndex].documentTypeLabel += `, ${getDocTypeLabel(doc.DocumentType)}`;
+                        
+                        // Promote poa, herbal_cert, or torbor1 as primary document if possible
+                        if (['poa', 'herbal_cert', 'torbor1'].includes(doc.DocumentType) && 
+                            !['poa', 'herbal_cert', 'torbor1'].includes(groupedDocs[groupIndex].primaryDoc.DocumentType)) {
+                            groupedDocs[groupIndex].primaryDoc = doc;
+                            groupedDocs[groupIndex].DocumentNo = doc.DocumentNo;
+                        }
+                    } else {
+                        groupedDocs.push({
+                            ...doc,
+                            primaryDoc: doc,
+                            docs: [doc],
+                            documentTypeLabel: getDocTypeLabel(doc.DocumentType)
+                        });
+                    }
+                });
+                setLinkedDocs(groupedDocs);
             } else {
                 setLinkedDocs([]);
             }
@@ -117,7 +173,7 @@ const ContractManagement = ({ onViewDocument }) => {
 
     const handlePrintDoc = async (doc) => {
         if (onViewDocument) {
-            onViewDocument(doc.DocumentType, doc.DocumentID);
+            onViewDocument(doc.DocumentType, doc.DocumentID, doc.docs);
         } else {
             // Fallback for legal documents if no handler provided
             if (doc.DocumentType === 'poa' || doc.DocumentType === 'corp_rep') {
@@ -205,11 +261,11 @@ const ContractManagement = ({ onViewDocument }) => {
                         </div>
                         <div className="form-group">
                             <label>วันที่เริ่มต้น</label>
-                            <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} />
+                            <CustomDatePicker name="startDate" value={formData.startDate} onChange={handleChange} />
                         </div>
                         <div className="form-group">
                             <label>วันที่สิ้นสุด (ถ้ามี)</label>
-                            <input type="date" name="endDate" value={formData.endDate} onChange={handleChange} />
+                            <CustomDatePicker name="endDate" value={formData.endDate} onChange={handleChange} />
                         </div>
                     </div>
                     <div className="contract-form-actions">
@@ -236,7 +292,7 @@ const ContractManagement = ({ onViewDocument }) => {
                                     <th>วันที่เริ่มต้น</th>
                                     <th>วันที่สิ้นสุด</th>
                                     <th>สถานะ</th>
-                                    <th style={{ textAlign: 'right' }}>จัดการ</th>
+                                    <th style={{ textAlign: 'center' }}>จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -247,7 +303,7 @@ const ContractManagement = ({ onViewDocument }) => {
                                         <td>{c.StartDate ? new Date(c.StartDate).toLocaleDateString('th-TH') : '-'}</td>
                                         <td>{c.EndDate ? new Date(c.EndDate).toLocaleDateString('th-TH') : '-'}</td>
                                         <td><span className="status-badge progress">{c.Status}</span></td>
-                                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                                             <button className="btn-icon view" onClick={() => handleViewDetails(c)} title="ดูรายละเอียด">
                                                 <Eye size={16} />
                                             </button>
@@ -266,7 +322,7 @@ const ContractManagement = ({ onViewDocument }) => {
             {/* View Modal */}
             {viewModalData && (
                 <div className="contract-modal-overlay">
-                    <div className="contract-modal">
+                    <div className="contract-modal" style={{ width: '800px', maxWidth: '90vw' }}>
                         <div className="contract-modal-header">
                             <h2 style={{ margin: 0, fontSize: '18px', color: '#0f172a' }}>รายละเอียดสัญญา</h2>
                             <button className="btn-icon" onClick={closeViewModal}><X size={20} /></button>
@@ -287,7 +343,7 @@ const ContractManagement = ({ onViewDocument }) => {
                             ) : linkedDocs.length === 0 ? (
                                 <div style={{ padding: '20px', textAlign: 'center', color: '#64748b', background: '#f8fafc', borderRadius: '4px' }}>ไม่มีเอกสารที่เกี่ยวข้องกับสัญญานี้</div>
                             ) : (
-                                <table className="contract-table docs-table">
+                                <table className="contract-table docs-table" style={{ whiteSpace: 'nowrap' }}>
                                     <thead>
                                         <tr>
                                             <th>ประเภทเอกสาร</th>
@@ -300,9 +356,9 @@ const ContractManagement = ({ onViewDocument }) => {
                                     <tbody>
                                         {linkedDocs.map(doc => (
                                             <tr key={doc.DocumentID}>
-                                                <td>{doc.DocumentType === 'poa' ? 'ขึ้นทะเบียน (POA)' : doc.DocumentType}</td>
-                                                <td>{doc.DocumentNo || '-'}</td>
-                                                <td>{doc.DocumentDate ? new Date(doc.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
+                                                <td>{doc.documentTypeLabel || doc.DocumentType}</td>
+                                                <td>{doc.primaryDoc?.DocumentNo || doc.DocumentNo || '-'}</td>
+                                                <td>{doc.primaryDoc?.DocumentDate || doc.DocumentDate ? new Date(doc.primaryDoc?.DocumentDate || doc.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
                                                 <td><span className="status-badge progress">{doc.Status}</span></td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div className="action-buttons justify-center" style={{ display: 'flex', gap: '8px' }}>

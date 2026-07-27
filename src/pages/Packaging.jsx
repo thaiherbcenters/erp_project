@@ -49,6 +49,7 @@ const getDestBadge = (dest) => {
 };
 
 import API_BASE from '../config';
+import CustomSelect from '../components/CustomSelect';
 
 const API_URL = API_BASE;
 
@@ -555,7 +556,7 @@ export default function Packaging() {
                                     </div>
                                     <button className="search-btn">ค้นหา</button>
                                 </div>
-                                <select
+                                <CustomSelect
                                     value={statusFilter}
                                     onChange={(e) => setStatusFilter(e.target.value)}
                                     style={{ padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 13, background: '#fff', cursor: 'pointer' }}
@@ -563,7 +564,7 @@ export default function Packaging() {
                                     {statusOptions.map(s => (
                                         <option key={s} value={s}>{s}</option>
                                     ))}
-                                </select>
+                                </CustomSelect>
                             </div>
 
                         </div>

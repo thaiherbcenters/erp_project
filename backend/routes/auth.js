@@ -62,7 +62,7 @@ router.post('/login', async (req, res) => {
         const token = jwt.sign(
             userData,
             process.env.JWT_SECRET || 'THAIHERB_SECRET_KEY_2026_ERP',
-            { expiresIn: '8h' }
+            { expiresIn: '10h' }
         );
 
         // Log การ Login สำเร็จ

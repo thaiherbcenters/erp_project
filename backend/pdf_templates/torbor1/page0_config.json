@@ -1,8 +1,8 @@
 {
   "templateName": "3 แบบ ทบ.1 คำขอขึ้นทะเบียนผลิตภัณฑ์สมุนไพร.pdf",
   "templateConfig": {
-    "defaultFontSize": 7,
-    "defaultFontFamily": "Sarabun",
+    "defaultFontSize": 16,
+    "defaultFontFamily": "THSarabunNew",
     "defaultFontWeight": "normal"
   },
   "fields": [

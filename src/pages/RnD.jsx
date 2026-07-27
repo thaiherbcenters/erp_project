@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import { useRnD } from '../context/RnDContext';
 import { useAlert } from '../components/CustomAlert';
+import CustomDatePicker from '../components/CustomDatePicker';
+import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 import './RnD.css';
 
@@ -43,7 +45,7 @@ export default function RnD() {
     // Forms
     const emptyFormulaForm = {
         name: '', category: 'ยาดม', version: 'v1.0', batchSize: 0, unit: '', shelfLife: '',
-        description: '', instructions: [''], ingredients: [{ materialId: '', name: '', qty: 0, unit: '' }],
+        description: '', instructions: [''], ingredients: [{ materialId: '', name: '', qty: 0, unit: '', type: 'active', engName: '', latinName: '', partUsed: '' }],
     };
     const [formulaForm, setFormulaForm] = useState(emptyFormulaForm);
     const [projectForm, setProjectForm] = useState({ name: '', category: '', researcher: '', startDate: '', targetDate: '', formulaRef: '' });
@@ -96,7 +98,7 @@ export default function RnD() {
     };
 
     // ── Formula Form Helpers ──
-    const addIngredient = () => setFormulaForm(p => ({ ...p, ingredients: [...p.ingredients, { materialId: '', name: '', qty: 0, unit: '' }] }));
+    const addIngredient = () => setFormulaForm(p => ({ ...p, ingredients: [...p.ingredients, { materialId: '', name: '', qty: 0, unit: '', type: 'active', engName: '', latinName: '', partUsed: '' }] }));
     const removeIngredient = (idx) => setFormulaForm(p => ({ ...p, ingredients: p.ingredients.filter((_, i) => i !== idx) }));
     const updateIngredient = (idx, field, value) => {
         setFormulaForm(p => {
@@ -162,7 +164,7 @@ export default function RnD() {
             name: f.name, category: f.category, version: f.version, batchSize: f.batchSize,
             unit: f.unit, shelfLife: f.shelfLife, description: f.description,
             instructions: f.instructions?.length ? f.instructions : [''],
-            ingredients: f.ingredients?.length ? f.ingredients : [{ materialId: '', name: '', qty: 0, unit: '' }],
+            ingredients: f.ingredients?.length ? f.ingredients : [{ materialId: '', name: '', qty: 0, unit: '', type: 'active', engName: '', latinName: '', partUsed: '' }],
         });
         setSelectedFormula(f);
         setShowEditFormula(true);
@@ -598,9 +600,9 @@ export default function RnD() {
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>หมวดหมู่</label>
-                                <select style={inputStyle} value={formulaForm.category} onChange={e => setFormulaForm({ ...formulaForm, category: e.target.value })}>
+                                <CustomSelect style={inputStyle} value={formulaForm.category} onChange={e => setFormulaForm({ ...formulaForm, category: e.target.value })}>
                                     <option>ยาดม</option><option>Skincare</option><option>น้ำมันนวด</option><option>เครื่องดื่ม</option><option>สุขอนามัย</option><option>Essential Oil</option>
-                                </select>
+                                </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>เวอร์ชัน</label>
@@ -629,14 +631,26 @@ export default function RnD() {
                             <Beaker size={16} style={{ color: '#1e88e5' }} /> วัตถุดิบ ({formulaForm.ingredients.length} รายการ)
                         </h4>
                         {formulaForm.ingredients.map((ing, idx) => (
-                            <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                                <select style={{ ...inputStyle, flex: 2 }} value={ing.materialId} onChange={e => updateIngredient(idx, 'materialId', e.target.value)}>
-                                    <option value="">-- เลือกวัตถุดิบ --</option>
-                                    {materials.map(m => <option key={m.id} value={m.id}>{m.id} — {m.name} ({m.unit})</option>)}
-                                </select>
-                                <input type="number" style={{ ...inputStyle, flex: 0.5 }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateIngredient(idx, 'qty', parseFloat(e.target.value) || 0)} />
-                                <span style={{ color: '#6b7280', fontSize: 13, minWidth: 30 }}>{ing.unit}</span>
-                                <button onClick={() => removeIngredient(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={16} /></button>
+                            <div key={idx} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: 12, marginBottom: 12 }}>
+                                <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                                    <CustomSelect style={{ ...inputStyle, flex: 1 }} value={ing.type} onChange={e => updateIngredient(idx, 'type', e.target.value)}>
+                                        <option value="active">สารสำคัญ (Active)</option>
+                                        <option value="extract">สารสกัด (Extract)</option>
+                                        <option value="inactive">สารช่วย (Inactive)</option>
+                                    </CustomSelect>
+                                    <CustomSelect style={{ ...inputStyle, flex: 2 }} value={ing.materialId} onChange={e => updateIngredient(idx, 'materialId', e.target.value)}>
+                                        <option value="">-- เลือกวัตถุดิบ --</option>
+                                        {materials.map(m => <option key={m.id} value={m.id}>{m.id} — {m.name} ({m.unit})</option>)}
+                                    </CustomSelect>
+                                    <input type="number" style={{ ...inputStyle, width: 80 }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateIngredient(idx, 'qty', parseFloat(e.target.value) || 0)} />
+                                    <span style={{ color: '#6b7280', fontSize: 13, minWidth: 30 }}>{ing.unit}</span>
+                                    <button onClick={() => removeIngredient(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={16} /></button>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <input type="text" style={{ ...inputStyle, flex: 1, fontSize: 13 }} placeholder="ชื่ออังกฤษ (ถ้ามี)" value={ing.engName || ''} onChange={e => updateIngredient(idx, 'engName', e.target.value)} />
+                                    <input type="text" style={{ ...inputStyle, flex: 1, fontSize: 13 }} placeholder="ชื่อวิทยาศาสตร์/ละติน" value={ing.latinName || ''} onChange={e => updateIngredient(idx, 'latinName', e.target.value)} />
+                                    <input type="text" style={{ ...inputStyle, flex: 1, fontSize: 13 }} placeholder="ส่วนที่ใช้" value={ing.partUsed || ''} onChange={e => updateIngredient(idx, 'partUsed', e.target.value)} />
+                                </div>
                             </div>
                         ))}
                         <button className="btn-sm" onClick={addIngredient} style={{ marginBottom: 20 }}><Plus size={14} /> เพิ่มวัตถุดิบ</button>
@@ -685,10 +699,10 @@ export default function RnD() {
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>หมวดหมู่</label>
-                                <select style={inputStyle} value={projectForm.category} onChange={e => setProjectForm({ ...projectForm, category: e.target.value })}>
+                                <CustomSelect style={inputStyle} value={projectForm.category} onChange={e => setProjectForm({ ...projectForm, category: e.target.value })}>
                                     <option value="">-- เลือก --</option>
                                     <option>Skincare</option><option>Essential Oil</option><option>เครื่องดื่ม</option><option>น้ำมันนวด</option><option>สุขอนามัย</option><option>ยาดม</option>
-                                </select>
+                                </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>นักวิจัย</label>
@@ -696,18 +710,18 @@ export default function RnD() {
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>วันเริ่มต้น</label>
-                                <input type="date" style={inputStyle} value={projectForm.startDate} onChange={e => setProjectForm({ ...projectForm, startDate: e.target.value })} />
+                                <CustomDatePicker style={inputStyle} value={projectForm.startDate} onChange={e => setProjectForm({ ...projectForm, startDate: e.target.value })} />
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>วันเป้าหมาย</label>
-                                <input type="date" style={inputStyle} value={projectForm.targetDate} onChange={e => setProjectForm({ ...projectForm, targetDate: e.target.value })} />
+                                <CustomDatePicker style={inputStyle} value={projectForm.targetDate} onChange={e => setProjectForm({ ...projectForm, targetDate: e.target.value })} />
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>สูตรอ้างอิง (ถ้ามี)</label>
-                                <select style={inputStyle} value={projectForm.formulaRef} onChange={e => setProjectForm({ ...projectForm, formulaRef: e.target.value })}>
+                                <CustomSelect style={inputStyle} value={projectForm.formulaRef} onChange={e => setProjectForm({ ...projectForm, formulaRef: e.target.value })}>
                                     <option value="">-- ไม่มี --</option>
                                     {formulas.map(f => <option key={f.id} value={f.id}>{f.id} — {f.name}</option>)}
-                                </select>
+                                </CustomSelect>
                             </div>
                         </div>
                     </div>
@@ -736,10 +750,10 @@ export default function RnD() {
                         <div className="rnd-modal-info-grid">
                             <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                 <label>โครงการ <span style={{ color: '#ef4444' }}>*</span></label>
-                                <select style={inputStyle} value={experimentForm.projectCode} onChange={e => setExperimentForm({ ...experimentForm, projectCode: e.target.value })}>
+                                <CustomSelect style={inputStyle} value={experimentForm.projectCode} onChange={e => setExperimentForm({ ...experimentForm, projectCode: e.target.value })}>
                                     <option value="">-- เลือกโครงการ --</option>
                                     {projects.map(p => <option key={p.code} value={p.code}>{p.code} — {p.name}</option>)}
-                                </select>
+                                </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                 <label>ชื่อการทดลอง <span style={{ color: '#ef4444' }}>*</span></label>
@@ -747,13 +761,13 @@ export default function RnD() {
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>วันที่ทดลอง</label>
-                                <input type="date" style={inputStyle} value={experimentForm.date} onChange={e => setExperimentForm({ ...experimentForm, date: e.target.value })} />
+                                <CustomDatePicker style={inputStyle} value={experimentForm.date} onChange={e => setExperimentForm({ ...experimentForm, date: e.target.value })} />
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ผลลัพธ์</label>
-                                <select style={inputStyle} value={experimentForm.result} onChange={e => setExperimentForm({ ...experimentForm, result: e.target.value })}>
+                                <CustomSelect style={inputStyle} value={experimentForm.result} onChange={e => setExperimentForm({ ...experimentForm, result: e.target.value })}>
                                     <option value="รอผล">รอผล</option><option value="ผ่าน">ผ่าน</option><option value="ไม่ผ่าน">ไม่ผ่าน</option>
-                                </select>
+                                </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                 <label>หมายเหตุ</label>

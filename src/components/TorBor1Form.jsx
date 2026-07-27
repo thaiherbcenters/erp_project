@@ -1,6 +1,61 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { useAlert } from './CustomAlert';
-import { FileText, User, Building2, Globe, Check, ChevronRight, Plus, Trash2, Factory, Ship } from 'lucide-react';
+import { FileText, User, Building2, Globe, Check, ChevronRight, Plus, Trash2, Factory, Ship, Database, X } from 'lucide-react';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import API_BASE from '../config';
+import './PowerOfAttorneyForm.css';
+import NameInputWithTitle from './NameInputWithTitle';
+import IdCardInput from './IdCardInput';
+import CustomDatePicker from './CustomDatePicker';
+
+const TipTapCell = ({ value, onChange, readOnly, style }) => {
+    const editor = useEditor({
+        extensions: [StarterKit],
+        content: value || '',
+        editable: !readOnly,
+        onUpdate: ({ editor }) => {
+            onChange(editor.getHTML());
+        },
+    });
+
+    useEffect(() => {
+        if (editor && value !== editor.getHTML()) {
+            // Only update if the value is different to avoid cursor jumps
+            // TipTap sometimes formats HTML slightly differently, so a simple string comparison might trigger unnecessarily,
+            // but for completely new data it will work.
+            editor.commands.setContent(value || '');
+        }
+    }, [value, editor]);
+
+    if (!editor) return null;
+
+    return (
+        <div style={{ ...style, display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
+            {editor && <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
+                <div style={{ background: '#333', padding: '4px', borderRadius: '4px', display: 'flex', gap: '4px' }}>
+                    <button
+                        type="button"
+                        onClick={() => editor.chain().focus().toggleBold().run()}
+                        style={{ 
+                            background: editor.isActive('bold') ? '#555' : 'transparent', 
+                            color: '#fff', 
+                            border: 'none', 
+                            padding: '4px 8px', 
+                            borderRadius: '4px', 
+                            cursor: 'pointer', 
+                            fontWeight: 'bold',
+                            fontSize: '12px'
+                        }}
+                    >
+                        B
+                    </button>
+                </div>
+            </BubbleMenu>}
+            <EditorContent editor={editor} style={{ flex: 1 }} />
+        </div>
+    );
+};
 
 // ─── Design Tokens ───
 const colors = {
@@ -52,91 +107,301 @@ const applicantTypes = [
 const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = null, onStatusChange, customerData, contractId, embedded, sharedFormData, onSharedDataChange }, ref) => {
     const { showAlert } = useAlert();
     const [form, setForm] = useState({
-        // สำหรับเจ้าหน้าที่ (Official Use)
-        ReceiptNo: 'ร.1234/2567',
-        ReceiptDate: '2024-01-15',
-        ReceiverName: 'นายเจ้าหน้าที่ ทดสอบ',
+        // ── สำหรับเจ้าหน้าที่ (Official Use)
+        ReceiptNo: '',
+        ReceiptDate: '',
+        ReceiverName: '',
 
         documentId: null,
         DocumentDate: new Date().toISOString().split('T')[0],
-        // ๑. ความประสงค์
-        ReqMedicineFromHerb: true,
-        ReqMedType: 'ยาแผนไทย',
+        // ๑. ประเภทคำขอ
+        ReqMedicineFromHerb: false,
+        ReqMedType: '',
         ReqMedTypeOther: '',
         ReqHealthProduct: false,
-        TypeProduce: true,
+        TypeProduce: false,
         TypeImport: false,
         TypeExportOnly: false,
-        ProductNameThai: 'ยาสมุนไพรไทยตราเทส',
-        ProductNameEng: 'Thai Herb Test Brand',
-        ApplicantType: 'นิติบุคคล',
-        AppNaturalName: 'นายทดสอบ บุคคลธรรมดา', AppNaturalAge: '35', AppNaturalNationality: 'ไทย', AppNaturalCitizenID: '1234567890123',
-        AppNaturalAddressNo: '111', AppNaturalBuilding: 'ตึกเทส', AppNaturalMoo: '1', AppNaturalSoi: 'ซอยทดสอบ',
-        AppNaturalRoad: 'ถนนทดสอบ', AppNaturalSubDistrict: 'แขวงเทส', AppNaturalDistrict: 'เขตเทส', AppNaturalProvince: 'กรุงเทพมหานคร',
-        AppNaturalPostcode: '10000', AppNaturalFax: '02-111-1111', AppNaturalPhone: '081-111-1111', AppNaturalEmail: 'test@test.com',
-        AppJuristicName: 'บริษัท ทดสอบ จำกัด', AppJuristicID: '0105555555555',
-        AppJuristicAddressNo: '222', AppJuristicBuilding: 'ตึกบริษัท', AppJuristicMoo: '2', AppJuristicSoi: 'ซอยออฟฟิศ',
-        AppJuristicRoad: 'ถนนออฟฟิศ', AppJuristicSubDistrict: 'แขวงบริษัท', AppJuristicDistrict: 'เขตบริษัท', AppJuristicProvince: 'กรุงเทพมหานคร',
-        AppJuristicPostcode: '10000', AppJuristicFax: '02-222-2222', AppJuristicPhone: '082-222-2222', AppJuristicEmail: 'company@test.com',
-        AppJuristicRepName: 'นายตัวแทน นิติบุคคล', AppJuristicRepAge: '40', AppJuristicRepNationality: 'ไทย', AppJuristicRepCitizenID: '9876543210987',
-        AppForeignPassportNo: 'A12345678', AppForeignPassportExpiry: '2030-12-31',
-        AppForeignResCertNo: 'R87654321', AppForeignResCertDate: '2020-05-10',
-        AppForeignWorkPermitNo: 'W11223344', AppForeignWorkPermitExpiry: '2025-05-10',
+        ProductNameThai: '',
+        ProductNameEng: '',
+        ApplicantType: '',
+        AppJuristicRepName: '', AppJuristicRepAge: '', AppJuristicRepNationality: '', AppJuristicRepCitizenID: '',
+        AppForeignPassportNo: '', AppForeignPassportExpiry: '',
+        AppForeignResCertNo: '', AppForeignResCertDate: '',
+        AppForeignWorkPermitNo: '', AppForeignWorkPermitExpiry: '',
         
-        AppForeignBizLicenseNo: 'FL-998877', AppForeignBizLicenseDate: '2021-01-01',
-        AppForeignBizCertNo: 'FC-112233', AppForeignBizCertDate: '2021-01-15',
+        AppForeignBizLicenseNo: '', AppForeignBizLicenseDate: '',
+        AppForeignBizCertNo: '', AppForeignBizCertDate: '',
 
         // ๓. ข้อมูลสถานที่ผลิต หรือนำเข้า
         ProductionType: 'ผลิตในประเทศ', // 'ผลิตในประเทศ', 'นำเข้า'
 
         // กรณีผลิตในประเทศ
-        ProdLicenseeName: 'บริษัท โรงงานผลิตเทส จำกัด', ProdLicenseNo: 'ผ.123/2560',
-        ProdOperatorName: 'นายผู้ดำเนิน โรงงาน', ProdPlaceName: 'โรงงานสมุนไพรเทส',
-        ProdAddressNo: '333', ProdSoi: 'ซอยโรงงาน', ProdRoad: 'ถนนโรงงาน', ProdMoo: '3', ProdSubDistrict: 'ตำบลโรงงาน',
-        ProdDistrict: 'อำเภอโรงงาน', ProdProvince: 'ปทุมธานี', ProdPostcode: '12000', ProdPhone: '02-333-3333',
+        ProdLicenseeName: 'นายธวัช จรุงพิรวงศ์', ProdLicenseNo: 'HB 12-1-67-1',
+        ProdOperatorName: '-', ProdPlaceName: 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์',
+        ProdAddressNo: '6/10', ProdSoi: '-', ProdRoad: '-', ProdMoo: '2', ProdSubDistrict: 'ไทรม้า',
+        ProdDistrict: 'เมืองนนทบุรี', ProdProvince: 'นนทบุรี', ProdPostcode: '11000', ProdPhone: '-',
 
         // กรณีแบ่งบรรจุ
-        RepackRegNo: 'บ.999/2567',
+        RepackRegNo: '-',
 
         // กรณีนำเข้า
-        ImportLicenseeName: 'บริษัท นำเข้าเทส จำกัด', ImportLicenseNo: 'น.456/2560',
-        ImportOperatorName: 'นางผู้นำเข้า ทดสอบ', ImportPlaceName: 'โกดังนำเข้าเทส',
-        ImportAddressNo: '444', ImportSoi: 'ซอยโกดัง', ImportRoad: 'ถนนนำเข้า',
-        ImportMoo: '4', ImportSubDistrict: 'ตำบลโกดัง', ImportDistrict: 'อำเภอโกดัง', ImportProvince: 'สมุทรปราการ',
-        ImportPostcode: '10270', ImportPhone: '02-444-4444',
-        ImportForeignMfgName: 'Foreign Test Co., Ltd.', ImportForeignMfgAddress: '123 Fake St, Test City, Test Country',
+        ImportLicenseeName: '', ImportLicenseNo: '',
+        ImportOperatorName: '', ImportPlaceName: '',
+        ImportAddressNo: '', ImportSoi: '', ImportRoad: '',
+        ImportMoo: '', ImportSubDistrict: '', ImportDistrict: '', ImportProvince: '',
+        ImportPostcode: '', ImportPhone: '',
+        ImportForeignMfgName: '', ImportForeignMfgAddress: '',
 
         // ๔. รายละเอียดผู้ผลิตอื่นที่เกี่ยวข้อง (Stored as JSON string)
-        RelatedManufacturers: [
-            { name: 'บริษัท ซัพพลายเออร์ 1 จำกัด (ที่อยู่ 111)', licenseNo: 'ส.111/2560', responsibility: 'บรรจุผลิตภัณฑ์' },
-            { name: 'บริษัท ซัพพลายเออร์ 2 จำกัด (ที่อยู่ 222)', licenseNo: 'ส.222/2560', responsibility: 'เตรียมผลิตภัณฑ์กึ่งสำเร็จรูป' }
-        ],
+        RelatedManufacturers: [],
 
         // ๔ (ต่อ). รายละเอียดของตำรับผลิตภัณฑ์สมุนไพร
-        RecipeOtherName: 'Test Recipe Alternative Name', RecipeFormat: 'แคปซูล (Capsule)', RecipeQuantity: '1000 แคปซูล',
-        RecipeActiveIngredients: [
-            { thaiName: 'ขมิ้นชัน', engName: 'Turmeric', latinName: 'Curcuma longa', partUsed: 'เหง้า', quantity: '250 mg' },
-            { thaiName: 'พริกไทยดำ', engName: 'Black Pepper', latinName: 'Piper nigrum', partUsed: 'ผล', quantity: '50 mg' }
-        ],
-        RecipeExtracts: [
-            { extractName: 'สารสกัดฟ้าทะลายโจร', latinName: 'Andrographis paniculata', partUsed: 'ใบ', solvent: 'เอทานอล', ratio: '10:1', quantity: '100 mg' }
-        ],
-        RecipeExcipients: [
-            { name: 'แป้งข้าวโพด', casNumber: '9005-25-8', function: 'สารเติมเต็ม (Filler)', quantity: '100 mg' },
-            { name: 'แมกนีเซียมสเตียเรต', casNumber: '557-04-0', function: 'สารหล่อลื่น (Lubricant)', quantity: '5 mg' }
-        ],
+        RecipeOtherName: '', RecipeFormat: '', RecipeQuantity: '',
+        RecipeActiveIngredients: [],
+        RecipeExtracts: [],
+        RecipeExcipients: [],
 
         // ๕. รายละเอียดของผลิตภัณฑ์สมุนไพร
-        ProductAppearance: 'แคปซูลสีเขียว-ขาว บรรจุผงสีน้ำตาล', ProductPackSize: 'กระปุกละ 60 แคปซูล, แผงละ 10 แคปซูล', ProductMfgProcess: 'ผสมสารสกัดและสมุนไพรบดหยาบ นำเข้าเครื่องบรรจุแคปซูล', ProductIndication: 'บรรเทาอาการท้องอืด ท้องเฟ้อ ช่วยย่อยอาหาร',
-        ProductDosage: 'รับประทานครั้งละ 1-2 แคปซูล วันละ 3 ครั้ง', ProductPreparation: 'ไม่ต้องเตรียม', ProductCondition: 'รับประทานหลังอาหารทันที', ProductStorage: 'เก็บในที่แห้ง อุณหภูมิต่ำกว่า 30 องศาเซลเซียส / อายุ 2 ปี',
-        ProductContraindication: 'ห้ามใช้ในสตรีมีครรภ์และผู้ป่วยท่อน้ำดีอุดตัน', ProductWarning: 'หากมีอาการแพ้ควรหยุดใช้ทันที', ProductPrecaution: 'ควรระวังการใช้ร่วมกับยาต้านการแข็งตัวของเลือด', ProductAdverseReaction: 'อาจเกิดอาการระคายเคืองกระเพาะอาหาร',
-        SalesChannel: 'ผลิตภัณฑ์สมุนไพรขายทั่วไป', ProductSummary: 'ผลิตภัณฑ์มีคุณภาพผ่านเกณฑ์มาตรฐาน สมุนไพรมีความปลอดภัยตามเอกสารอ้างอิง และมีประสิทธิภาพในการบรรเทาอาการท้องอืด',
+        ProductAppearance: '', ProductPackSize: '', ProductMfgProcess: '', ProductIndication: '',
+        ProductDosage: '', ProductPreparation: '', ProductCondition: '', ProductStorage: '',
+        ProductContraindication: '', ProductWarning: '', ProductPrecaution: '', ProductAdverseReaction: '',
+        SalesChannel: '', ProductSummary: '',
         AttachedDocuments: {
-            doc1: true, doc2: true, doc3: true, doc4: false, doc5: false,
-            doc6_1: true, doc6_2: true, doc6_3: true, doc6_4: false, doc6_5: false, doc6_6: false,
-            doc7: true, doc8: false, doc9: true
+            doc1: false, doc2: false, doc3: false, doc4: false, doc5: false,
+            doc6_1: false, doc6_2: false, doc6_3: false, doc6_4: false, doc6_5: false, doc6_6: false,
+            doc7: false, doc8: false, doc9: false
         }
     });
+
+    const [formulas, setFormulas] = useState([]);
+    const [showFormulaModal, setShowFormulaModal] = useState(false);
+    const [currentDocId, setCurrentDocId] = useState(documentId);
+
+    // Fetch saved data when editing
+    useEffect(() => {
+        if (!documentId) return;
+        setCurrentDocId(documentId);
+        const fetchData = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/torbor1-documents/${documentId}`);
+                const json = await res.json();
+                if (json.success && json.data) {
+                    const d = json.data;
+                    setForm(prev => ({
+                        ...prev,
+                        ReceiptNo: d.ReceiptNo || prev.ReceiptNo,
+                        ReceiptDate: d.ReceiptDate ? new Date(d.ReceiptDate).toISOString().split('T')[0] : prev.ReceiptDate,
+                        ReceiverName: d.ReceiverName || prev.ReceiverName,
+                        DocumentDate: d.DocumentDate ? new Date(d.DocumentDate).toISOString().split('T')[0] : prev.DocumentDate,
+                        ReqMedicineFromHerb: d.ReqMedicineFromHerb !== undefined ? Boolean(d.ReqMedicineFromHerb) : prev.ReqMedicineFromHerb,
+                        ReqMedType: d.ReqMedType || prev.ReqMedType,
+                        ReqMedTypeOther: d.ReqMedTypeOther || prev.ReqMedTypeOther,
+                        ReqHealthProduct: d.ReqHealthProduct !== undefined ? Boolean(d.ReqHealthProduct) : prev.ReqHealthProduct,
+                        TypeProduce: d.TypeProduce !== undefined ? Boolean(d.TypeProduce) : prev.TypeProduce,
+                        TypeImport: d.TypeImport !== undefined ? Boolean(d.TypeImport) : prev.TypeImport,
+                        TypeExportOnly: d.TypeExportOnly !== undefined ? Boolean(d.TypeExportOnly) : prev.TypeExportOnly,
+                        ProductNameThai: d.ProductNameThai || prev.ProductNameThai,
+                        ProductNameEng: d.ProductNameEng || prev.ProductNameEng,
+                        ApplicantType: d.ApplicantType || prev.ApplicantType,
+                        AppNaturalName: d.AppNaturalName || prev.AppNaturalName,
+                        AppNaturalAge: d.AppNaturalAge || prev.AppNaturalAge,
+                        AppNaturalNationality: d.AppNaturalNationality || prev.AppNaturalNationality,
+                        AppNaturalCitizenID: d.AppNaturalCitizenID || prev.AppNaturalCitizenID,
+                        AppNaturalAddressNo: d.AppNaturalAddressNo || prev.AppNaturalAddressNo,
+                        AppNaturalBuilding: d.AppNaturalBuilding || prev.AppNaturalBuilding,
+                        AppNaturalMoo: d.AppNaturalMoo || prev.AppNaturalMoo,
+                        AppNaturalSoi: d.AppNaturalSoi || prev.AppNaturalSoi,
+                        AppNaturalRoad: d.AppNaturalRoad || prev.AppNaturalRoad,
+                        AppNaturalSubDistrict: d.AppNaturalSubDistrict || prev.AppNaturalSubDistrict,
+                        AppNaturalDistrict: d.AppNaturalDistrict || prev.AppNaturalDistrict,
+                        AppNaturalProvince: d.AppNaturalProvince || prev.AppNaturalProvince,
+                        AppNaturalPostcode: d.AppNaturalPostcode || prev.AppNaturalPostcode,
+                        AppNaturalFax: d.AppNaturalFax || prev.AppNaturalFax,
+                        AppNaturalPhone: d.AppNaturalPhone || prev.AppNaturalPhone,
+                        AppNaturalEmail: d.AppNaturalEmail || prev.AppNaturalEmail,
+                        AppJuristicName: d.AppJuristicName || prev.AppJuristicName,
+                        AppJuristicID: d.AppJuristicID || prev.AppJuristicID,
+                        AppJuristicAddressNo: d.AppJuristicAddressNo || prev.AppJuristicAddressNo,
+                        AppJuristicBuilding: d.AppJuristicBuilding || prev.AppJuristicBuilding,
+                        AppJuristicMoo: d.AppJuristicMoo || prev.AppJuristicMoo,
+                        AppJuristicSoi: d.AppJuristicSoi || prev.AppJuristicSoi,
+                        AppJuristicRoad: d.AppJuristicRoad || prev.AppJuristicRoad,
+                        AppJuristicSubDistrict: d.AppJuristicSubDistrict || prev.AppJuristicSubDistrict,
+                        AppJuristicDistrict: d.AppJuristicDistrict || prev.AppJuristicDistrict,
+                        AppJuristicProvince: d.AppJuristicProvince || prev.AppJuristicProvince,
+                        AppJuristicPostcode: d.AppJuristicPostcode || prev.AppJuristicPostcode,
+                        AppJuristicFax: d.AppJuristicFax || prev.AppJuristicFax,
+                        AppJuristicPhone: d.AppJuristicPhone || prev.AppJuristicPhone,
+                        AppJuristicEmail: d.AppJuristicEmail || prev.AppJuristicEmail,
+                        AppJuristicRepName: d.AppJuristicRepName || prev.AppJuristicRepName,
+                        AppJuristicRepAge: d.AppJuristicRepAge || prev.AppJuristicRepAge,
+                        AppJuristicRepNationality: d.AppJuristicRepNationality || prev.AppJuristicRepNationality,
+                        AppJuristicRepCitizenID: d.AppJuristicRepCitizenID || prev.AppJuristicRepCitizenID,
+                        AppForeignPassportNo: d.AppForeignPassportNo || prev.AppForeignPassportNo,
+                        AppForeignPassportExpiry: d.AppForeignPassportExpiry ? new Date(d.AppForeignPassportExpiry).toISOString().split('T')[0] : prev.AppForeignPassportExpiry,
+                        AppForeignResCertNo: d.AppForeignResCertNo || prev.AppForeignResCertNo,
+                        AppForeignResCertDate: d.AppForeignResCertDate ? new Date(d.AppForeignResCertDate).toISOString().split('T')[0] : prev.AppForeignResCertDate,
+                        AppForeignWorkPermitNo: d.AppForeignWorkPermitNo || prev.AppForeignWorkPermitNo,
+                        AppForeignWorkPermitExpiry: d.AppForeignWorkPermitExpiry ? new Date(d.AppForeignWorkPermitExpiry).toISOString().split('T')[0] : prev.AppForeignWorkPermitExpiry,
+                        AppForeignBizLicenseNo: d.AppForeignBizLicenseNo || prev.AppForeignBizLicenseNo,
+                        AppForeignBizLicenseDate: d.AppForeignBizLicenseDate ? new Date(d.AppForeignBizLicenseDate).toISOString().split('T')[0] : prev.AppForeignBizLicenseDate,
+                        AppForeignBizCertNo: d.AppForeignBizCertNo || prev.AppForeignBizCertNo,
+                        AppForeignBizCertDate: d.AppForeignBizCertDate ? new Date(d.AppForeignBizCertDate).toISOString().split('T')[0] : prev.AppForeignBizCertDate,
+                        ProductionType: d.ProductionType || prev.ProductionType,
+                        ProdLicenseeName: d.ProdLicenseeName || prev.ProdLicenseeName,
+                        ProdLicenseNo: d.ProdLicenseNo || prev.ProdLicenseNo,
+                        ProdOperatorName: d.ProdOperatorName || prev.ProdOperatorName,
+                        ProdPlaceName: d.ProdPlaceName || prev.ProdPlaceName,
+                        ProdAddressNo: d.ProdAddressNo || prev.ProdAddressNo,
+                        ProdSoi: d.ProdSoi || prev.ProdSoi,
+                        ProdRoad: d.ProdRoad || prev.ProdRoad,
+                        ProdMoo: d.ProdMoo || prev.ProdMoo,
+                        ProdSubDistrict: d.ProdSubDistrict || prev.ProdSubDistrict,
+                        ProdDistrict: d.ProdDistrict || prev.ProdDistrict,
+                        ProdProvince: d.ProdProvince || prev.ProdProvince,
+                        ProdPostcode: d.ProdPostcode || prev.ProdPostcode,
+                        ProdPhone: d.ProdPhone || prev.ProdPhone,
+                        RepackRegNo: d.RepackRegNo || prev.RepackRegNo,
+                        ImportLicenseeName: d.ImportLicenseeName || prev.ImportLicenseeName,
+                        ImportLicenseNo: d.ImportLicenseNo || prev.ImportLicenseNo,
+                        ImportOperatorName: d.ImportOperatorName || prev.ImportOperatorName,
+                        ImportPlaceName: d.ImportPlaceName || prev.ImportPlaceName,
+                        ImportAddressNo: d.ImportAddressNo || prev.ImportAddressNo,
+                        ImportSoi: d.ImportSoi || prev.ImportSoi,
+                        ImportRoad: d.ImportRoad || prev.ImportRoad,
+                        ImportMoo: d.ImportMoo || prev.ImportMoo,
+                        ImportSubDistrict: d.ImportSubDistrict || prev.ImportSubDistrict,
+                        ImportDistrict: d.ImportDistrict || prev.ImportDistrict,
+                        ImportProvince: d.ImportProvince || prev.ImportProvince,
+                        ImportPostcode: d.ImportPostcode || prev.ImportPostcode,
+                        ImportPhone: d.ImportPhone || prev.ImportPhone,
+                        ImportForeignMfgName: d.ImportForeignMfgName || prev.ImportForeignMfgName,
+                        ImportForeignMfgAddress: d.ImportForeignMfgAddress || prev.ImportForeignMfgAddress,
+                        RelatedManufacturers: d.RelatedManufacturers || prev.RelatedManufacturers,
+                        RecipeOtherName: d.RecipeOtherName || prev.RecipeOtherName,
+                        RecipeFormat: d.RecipeFormat || prev.RecipeFormat,
+                        RecipeQuantity: d.RecipeQuantity || prev.RecipeQuantity,
+                        RecipeActiveIngredients: d.RecipeActiveIngredients || prev.RecipeActiveIngredients,
+                        RecipeExtracts: d.RecipeExtracts || prev.RecipeExtracts,
+                        RecipeExcipients: d.RecipeExcipients || prev.RecipeExcipients,
+                        ProductAppearance: d.ProductAppearance || prev.ProductAppearance,
+                        ProductPackSize: d.ProductPackSize || prev.ProductPackSize,
+                        ProductMfgProcess: d.ProductMfgProcess || prev.ProductMfgProcess,
+                        ProductIndication: d.ProductIndication || prev.ProductIndication,
+                        ProductDosage: d.ProductDosage || prev.ProductDosage,
+                        ProductPreparation: d.ProductPreparation || prev.ProductPreparation,
+                        ProductCondition: d.ProductCondition || prev.ProductCondition,
+                        ProductStorage: d.ProductStorage || prev.ProductStorage,
+                        ProductContraindication: d.ProductContraindication || prev.ProductContraindication,
+                        ProductWarning: d.ProductWarning || prev.ProductWarning,
+                        ProductPrecaution: d.ProductPrecaution || prev.ProductPrecaution,
+                        ProductAdverseReaction: d.ProductAdverseReaction || prev.ProductAdverseReaction,
+                        SalesChannel: d.SalesChannel || prev.SalesChannel,
+                        ProductSummary: d.ProductSummary || prev.ProductSummary,
+                        AttachedDocuments: d.AttachedDocuments || prev.AttachedDocuments,
+                    }));
+                }
+            } catch (err) {
+                console.error('Error fetching data:', err);
+            }
+        };
+        fetchData();
+    }, [documentId]);
+
+    // Sync shared form data
+    useEffect(() => {
+        if (sharedFormData?.productName) {
+            setForm(prev => {
+                if (prev.ProductNameThai !== sharedFormData.productName) {
+                    return { ...prev, ProductNameThai: sharedFormData.productName };
+                }
+                return prev;
+            });
+        }
+    }, [sharedFormData?.productName]);
+
+    useEffect(() => {
+        fetch(`${API_BASE}/rnd/formulas`)
+            .then(res => res.json())
+            .then(data => setFormulas(data))
+            .catch(err => console.error("Error fetching formulas:", err));
+    }, []);
+
+    const handleSelectFormula = (formula) => {
+        if (!formula || !formula.ingredients) return;
+        
+        const active = [];
+        const extract = [];
+        const inactive = [];
+        
+        formula.ingredients.forEach(ing => {
+            const ingredientData = {
+                thaiName: ing.name || '',
+                engName: ing.engName || '',
+                latinName: ing.latinName || '',
+                partUsed: ing.partUsed || '',
+                quantity: (ing.qty || '') + (ing.unit ? ' ' + ing.unit : '')
+            };
+            
+            if (ing.type === 'active') {
+                active.push(ingredientData);
+            } else if (ing.type === 'extract') {
+                extract.push({
+                    extractName: ing.name || '',
+                    latinName: ing.latinName || '',
+                    partUsed: ing.partUsed || '',
+                    solvent: '',
+                    ratio: '',
+                    quantity: (ing.qty || '') + (ing.unit ? ' ' + ing.unit : '')
+                });
+            } else if (ing.type === 'inactive') {
+                inactive.push({
+                    name: ing.name || '',
+                    casNumber: '',
+                    function: '',
+                    quantity: (ing.qty || '') + (ing.unit ? ' ' + ing.unit : '')
+                });
+            }
+        });
+        
+        let instructions = {};
+        if (formula.instructions) {
+            if (Array.isArray(formula.instructions) && formula.instructions.length === 0) {
+                // Ignore empty array which is the default for old formulas
+            } else if (typeof formula.instructions === 'object') {
+                instructions = formula.instructions;
+            }
+        }
+        
+        const hasInstructions = Object.keys(instructions).length > 0;
+        
+        setForm(prev => ({
+            ...prev,
+            RecipeActiveIngredients: active.length > 0 ? active : [{ thaiName: '', engName: '', latinName: '', partUsed: '', quantity: '' }],
+            RecipeExtracts: extract.length > 0 ? extract : [{ extractName: '', latinName: '', partUsed: '', solvent: '', ratio: '', quantity: '' }],
+            RecipeExcipients: inactive.length > 0 ? inactive : [{ name: '', casNumber: '', function: '', quantity: '' }],
+            
+            // Map product details if they exist in instructions
+            ProductAppearance: hasInstructions ? (instructions.ProductAppearance || '') : prev.ProductAppearance,
+            ProductPackSize: hasInstructions ? (instructions.ProductPackSize || '') : prev.ProductPackSize,
+            ProductMfgProcess: hasInstructions ? (instructions.ProductMfgProcess || '') : prev.ProductMfgProcess,
+            ProductIndication: hasInstructions ? (instructions.ProductIndication || '') : prev.ProductIndication,
+            ProductDosage: hasInstructions ? (instructions.ProductDosage || '') : prev.ProductDosage,
+            ProductPreparation: hasInstructions ? (instructions.ProductPreparation || '') : prev.ProductPreparation,
+            ProductCondition: hasInstructions ? (instructions.ProductCondition || '') : prev.ProductCondition,
+            ProductStorage: hasInstructions ? (instructions.ProductStorage || '') : prev.ProductStorage,
+            ProductContraindication: hasInstructions ? (instructions.ProductContraindication || '') : prev.ProductContraindication,
+            ProductWarning: hasInstructions ? (instructions.ProductWarning || '') : prev.ProductWarning,
+            ProductPrecaution: hasInstructions ? (instructions.ProductPrecaution || '') : prev.ProductPrecaution,
+            ProductAdverseReaction: hasInstructions ? (instructions.ProductAdverseReaction || '') : prev.ProductAdverseReaction,
+            SalesChannel: hasInstructions ? (instructions.SalesChannel || '') : prev.SalesChannel,
+            ProductSummary: hasInstructions ? (instructions.ProductSummary || '') : prev.ProductSummary
+        }));
+        
+        setShowFormulaModal(false);
+        showAlert('success', 'ดึงข้อมูลสูตรตำรับสำเร็จ');
+    };
 
     useEffect(() => {
         if (initialData && Object.keys(initialData).length > 0) {
@@ -147,8 +412,151 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
     const handleChange = useCallback((e) => {
         if (readOnly) return;
         const { name, value, type, checked } = e.target;
-        setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
-    }, [readOnly]);
+        
+        setForm(prev => {
+            const nextForm = { ...prev, [name]: type === 'checkbox' ? checked : value };
+            
+            if (name === 'ApplicantType') {
+                // Clear all section 4 fields to avoid saving mixed data
+                nextForm.AppNaturalName = ''; nextForm.AppNaturalAge = ''; nextForm.AppNaturalNationality = ''; nextForm.AppNaturalCitizenID = '';
+                nextForm.AppNaturalAddressNo = ''; nextForm.AppNaturalBuilding = ''; nextForm.AppNaturalMoo = ''; nextForm.AppNaturalSoi = '';
+                nextForm.AppNaturalRoad = ''; nextForm.AppNaturalSubDistrict = ''; nextForm.AppNaturalDistrict = ''; nextForm.AppNaturalProvince = '';
+                nextForm.AppNaturalPostcode = ''; nextForm.AppNaturalPhone = ''; nextForm.AppNaturalFax = ''; nextForm.AppNaturalEmail = '';
+                
+                nextForm.AppJuristicName = ''; nextForm.AppJuristicID = ''; nextForm.AppJuristicAddressNo = ''; nextForm.AppJuristicBuilding = '';
+                nextForm.AppJuristicMoo = ''; nextForm.AppJuristicSoi = ''; nextForm.AppJuristicRoad = ''; nextForm.AppJuristicSubDistrict = '';
+                nextForm.AppJuristicDistrict = ''; nextForm.AppJuristicProvince = ''; nextForm.AppJuristicPostcode = ''; nextForm.AppJuristicPhone = '';
+                nextForm.AppJuristicFax = ''; nextForm.AppJuristicEmail = '';
+                nextForm.AppJuristicRepName = ''; nextForm.AppJuristicRepAge = ''; nextForm.AppJuristicRepNationality = ''; nextForm.AppJuristicRepCitizenID = '';
+
+                // If customer data is available, populate it into the newly selected type
+                if (customerData && !documentId) {
+                    const customerAddress = customerData.Address || '';
+                    const customerTaxId = customerData.TaxID || customerData.IDCard || '';
+                    const customerName = customerData.CustomerName || '';
+                    const customerPhone = customerData.Phone || '';
+                    const customerEmail = customerData.Email || '';
+                    
+                    const parseAddress = (addr) => {
+                        if (!addr) return { no: '-', moo: '-', soi: '-', road: '-', subDistrict: '-', district: '-', province: '-', zip: '-' };
+                        let remaining = addr.trim();
+                        let no = '-', moo = '-', soi = '-', road = '-', subDistrict = '-', district = '-', province = '-', zip = '-';
+
+                        const zipMatch = remaining.match(/\s?(\d{5})$/);
+                        if (zipMatch) { zip = zipMatch[1]; remaining = remaining.replace(/\s?\d{5}$/, '').trim(); }
+
+                        const provMatch = remaining.match(/(?:จ\.|จังหวัด)\s*([^\s]+)/);
+                        if (provMatch) { province = provMatch[1]; remaining = remaining.replace(/(?:จ\.|จังหวัด)\s*[^\s]+/, '').trim(); }
+
+                        const distMatch = remaining.match(/(?:อ\.|อำเภอ|เขต)\s*([^\s]+)/);
+                        if (distMatch) { district = distMatch[1]; remaining = remaining.replace(/(?:อ\.|อำเภอ|เขต)\s*[^\s]+/, '').trim(); }
+
+                        const subMatch = remaining.match(/(?:ต\.|ตำบล|แขวง)\s*([^\s]+)/);
+                        if (subMatch) { subDistrict = subMatch[1]; remaining = remaining.replace(/(?:ต\.|ตำบล|แขวง)\s*[^\s]+/, '').trim(); }
+
+                        const roadMatch = remaining.match(/(?:ถ\.|ถนน)\s*([^\s]+)/);
+                        if (roadMatch) { road = roadMatch[1]; remaining = remaining.replace(/(?:ถ\.|ถนน)\s*[^\s]+/, '').trim(); }
+
+                        const soiMatch = remaining.match(/(?:ซ\.|ซอย)\s*([^\s]+)/);
+                        if (soiMatch) { soi = soiMatch[1]; remaining = remaining.replace(/(?:ซ\.|ซอย)\s*[^\s]+/, '').trim(); }
+
+                        const mooMatch = remaining.match(/(?:ม\.|หมู่|หมู่ที่)\s*([0-9]+)/);
+                        if (mooMatch) { moo = mooMatch[1]; remaining = remaining.replace(/(?:ม\.|หมู่|หมู่ที่)\s*[0-9]+/, '').trim(); }
+
+                        remaining = remaining.replace(/เลขที่\s*/, '').trim();
+                        no = remaining || '-';
+                        
+                        return { no, moo, soi, road, subDistrict, district, province, zip, building: '-' }; // added building for TorBor1
+                    };
+                    const addr = parseAddress(customerAddress);
+                    
+                    const fallback = (val) => val ? val : '-';
+
+                    if (value === 'บุคคลธรรมดา') {
+                        nextForm.AppNaturalName = fallback(customerName);
+                        nextForm.AppNaturalCitizenID = customerTaxId;
+                        nextForm.AppNaturalAddressNo = addr.no;
+                        nextForm.AppNaturalBuilding = addr.building;
+                        nextForm.AppNaturalMoo = addr.moo;
+                        nextForm.AppNaturalSoi = addr.soi;
+                        nextForm.AppNaturalRoad = addr.road;
+                        nextForm.AppNaturalSubDistrict = addr.subDistrict;
+                        nextForm.AppNaturalDistrict = addr.district;
+                        nextForm.AppNaturalProvince = addr.province;
+                        nextForm.AppNaturalPostcode = addr.zip === '-' ? '' : addr.zip; // Zip is better left empty if none
+                        nextForm.AppNaturalPhone = fallback(customerPhone);
+                        nextForm.AppNaturalEmail = fallback(customerEmail);
+                        nextForm.AppNaturalFax = '-'; // usually not in CRM, fallback
+                    } else if (value === 'นิติบุคคล') {
+                        nextForm.AppJuristicName = fallback(customerName);
+                        nextForm.AppJuristicID = customerTaxId;
+                        nextForm.AppJuristicAddressNo = addr.no;
+                        nextForm.AppJuristicBuilding = addr.building;
+                        nextForm.AppJuristicMoo = addr.moo;
+                        nextForm.AppJuristicSoi = addr.soi;
+                        nextForm.AppJuristicRoad = addr.road;
+                        nextForm.AppJuristicSubDistrict = addr.subDistrict;
+                        nextForm.AppJuristicDistrict = addr.district;
+                        nextForm.AppJuristicProvince = addr.province;
+                        nextForm.AppJuristicPostcode = addr.zip === '-' ? '' : addr.zip;
+                        nextForm.AppJuristicPhone = fallback(customerPhone);
+                        nextForm.AppJuristicEmail = fallback(customerEmail);
+                        nextForm.AppJuristicFax = '-';
+                    }
+                }
+            }
+            if (name === 'ProductionType') {
+                if (value === 'ผลิตในประเทศ') {
+                    // Clear Import fields
+                    nextForm.ImportLicenseeName = ''; nextForm.ImportLicenseNo = '';
+                    nextForm.ImportOperatorName = ''; nextForm.ImportPlaceName = '';
+                    nextForm.ImportAddressNo = ''; nextForm.ImportSoi = ''; nextForm.ImportRoad = '';
+                    nextForm.ImportMoo = ''; nextForm.ImportSubDistrict = ''; nextForm.ImportDistrict = ''; nextForm.ImportProvince = '';
+                    nextForm.ImportPostcode = ''; nextForm.ImportPhone = '';
+                    nextForm.ImportForeignMfgName = ''; nextForm.ImportForeignMfgAddress = '';
+                    
+                    // Restore Prod defaults if empty
+                    nextForm.ProdLicenseeName = nextForm.ProdLicenseeName || 'นายธวัช จรุงพิรวงศ์';
+                    nextForm.ProdLicenseNo = nextForm.ProdLicenseNo || 'HB 12-1-67-1';
+                    nextForm.ProdPlaceName = nextForm.ProdPlaceName || 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์';
+                    nextForm.ProdAddressNo = nextForm.ProdAddressNo || '6/10';
+                    nextForm.ProdMoo = nextForm.ProdMoo || '2';
+                    nextForm.ProdSubDistrict = nextForm.ProdSubDistrict || 'ไทรม้า';
+                    nextForm.ProdDistrict = nextForm.ProdDistrict || 'เมืองนนทบุรี';
+                    nextForm.ProdProvince = nextForm.ProdProvince || 'นนทบุรี';
+                    nextForm.ProdPostcode = nextForm.ProdPostcode || '11000';
+                    nextForm.ProdOperatorName = nextForm.ProdOperatorName || '-';
+                    nextForm.ProdSoi = nextForm.ProdSoi || '-';
+                    nextForm.ProdRoad = nextForm.ProdRoad || '-';
+                    nextForm.ProdPhone = nextForm.ProdPhone || '-';
+                } else if (value === 'นำเข้า') {
+                    // Clear Prod fields
+                    nextForm.ProdLicenseeName = ''; nextForm.ProdLicenseNo = '';
+                    nextForm.ProdOperatorName = ''; nextForm.ProdPlaceName = '';
+                    nextForm.ProdAddressNo = ''; nextForm.ProdSoi = ''; nextForm.ProdRoad = ''; nextForm.ProdMoo = ''; nextForm.ProdSubDistrict = '';
+                    nextForm.ProdDistrict = ''; nextForm.ProdProvince = ''; nextForm.ProdPostcode = ''; nextForm.ProdPhone = '';
+                    
+                    // Set Import defaults to -
+                    nextForm.ImportLicenseeName = nextForm.ImportLicenseeName || '-';
+                    nextForm.ImportLicenseNo = nextForm.ImportLicenseNo || '-';
+                    nextForm.ImportOperatorName = nextForm.ImportOperatorName || '-';
+                    nextForm.ImportPlaceName = nextForm.ImportPlaceName || '-';
+                    nextForm.ImportAddressNo = nextForm.ImportAddressNo || '-';
+                    nextForm.ImportSoi = nextForm.ImportSoi || '-';
+                    nextForm.ImportRoad = nextForm.ImportRoad || '-';
+                    nextForm.ImportMoo = nextForm.ImportMoo || '-';
+                    nextForm.ImportSubDistrict = nextForm.ImportSubDistrict || '-';
+                    nextForm.ImportDistrict = nextForm.ImportDistrict || '-';
+                    nextForm.ImportProvince = nextForm.ImportProvince || '-';
+                    nextForm.ImportPhone = nextForm.ImportPhone || '-';
+                    nextForm.ImportForeignMfgName = nextForm.ImportForeignMfgName || '-';
+                    nextForm.ImportForeignMfgAddress = nextForm.ImportForeignMfgAddress || '-';
+                }
+            }
+            
+            return nextForm;
+        });
+    }, [readOnly, customerData, documentId]);
 
     const handleAttachmentChange = useCallback((e) => {
         if (readOnly) return;
@@ -275,31 +683,49 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
 
     const InputField = useMemo(() => {
         const Field = ({ label, name, value, type = 'text', width, disabled = false, placeholder = '' }) => (
-            <div style={{ flex: width || 1, minWidth: 0 }}>
-                <label style={labelStyle}>{label}</label>
-                <input
-                    type={type} name={name} value={value || ''} onChange={handleChange}
-                    disabled={disabled || readOnly} placeholder={placeholder}
-                    style={{ ...inputStyle, ...(disabled || readOnly ? { background: '#f1f5f9', color: '#94a3b8' } : {}) }}
-                    onFocus={(e) => { e.target.style.borderColor = colors.primary; e.target.style.boxShadow = `0 0 0 3px ${colors.primaryLight}`; }}
-                    onBlur={(e) => { e.target.style.borderColor = colors.border; e.target.style.boxShadow = 'none'; }}
-                />
+            <div className={`poa-field ${width === 'full' ? 'full' : ''}`} style={width && width !== 'full' ? { flex: width } : {}}>
+                <label>{label}</label>
+                {type === 'date' ? (
+                    <CustomDatePicker
+                        name={name} value={value || ''} onChange={handleChange}
+                        disabled={disabled || readOnly} placeholderText={placeholder}
+                    />
+                ) : (
+                    <input
+                        type={type} name={name} value={value || ''} onChange={handleChange}
+                        disabled={disabled || readOnly} placeholder={placeholder}
+                    />
+                )}
             </div>
         );
         Field.displayName = 'InputField';
         return Field;
     }, [handleChange, readOnly]);
 
+    const IdCardInputField = useMemo(() => {
+        const Field = ({ label, name, value, width, disabled = false }) => (
+            <div className={`poa-field ${width === 'full' ? 'full' : ''}`} style={width && width !== 'full' ? { flex: width } : {}}>
+                <label>{label}</label>
+                <div style={{ marginTop: '6px' }}>
+                    <IdCardInput 
+                        value={value || ''} 
+                        onChange={(val) => handleChange({ target: { name, value: val } })} 
+                        disabled={disabled || readOnly} 
+                    />
+                </div>
+            </div>
+        );
+        Field.displayName = 'IdCardInputField';
+        return Field;
+    }, [handleChange, readOnly]);
+
     const TextAreaField = useMemo(() => {
         const Field = ({ label, name, value, disabled = false, placeholder = '', rows = 3 }) => (
-            <div style={{ width: '100%', marginBottom: '14px' }}>
-                <label style={labelStyle}>{label}</label>
+            <div className="poa-field full" style={{ marginBottom: '14px' }}>
+                <label>{label}</label>
                 <textarea
                     name={name} value={value || ''} onChange={handleChange}
                     disabled={disabled || readOnly} placeholder={placeholder} rows={rows}
-                    style={{ ...inputStyle, resize: 'vertical', minHeight: '80px', ...(disabled || readOnly ? { background: '#f1f5f9', color: '#94a3b8' } : {}) }}
-                    onFocus={(e) => { e.target.style.borderColor = colors.primary; e.target.style.boxShadow = `0 0 0 3px ${colors.primaryLight}`; }}
-                    onBlur={(e) => { e.target.style.borderColor = colors.border; e.target.style.boxShadow = 'none'; }}
                 />
             </div>
         );
@@ -310,7 +736,22 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
     // Applicant types moved outside
 
     return (
-        <div style={{ background: colors.bg, padding: '28px', borderRadius: '16px', fontFamily: "'Inter', 'Sarabun', sans-serif" }}>
+        <div className="poa-form-wrapper">
+            <style>
+                {`
+                .tiptap {
+                    font-family: inherit !important;
+                    font-size: 13.5px !important;
+                    padding: 8px !important;
+                    line-height: 1.4 !important;
+                    outline: none !important;
+                    min-height: 40px;
+                }
+                .tiptap p {
+                    margin-bottom: 0 !important;
+                }
+                `}
+            </style>
 
             {/* ── Header ── */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
@@ -333,7 +774,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             </div>
 
             {/* ── สำหรับเจ้าหน้าที่ (Official Use) ── */}
-            <div style={{ ...cardStyle, borderLeft: `4px solid ${colors.border}`, marginBottom: '16px', background: '#f8fafc' }}>
+            <div className="poa-info-box gray" style={{ marginBottom: '16px' }}>
                 <h4 style={{ ...sectionTitleStyle, borderBottom: 'none', marginBottom: '12px', fontSize: '13px', color: colors.textMuted }}>
                     สำหรับเจ้าหน้าที่ (ส่วนบนขวาของเอกสาร)
                 </h4>
@@ -347,7 +788,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             {/* ── Section 1: ชนิดคำขอ + ประเภท ── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 {/* ชนิด */}
-                <div style={cardStyle}>
+                <div className="poa-info-box" style={{ background: '#fff', marginBottom: '20px' }}>
                     <h4 style={sectionTitleStyle}>
                         <span style={{ background: colors.primary, color: '#fff', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>1</span>
                         คำขออนุญาต (ชนิด)
@@ -411,7 +852,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
 
                 {/* ประเภท + ชื่อผลิตภัณฑ์ */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    <div style={cardStyle}>
+                    <div className="poa-info-box" style={{ background: '#fff', marginBottom: '20px' }}>
                         <h4 style={sectionTitleStyle}>
                             <span style={{ background: colors.primary, color: '#fff', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>2</span>
                             ประเภทการดำเนินการ
@@ -431,7 +872,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                         </div>
                     </div>
 
-                    <div style={{ ...cardStyle, flex: 1 }}>
+                    <div className="poa-info-box" style={{ flex: 1, marginBottom: '20px' }}>
                         <h4 style={sectionTitleStyle}>
                             <span style={{ background: colors.primary, color: '#fff', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>3</span>
                             ชื่อของผลิตภัณฑ์
@@ -445,7 +886,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             </div>
 
             {/* ── Section 2: ข้อมูลผู้ขอขึ้นทะเบียน ── */}
-            <div style={cardStyle}>
+            <div className="poa-info-box" style={{ background: '#fff', marginBottom: '20px' }}>
                 <h4 style={sectionTitleStyle}>
                     <span style={{ background: colors.primary, color: '#fff', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>4</span>
                     ข้อมูลผู้ขอขึ้นทะเบียนตำรับผลิตภัณฑ์สมุนไพร (เจ้าของผลิตภัณฑ์)
@@ -479,7 +920,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                             <InputField label="ชื่อ - นามสกุล" name="AppNaturalName" value={form.AppNaturalName} />
                             <InputField label="อายุ (ปี)" name="AppNaturalAge" value={form.AppNaturalAge} type="number" />
                             <InputField label="สัญชาติ" name="AppNaturalNationality" value={form.AppNaturalNationality} />
-                            <InputField label="เลขประจำตัวประชาชน" name="AppNaturalCitizenID" value={form.AppNaturalCitizenID} />
+                            <IdCardInputField label="เลขประจำตัวประชาชน" name="AppNaturalCitizenID" value={form.AppNaturalCitizenID} />
                         </div>
 
                         <div style={{ borderTop: `1px solid ${colors.borderLight}`, paddingTop: '16px', marginBottom: '20px' }}>
@@ -518,7 +959,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                     <div style={{ animation: 'fadeIn 0.3s ease' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '14px', marginBottom: '20px' }}>
                             <InputField label="ชื่อนิติบุคคล" name="AppJuristicName" value={form.AppJuristicName} />
-                            <InputField label="เลขทะเบียนนิติบุคคล" name="AppJuristicID" value={form.AppJuristicID} />
+                            <IdCardInputField label="เลขทะเบียนนิติบุคคล" name="AppJuristicID" value={form.AppJuristicID} />
                         </div>
 
                         <div style={{ borderTop: `1px solid ${colors.borderLight}`, paddingTop: '16px', marginBottom: '20px' }}>
@@ -562,7 +1003,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                                 <InputField label="ชื่อ - นามสกุล" name="AppJuristicRepName" value={form.AppJuristicRepName} />
                                 <InputField label="อายุ (ปี)" name="AppJuristicRepAge" value={form.AppJuristicRepAge} type="number" />
                                 <InputField label="สัญชาติ" name="AppJuristicRepNationality" value={form.AppJuristicRepNationality} />
-                                <InputField label="เลขประจำตัวประชาชน" name="AppJuristicRepCitizenID" value={form.AppJuristicRepCitizenID} />
+                                <IdCardInputField label="เลขประจำตัวประชาชน" name="AppJuristicRepCitizenID" value={form.AppJuristicRepCitizenID} />
                             </div>
                         </div>
                     </div>
@@ -623,7 +1064,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             </div>
 
             {/* ── Section 3: ข้อมูลสถานที่ผลิต หรือนำเข้า ── */}
-            <div style={cardStyle}>
+            <div className="poa-info-box" style={{ background: '#fff', marginBottom: '20px' }}>
                 <h4 style={sectionTitleStyle}>
                     <span style={{ background: colors.primary, color: '#fff', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>5</span>
                     ข้อมูลสถานที่ผลิต หรือนำเข้า ผลิตภัณฑ์สมุนไพร
@@ -739,7 +1180,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             </div>
 
             {/* ── Section 4: รายละเอียดผู้ผลิตอื่นที่เกี่ยวข้อง ── */}
-            <div style={cardStyle}>
+            <div className="poa-info-box" style={{ background: '#fff', marginBottom: '20px' }}>
                 <h4 style={sectionTitleStyle}>
                     <span style={{ background: colors.primary, color: '#fff', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>6</span>
                     รายละเอียดผู้ผลิตอื่นที่เกี่ยวข้อง
@@ -805,7 +1246,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             </div>
 
             {/* ── Section 4: รายละเอียดของตำรับผลิตภัณฑ์สมุนไพร ── */}
-            <div style={cardStyle}>
+            <div className="poa-info-box" style={{ background: '#fff', marginBottom: '20px' }}>
                 <h4 style={sectionTitleStyle}>
                     <span style={{ background: colors.primary, color: '#fff', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>4</span>
                     รายละเอียดของตำรับผลิตภัณฑ์สมุนไพร
@@ -821,7 +1262,14 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
 
                 {/* Table 1: Active Ingredients */}
                 <div style={{ marginBottom: '24px' }}>
-                    <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '700', color: colors.primaryDark }}>มีวัตถุอันเป็นส่วนประกอบ คือ</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: colors.primaryDark }}>มีวัตถุอันเป็นส่วนประกอบ คือ</p>
+                        {!readOnly && (
+                            <button type="button" onClick={() => setShowFormulaModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer' }}>
+                                <Database size={14} /> ดึงข้อมูลสูตรตำรับ (R&D)
+                            </button>
+                        )}
+                    </div>
                     <div style={{ border: `1px solid ${colors.border}`, borderRadius: '10px', overflow: 'hidden' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr 1fr 1fr 50px', background: colors.primary, color: '#fff' }}>
                             <div style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700' }}>ชื่อภาษาไทย</div>
@@ -833,11 +1281,11 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                         </div>
                         {(form.RecipeActiveIngredients || []).map((row, idx) => (
                             <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr 1fr 1fr 50px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
-                                <div style={{ padding: '4px' }}><input value={row.thaiName} onChange={(e) => handleActiveIngredientChange(idx, 'thaiName', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.engName} onChange={(e) => handleActiveIngredientChange(idx, 'engName', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.latinName} onChange={(e) => handleActiveIngredientChange(idx, 'latinName', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.partUsed} onChange={(e) => handleActiveIngredientChange(idx, 'partUsed', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.quantity} onChange={(e) => handleActiveIngredientChange(idx, 'quantity', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
+                                <div style={{ padding: '4px', display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.thaiName || ''} onChange={(val) => handleActiveIngredientChange(idx, 'thaiName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.engName || ''} onChange={(val) => handleActiveIngredientChange(idx, 'engName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.latinName || ''} onChange={(val) => handleActiveIngredientChange(idx, 'latinName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.partUsed || ''} onChange={(val) => handleActiveIngredientChange(idx, 'partUsed', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.quantity || ''} onChange={(val) => handleActiveIngredientChange(idx, 'quantity', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     {!readOnly && (form.RecipeActiveIngredients || []).length > 1 && (
                                         <button type="button" onClick={() => removeActiveIngredient(idx)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}><Trash2 size={16} /></button>
@@ -866,12 +1314,12 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                         </div>
                         {(form.RecipeExtracts || []).map((row, idx) => (
                             <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 1fr 1fr 1fr 50px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
-                                <div style={{ padding: '4px' }}><input value={row.extractName} onChange={(e) => handleExtractChange(idx, 'extractName', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.latinName} onChange={(e) => handleExtractChange(idx, 'latinName', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.partUsed} onChange={(e) => handleExtractChange(idx, 'partUsed', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.solvent} onChange={(e) => handleExtractChange(idx, 'solvent', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.ratio} onChange={(e) => handleExtractChange(idx, 'ratio', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.quantity} onChange={(e) => handleExtractChange(idx, 'quantity', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
+                                <div style={{ padding: '4px', display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.extractName || ''} onChange={(val) => handleExtractChange(idx, 'extractName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.latinName || ''} onChange={(val) => handleExtractChange(idx, 'latinName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.partUsed || ''} onChange={(val) => handleExtractChange(idx, 'partUsed', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.solvent || ''} onChange={(val) => handleExtractChange(idx, 'solvent', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.ratio || ''} onChange={(val) => handleExtractChange(idx, 'ratio', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.quantity || ''} onChange={(val) => handleExtractChange(idx, 'quantity', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     {!readOnly && (form.RecipeExtracts || []).length > 1 && (
                                         <button type="button" onClick={() => removeExtract(idx)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}><Trash2 size={16} /></button>
@@ -898,10 +1346,10 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                         </div>
                         {(form.RecipeExcipients || []).map((row, idx) => (
                             <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 50px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
-                                <div style={{ padding: '4px' }}><input value={row.name} onChange={(e) => handleExcipientChange(idx, 'name', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.casNumber} onChange={(e) => handleExcipientChange(idx, 'casNumber', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.function} onChange={(e) => handleExcipientChange(idx, 'function', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
-                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}` }}><input value={row.quantity} onChange={(e) => handleExcipientChange(idx, 'quantity', e.target.value)} disabled={readOnly} style={{ ...inputStyle, border: 'none', background: 'transparent' }} /></div>
+                                <div style={{ padding: '4px', display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.name || ''} onChange={(val) => handleExcipientChange(idx, 'name', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.casNumber || ''} onChange={(val) => handleExcipientChange(idx, 'casNumber', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.function || ''} onChange={(val) => handleExcipientChange(idx, 'function', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
+                                <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.quantity || ''} onChange={(val) => handleExcipientChange(idx, 'quantity', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     {!readOnly && (form.RecipeExcipients || []).length > 1 && (
                                         <button type="button" onClick={() => removeExcipient(idx)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}><Trash2 size={16} /></button>
@@ -917,7 +1365,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             </div>
 
             {/* ── Section 5: รายละเอียดของผลิตภัณฑ์สมุนไพร ── */}
-            <div style={cardStyle}>
+            <div className="poa-info-box" style={{ background: '#fff', marginBottom: '20px' }}>
                 <h4 style={sectionTitleStyle}>
                     <span style={{ background: colors.primary, color: '#fff', width: '24px', height: '24px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700' }}>5</span>
                     รายละเอียดของผลิตภัณฑ์สมุนไพร
@@ -960,6 +1408,41 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                 </div>
             </div>
 
+            {/* Modal เลือกสูตร R&D */}
+            {showFormulaModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+                    <div style={{ background: '#fff', borderRadius: '12px', width: '500px', maxWidth: '90%', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Database size={20} color={colors.primary} />
+                                เลือกสูตรตำรับ (R&D)
+                            </h3>
+                            <button type="button" onClick={() => setShowFormulaModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                            {formulas.length === 0 ? (
+                                <p style={{ textAlign: 'center', color: '#6b7280', padding: '20px' }}>ไม่พบสูตรตำรับในระบบ</p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {formulas.map(f => (
+                                        <div key={f.id} onClick={() => handleSelectFormula(f)} style={{ padding: '12px', border: `1px solid ${colors.border}`, borderRadius: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = colors.primary} onMouseLeave={e => e.currentTarget.style.borderColor = colors.border}>
+                                            <div>
+                                                <div style={{ fontWeight: '600', fontSize: '14px', color: colors.text }}>{f.name} <span style={{ fontSize: '12px', color: colors.textMuted }}>({f.version})</span></div>
+                                                <div style={{ fontSize: '12px', color: colors.textMuted, marginTop: '4px' }}>{f.category} • ส่วนประกอบ {f.ingredients?.length || 0} รายการ</div>
+                                            </div>
+                                            <ChevronRight size={16} color={colors.primary} />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Inline animation keyframes */}
             <style>{`
                 @keyframes fadeIn {
@@ -972,3 +1455,5 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
 });
 
 export default TorBor1Form;
+
+

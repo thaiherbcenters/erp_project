@@ -147,4 +147,112 @@ function wrapThaiText(text, maxWidth, size, font) {
     return wrappedLines;
 }
 
-module.exports = { drawThaiText, wrapThaiText };
+function parseHTMLToParagraphs(html) {
+    if (!html) return [[]];
+    
+    // Clean and normalize HTML tags from React Quill
+    let text = html
+        .replace(/<p><br><\/p>/gi, '\n')
+        .replace(/<\/p>\s*<p>/gi, '\n')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n')
+        .replace(/<p>/gi, '');
+        
+    // Strip everything except <strong> and <b>
+    text = text.replace(/<(?!strong\b|\/strong\b|b\b|\/b\b)[^>]+>/gi, '').trim();
+    
+    const lines = text.split(/\r?\n/);
+    const paragraphs = [];
+    const regex = /<(strong|b)>(.*?)<\/\1>/gis;
+    
+    for (const line of lines) {
+        if (!line) {
+            paragraphs.push([]);
+            continue;
+        }
+        
+        const segments = [];
+        let lastIndex = 0;
+        let match;
+        
+        regex.lastIndex = 0;
+        while ((match = regex.exec(line)) !== null) {
+            if (match.index > lastIndex) {
+                segments.push({ text: line.substring(lastIndex, match.index), bold: false });
+            }
+            segments.push({ text: match[2], bold: true });
+            lastIndex = regex.lastIndex;
+        }
+        
+        if (lastIndex < line.length) {
+            segments.push({ text: line.substring(lastIndex), bold: false });
+        }
+        
+        if (segments.length === 0 && line.length > 0) {
+            segments.push({ text: line, bold: false });
+        }
+        
+        paragraphs.push(segments);
+    }
+    
+    return paragraphs;
+}
+
+function wrapThaiTextRich(html, maxWidth, size, font, boldFont) {
+    if (!html) return [];
+    if (!boldFont) boldFont = font;
+    
+    const paragraphs = parseHTMLToParagraphs(html);
+    const wrappedLines = [];
+    
+    let segmenter;
+    try {
+        segmenter = new Intl.Segmenter('th', { granularity: 'word' });
+    } catch (e) {
+        segmenter = null;
+    }
+    
+    for (const paragraph of paragraphs) {
+        if (paragraph.length === 0) {
+            wrappedLines.push([]);
+            continue;
+        }
+        
+        if (maxWidth <= 0 || !segmenter) {
+            wrappedLines.push(paragraph);
+            continue;
+        }
+        
+        let currentLineChunks = [];
+        let currentLineWidth = 0;
+        
+        for (const chunk of paragraph) {
+            const activeFont = chunk.bold ? boldFont : font;
+            const words = Array.from(segmenter.segment(chunk.text)).map(s => s.segment);
+            
+            for (const word of words) {
+                const wordWidth = activeFont.widthOfTextAtSize(word, size);
+                
+                if (currentLineWidth + wordWidth > maxWidth && currentLineWidth > 0) {
+                    wrappedLines.push(currentLineChunks);
+                    currentLineChunks = [{ text: word, bold: chunk.bold }];
+                    currentLineWidth = wordWidth;
+                } else {
+                    if (currentLineChunks.length > 0 && currentLineChunks[currentLineChunks.length - 1].bold === chunk.bold) {
+                        currentLineChunks[currentLineChunks.length - 1].text += word;
+                    } else {
+                        currentLineChunks.push({ text: word, bold: chunk.bold });
+                    }
+                    currentLineWidth += wordWidth;
+                }
+            }
+        }
+        if (currentLineChunks.length > 0) {
+            wrappedLines.push(currentLineChunks);
+        }
+    }
+    
+    return wrappedLines;
+}
+
+module.exports = { drawThaiText, wrapThaiText, wrapThaiTextRich };

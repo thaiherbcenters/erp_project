@@ -12,7 +12,8 @@
  */
 
 import { useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/AuthContext';import CustomSelect from '../components/CustomSelect';
+
 import './Home.css';
 
 export default function Home() {
@@ -88,10 +89,10 @@ export default function Home() {
                         <div className="chart-card card">
                             <div className="chart-header">
                                 <h2>แนวโน้มยอดขาย (6 เดือนล่าสุด)</h2>
-                                <select className="chart-filter">
+                                <CustomSelect className="chart-filter">
                                     <option>รายเดือน</option>
                                     <option>รายปี</option>
-                                </select>
+                                </CustomSelect>
                             </div>
                             <div className="mock-chart-container">
                                 <div className="mock-bar-wrapper"><div className="mock-bar" style={{ height: '40%' }}></div><span className="mock-label">ก.ย.</span></div>

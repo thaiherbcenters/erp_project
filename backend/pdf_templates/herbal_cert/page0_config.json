@@ -1,8 +1,8 @@
 {
   "templateName": "11 คำรับรองสำหรับผู้ยื่น(แม่แบบ).pdf",
   "templateConfig": {
-    "defaultFontSize": 7,
-    "defaultFontFamily": "Sarabun",
+    "defaultFontSize": 16,
+    "defaultFontFamily": "THSarabunNew",
     "defaultFontWeight": "normal"
   },
   "fields": [

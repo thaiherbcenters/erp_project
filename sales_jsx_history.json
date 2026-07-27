@@ -1,0 +1,229 @@
+{
+  "lastView": null,
+  "patches": [
+    {
+      "time": "2026-07-23T04:03:43Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Fix handleViewDocHistory call to pass the correct DocumentType instead of hardcoded 'poa'",
+        "EndLine": 1377,
+        "Instruction": "Replace hardcoded 'poa' with `p.DocumentType || (p.primaryDoc && p.primaryDoc.DocumentType) || 'poa'` when calling handleViewDocHistory.",
+        "ReplacementContent": "                                                    <button className=\"btn-icon text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700\" style={{ color: '#4f46e5' }} title=\"ไฟล์แนบ/อัปโหลด\" onClick={() => handleViewDocHistory(p.DocumentNo, p.DocumentType || (p.primaryDoc && p.primaryDoc.DocumentType) || 'poa', 'attachments')}>\n                                                        <Upload size={16} />\n                                                    </button>\n                                                    {p.Version > 1 && (\n                                                        <button className=\"btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700\" style={{ color: '#9333ea' }} title=\"ประวัติการแก้ไข\" onClick={() => handleViewDocHistory(p.DocumentNo, p.DocumentType || (p.primaryDoc && p.primaryDoc.DocumentType) || 'poa', 'versions')}>\n                                                            <History size={16} />\n                                                        </button>\n                                                    )}\n                                                    <button className=\"btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700\" style={{ color: '#2563eb' }} title=\"ดู/พิมพ์ PDF\" onClick={() => {",
+        "StartLine": 1369,
+        "TargetContent": "                                                    <button className=\"btn-icon text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700\" style={{ color: '#4f46e5' }} title=\"ไฟล์แนบ/อัปโหลด\" onClick={() => handleViewDocHistory(p.DocumentNo, 'poa', 'attachments')}>\n                                                        <Upload size={16} />\n                                                    </button>\n                                                    {p.Version > 1 && (\n                                                        <button className=\"btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700\" style={{ color: '#9333ea' }} title=\"ประวัติการแก้ไข\" onClick={() => handleViewDocHistory(p.DocumentNo, 'poa', 'versions')}>\n                                                            <History size={16} />\n                                                        </button>\n                                                    )}\n                                                    <button className=\"btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700\" style={{ color: '#2563eb' }} title=\"ดู/พิมพ์ PDF\" onClick={() => {",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Fix docType in Sales.jsx",
+        "toolSummary": "Fix bug"
+      }
+    },
+    {
+      "time": "2026-07-23T04:14:47Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Fix handlePrintPOA and handleDeletePOA arguments in the document history modal to pass the correct DocumentType and correct array structure.",
+        "EndLine": 1540,
+        "Instruction": "Replace `handlePrintPOA(h.DocumentID)` with `handlePrintPOA(h.DocumentID, h.DocumentType || 'poa')`.\nReplace `handleDeletePOA(h.DocumentID)` with `handleDeletePOA([{ DocumentID: h.DocumentID, DocumentType: h.DocumentType || 'poa' }])`.",
+        "ReplacementContent": "                                                        <div style={{ display: 'flex', gap: '8px' }}>\n                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => handlePrintPOA(h.DocumentID, h.DocumentType || 'poa')}>\n                                                                <FileText size={16} />\n                                                            </button>\n                                                            {i === 0 && (\n                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA([{ DocumentID: h.DocumentID, DocumentType: h.DocumentType || 'poa' }])}>\n                                                                    <Trash2 size={16} />\n                                                                </button>\n                                                            )}\n                                                        </div>",
+        "StartLine": 1531,
+        "TargetContent": "                                                        <div style={{ display: 'flex', gap: '8px' }}>\n                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => handlePrintPOA(h.DocumentID)}>\n                                                                <FileText size={16} />\n                                                            </button>\n                                                            {i === 0 && (\n                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.DocumentID)}>\n                                                                    <Trash2 size={16} />\n                                                                </button>\n                                                            )}\n                                                        </div>",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Fix bugs in Sales.jsx history modal",
+        "toolSummary": "Fix bugs"
+      }
+    },
+    {
+      "time": "2026-07-23T04:28:21Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Use /history-by-id endpoint to reliably fetch history by DocumentID for all documents in the bundle.",
+        "EndLine": 450,
+        "Instruction": "Change the endpoints in handleViewDocHistory to use `/history-by-id/${doc.DocumentID || doc.id}` instead of `/history/${encodeURIComponent(documentNo)}`.",
+        "ReplacementContent": "                const docId = doc.DocumentID || doc.id || doc.documentId;\n                if (t === 'herbal_cert') endpoint = `${API_BASE}/herbal-cert-documents/history-by-id/${docId}`;\n                else if (t === 'torbor1') endpoint = `${API_BASE}/torbor1-documents/history-by-id/${docId}`;\n                else if (t === 'contract_mfg') endpoint = `${API_BASE}/contract-mfg/history-by-id/${docId}`;\n                else if (t === 'pdpa_consent') endpoint = `${API_BASE}/pdpa-consent-documents/history-by-id/${docId}`;\n                else if (t === 'corp_rep') endpoint = `${API_BASE}/corp-rep-documents/history-by-id/${docId}`;\n                else if (t === 'safety_cert') endpoint = `${API_BASE}/safety-cert-documents/history-by-id/${docId}`;\n                else endpoint = `${API_BASE}/legal-documents/history-by-id/${docId}`;",
+        "StartLine": 444,
+        "TargetContent": "                if (t === 'herbal_cert') endpoint = `${API_BASE}/herbal-cert-documents/history/${encodeURIComponent(documentNo)}`;\n                else if (t === 'torbor1') endpoint = `${API_BASE}/torbor1-documents/history/${encodeURIComponent(documentNo)}`;\n                else if (t === 'contract_mfg') endpoint = `${API_BASE}/contract-mfg/history/${encodeURIComponent(documentNo)}`;\n                else if (t === 'pdpa_consent') endpoint = `${API_BASE}/pdpa-consent-documents/history/${encodeURIComponent(documentNo)}`;\n                else if (t === 'corp_rep') endpoint = `${API_BASE}/corp-rep-documents/history/${encodeURIComponent(documentNo)}`;\n                else if (t === 'safety_cert') endpoint = `${API_BASE}/safety-cert-documents/history/${encodeURIComponent(documentNo)}`;\n                else endpoint = `${API_BASE}/legal-documents/history/${encodeURIComponent(documentNo)}`;",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Fix endpoints in Sales.jsx",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:29:19Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Inject DocumentType into history items and fix print button to use h.docs[0] when printing a single document.",
+        "EndLine": 458,
+        "Instruction": "Inject `doc.DocumentType` into `json.data` before pushing to `allHistoryItems`.",
+        "ReplacementContent": "                try {\n                    const res = await fetch(endpoint);\n                    const json = await res.json();\n                    if (json.success && json.data) {\n                        const typedData = json.data.map(d => ({ ...d, DocumentType: doc.DocumentType || doc.type || 'poa' }));\n                        allHistoryItems.push(...typedData);\n                    }\n                } catch(err) {",
+        "StartLine": 452,
+        "TargetContent": "                try {\n                    const res = await fetch(endpoint);\n                    const json = await res.json();\n                    if (json.success && json.data) {\n                        allHistoryItems.push(...json.data);\n                    }\n                } catch(err) {",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Inject DocumentType in Sales",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:29:32Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Fix print button and delete button to use h.docs arrays properly",
+        "EndLine": 1577,
+        "Instruction": "Fix the handlers for Print and Delete.",
+        "ReplacementContent": "                                                        <div style={{ display: 'flex', gap: '8px' }}>\n                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => h.docs && h.docs.length > 1 ? handlePrintBundle(h.docs) : handlePrintPOA(h.docs[0].DocumentID, h.docs[0].DocumentType || 'poa')}>\n                                                                <FileText size={16} />\n                                                            </button>\n                                                            {i === 0 && (\n                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.docs)}>\n                                                                    <Trash2 size={16} />\n                                                                </button>\n                                                            )}\n                                                        </div>",
+        "StartLine": 1568,
+        "TargetContent": "                                                        <div style={{ display: 'flex', gap: '8px' }}>\n                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => h.docs && h.docs.length > 1 ? handlePrintBundle(h.docs) : handlePrintPOA(h.DocumentID, h.DocumentType || 'poa')}>\n                                                                <FileText size={16} />\n                                                            </button>\n                                                            {i === 0 && (\n                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.docs || [{ DocumentID: h.DocumentID, DocumentType: h.DocumentType || 'poa' }])}>\n                                                                    <Trash2 size={16} />\n                                                                </button>\n                                                            )}\n                                                        </div>",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Fix print/delete handlers",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:30:02Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Fix button handlers",
+        "EndLine": 1579,
+        "Instruction": "Fix print and delete buttons to use h.docs array properly.",
+        "ReplacementContent": "                                                        <div style={{ display: 'flex', gap: '8px' }}>\n                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => h.docs && h.docs.length > 1 ? handlePrintBundle(h.docs) : handlePrintPOA(h.docs[0].DocumentID, h.docs[0].DocumentType || 'poa')}>\n                                                                <FileText size={16} />\n                                                            </button>\n                                                            {i === 0 && (\n                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.docs)}>\n                                                                    <Trash2 size={16} />\n                                                                </button>\n                                                            )}\n                                                        </div>",
+        "StartLine": 1570,
+        "TargetContent": "                                                        <div style={{ display: 'flex', gap: '8px' }}>\n                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => h.docs && h.docs.length > 1 ? handlePrintBundle(h.docs) : handlePrintPOA(h.DocumentID, h.DocumentType || 'poa')}>\n                                                                <FileText size={16} />\n                                                            </button>\n                                                            {i === 0 && (\n                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.docs || [{ DocumentID: h.DocumentID, DocumentType: h.DocumentType || 'poa' }])}>\n                                                                    <Trash2 size={16} />\n                                                                </button>\n                                                            )}\n                                                        </div>",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Apply print button fix in Sales.jsx",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:30:30Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Fix handlers in history modal",
+        "EndLine": 1577,
+        "Instruction": "Fix the button handlers in the history modal.",
+        "ReplacementContent": "                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => h.docs && h.docs.length > 1 ? handlePrintBundle(h.docs) : handlePrintPOA(h.docs[0].DocumentID, h.docs[0].DocumentType || 'poa')}>\n                                                                <FileText size={16} />\n                                                            </button>\n                                                            {i === 0 && (\n                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.docs)}>\n                                                                    <Trash2 size={16} />\n                                                                </button>\n                                                            )}",
+        "StartLine": 1571,
+        "TargetContent": "                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => h.docs && h.docs.length > 1 ? handlePrintBundle(h.docs) : handlePrintPOA(h.DocumentID, h.DocumentType || 'poa')}>\n                                                                <FileText size={16} />\n                                                            </button>\n                                                            {i === 0 && (\n                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.docs || [{ DocumentID: h.DocumentID, DocumentType: h.DocumentType || 'poa' }])}>\n                                                                    <Trash2 size={16} />\n                                                                </button>\n                                                            )}",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Fix buttons in Sales.jsx",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:30:59Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Fix handlePrintPOA call",
+        "EndLine": 1571,
+        "Instruction": "Replace handlePrintPOA(h.DocumentID, h.DocumentType || 'poa') with handlePrintPOA(h.docs[0].DocumentID, h.docs[0].DocumentType || 'poa')",
+        "ReplacementContent": "                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => h.docs && h.docs.length > 1 ? handlePrintBundle(h.docs) : handlePrintPOA(h.docs[0].DocumentID, h.docs[0].DocumentType || 'poa')}>",
+        "StartLine": 1571,
+        "TargetContent": "                                                            <button className=\"btn-icon\" style={{ color: '#2563eb' }} title=\"ดู PDF\" onClick={() => h.docs && h.docs.length > 1 ? handlePrintBundle(h.docs) : handlePrintPOA(h.DocumentID, h.DocumentType || 'poa')}>",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Fix print call in Sales.jsx",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:31:06Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Fix delete button in history modal",
+        "EndLine": 1575,
+        "Instruction": "Replace the delete handler to use h.docs",
+        "ReplacementContent": "                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.docs)}>",
+        "StartLine": 1575,
+        "TargetContent": "                                                                <button className=\"btn-icon\" style={{ color: '#dc2626' }} title=\"ลบเวอร์ชันนี้\" onClick={() => handleDeletePOA(h.docs || [{ DocumentID: h.DocumentID, DocumentType: h.DocumentType || 'poa' }])}>",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Fix delete call in Sales.jsx",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:53:09Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Fix wrapping in POA table",
+        "EndLine": 1370,
+        "Instruction": "Add whiteSpace: nowrap to the POA table.",
+        "ReplacementContent": "                            <div className=\"table-responsive\">\n                                <table className=\"data-table\" style={{ whiteSpace: 'nowrap' }}>\n                                <thead>\n                                    <tr>\n                                        <th>ประเภทเอกสาร</th>\n                                        <th>เลขที่เอกสาร</th>\n                                        <th>เวอร์ชัน</th>",
+        "StartLine": 1364,
+        "TargetContent": "                            <div className=\"table-responsive\">\n                                <table className=\"data-table\">\n                                <thead>\n                                    <tr>\n                                        <th>ประเภทเอกสาร</th>\n                                        <th>เลขที่เอกสาร</th>\n                                        <th>เวอร์ชัน</th>",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Add whiteSpace nowrap to POA table",
+        "toolSummary": "Fix Table Wrapping"
+      }
+    },
+    {
+      "time": "2026-07-23T04:53:28Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Add whiteSpace nowrap to POA table",
+        "EndLine": 1378,
+        "Instruction": "Add style={{ whiteSpace: 'nowrap' }} to the table.",
+        "ReplacementContent": "                        <div className=\"table-card card\">\n                            <div className=\"table-responsive\">\n                                <table className=\"data-table\" style={{ whiteSpace: 'nowrap' }}>\n                                <thead>\n                                    <tr>\n                                        <th>ประเภทเอกสาร</th>\n                                        <th>เลขที่เอกสาร</th>\n                                        <th>เวอร์ชัน</th>\n                                        <th>วันที่เอกสาร</th>\n                                        <th>ผู้มอบอำนาจ</th>\n                                        <th>ผู้รับมอบอำนาจ</th>\n                                        <th>สถานะ</th>\n                                        <th style={{ textAlign: 'center' }}>การจัดการ</th>\n                                    </tr>\n                                </thead>\n                                <tbody>",
+        "StartLine": 1363,
+        "TargetContent": "                        <div className=\"table-card card\">\n                            <div className=\"table-responsive\">\n                                <table className=\"data-table\">\n                                <thead>\n                                    <tr>\n                                        <th>ประเภทเอกสาร</th>\n                                        <th>เลขที่เอกสาร</th>\n                                        <th>เวอร์ชัน</th>\n                                        <th>วันที่เอกสาร</th>\n                                        <th>ผู้มอบอำนาจ</th>\n                                        <th>ผู้รับมอบอำนาจ</th>\n                                        <th>สถานะ</th>\n                                        <th style={{ textAlign: 'center' }}>การจัดการ</th>\n                                    </tr>\n                                </thead>\n                                <tbody>",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Apply nowrap to POA table",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:53:52Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Add white-space nowrap to POA table",
+        "EndLine": 1365,
+        "Instruction": "Replace the table tag on line 1365",
+        "ReplacementContent": "                                <table className=\"data-table\" style={{ whiteSpace: 'nowrap' }}>",
+        "StartLine": 1365,
+        "TargetContent": "                                <table className=\"data-table\">",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Apply whiteSpace nowrap to POA table",
+        "toolSummary": "Fix Sales.jsx"
+      }
+    },
+    {
+      "time": "2026-07-23T04:55:57Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Shorten safety_cert label in Sales.jsx",
+        "EndLine": 251,
+        "Instruction": "Change 'หนังสือรับรองความปลอดภัย' to 'ความปลอดภัยฯ'",
+        "ReplacementContent": "                        GranteeName: d.ProductName,\n                        documentTypeLabel: 'ความปลอดภัยฯ'\n                    }));",
+        "StartLine": 249,
+        "TargetContent": "                        GranteeName: d.ProductName,\n                        documentTypeLabel: 'หนังสือรับรองความปลอดภัย'\n                    }));",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Shorten safety_cert label",
+        "toolSummary": "Shorten label"
+      }
+    },
+    {
+      "time": "2026-07-23T04:56:22Z",
+      "type": "replace_file_content",
+      "args": {
+        "AllowMultiple": false,
+        "Description": "Restore torbor1 and safety_cert labels",
+        "EndLine": 238,
+        "Instruction": "Restore the deleted torbor1 logic and update safety_cert label.",
+        "ReplacementContent": "                        documentTypeLabel: 'คำรับรอง'\n                    }));\n                    combined = [...combined, ...herbalMapped];\n                }\n                if (torbor1Json.success) {\n                    const torbor1Mapped = (torbor1Json.data || []).map(d => ({\n                        ...d,\n                        GrantorName: d.AppNaturalName || d.AppJuristicName || 'ไม่ระบุ',\n                        GranteeName: d.ProductNameThai,\n                        documentTypeLabel: 'ทบ.๑'\n                    }));\n                    combined = [...combined, ...torbor1Mapped];\n                }\n                \n                if (Array.isArray(safetyJson)) {\n                    const safetyMapped = safetyJson.map(d => ({\n                        ...d,\n                        DocumentID: d.documentId,\n                        DocumentNo: `SFTY-${String(d.documentId).padStart(4, '0')}`,\n                        DocumentType: 'safety_cert',\n                        GrantorName: d.OwnerName,\n                        GranteeName: d.ProductName,\n                        documentTypeLabel: 'ความปลอดภัยฯ'\n                    }));\n                    combined = [...combined, ...safetyMapped];\n                }",
+        "StartLine": 228,
+        "TargetContent": "                        documentTypeLabel: 'คำรับรอง'\n                    }));\n                    combined = [...combined, ...herbalMapped];\n                        DocumentID: d.documentId,\n                        DocumentNo: `SFTY-${String(d.documentId).padStart(4, '0')}`,\n                        DocumentType: 'safety_cert',\n                        GrantorName: d.OwnerName,\n                        GranteeName: d.ProductName,\n                        documentTypeLabel: 'หนังสือรับรองความปลอดภัย'\n                    }));\n                    combined = [...combined, ...safetyMapped];\n                }",
+        "TargetFile": "c:\\Users\\thaih\\OneDrive\\เอกสาร\\GitHub\\erp_project\\src\\pages\\Sales.jsx",
+        "toolAction": "Restore and fix Sales.jsx",
+        "toolSummary": "Restore code"
+      }
+    }
+  ]
+}

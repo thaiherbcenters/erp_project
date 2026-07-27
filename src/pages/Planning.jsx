@@ -26,6 +26,8 @@ import { usePlanner } from '../context/PlannerContext';
 import { useRnD } from '../context/RnDContext';
 import { useProduction } from '../context/ProductionContext';
 import { useAlert } from '../components/CustomAlert';
+import CustomDatePicker from '../components/CustomDatePicker';
+import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 import './Planning.css';
 
@@ -69,12 +71,13 @@ export default function Planning() {
 
     useEffect(() => {
         if (currentTab === 'planning_overview') {
-            fetchPendingSalesOrders();
+            // Only show loading indicator if it's currently empty (first load)
+            fetchPendingSalesOrders(pendingSalesOrders.length === 0);
         }
     }, [currentTab, jobs]);
 
-    const fetchPendingSalesOrders = async () => {
-        setLoadingSOs(true);
+    const fetchPendingSalesOrders = async (showLoading = true) => {
+        if (showLoading) setLoadingSOs(true);
         try {
             const res = await fetch(`${API_BASE}/sales-orders`);
             const json = await res.json();
@@ -90,7 +93,7 @@ export default function Planning() {
         } catch (err) {
             console.error('Error fetching sales orders:', err);
         } finally {
-            setLoadingSOs(false);
+            if (showLoading) setLoadingSOs(false);
         }
     };
 
@@ -263,7 +266,7 @@ export default function Planning() {
                                                 <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                                                     <div style={{ flex: 1, minWidth: 200 }}>
                                                         <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>สูตรการผลิต <span style={{ color: '#ef4444' }}>*</span></label>
-                                                        <select
+                                                        <CustomSelect
                                                             style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 13 }}
                                                             value={item.selectedFormulaId}
                                                             onChange={(e) => handleSOItemFormulaChange(idx, e.target.value)}
@@ -272,7 +275,7 @@ export default function Planning() {
                                                             {approvedFormulas.map(f => (
                                                                 <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize.toLocaleString()} {f.unit}/batch)</option>
                                                             ))}
-                                                        </select>
+                                                        </CustomSelect>
                                                     </div>
                                                     {matchedFormula && (
                                                         <div style={{ fontSize: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '6px 10px', minWidth: 180 }}>
@@ -293,7 +296,7 @@ export default function Planning() {
                                                     </div>
                                                     <div>
                                                         <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>ความสำคัญ <span style={{ color: '#ef4444' }}>*</span></label>
-                                                        <select
+                                                        <CustomSelect
                                                             style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12 }}
                                                             value={item.priority}
                                                             onChange={(e) => handleSOItemFieldChange(idx, 'priority', e.target.value)}
@@ -301,12 +304,11 @@ export default function Planning() {
                                                             <option value="ต่ำ">ต่ำ</option>
                                                             <option value="ปกติ">ปกติ</option>
                                                             <option value="สูง">สูง (ด่วน)</option>
-                                                        </select>
+                                                        </CustomSelect>
                                                     </div>
                                                     <div>
                                                         <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>วันเริ่มผลิต</label>
-                                                        <input
-                                                            type="date"
+                                                        <CustomDatePicker
                                                             style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, boxSizing: 'border-box' }}
                                                             value={item.planDate}
                                                             onChange={(e) => handleSOItemFieldChange(idx, 'planDate', e.target.value)}
@@ -314,7 +316,7 @@ export default function Planning() {
                                                     </div>
                                                     <div>
                                                         <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>สายการผลิต</label>
-                                                        <select
+                                                        <CustomSelect
                                                             style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12 }}
                                                             value={item.assignedLine}
                                                             onChange={(e) => handleSOItemFieldChange(idx, 'assignedLine', e.target.value)}
@@ -322,7 +324,7 @@ export default function Planning() {
                                                             <option value="Line A">Line A (สายหลัก)</option>
                                                             <option value="Line B">Line B (สายรอง)</option>
                                                             <option value="Line C">Line C (สารเคมี)</option>
-                                                        </select>
+                                                        </CustomSelect>
                                                     </div>
                                                 </div>
 
@@ -749,7 +751,7 @@ export default function Planning() {
                             ))}
                         </div>
                         {soList.length > 0 && (
-                            <select 
+                            <CustomSelect 
                                 value={soFilter} 
                                 onChange={(e) => setSOFilter(e.target.value)}
                                 style={{ padding: '6px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, color: soFilter ? '#0369a1' : 'var(--text-muted)', background: soFilter ? '#e0f2fe' : 'var(--card-bg)' }}
@@ -758,7 +760,7 @@ export default function Planning() {
                                 {soList.map(so => (
                                     <option key={so} value={so}>{so}</option>
                                 ))}
-                            </select>
+                            </CustomSelect>
                         )}
                     </div>
                     {hasSectionPermission('planning_list_action') && (
@@ -1192,7 +1194,7 @@ export default function Planning() {
                         <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
                             <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                 <label>สูตรที่อนุมัติแล้ว <span style={{ color: '#ef4444' }}>*</span></label>
-                                <select 
+                                <CustomSelect 
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
                                     value={createForm.formulaId} 
                                     onChange={(e) => handleFormulaSelect(e.target.value)}
@@ -1201,7 +1203,7 @@ export default function Planning() {
                                     {approvedFormulas.map(f => (
                                         <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize} {f.unit}/batch)</option>
                                     ))}
-                                </select>
+                                </CustomSelect>
                             </div>
                             {selectedFormula && (
                                 <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1', background: '#f0fdf4', padding: 12, borderRadius: 8 }}>
@@ -1258,7 +1260,7 @@ export default function Planning() {
                         <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
                             <div className="rnd-modal-info-item">
                                 <label>ประเภทการผลิต</label>
-                                <select style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                <CustomSelect style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
                                     value={createForm.productionType}
                                     onChange={(e) => setCreateForm({...createForm, productionType: e.target.value})}
                                 >
@@ -1266,22 +1268,22 @@ export default function Planning() {
                                     <option value="ผลิตตามออร์เดอร์ (OEM)">ผลิตตามออร์เดอร์ (OEM)</option>
                                     <option value="ผลิตเร่งด่วน">ผลิตเร่งด่วน (Urgent)</option>
                                     <option value="ผลิตทดสอบ">ผลิตทดสอบ (Trial Run)</option>
-                                </select>
+                                </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ความสำคัญ <span style={{ color: '#ef4444' }}>*</span></label>
-                                <select style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                <CustomSelect style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
                                     value={createForm.priority}
                                     onChange={(e) => setCreateForm({...createForm, priority: e.target.value})}
                                 >
                                     <option value="ต่ำ">ต่ำ</option>
                                     <option value="ปกติ">ปกติ</option>
                                     <option value="สูง">สูง (ด่วน)</option>
-                                </select>
+                                </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>วันเริ่มผลิต</label>
-                                <input type="date" 
+                                <CustomDatePicker 
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
                                     value={createForm.planDate}
                                     onChange={(e) => setCreateForm({...createForm, planDate: e.target.value})}
@@ -1289,7 +1291,7 @@ export default function Planning() {
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>กำหนดเสร็จ <span style={{ color: '#ef4444' }}>*</span></label>
-                                <input type="date"
+                                <CustomDatePicker
                                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
                                     value={createForm.dueDate}
                                     onChange={(e) => setCreateForm({...createForm, dueDate: e.target.value})}
@@ -1297,14 +1299,14 @@ export default function Planning() {
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>สายการผลิต (Production Line)</label>
-                                <select style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
+                                <CustomSelect style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
                                     value={createForm.assignedLine}
                                     onChange={(e) => setCreateForm({...createForm, assignedLine: e.target.value})}
                                 >
                                     <option value="Line A">Line A (สายหลัก)</option>
                                     <option value="Line B">Line B (สายรอง)</option>
                                     <option value="Line C">Line C (สารเคมี)</option>
-                                </select>
+                                </CustomSelect>
                             </div>
                         </div>
 

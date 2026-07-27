@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Save, ArrowLeft, Plus, Trash2, Search, X, Loader2, Printer } from 'lucide-react';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
+import CustomDatePicker from './CustomDatePicker';
+import TaxIdInput from '../components/TaxIdInput';
+import CustomSelect from './CustomSelect';
 import '../pages/PageCommon.css';
 
 const PRODUCT_CATALOG = {
@@ -363,6 +366,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     };
 
     const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border, #e2e8f0)', fontSize: 13, fontFamily: 'inherit', background: 'var(--bg-white, #fff)', color: 'var(--text, #1e293b)' };
+    const labelStyle = { display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' };
     const sectionStyle = { background: 'var(--bg-white, #fff)', border: '1px solid var(--border, #e2e8f0)', borderRadius: 8, padding: 20, marginBottom: 16 };
 
     const a4PageStyle = {
@@ -381,7 +385,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
 
     if (viewOnly) {
         return (
-            <div style={{ background: '#f1f5f9', padding: '20px', minHeight: '100vh', animation: 'slideUp 0.3s ease-out' }}>
+            <div style={{ background: '#f1f5f9', padding: '20px', paddingBottom: '80px', minHeight: '100vh', animation: 'slideUp 0.3s ease-out' }}>
                 <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', maxWidth: '210mm', margin: '0 auto' }}>
                     <button onClick={onBack} style={{ padding: '8px 16px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <ArrowLeft size={16} /> กลับไปหน้ารายการ
@@ -717,7 +721,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     }
 
     return (
-        <div style={{ animation: 'slideUp 0.3s ease-out' }}>
+        <div style={{ animation: 'slideUp 0.3s ease-out', paddingBottom: '80px' }}>
             <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', marginBottom: 16, border: '1px solid var(--primary-light, #818cf8)', borderRadius: 6, background: '#fff', color: 'var(--primary, #4f46e5)', fontWeight: 500, fontSize: 13, cursor: 'pointer' }}>
                 <ArrowLeft size={16} /> กลับ
             </button>
@@ -824,7 +828,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                     </div>
                 </div>
                 <div>
-                    <select 
+                    <CustomSelect 
                         style={inputStyle} 
                         name="contractId" 
                         value={formData.contractId} 
@@ -836,7 +840,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                 {c.ContractNo} - {c.ContractName} {c.CustomerName ? `(${c.CustomerName})` : ''}
                             </option>
                         ))}
-                    </select>
+                    </CustomSelect>
                 </div>
             </div>
 
@@ -871,16 +875,16 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>โทรศัพท์</label>
                         <input style={inputStyle} name="phone" value={formData.phone} onChange={handleFormChange} />
                     </div>
-                    <div>
+                    <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>เลขผู้เสียภาษี</label>
-                        <input style={inputStyle} name="taxId" value={formData.taxId} onChange={handleFormChange} />
+                        <TaxIdInput name="taxId" value={formData.taxId} onChange={handleFormChange} />
                     </div>
                     <div>
                         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>สำนักงานใหญ่ / สาขา</label>
-                        <select style={inputStyle} name="taxBranch" value={formData.taxBranch} onChange={handleFormChange}>
+                        <CustomSelect style={inputStyle} name="taxBranch" value={formData.taxBranch} onChange={handleFormChange}>
                             <option value="head_office">สำนักงานใหญ่</option>
                             <option value="branch">สาขา</option>
-                        </select>
+                        </CustomSelect>
                     </div>
                     {formData.taxBranch === 'branch' ? (
                         <div>
@@ -892,11 +896,11 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                     )}
                     <div>
                         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>วันที่สั่งซื้อ</label>
-                        <input style={inputStyle} type="date" name="orderDate" value={formData.orderDate} onChange={handleFormChange} />
+                        <CustomDatePicker style={inputStyle} name="orderDate" value={formData.orderDate} onChange={handleFormChange} />
                     </div>
                     <div>
                         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>วันที่ต้องการส่ง <span style={{ color: '#ef4444' }}>*</span></label>
-                        <input style={inputStyle} type="date" name="deliveryDate" value={formData.deliveryDate} onChange={handleFormChange} />
+                        <CustomDatePicker style={inputStyle} name="deliveryDate" value={formData.deliveryDate} onChange={handleFormChange} />
                     </div>
                 </div>
             </div>

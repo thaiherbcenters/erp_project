@@ -6,6 +6,7 @@ const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const fontkit = require('@pdf-lib/fontkit');
 const { poolPromise } = require('../config/db');
 const { drawThaiText, wrapThaiText } = require('../utils/thaiShaper');
+const { renderTorbor1Page3, renderTorbor1Page4And5, renderRelatedManufacturersOnPage2 } = require('../utils/torbor1PdfRenderer');
 // GET /check-template/:documentType
 // ตรวจสอบว่ามีแฟ้มแม่แบบสำหรับประเภทเอกสารนี้หรือไม่
 router.get('/check-template/:documentType', (req, res) => {
@@ -83,7 +84,8 @@ router.post('/', async (req, res) => {
         const fontUrls = {
             'Sarabun': { regular: 'https://github.com/google/fonts/raw/main/ofl/sarabun/Sarabun-Regular.ttf', bold: 'https://github.com/google/fonts/raw/main/ofl/sarabun/Sarabun-Bold.ttf' },
             'Kanit': { regular: 'https://github.com/google/fonts/raw/main/ofl/kanit/Kanit-Regular.ttf', bold: 'https://github.com/google/fonts/raw/main/ofl/kanit/Kanit-Bold.ttf' },
-            'Prompt': { regular: 'https://github.com/google/fonts/raw/main/ofl/prompt/Prompt-Regular.ttf', bold: 'https://github.com/google/fonts/raw/main/ofl/prompt/Prompt-Bold.ttf' }
+            'Prompt': { regular: 'https://github.com/google/fonts/raw/main/ofl/prompt/Prompt-Regular.ttf', bold: 'https://github.com/google/fonts/raw/main/ofl/prompt/Prompt-Bold.ttf' },
+            'THSarabunNew': { local: true, path: path.join(__dirname, '../fonts/THSarabunNew.ttf') }
         };
 
         const neededFonts = { regular: new Set(), bold: new Set() };
@@ -92,7 +94,9 @@ router.post('/', async (req, res) => {
             const configData = JSON.parse(fs.readFileSync(page.configPath, 'utf-8'));
             const templateFontFamily = (configData.templateConfig && configData.templateConfig.defaultFontFamily) || 'Sarabun';
             const templateFontWeight = (configData.templateConfig && configData.templateConfig.defaultFontWeight) || 'normal';
-            neededFonts[templateFontWeight === 'bold' || templateFontWeight === '700' ? 'bold' : 'regular'].add(templateFontFamily);
+            neededFonts['regular'].add(templateFontFamily);
+            neededFonts['bold'].add(templateFontFamily); // Always load bold font for the template font
+            
             for (const f of configData.fields) {
                 const fFamily = f.fontFamily || templateFontFamily;
                 const fWeight = f.fontWeight || (f.isBold ? 'bold' : templateFontWeight);
@@ -105,9 +109,26 @@ router.post('/', async (req, res) => {
         const fontBytesCache = { regular: {}, bold: {} };
         for (const style of ['regular', 'bold']) {
             for (const family of neededFonts[style]) {
-                const url = fontUrls[family] ? fontUrls[family][style] : fontUrls['Sarabun'][style];
-                const response = await fetch(url);
-                fontBytesCache[style][family] = await response.arrayBuffer();
+                if (fontUrls[family] && fontUrls[family].local) {
+                    let localPath = fontUrls[family].path;
+                    if (style === 'bold' && !fs.existsSync(localPath.replace('.ttf', '-Bold.ttf'))) {
+                        // Fallback to Sarabun Bold from Google Fonts if local bold font is missing
+                        const url = fontUrls['Sarabun'].bold;
+                        const response = await fetch(url);
+                        fontBytesCache[style][family] = await response.arrayBuffer();
+                    } else {
+                        // Use local font
+                        const actualPath = style === 'bold' ? localPath.replace('.ttf', '-Bold.ttf') : localPath;
+                        if (fs.existsSync(actualPath)) {
+                            const fontBytes = fs.readFileSync(actualPath);
+                            fontBytesCache[style][family] = new Uint8Array(fontBytes);
+                        }
+                    }
+                } else {
+                    const url = fontUrls[family] ? fontUrls[family][style] : fontUrls['Sarabun'][style];
+                    const response = await fetch(url);
+                    fontBytesCache[style][family] = await response.arrayBuffer();
+                }
             }
         }
 
@@ -125,8 +146,8 @@ router.post('/', async (req, res) => {
             const dingbatsFont = await pdfDoc.embedFont(StandardFonts.ZapfDingbats);
 
             const templateConfig = configData.templateConfig || {};
+            const defaultFontSize = templateConfig.defaultFontSize || 16;
             const templateFontFamily = templateConfig.defaultFontFamily || 'Sarabun';
-            const defaultFontSize = templateConfig.defaultFontSize || 14;
 
             const templateFontWeight = templateConfig.defaultFontWeight || 'normal';
 
@@ -139,7 +160,25 @@ router.post('/', async (req, res) => {
                 }
             }
 
-            for (const field of configData.fields) {
+            // ── TorBor1 Special: Filter out page 3 dynamic table fields ──
+            let fieldsToRender = configData.fields;
+            if (documentType === 'torbor1') {
+                fieldsToRender = configData.fields.filter(field => {
+                    if (!field.query) return true;
+                    // Skip all hardcoded JSON_VALUE fields for dynamic tables
+                    if (field.query.includes('JSON_VALUE(RecipeActiveIngredients') ||
+                        field.query.includes('JSON_VALUE(RecipeExtracts') ||
+                        field.query.includes('JSON_VALUE(RecipeExcipients') ||
+                        field.query.includes('JSON_VALUE(RelatedManufacturers')) {
+                        return false;
+                    }
+                    // Skip scalar fields on page 3 (they'll be drawn by the renderer)
+                    if (field.pageIndex === 3) return false;
+                    return true;
+                });
+            }
+
+            for (const field of fieldsToRender) {
                 if (!field.query) continue;
 
                 let queryStr = field.query;
@@ -223,7 +262,7 @@ router.post('/', async (req, res) => {
                                 start: { x: x, y: y + (boxHeight / 2) },
                                 end: { x: x + boxWidth, y: y + (boxHeight / 2) },
                                 thickness: 1,
-                                color: rgb(0.15, 0.15, 0.15),
+                                color: rgb(0, 0, 0),
                             });
                         }
                     } else if (field.type === 'comb' && (field.combCount || field.combFormat)) {
@@ -269,7 +308,7 @@ router.post('/', async (req, res) => {
                                 y: adjustedY,
                                 size: fieldFontSize,
                                 font: activeFont,
-                                color: rgb(0.15, 0.15, 0.15),
+                                color: rgb(0, 0, 0),
                             });
                         }
                     } else if (field.charSpacingEm && field.charSpacingEm > 0) {
@@ -282,7 +321,7 @@ router.post('/', async (req, res) => {
                                 y: adjustedY,
                                 size: fieldFontSize,
                                 font: activeFont,
-                                color: rgb(0.15, 0.15, 0.15),
+                                color: rgb(0, 0, 0),
                             });
                             currentX += activeFont.widthOfTextAtSize(chars[i], fieldFontSize) + spacing;
                         }
@@ -316,7 +355,7 @@ router.post('/', async (req, res) => {
                             
                             for (let i = 0; i < lines.length; i++) {
                                 const lineY = startLineY - (i * lineHeight);
-                                drawThaiText(pdfPage, lines[i], x, lineY, currentFontSize, activeFont, rgb(0.15, 0.15, 0.15));
+                                drawThaiText(pdfPage, lines[i], x, lineY, currentFontSize, activeFont, rgb(0, 0, 0));
                             }
                         } else {
                             // Auto-shrink font size if text overflows the bounding box for single line
@@ -326,15 +365,97 @@ router.post('/', async (req, res) => {
                             }
 
                             // Apply Custom Thai Renderer to fix Sara Am, floating vowels, and tone marks
-                            drawThaiText(pdfPage, finalValue, x, adjustedY, fieldFontSize, activeFont, rgb(0.15, 0.15, 0.15));
+                            drawThaiText(pdfPage, finalValue, x, adjustedY, fieldFontSize, activeFont, rgb(0, 0, 0));
                         }
                     }
                 }
             }
 
-            // Copy filled pages from pdfDoc to mergedPdf
-            const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-            copiedPages.forEach((p) => mergedPdf.addPage(p));
+            // ── TorBor1 Special: Replace page 3 with dynamically generated pages ──
+            if (documentType === 'torbor1' && documentId) {
+                try {
+                    // Fetch full document data for dynamic rendering
+                    const docResult = await pool.request()
+                        .input('docId', documentId)
+                        .query('SELECT * FROM TorBor1Documents WHERE DocumentID = @docId');
+                    
+                    if (docResult.recordset.length > 0) {
+                        const docData = docResult.recordset[0];
+                        
+                        // Handle RelatedManufacturers on page 2 (index 1)
+                        if (pdfDoc.getPageCount() > 1) {
+                            const page2 = pdfDoc.getPage(1);
+                            const { width: p2w, height: p2h } = page2.getSize();
+                            const regularFont = loadedFonts.regular[templateFontFamily] || loadedFonts.regular['Sarabun'];
+                            const boldFontObj = loadedFonts.bold[templateFontFamily] || loadedFonts.bold['Sarabun'] || regularFont;
+                            renderRelatedManufacturersOnPage2(page2, regularFont, boldFontObj, docData, p2w, p2h);
+                        }
+                        
+                        // Create a temporary PDFDocument for the dynamic pages
+                        const { PDFDocument: PDFDoc2 } = require('pdf-lib');
+                        const tempPdf = await PDFDoc2.create();
+                        tempPdf.registerFontkit(fontkit);
+                        
+                        // Embed fonts in the temp document
+                        const tempRegularFont = fontBytesCache.regular[templateFontFamily] 
+                            ? await tempPdf.embedFont(fontBytesCache.regular[templateFontFamily])
+                            : await tempPdf.embedFont(Object.values(fontBytesCache.regular)[0]);
+                        const tempBoldFont = fontBytesCache.bold[templateFontFamily]
+                            ? await tempPdf.embedFont(fontBytesCache.bold[templateFontFamily])
+                            : tempRegularFont;
+                        
+                        // Also embed dingbats in tempPdf
+                        const { StandardFonts } = require('pdf-lib');
+                        const tempDingbatsFont = await tempPdf.embedFont(StandardFonts.ZapfDingbats);
+                        
+                        // Render dynamic page 3
+                        renderTorbor1Page3(tempPdf, tempRegularFont, tempBoldFont, docData);
+                        
+                        // Render dynamic pages 4 and 5
+                        renderTorbor1Page4And5(tempPdf, tempRegularFont, tempBoldFont, tempDingbatsFont, docData);
+                        
+                        // Now build the final merged PDF:
+                        // Copy pages 1-2 from original template (indices 0,1)
+                        const templatePageCount = pdfDoc.getPageCount();
+                        
+                        if (templatePageCount >= 3) {
+                            // Copy pages before page 3 (pages 1 & 2 = indices 0, 1)
+                            const beforePages = await mergedPdf.copyPages(pdfDoc, [0, 1]);
+                            beforePages.forEach(p => mergedPdf.addPage(p));
+                            
+                            // Copy dynamic pages (3, 4, 5...) from tempPdf
+                            const tempPageIndices = tempPdf.getPageIndices();
+                            const dynamicCopied = await mergedPdf.copyPages(tempPdf, tempPageIndices);
+                            dynamicCopied.forEach(p => mergedPdf.addPage(p));
+                            
+                            // Copy pages after page 5 (pages 6+ = indices 5, 6, ...)
+                            if (templatePageCount > 5) {
+                                const afterIndices = [];
+                                for (let i = 5; i < templatePageCount; i++) afterIndices.push(i);
+                                const afterPages = await mergedPdf.copyPages(pdfDoc, afterIndices);
+                                afterPages.forEach(p => mergedPdf.addPage(p));
+                            }
+                        } else {
+                            // Fallback: copy all pages normally
+                            const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                            copiedPages.forEach((p) => mergedPdf.addPage(p));
+                        }
+                    } else {
+                        // No doc data found, copy pages normally
+                        const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                        copiedPages.forEach((p) => mergedPdf.addPage(p));
+                    }
+                } catch (torbor1Err) {
+                    console.error('TorBor1 dynamic rendering error:', torbor1Err);
+                    // Fallback: copy all pages normally
+                    const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                    copiedPages.forEach((p) => mergedPdf.addPage(p));
+                }
+            } else {
+                // Standard flow for non-torbor1 documents
+                const copiedPages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+                copiedPages.forEach((p) => mergedPdf.addPage(p));
+            }
         }
 
         const pdfBytesOut = await mergedPdf.save();

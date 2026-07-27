@@ -50,6 +50,10 @@ router.get('/formulas', async (req, res) => {
                     name: i.MaterialName,
                     qty: i.Qty,
                     unit: i.Unit,
+                    type: i.IngredientType || '',
+                    engName: i.EngName || '',
+                    latinName: i.LatinName || '',
+                    partUsed: i.PartUsed || ''
                 })),
         }));
 
@@ -99,6 +103,10 @@ router.get('/formulas/:id', async (req, res) => {
                 name: i.MaterialName,
                 qty: i.Qty,
                 unit: i.Unit,
+                type: i.IngredientType || '',
+                engName: i.EngName || '',
+                latinName: i.LatinName || '',
+                partUsed: i.PartUsed || ''
             })),
         });
     } catch (err) {
@@ -151,9 +159,13 @@ router.post('/formulas', authorizeRoles('admin', 'executive', 'rnd'), async (req
                         .input('MaterialName', sql.NVarChar, ing.name || '')
                         .input('Qty', sql.Decimal(10, 2), ing.qty || 0)
                         .input('Unit', sql.NVarChar, ing.unit || '')
+                        .input('IngredientType', sql.NVarChar, ing.type || '')
+                        .input('EngName', sql.NVarChar, ing.engName || '')
+                        .input('LatinName', sql.NVarChar, ing.latinName || '')
+                        .input('PartUsed', sql.NVarChar, ing.partUsed || '')
                         .query(`
-                            INSERT INTO RnD_Formula_Ingredients (FormulaID, MaterialID, MaterialName, Qty, Unit)
-                            VALUES (@FormulaID, @MaterialID, @MaterialName, @Qty, @Unit)
+                            INSERT INTO RnD_Formula_Ingredients (FormulaID, MaterialID, MaterialName, Qty, Unit, IngredientType, EngName, LatinName, PartUsed)
+                            VALUES (@FormulaID, @MaterialID, @MaterialName, @Qty, @Unit, @IngredientType, @EngName, @LatinName, @PartUsed)
                         `);
                 }
             }
@@ -277,7 +289,11 @@ router.put('/formulas/:id', authorizeRoles('admin', 'executive', 'rnd'), async (
                         .input('MaterialName', sql.NVarChar, ing.name || '')
                         .input('Qty', sql.Decimal(10, 2), ing.qty || 0)
                         .input('Unit', sql.NVarChar, ing.unit || '')
-                        .query('INSERT INTO RnD_Formula_Ingredients (FormulaID, MaterialID, MaterialName, Qty, Unit) VALUES (@FormulaID, @MaterialID, @MaterialName, @Qty, @Unit)');
+                        .input('IngredientType', sql.NVarChar, ing.type || '')
+                        .input('EngName', sql.NVarChar, ing.engName || '')
+                        .input('LatinName', sql.NVarChar, ing.latinName || '')
+                        .input('PartUsed', sql.NVarChar, ing.partUsed || '')
+                        .query('INSERT INTO RnD_Formula_Ingredients (FormulaID, MaterialID, MaterialName, Qty, Unit, IngredientType, EngName, LatinName, PartUsed) VALUES (@FormulaID, @MaterialID, @MaterialName, @Qty, @Unit, @IngredientType, @EngName, @LatinName, @PartUsed)');
                 }
             }
             await transaction.commit();
