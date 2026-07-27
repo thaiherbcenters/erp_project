@@ -2615,15 +2615,13 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                     </div>
                 ) : (
                 <>
-                
-                
                 <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginBottom: 0 }}>
                     <tbody>
                         <tr>
-                            <td style={{ width: '15%', textAlign: 'center', verticalAlign: 'middle', border: 'none', padding: '2px' }}>
+                            <td style={{ width: '12%', textAlign: 'center', verticalAlign: 'middle', border: 'none', padding: '2px' }}>
                                 <img src={compLogo} alt="Logo" style={{ maxWidth: '100px', maxHeight: '100px', objectFit: 'contain' }} />
                             </td>
-                            <td style={{ width: '50%', padding: '2px 8px', verticalAlign: 'middle', border: 'none' }}>
+                            <td style={{ width: '55%', padding: '2px 8px', verticalAlign: 'middle', border: 'none' }}>
                                 <div style={{ color: '#1a7a3a', fontWeight: 'bold', fontSize: '13.5pt', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
                                     {compNameTH}
                                 </div>
@@ -2638,15 +2636,19 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                     {compTax}
                                 </div>
                             </td>
-                            <td style={{ width: '35%', textAlign: 'center', verticalAlign: 'top', border: 'none', padding: '10px' }}>
+                            <td style={{ width: '33%', textAlign: 'center', verticalAlign: 'middle', border: 'none', padding: '8px' }}>
                                 {isFda && <div style={{ color: 'red', fontSize: '11pt', fontWeight: 'bold', marginBottom: '8px' }}>{isEn ? '** For FDA Billing Invoice Only **' : '** ข้อมูลเฉพาะใบเสร็จรับเงิน RECEIPT (ORIGINAL) อย. (FDA) **'}</div>}
                                 <div style={{ backgroundColor: '#2ecc71', color: 'white', borderRadius: '25px', padding: '8px 5px', position: 'relative' }}>
                                     <div style={{ fontSize: '15pt', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                                        {isEn ? 'RECEIPT (ORIGINAL)' : 'ใบเสร็จรับเงิน RECEIPT (ORIGINAL)'}
+                                        {isEn ? 'RECEIPT (ORIGINAL)' : 'ใบเสร็จรับเงิน (ต้นฉบับ)'}
                                     </div>
                                     {!isEn && <div style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '2px' }}>
                                         RECEIPT (ORIGINAL)
                                     </div>}
+                                </div>
+                                <div style={{ fontSize: '8pt', color: '#145a24', marginTop: '6px', fontWeight: 'bold', lineHeight: 1.4 }}>
+                                    <span>สำหรับลูกค้า (เอกสารออกเป็นชุด)</span><br />
+                                    <span style={{ fontWeight: 'normal' }}>ออกใบกำกับภาษี ☐ สำนักงานใหญ่ ☐ สาขา</span>
                                 </div>
                             </td>
                         </tr>
@@ -2656,7 +2658,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                 {/* Customer Info */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     {/* Left: Customer Info Box */}
-                    <div style={{ width: '65%', border: '1px solid #1a7a3a', borderRadius: '8px', padding: '6px 12px', boxSizing: 'border-box' }}>
+                    <div style={{ width: '65%', border: '1.5px solid #1a7a3a', borderRadius: '8px', padding: '6px 12px', boxSizing: 'border-box' }}>
                         <table style={{ width: '100%', border: 'none', fontSize: '10pt', borderCollapse: 'collapse' }}>
                             <tbody>
                                 <tr>
@@ -2682,43 +2684,27 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                         เลขประจำตัวผู้เสียภาษี :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>TAX ID</span>
                                     </td>
                                     <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>
-                                        {formData.taxId || '-'}
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                            <span>{formData.taxId || '-'}</span>
+                                            <div style={{ fontSize: '7.5pt', marginLeft: 'auto', display: 'flex', gap: '15px', textAlign: 'left' }}>
+                                                <div>
+                                                    ☐ สำนักงานใหญ่<br />
+                                                    <span style={{ color: '#555', marginLeft: '12px' }}>Head Office</span>
+                                                </div>
+                                                <div>
+                                                    ☐ สาขาที่ ..........................<br />
+                                                    <span style={{ color: '#555', marginLeft: '12px' }}>Branch No.</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
-                                {isFda && (
-                                    <>
-                                        <tr>
-                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                                                รหัสลูกค้า :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Customer ID</span>
-                                            </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.fdaCustomerCode || '-'}</td>
-                                        </tr>
-                                        <tr>
-                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                                                อีเมล :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>E-mail</span>
-                                            </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.fdaEmail || '-'}</td>
-                                        </tr>
-                                        <tr>
-                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                                                ชื่อโครงการ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Project Name</span>
-                                            </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.fdaProjectName || '-'}</td>
-                                        </tr>
-                                        <tr>
-                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
-                                                เงื่อนไขชำระเงิน :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Credit Term</span>
-                                            </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.fdaCreditTerms || '-'}</td>
-                                        </tr>
-                                    </>
-                                )}
                             </tbody>
                         </table>
                     </div>
 
                     {/* Right: Doc Info Box */}
-                    <div style={{ width: '33%', border: '1px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden', boxSizing: 'border-box' }}>
+                    <div style={{ width: '33%', border: '1.5px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden', boxSizing: 'border-box' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt' }}>
                             <tbody>
                                 <tr style={{ backgroundColor: '#d5f5e3' }}>
@@ -2738,11 +2724,19 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                     </td>
                                 </tr>
                                 <tr>
+                                    <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
+                                        สถานที่ส่ง :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Deliver To</span>
+                                    </td>
+                                    <td style={{ padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
+                                        -
+                                    </td>
+                                </tr>
+                                <tr>
                                     <td style={{ fontWeight: 'bold', padding: '4px 8px' }}>
-                                        พนักงานขาย :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Salesperson</span>
+                                        ติดต่อ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Contact</span>
                                     </td>
                                     <td style={{ padding: '4px 8px' }}>
-                                        {formData.salesperson || '-'}
+                                        {formData.contactPerson || '-'}
                                     </td>
                                 </tr>
                             </tbody>
@@ -2751,39 +2745,35 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                 </div>
 
                 {/* Purchase Info Row */}
-                <div style={{ border: '1px solid #1a7a3a', borderRadius: '8px', marginBottom: '8px', overflow: 'hidden' }}>
+                <div style={{ border: '1.5px solid #1a7a3a', borderRadius: '8px', marginBottom: '8px', overflow: 'hidden' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', fontSize: '9pt' }}>
                         <tbody>
                             <tr style={{ backgroundColor: '#d5f5e3' }}>
-                                <td style={{ width: '20%', fontWeight: 'bold', padding: '4px', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a' }}>
-                                    เลขที่<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>P/O No.</span>
+                                <td style={{ width: '25%', fontWeight: 'bold', padding: '4px', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a' }}>
+                                    เลขที่ใบสั่งซื้อ<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Purchase No.</span>
                                 </td>
-                                <td style={{ width: '20%', fontWeight: 'bold', padding: '4px', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a' }}>
-                                    ผู้ติดต่อ<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Contact By</span>
+                                <td style={{ width: '25%', fontWeight: 'bold', padding: '4px', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a' }}>
+                                    เงื่อนไขการชำระเงิน<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Term Of Payment</span>
                                 </td>
-                                <td style={{ width: '20%', fontWeight: 'bold', padding: '4px', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a' }}>
-                                    เลขที่ลูกค้าสั่งซื้อ<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Customer Order</span>
-                                </td>
-                                <td style={{ width: '20%', fontWeight: 'bold', padding: '4px', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a' }}>
-                                    เงื่อนไขในการชำระเงิน<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Term of Payment</span>
-                                </td>
-                                <td style={{ width: '20%', fontWeight: 'bold', padding: '4px', borderBottom: '1px solid #1a7a3a' }}>
+                                <td style={{ width: '25%', fontWeight: 'bold', padding: '4px', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a' }}>
                                     วันครบกำหนดชำระ<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Due Date</span>
+                                </td>
+                                <td style={{ width: '25%', fontWeight: 'bold', padding: '4px', borderBottom: '1px solid #1a7a3a' }}>
+                                    พนักงานขาย<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Salesperson</span>
                                 </td>
                             </tr>
                             <tr>
-                                <td style={{ padding: '6px', borderRight: '1px solid #1a7a3a' }}>{formData.purchaseNo || '-'}</td>
-                                <td style={{ padding: '6px', borderRight: '1px solid #1a7a3a' }}>{formData.contactPerson || '-'}</td>
-                                <td style={{ padding: '6px', borderRight: '1px solid #1a7a3a' }}>{formData.customerOrder || '-'}</td>
-                                <td style={{ padding: '6px', borderRight: '1px solid #1a7a3a' }}>{formData.termOfPayment || '-'}</td>
-                                <td style={{ padding: '6px' }}>{formData.dueDate ? formatDate(formData.dueDate) : '-'}</td>
+                                <td style={{ padding: '6px', borderRight: '1px solid #1a7a3a' }}>{formData.purchaseNo || ' '}</td>
+                                <td style={{ padding: '6px', borderRight: '1px solid #1a7a3a' }}>{formData.termOfPayment || ' '}</td>
+                                <td style={{ padding: '6px', borderRight: '1px solid #1a7a3a' }}>{formData.dueDate ? formatDate(formData.dueDate) : ' '}</td>
+                                <td style={{ padding: '6px' }}>{formData.salesperson || ' '}</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
                 {/* Products Table */}
-                <div style={{ border: '1px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px' }}>
+                <div style={{ border: '1.5px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                         <thead>
                             <tr style={{ backgroundColor: '#d5f5e3' }}>
@@ -2835,7 +2825,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 </tr>
                             )}
                         </tbody>
-                        
+
                         {/* Footer enclosed within the same rounded box */}
                         <tbody>
                             <tr>
@@ -2847,11 +2837,26 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                     (formData.showDepositInPrint && depositAmount > 0 ? 2 : 0) + 1
                                 } style={{ width: '54%', verticalAlign: 'top', padding: '5px 12px', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a' }}>
                                     <div className="print-notes-container" dangerouslySetInnerHTML={{ __html: formData.notes }} style={{ fontSize: '9pt', minHeight: '15px' }} />
+                                    
+                                    <div style={{ marginTop: '8px', padding: '5px 0' }}>
+                                        <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '10pt', color: '#1a7a3a' }}>
+                                            ช่องทางชำระเงิน :
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '20px', alignItems: 'center', fontSize: '10pt' }}>
+                                            <label><span>☐</span> เงินสด (Cash)</label>
+                                            <label><span>☐</span> โอนเงิน (Bank Transfer)</label>
+                                            <label><span>☐</span> เช็ค (Cheque)</label>
+                                        </div>
+                                        <div style={{ marginTop: '6px', fontSize: '9pt', lineHeight: 1.7 }}>
+                                            ธนาคาร (Bank) ........................................... สาขา (Branch) ...........................................<br />
+                                            เลขที่เช็ค (Cheque No.) ........................................... วันที่ ...........................................
+                                        </div>
+                                    </div>
                                 </td>
-                                <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
                                     ยอดรวม<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>TOTAL</span>
                                 </td>
-                                <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderTop: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
                                     <span style={{ fontWeight: 'normal' }}>{subTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                 </td>
                             </tr>
@@ -2859,18 +2864,18 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             {formData.showDiscountInPrint && discountAmount > 0 && (
                                 <>
                                     <tr>
-                                        <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', color: 'red', fontSize: '10pt' }}>
+                                        <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', color: 'black', fontSize: '10pt' }}>
                                             หักส่วนลด<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>DISCOUNT</span>
                                         </td>
-                                        <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderLeft: '1px solid #1a7a3a', color: 'red', fontSize: '10pt' }}>
+                                        <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', color: 'black', fontSize: '10pt' }}>
                                             <span style={{ fontWeight: 'normal' }}>{discountAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                        <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '10pt' }}>
                                             ยอดหลังหักส่วนลด<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>AFTER DISCOUNT</span>
                                         </td>
-                                        <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt', fontWeight: 'normal' }}>
+                                        <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', fontWeight: 'normal' }}>
                                             <span>{afterDiscount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                         </td>
                                     </tr>
@@ -2878,30 +2883,30 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             )}
                             {(isFda || formData.showVatInPrint) && vatAmount > 0 && (
                                 <tr>
-                                    <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                    <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '10pt' }}>
                                         ภาษีมูลค่าเพิ่ม 7%<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>VAT</span>
                                     </td>
-                                    <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                    <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt' }}>
                                         <span style={{ fontWeight: 'normal' }}>{vatAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                     </td>
                                 </tr>
                             )}
                             {formData.showShippingInPrint && shipping > 0 && (
                                 <tr>
-                                    <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                    <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '10pt' }}>
                                         ค่าจัดส่ง<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>SHIPPING COST</span>
                                     </td>
-                                    <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                    <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt' }}>
                                         <span style={{ fontWeight: 'normal' }}>{shipping.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                     </td>
                                 </tr>
                             )}
                             {formData.showDesignFeeInPrint && designFee > 0 && (
                                 <tr>
-                                    <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                    <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '10pt' }}>
                                         ค่าออกแบบ<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>DESIGN FEE</span>
                                     </td>
-                                    <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                    <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt' }}>
                                         <span style={{ fontWeight: 'normal' }}>{designFee.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                     </td>
                                 </tr>
@@ -2909,18 +2914,18 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             {formData.showDepositInPrint && depositAmount > 0 && (
                                 <>
                                     <tr>
-                                        <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                        <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '10pt', color: 'black' }}>
                                             ยอดชำระมัดจำ<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>DEPOSIT</span>
                                         </td>
-                                        <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt', fontWeight: 'bold' }}>
+                                        <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', color: 'black', fontWeight: 'bold' }}>
                                             <span>{depositAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                        <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '10pt', color: 'black' }}>
                                             ยอดคงเหลือที่ต้องชำระ<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>REMAINING BALANCE</span>
                                         </td>
-                                        <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt', fontWeight: 'bold' }}>
+                                        <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', color: 'black', fontWeight: 'bold' }}>
                                             <span>{remainingAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                         </td>
                                     </tr>
@@ -2930,10 +2935,10 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 <td colSpan="4" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '12pt', backgroundColor: '#d5f5e3', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', padding: '5px' }}>
                                     <span style={{ fontStyle: 'italic' }}>{ThaiBaht(grandTotal)}</span>
                                 </td>
-                                <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', backgroundColor: '#d5f5e3', fontSize: '10pt' }}>
+                                <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderRight: '1px solid #1a7a3a', backgroundColor: '#d5f5e3', fontSize: '10pt' }}>
                                     รวมเงินทั้งสิ้น<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>GRAND TOTAL</span>
                                 </td>
-                                <td style={{ textAlign: 'right', fontWeight: 'bold', textDecoration: 'underline', borderTop: '1px solid #1a7a3a', backgroundColor: '#d5f5e3', borderLeft: '1px solid #1a7a3a', padding: '5px 10px', fontSize: '11pt' }}>
+                                <td style={{ textAlign: 'right', fontWeight: 'bold', textDecoration: 'underline', backgroundColor: '#d5f5e3', padding: '5px 10px', fontSize: '11pt' }}>
                                     <span>{grandTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                 </td>
                             </tr>
@@ -2941,51 +2946,31 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                     </table>
                 </div>
 
-                {/* Signatures for Receipt (2 separated boxes - Flex 6 and Flex 4) */}
+                {/* Signatures for Receipt (3 separated boxes) */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', gap: '15px' }}>
-                    <div style={{ flex: 6, border: '1px solid #1a7a3a', borderRadius: '8px', fontSize: '10pt', padding: '10px 15px', position: 'relative' }}>
-                        <div style={{ color: '#1a7a3a', fontSize: '9pt', marginBottom: '25px', fontWeight: 'bold' }}>
-                            ได้รับสินค้าตามรายการถูกต้องเรียบร้อยแล้ว <span style={{ fontSize: '8pt', color: '#555', fontWeight: 'normal' }}>Receipt the above goods in good condition</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-                            <div style={{ lineHeight: 1.2 }}>
-                                <span style={{ fontSize: '9pt', fontWeight: 'bold' }}>ผู้รับสินค้า</span><br /><span style={{ fontSize: '8pt', color: '#555' }}>Received by</span>
-                            </div>
-                            <div style={{ flex: 1, borderBottom: '1px dotted #999', margin: '0 10px', position: 'relative', top: '-5px' }}></div>
-                            <div style={{ width: '150px', display: 'flex' }}>
-                                <div style={{ lineHeight: 1.2, marginRight: '10px' }}>
-                                    <span style={{ fontSize: '9pt', fontWeight: 'bold' }}>วันที่</span><br /><span style={{ fontSize: '8pt', color: '#555' }}>Date</span>
-                                </div>
-                                <div style={{ flex: 1, borderBottom: '1px dotted #999', position: 'relative', top: '-5px' }}></div>
-                            </div>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <div style={{ lineHeight: 1.2 }}>
-                                <span style={{ fontSize: '9pt', fontWeight: 'bold' }}>ผู้ส่งสินค้า</span><br /><span style={{ fontSize: '8pt', color: '#555' }}>Delivery by</span>
-                            </div>
-                            <div style={{ flex: 1, borderBottom: '1px dotted #999', margin: '0 10px', position: 'relative', top: '-5px' }}></div>
-                            <div style={{ width: '150px', display: 'flex' }}>
-                                <div style={{ lineHeight: 1.2, marginRight: '10px' }}>
-                                    <span style={{ fontSize: '9pt', fontWeight: 'bold' }}>วันที่</span><br /><span style={{ fontSize: '8pt', color: '#555' }}>Date</span>
-                                </div>
-                                <div style={{ flex: 1, borderBottom: '1px dotted #999', position: 'relative', top: '-5px' }}></div>
-                            </div>
-                        </div>
+                    <div style={{ flex: 1, border: '1.5px solid #1a7a3a', borderRadius: '8px', textAlign: 'center', fontSize: '10pt', padding: '15px 10px 10px 10px' }}>
+                        <div style={{ height: '35px' }}></div>
+                        <div>(.......................................................)</div>
+                        <div style={{ marginTop: '4px', fontSize: '9pt' }}>ผู้รับเงิน / Collector By</div>
+                        <div style={{ marginTop: '4px', fontSize: '8pt', color: '#555' }}>วันที่ / Date ......./......./.......</div>
                     </div>
 
-                    <div style={{ flex: 4, border: '1px solid #1a7a3a', borderRadius: '8px', textAlign: 'center', fontSize: '10pt', padding: '10px 15px', position: 'relative' }}>
-                        <div style={{ fontSize: '9pt', fontWeight: 'bold', marginBottom: '2px' }}>
-                            ในนาม {isEn ? (isElt ? 'Elite Trading 2020 Co., Ltd.' : (isPsf ? 'Premier Smart Farm Co., Ltd.' : 'Thai Herb Centers Community Enterprise (HEAD OFFICE)')) : (isElt ? 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด' : (isPsf ? 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด' : 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์ (สำนักงานใหญ่)'))}
-                        </div>
-                        <div style={{ fontSize: '8pt', color: '#555', marginBottom: '25px' }}>
-                            For {isElt ? 'Elite Trading 2020 Co., Ltd.' : (isPsf ? 'Premier Smart Farm Co., Ltd.' : 'Thai Herb Centers(THC)Community Enterprise (HEAD OFFICE)')}
-                        </div>
+                    <div style={{ flex: 1, border: '1.5px solid #1a7a3a', borderRadius: '8px', textAlign: 'center', fontSize: '10pt', padding: '15px 10px 10px 10px' }}>
+                        <div style={{ height: '35px' }}></div>
+                        <div>(.......................................................)</div>
+                        <div style={{ marginTop: '4px', fontSize: '9pt' }}>ผู้รับสินค้า / Received By</div>
+                        <div style={{ marginTop: '4px', fontSize: '8pt', color: '#555' }}>วันที่ / Date ......./......./.......</div>
+                    </div>
+
+                    <div style={{ flex: 1, border: '1.5px solid #1a7a3a', borderRadius: '8px', textAlign: 'center', fontSize: '10pt', padding: '15px 10px 10px 10px', position: 'relative' }}>
                         <div style={{ height: '35px', position: 'relative' }}>
-                            <img src="/images/signatures/sign-authorized.png" style={{ maxHeight: '70px', position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', marginLeft: '-20px', zIndex: 10 }} alt="signature" />
+                            {formData.signer === 'jutharat' && (
+                                <img src="/images/signatures/sign-authorized.png" style={{ maxHeight: '70px', position: 'absolute', bottom: '-15px', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }} alt="signature" />
+                            )}
                         </div>
-                        <div style={{ borderBottom: '1px dotted #999', width: '80%', margin: '0 auto 5px auto' }}></div>
-                        <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>ผู้มีอำนาจลงนาม</div>
-                        <div style={{ fontSize: '8pt', color: '#555' }}>Authorized Signature</div>
+                        <div>(<span style={{ display: 'inline-block', minWidth: '140px', margin: '0 5px' }}></span>)</div>
+                        <div style={{ marginTop: '4px', fontSize: '9pt' }}>ผู้มีอำนาจลงนาม / Authorized Signature</div>
+                        <div style={{ marginTop: '4px', fontSize: '8pt', color: '#555' }}>วันที่ / Date ......./......./.......</div>
                     </div>
                 </div>
 </>

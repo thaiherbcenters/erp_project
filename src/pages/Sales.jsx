@@ -1905,15 +1905,15 @@ export default function Sales() {
                 <div className="subpage-content" key="sales_contracts">
                     <ContractManagement onViewDocument={(docType, docId) => {
                         if (docType === 'Quotation' || docType === 'ใบเสนอราคา') {
-                            setPreviewQuotationId(docId);
+                            setPreviewQuotationId({ id: docId, hideEdit: true });
                         } else if (docType === 'Billing' || docType === 'ใบวางบิล' || docType === 'ใบวางบิล/ใบแจ้งหนี้') {
-                            setPreviewBillingId(docId);
+                            setPreviewBillingId({ id: docId, hideEdit: true });
                         } else if (docType === 'TaxInvoice' || docType === 'ใบแจ้งหนี้/ใบส่งสินค้า') {
-                            setPreviewDocModal({ type: 'TaxInvoice', id: docId });
+                            setPreviewDocModal({ type: 'TaxInvoice', id: docId, hideEdit: true });
                         } else if (docType === 'DeliveryOrder' || docType === 'ใบส่งสินค้า') {
-                            setPreviewDocModal({ type: 'DeliveryOrder', id: docId });
+                            setPreviewDocModal({ type: 'DeliveryOrder', id: docId, hideEdit: true });
                         } else if (docType === 'Receipt' || docType === 'ใบเสร็จรับเงิน') {
-                            setPreviewDocModal({ type: 'Receipt', id: docId });
+                            setPreviewDocModal({ type: 'Receipt', id: docId, hideEdit: true });
                         } else if (docType === 'Sales Order' || docType === 'ใบสั่งขาย' || docType === 'ใบสั่งซื้อ') {
                             setEditingSOId(docId);
                             setIsSOViewOnly(true);
@@ -2214,21 +2214,24 @@ export default function Sales() {
                                 <Eye size={18} /> พรีวิวใบเสนอราคา
                             </h3>
                             <div style={{ display: 'flex', gap: '8px' }}>
-                                {!String(previewQuotationId).startsWith('history-') && (
-                                <button
-                                    onClick={() => {
-                                        const id = previewQuotationId;
-                                        setPreviewQuotationId(null);
-                                        setEditingQuotationId(id);
-                                        setIsViewOnly(false);
-                                        setIsHistoryView(false);
-                                        setShowQuotationForm(true);
-                                    }}
-                                    style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                >
-                                    <Edit size={14} /> แก้ไข
-                                </button>
-                                )}
+                                {(() => {
+                                    const qId = typeof previewQuotationId === 'object' && previewQuotationId !== null ? previewQuotationId.id : previewQuotationId;
+                                    const qHideEdit = typeof previewQuotationId === 'object' && previewQuotationId !== null ? previewQuotationId.hideEdit : false;
+                                    return !String(qId).startsWith('history-') && !qHideEdit && (
+                                    <button
+                                        onClick={() => {
+                                            setPreviewQuotationId(null);
+                                            setEditingQuotationId(qId);
+                                            setIsViewOnly(false);
+                                            setIsHistoryView(false);
+                                            setShowQuotationForm(true);
+                                        }}
+                                        style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        <Edit size={14} /> แก้ไข
+                                    </button>
+                                    );
+                                })()}
                                 <button
                                     onClick={() => setPreviewQuotationId(null)}
                                     style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
@@ -2239,9 +2242,9 @@ export default function Sales() {
                         </div>
                         <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
                             <QuotationForm
-                                editId={previewQuotationId}
+                                editId={typeof previewQuotationId === 'object' && previewQuotationId !== null ? previewQuotationId.id : previewQuotationId}
                                 viewOnly={true}
-                                isHistory={String(previewQuotationId).startsWith('history-')}
+                                isHistory={String(typeof previewQuotationId === 'object' && previewQuotationId !== null ? previewQuotationId.id : previewQuotationId).startsWith('history-')}
                                 hideControls={true}
                                 onBack={() => setPreviewQuotationId(null)}
                                 onSave={() => setPreviewQuotationId(null)}
@@ -2260,19 +2263,22 @@ export default function Sales() {
                                 <Eye size={18} /> พรีวิวใบวางบิล
                             </h3>
                             <div style={{ display: 'flex', gap: '8px' }}>
-                                {!String(previewBillingId).startsWith('history-') && (
-                                <button
-                                    onClick={() => {
-                                        const id = previewBillingId;
-                                        setPreviewBillingId(null);
-                                        setEditingBillingId(id);
-                                        setShowBillingForm(true);
-                                    }}
-                                    style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                >
-                                    <Edit size={14} /> แก้ไข
-                                </button>
-                                )}
+                                {(() => {
+                                    const bId = typeof previewBillingId === 'object' && previewBillingId !== null ? previewBillingId.id : previewBillingId;
+                                    const bHideEdit = typeof previewBillingId === 'object' && previewBillingId !== null ? previewBillingId.hideEdit : false;
+                                    return !String(bId).startsWith('history-') && !bHideEdit && (
+                                    <button
+                                        onClick={() => {
+                                            setPreviewBillingId(null);
+                                            setEditingBillingId(bId);
+                                            setShowBillingForm(true);
+                                        }}
+                                        style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        <Edit size={14} /> แก้ไข
+                                    </button>
+                                    );
+                                })()}
                                 <button
                                     onClick={() => setPreviewBillingId(null)}
                                     style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
@@ -2283,9 +2289,9 @@ export default function Sales() {
                         </div>
                         <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
                             <BillingInvoiceForm
-                                editId={previewBillingId}
+                                editId={typeof previewBillingId === 'object' && previewBillingId !== null ? previewBillingId.id : previewBillingId}
                                 viewOnly={true}
-                                isHistory={String(previewBillingId).startsWith('history-')}
+                                isHistory={String(typeof previewBillingId === 'object' && previewBillingId !== null ? previewBillingId.id : previewBillingId).startsWith('history-')}
                                 hideControls={true}
                                 onBack={() => setPreviewBillingId(null)}
                                 onSave={() => setPreviewBillingId(null)}
@@ -2304,7 +2310,7 @@ export default function Sales() {
                                 <Eye size={18} /> พรีวิวเอกสาร
                             </h3>
                             <div style={{ display: 'flex', gap: '8px' }}>
-                                {!String(previewDocModal.id).startsWith('history-') && (
+                                {!String(previewDocModal.id).startsWith('history-') && !previewDocModal.hideEdit && (
                                 <button
                                     onClick={() => {
                                         const type = previewDocModal.type;
