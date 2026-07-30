@@ -63,12 +63,12 @@ router.get('/', async (req, res) => {
 router.get('/next-number', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const docType = req.query.docType || 'delivery_order_thc';
+        const docType = req.query.docType || 'receipt_thc';
         
         // Determine prefix based on docType
-        let prefix = 'DO-';
-        if (docType.includes('psf')) prefix = 'DO-PSF-';
-        else if (docType.includes('elt')) prefix = 'DO-ELT-';
+        let prefix = 'RE-';
+        if (docType.includes('psf')) prefix = 'RE-PSF-';
+        else if (docType.includes('elt')) prefix = 'RE-ELT-';
         
         const datePrefix = getDatePrefix();
         const fullPrefix = `${prefix}${datePrefix}`;
@@ -158,7 +158,10 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         const request = new sql.Request(transaction);
 
         // Generate Receipt Number
-        const finalReceiptNo = receiptNo || await generateSequence(pool, 'Receipt', 'ReceiptNo', `BI-${getDatePrefix()}`, 3);
+        let prefix = 'RE-';
+        if (docType.includes('psf')) prefix = 'RE-PSF-';
+        else if (docType.includes('elt')) prefix = 'RE-ELT-';
+        const finalReceiptNo = receiptNo || await generateSequence(pool, 'Receipt', 'ReceiptNo', `${prefix}${getDatePrefix()}`, 3);
 
         // 1. Insert Header
         request.input('receiptNo', sql.NVarChar, finalReceiptNo);
