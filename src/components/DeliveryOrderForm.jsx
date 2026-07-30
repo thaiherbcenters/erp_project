@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Printer, ArrowLeft, Plus, Trash2, FileText, CheckCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { Save, Printer, ArrowLeft, Plus, Trash2, FileText, CheckCircle, Calendar as CalendarIcon, CheckCircle2, ChevronDown, Download, Eye, Loader2, Minus, Search, Settings, ShoppingCart, Info, Upload, Edit } from 'lucide-react';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import CustomDatePicker from '../components/CustomDatePicker';
 import TaxIdInput from '../components/TaxIdInput';
 import CustomSelect from './CustomSelect';
+import { useSignatures } from '../hooks/useSignatures';
+import BillingPrintContainer from './BillingPrintContainer';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -747,7 +749,7 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
-        signer: '',
+        signer: 'thawat',
         customerOrder: '',
         purchaseNo: '',
         salesperson: '',
@@ -850,6 +852,25 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
             }
         };
         fetchCustomerTypes();
+    }, []);
+
+    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
+    useEffect(() => {
+        const fetchSignatures = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE}/signatures`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const json = await res.json();
+                if (json.success) {
+                    setAvailableSignatures(json.data);
+                }
+            } catch (err) {
+                console.error('Failed to fetch signatures', err);
+            }
+        };
+        fetchSignatures();
     }, []);
 
     const parseAddressToSplit = (fullAddress) => {
@@ -1357,6 +1378,8 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
     else if (validItemsCount <= 5) { cellHeight = '50px'; imgSize = '40px'; }
     else if (validItemsCount === 6) { cellHeight = '40px'; imgSize = '34px'; }
     else { cellHeight = '35px'; imgSize = '30px'; }
+
+    const selectedSignature = availableSignatures.find(s => s.KeyName === formData.signer);
 
     return (
         <div className="q-form-wrapper">
@@ -2148,7 +2171,19 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                         </div>
 
                         <div className="form-row">
-
+                            <div className="form-group" style={{ flex: 1 }}>
+                                <label>ผู้มีอำนาจลงนาม (ลายเซ็น)</label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ flex: 1 }}>
+                                        <CustomSelect name="signer" value={formData.signer || ''} onChange={handleFormChange}>
+                                            <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                            {availableSignatures.map(sig => (
+                                                <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
+                                            ))}
+                                        </CustomSelect>
+                                    </div>
+                                </div>
+                            </div>
                             <div className="form-group" style={{ flex: 1 }}>
                                 <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span>เงื่อนไขการหักมัดจำ</span>
@@ -2591,8 +2626,8 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                                             </div>
                                             <div style={{ textAlign: 'center' }}>
                                                 <div style={{ height: '50px', position: 'relative' }}>
-                                                    {formData.signer === 'jutharat' && (
-                                                        <img src="/images/signatures/sign-jutharat.png" style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="signature" />
+                                                    {selectedSignature && (
+                                                        <img src={getSignatureUrl(selectedSignature.ImagePath)} style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="signature" onError={(e) => { e.target.onerror = null; e.target.src = selectedSignature.ImagePath; }} />
                                                     )}
                                                 </div>
                                                 <div style={{ position: 'relative', zIndex: 0 }}>_______________</div>
@@ -2600,8 +2635,8 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                                             </div>
                                             <div style={{ textAlign: 'center' }}>
                                                 <div style={{ height: '50px', position: 'relative' }}>
-                                                    {formData.signer === 'jutharat' && (
-                                                        <img src="/images/signatures/sign-approver.png" style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="approver signature" />
+                                                    {selectedSignature && (
+                                                        <img src={getSignatureUrl(selectedSignature.ImagePath)} style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="approver signature" onError={(e) => { e.target.onerror = null; e.target.src = selectedSignature.ImagePath; }} />
                                                     )}
                                                 </div>
                                                 <div style={{ position: 'relative', zIndex: 0 }}>_______________</div>
@@ -2981,7 +3016,9 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                             For {isElt ? 'Elite Trading 2020 Co., Ltd.' : (isPsf ? 'Premier Smart Farm Co., Ltd.' : 'Thai Herb Centers(THC)Community Enterprise (HEAD OFFICE)')}
                         </div>
                         <div style={{ height: '35px', position: 'relative' }}>
-                            <img src="/images/signatures/sign-authorized.png" style={{ maxHeight: '70px', position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', marginLeft: '-20px', zIndex: 10 }} alt="signature" />
+                            {selectedSignature && (
+                                <img src={getSignatureUrl(selectedSignature.ImagePath)} style={{ maxHeight: '70px', position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', marginLeft: '-20px', zIndex: 10 }} alt="signature" onError={(e) => { e.target.onerror = null; e.target.src = selectedSignature.ImagePath; }} />
+                            )}
                         </div>
                         <div style={{ borderBottom: '1px dotted #999', width: '80%', margin: '0 auto 5px auto' }}></div>
                         <div style={{ fontSize: '9pt', fontWeight: 'bold' }}>ผู้มีอำนาจลงนาม</div>

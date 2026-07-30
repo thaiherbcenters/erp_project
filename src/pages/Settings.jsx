@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import PermissionManager from './PermissionManager';
 import TemplateUploader from '../components/TemplateUploader';
+import SignatureManager from '../components/SignatureManager';
 import CustomDatePicker from '../components/CustomDatePicker';
 import './Settings.css';
 import API_BASE from '../config';import CustomSelect from '../components/CustomSelect';
@@ -91,6 +92,9 @@ export default function Settings() {
                 <button className={`settings-tab ${activeTab === 'templates' ? 'active' : ''}`} onClick={() => setActiveTab('templates')}>
                     <Upload size={16} /> เทมเพลต PDF
                 </button>
+                <button className={`settings-tab ${activeTab === 'signatures' ? 'active' : ''}`} onClick={() => setActiveTab('signatures')}>
+                    <SettingsIcon size={16} /> จัดการลายเซ็น
+                </button>
                 <button className={`settings-tab ${activeTab === 'audit_logs' ? 'active' : ''}`} onClick={() => setActiveTab('audit_logs')}>
                     <FileText size={16} /> ประวัติการใช้งาน
                 </button>
@@ -103,6 +107,7 @@ export default function Settings() {
             {activeTab === 'permissions' && <div className="settings-permissions-wrapper"><PermissionManager isEmbed={true} /></div>}
             {activeTab === 'general' && <GeneralTab />}
             {activeTab === 'templates' && <div className="p-6"><TemplateUploader /></div>}
+            {activeTab === 'signatures' && <div className="p-6"><SignatureManager isInline={true} /></div>}
             {activeTab === 'audit_logs' && <AuditLogTab />}
 
             {/* Toast */}

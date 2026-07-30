@@ -60,6 +60,15 @@ const createReceiptSchema = z.object({
     fdaServiceTrademarkPrice: z.number().min(0).optional().default(0),
     contractId: z.union([z.string(), z.number()]).nullable().optional(),
     status: z.string().optional().default('ร่าง'),
+    
+    deliverTo: z.string().nullable().optional(),
+    dueDate: z.string().nullable().optional(),
+    paymentMethod: z.string().nullable().optional(),
+    customerBank: z.string().nullable().optional(),
+    customerBranch: z.string().nullable().optional(),
+    chequeNo: z.string().nullable().optional(),
+    chequeDate: z.string().nullable().optional(),
+
     items: z.array(ReceiptItemSchema).optional().default([]),
 });
 

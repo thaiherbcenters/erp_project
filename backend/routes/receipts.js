@@ -63,7 +63,7 @@ router.get('/', async (req, res) => {
 router.get('/next-number', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const docType = req.query.docType || 'receipt_thc';
+        const docType = req.query.docType || 'delivery_order_thc';
         
         // Determine prefix based on docType
         let prefix = 'RE-';
@@ -145,7 +145,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         designFee, showDesignFeeInPrint,
         fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
         fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceTrademark, fdaServiceTrademarkPrice,
-        status, contractId, items 
+        status, contractId, items,
+        deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate
     } = req.body;
 
     let transaction;
@@ -159,8 +160,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
 
         // Generate Receipt Number
         let prefix = 'RE-';
-        if (docType.includes('psf')) prefix = 'RE-PSF-';
-        else if (docType.includes('elt')) prefix = 'RE-ELT-';
+        if (docType && docType.includes('psf')) prefix = 'RE-PSF-';
+        else if (docType && docType.includes('elt')) prefix = 'RE-ELT-';
         const finalReceiptNo = receiptNo || await generateSequence(pool, 'Receipt', 'ReceiptNo', `${prefix}${getDatePrefix()}`, 3);
 
         // 1. Insert Header
@@ -186,10 +187,10 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         request.input('depositAmount', sql.Decimal(18,2), depositAmount);
         request.input('remainingAmount', sql.Decimal(18,2), remainingAmount);
         request.input('signer', sql.NVarChar, signer);
-        request.input('customerOrder', sql.NVarChar, customerOrder);
-        request.input('purchaseNo', sql.NVarChar, purchaseNo);
-        request.input('salesperson', sql.NVarChar, salesperson);
-        request.input('termOfPayment', sql.NVarChar, termOfPayment);
+        request.input('customerOrder', sql.NVarChar, customerOrder || null);
+        request.input('purchaseNo', sql.NVarChar, purchaseNo || null);
+        request.input('salesperson', sql.NVarChar, salesperson || null);
+        request.input('termOfPayment', sql.NVarChar, termOfPayment || null);
         request.input('notes', sql.NVarChar, notes);
         request.input('showDiscount', sql.Bit, showDiscountInPrint ? 1 : 0);
         request.input('showVat', sql.Bit, showVatInPrint ? 1 : 0);
@@ -207,6 +208,14 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
         request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
+        
+        request.input('deliverTo', sql.NVarChar, deliverTo || null);
+        request.input('dueDate', sql.Date, dueDate || null);
+        request.input('paymentMethod', sql.NVarChar, paymentMethod || null);
+        request.input('customerBank', sql.NVarChar, customerBank || null);
+        request.input('customerBranch', sql.NVarChar, customerBranch || null);
+        request.input('chequeNo', sql.NVarChar, chequeNo || null);
+        request.input('chequeDate', sql.Date, chequeDate || null);
 
         const headerResult = await request.query(`
             INSERT INTO Receipt (
@@ -214,7 +223,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate
             )
             OUTPUT INSERTED.ReceiptID
             VALUES (
@@ -222,7 +232,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 @billDate, @validUntil, @subTotal, @discountPercent, @discountAmount, @afterDiscount,
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
                 @remainingAmount, @signer, @customerOrder, @purchaseNo, @salesperson, @termOfPayment, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
-                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice
+                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice,
+                @deliverTo, @dueDate, @paymentMethod, @customerBank, @customerBranch, @chequeNo, @chequeDate
             )
         `);
 
@@ -315,7 +326,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
         designFee, showDesignFeeInPrint,
         fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
         fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceTrademark, fdaServiceTrademarkPrice,
-        status, contractId, items 
+        status, contractId, items,
+        deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate
     } = req.body;
 
     let transaction;
@@ -327,9 +339,27 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
 
         const request = new sql.Request(transaction);
 
+        // Fetch existing record to retain original number if needed
+        const existingCheckReq = new sql.Request(transaction);
+        existingCheckReq.input('id', sql.Int, qid);
+        const existingCheck = await existingCheckReq.query(`SELECT ReceiptNo FROM Receipt WHERE ReceiptID = @id`);
+        let existingReceiptNo = existingCheck.recordset.length > 0 ? existingCheck.recordset[0].ReceiptNo : null;
+
+        let finalReceiptNo = receiptNo;
+        
+        // If frontend sends empty or dash, fallback to original number
+        if (!finalReceiptNo || finalReceiptNo.trim() === '' || finalReceiptNo.trim() === '-') {
+            finalReceiptNo = existingReceiptNo;
+        }
+
+        // Auto-fix the copy-paste BI- bug from older versions for receipts
+        if (finalReceiptNo && finalReceiptNo.startsWith('BI-')) {
+            finalReceiptNo = finalReceiptNo.replace('BI-', 'RE-');
+        }
+
         // 1. Update Header
         request.input('id', sql.Int, qid);
-        request.input('receiptNo', sql.NVarChar, receiptNo);
+        request.input('receiptNo', sql.NVarChar, finalReceiptNo);
         request.input('customerId', sql.Int, customerId || null);
         request.input('docType', sql.NVarChar, docType);
         request.input('bankAccount', sql.NVarChar, bankAccount);
@@ -373,6 +403,14 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
         request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
 
+        request.input('deliverTo', sql.NVarChar, deliverTo || null);
+        request.input('dueDate', sql.Date, dueDate || null);
+        request.input('paymentMethod', sql.NVarChar, paymentMethod || null);
+        request.input('customerBank', sql.NVarChar, customerBank || null);
+        request.input('customerBranch', sql.NVarChar, customerBranch || null);
+        request.input('chequeNo', sql.NVarChar, chequeNo || null);
+        request.input('chequeDate', sql.Date, chequeDate || null);
+
         // 1. Backup Current Version to History Table before modifying
         const backupReq = new sql.Request(transaction);
         backupReq.input('id', sql.Int, qid);
@@ -382,7 +420,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate
             )
             OUTPUT INSERTED.HistoryID
             SELECT 
@@ -390,7 +429,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate
             FROM Receipt
             WHERE ReceiptID = @id
         `);
@@ -422,6 +462,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 FdaCustomerCode = @fdaCustomerCode, FdaEmail = @fdaEmail, FdaProjectName = @fdaProjectName, FdaCreditTerms = @fdaCreditTerms,
                 FdaServiceRegister = @fdaServiceRegister, FdaServiceRegisterPrice = @fdaServiceRegisterPrice,
                 FdaServiceTrademark = @fdaServiceTrademark, FdaServiceTrademarkPrice = @fdaServiceTrademarkPrice,
+                DeliverTo = @deliverTo, DueDate = @dueDate, PaymentMethod = @paymentMethod,
+                CustomerBank = @customerBank, CustomerBranch = @customerBranch, ChequeNo = @chequeNo, ChequeDate = @chequeDate,
                 Revision = Revision + 1,
                 UpdatedAt = GETDATE()
             WHERE ReceiptID = @id

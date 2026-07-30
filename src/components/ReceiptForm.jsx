@@ -5,6 +5,7 @@ import API_BASE from '../config';
 import CustomDatePicker from '../components/CustomDatePicker';
 import TaxIdInput from '../components/TaxIdInput';
 import CustomSelect from './CustomSelect';
+import { useSignatures } from '../hooks/useSignatures';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -464,28 +465,107 @@ const styles = `
 /* CSS สำหรับการพิมพ์ (Media Print) */
 /* ------------------------------------ */
 @media print {
-    body, html { background-color: white !important; }
-    body * { visibility: hidden; }
+    body, html { 
+        background-color: white !important; 
+        height: auto !important;
+        overflow: visible !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Reset root containers to ensure absolute positioning anchors to the physical page */
+    body > div, body > div > div, .app-container, main {
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        transform: none !important;
+    }
+    
     * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
+    
+    body * { visibility: hidden; }
+    
+    /* Force the modal to anchor at top-left and allow its children to paginate */
+    .pdf-preview-overlay {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: block !important;
+        overflow: visible !important;
+        border: none !important;
+        visibility: visible;
+    }
+    .pdf-preview-overlay * {
+        visibility: visible;
+    }
+    
+    /* Unclip inner containers */
+    .pdf-preview-overlay > div {
+        position: static !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+    
+    .pdf-preview-overlay > div > div:first-child {
+        display: none !important;
+    }
+    
+    .pdf-preview-overlay > div > div:last-child {
+        position: static !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
     #q-print-container, #q-print-container * {
         visibility: visible;
     }
     .q-form-wrapper > *:not(#q-print-container) {
         display: none !important;
     }
+    
+    /* Print container anchors to the absolute modal */
     #q-print-container {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
         background-color: white !important;
         color: black;
         font-family: 'Sarabun', sans-serif;
         font-size: 11pt;
         line-height: 1.2;
+    }
+    .print-page-wrapper {
+        page-break-after: always;
+        break-after: page;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        width: 100% !important;
+    }
+    .print-page-wrapper:last-child {
+        page-break-after: auto;
+        break-after: auto;
     }
     @page { size: A4; margin: 5mm 7mm; }
 
@@ -600,12 +680,7 @@ function translateNotesToEN(html) {
     return res;
 }
 
-const DEFAULT_NORMAL_NOTES = `<div style="font-weight:bold; font-size: 9pt;">เงื่อนไข & ข้อตกลง :</div>
-<div style="font-size: 8.5pt; margin-left: 10px; line-height: 1.5;">
-    1. สินค้าที่ผลิตไม่สามารถเปลี่ยนแปลง ยกเลิก หรือคืนในกรณีการสั่งผลิตสินค้า ยกเว้นสินค้ามีปัญหาจากกระบวนการผลิต<br>
-    2. การตรวจรับสินค้าให้ตรวจสอบหลังรับสินค้า ต้องรายงานภายในวันเท่านั้น มิฉะนั้นถือว่ายอมรับสินค้าที่ส่งมอบ<br>
-    3. สินค้าที่มอบแล้วจะไม่สามารถเปลี่ยนแปลงใดๆ ขอสงวนสิทธิ์เรียกชำระเงินตามมูลค่าสินค้าที่ส่งมอบ
-</div>`;
+const DEFAULT_NORMAL_NOTES = `<div style="font-size: 9pt;">หมายเหตุ: ใบเสร็จรับเงินฉบับนี้จะถือว่าถูกต้องและสมบูรณ์ต่อเมื่อมีลายเซ็นของผู้มีอำนาจและเมื่อเรียกเก็บเงินตามบิลได้เรียบร้อย</div>`;
 
 const DEFAULT_FDA_NOTES = DEFAULT_NORMAL_NOTES;
 
@@ -684,6 +759,7 @@ const PRODUCT_IMAGES = {
 const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม', 'กระปุก', 'ขวด', 'ถุง', 'ซอง', 'หลอด', 'กล่อง', 'แผง', 'ขวด(โหล)', 'โหล'];
 
 export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistory }) {
+    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
 
@@ -747,7 +823,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
-        signer: '',
+        signer: 'thawat',
         customerOrder: '',
         purchaseNo: '',
         salesperson: '',
@@ -950,7 +1026,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             shippingCost: data.ShippingCost || 0,
                             depositPercent: data.DepositPercent || '0',
                             customDepositAmount: data.DepositPercent === 'custom' ? data.DepositAmount : 0,
-                            signer: data.Signer || '',
+                            signer: data.Signer || 'thawat',
                             customerOrder: data.CustomerOrder || '',
                             purchaseNo: data.PurchaseNo || '',
                             salesperson: data.Salesperson || '',
@@ -969,7 +1045,14 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             fdaServiceRegister: data.FdaServiceRegister !== undefined ? Boolean(data.FdaServiceRegister) : true,
                             fdaServiceRegisterPrice: data.FdaServiceRegisterPrice !== undefined ? parseFloat(data.FdaServiceRegisterPrice) : 30000,
                             fdaServiceTrademark: data.FdaServiceTrademark !== undefined ? Boolean(data.FdaServiceTrademark) : false,
-                            fdaServiceTrademarkPrice: data.FdaServiceTrademarkPrice !== undefined ? parseFloat(data.FdaServiceTrademarkPrice) : 5000
+                            fdaServiceTrademarkPrice: data.FdaServiceTrademarkPrice !== undefined ? parseFloat(data.FdaServiceTrademarkPrice) : 5000,
+                            deliverTo: data.DeliverTo || '',
+                            dueDate: data.DueDate ? data.DueDate.split('T')[0] : '',
+                            paymentMethod: data.PaymentMethod || '',
+                            customerBank: data.CustomerBank || '',
+                            customerBranch: data.CustomerBranch || '',
+                            chequeNo: data.ChequeNo || '',
+                            chequeDate: data.ChequeDate ? data.ChequeDate.split('T')[0] : ''
                         });
 
                         if (data.items && data.items.length > 0) {
@@ -1307,6 +1390,16 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             showDesignFeeInPrint: formData.showDesignFeeInPrint,
             contractId: formData.contractId || null,
             status: editId ? undefined : 'พร้อมใช้',
+            deliverTo: formData.deliverTo,
+            dueDate: formData.dueDate,
+            paymentMethod: formData.paymentMethod,
+            customerBank: formData.customerBank,
+            customerBranch: formData.customerBranch,
+            chequeNo: formData.chequeNo,
+            chequeDate: formData.chequeDate,
+            purchaseNo: formData.purchaseNo,
+            salesperson: formData.salesperson,
+            termOfPayment: formData.termOfPayment,
             items: items.filter(i => i.name).map(i => ({
                 name: i.name,
                 qty: Number(i.qty) || 0,
@@ -1358,6 +1451,9 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
     else if (validItemsCount === 6) { cellHeight = '40px'; imgSize = '34px'; }
     else { cellHeight = '35px'; imgSize = '30px'; }
 
+    const selectedSignature = availableSignatures.find(s => s.KeyName === formData.signer);
+
+
     return (
         <div className="q-form-wrapper">
             <style>{styles}</style>
@@ -1372,9 +1468,11 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             #q-print-container { 
                                 display: block !important; 
                                 position: static !important;
+                            }
+                            #q-print-container > div {
                                 width: 210mm; 
                                 min-height: 297mm; 
-                                margin: 0 auto; 
+                                margin: 0 auto 20px auto; 
                                 background: white; 
                                 padding: 10mm;
                                 box-shadow: 0 0 10px rgba(0,0,0,0.1);
@@ -1730,13 +1828,12 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         )}
                     </div>
 
-                    {/* ===== Section: ข้อมูลเพิ่มเติมเฉพาะใบกำกับภาษี/ใบเสร็จรับเงิน ===== */}
+                    {/* ===== Section: ข้อมูลทางการเงินเฉพาะใบเสร็จรับเงิน ===== */}
                     <div className="q-section" style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
                         <div className="q-section-header">
-                            <div className="q-section-icon" style={{ backgroundColor: '#22c55e', color: 'white' }}><span style={{ fontSize: '16px' }}>📝</span></div>
+                            <div className="q-section-icon" style={{ backgroundColor: '#22c55e', color: 'white' }}><span style={{ fontSize: '16px' }}>💰</span></div>
                             <div>
-                                <div className="q-section-title" style={{ color: '#166534' }}>ข้อมูลเพิ่มเติมเฉพาะใบกำกับภาษี/ใบเสร็จรับเงิน</div>
-                                <div className="q-section-desc" style={{ color: '#15803d' }}>ข้อมูลอ้างอิง สถานที่ส่ง ติดต่อ และเงื่อนไขการชำระเงิน</div>
+                                <div className="q-section-title" style={{ color: '#166534' }}>ข้อมูลทางการเงินเฉพาะใบเสร็จรับเงิน</div>
                             </div>
                         </div>
                         
@@ -1746,24 +1843,20 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 <input type="text" name="deliverTo" placeholder="ถ้ามี" value={formData.deliverTo || ''} onChange={handleFormChange} />
                             </div>
                             <div className="form-group">
-                                <label>เลขที่ลูกค้าสั่งซื้อ (Customer Order)</label>
-                                <input type="text" name="customerOrder" placeholder="ถ้ามี" value={formData.customerOrder} onChange={handleFormChange} />
-                            </div>
-                            <div className="form-group">
                                 <label>ติดต่อ (Contact)</label>
                                 <input type="text" name="contactPerson" placeholder="ถ้ามี" value={formData.contactPerson || ''} onChange={handleFormChange} />
                             </div>
                             <div className="form-group">
                                 <label>เลขที่ใบสั่งซื้อ (Purchase No.)</label>
-                                <input type="text" name="purchaseNo" placeholder="ถ้ามี" value={formData.purchaseNo} onChange={handleFormChange} />
+                                <input type="text" name="purchaseNo" placeholder="ถ้ามี" value={formData.purchaseNo || ''} onChange={handleFormChange} />
                             </div>
                             <div className="form-group">
                                 <label>พนักงานขาย (Salesperson)</label>
-                                <input type="text" name="salesperson" placeholder="ถ้ามี" value={formData.salesperson} onChange={handleFormChange} />
+                                <input type="text" name="salesperson" placeholder="ถ้ามี" value={formData.salesperson || ''} onChange={handleFormChange} />
                             </div>
                             <div className="form-group">
                                 <label>เงื่อนไขการชำระเงิน (Term of Payment)</label>
-                                <select name="termOfPayment" value={formData.termOfPayment} onChange={handleFormChange} style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px', outline: 'none', backgroundColor: '#fff' }}>
+                                <select name="termOfPayment" value={formData.termOfPayment || ''} onChange={handleFormChange} style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px', outline: 'none', backgroundColor: '#fff' }}>
                                     <option value="">- เลือก -</option>
                                     <option value="เงินสด">เงินสด (Cash)</option>
                                     <option value="7 วัน">เครดิต 7 วัน</option>
@@ -1777,6 +1870,35 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             <div className="form-group">
                                 <label>วันครบกำหนดชำระ (Due Date)</label>
                                 <input type="date" name="dueDate" value={formData.dueDate || ''} onChange={handleFormChange} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px' }} />
+                            </div>
+                        </div>
+
+                        <div className="form-group" style={{ marginTop: '12px', padding: '0' }}>
+                            <label>ช่องทางที่ลูกค้าชำระเงินเข้ามา</label>
+                            <select name="paymentMethod" value={formData.paymentMethod || ''} onChange={handleFormChange} style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px', outline: 'none', backgroundColor: '#fff' }}>
+                                <option value="">- เลือกช่องทาง -</option>
+                                <option value="cash">เงินสด (Cash)</option>
+                                <option value="transfer">โอนเงินเข้าบัญชี (Transfer)</option>
+                                <option value="cheque">เช็ค (Cheque)</option>
+                            </select>
+                        </div>
+                        
+                        <div className="q-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px 20px', marginTop: '12px' }}>
+                            <div className="form-group">
+                                <label>ธนาคารลูกค้า (Bank)</label>
+                                <input type="text" name="customerBank" placeholder="ระบุธนาคาร" value={formData.customerBank || ''} onChange={handleFormChange} />
+                            </div>
+                            <div className="form-group">
+                                <label>สาขา (Branch)</label>
+                                <input type="text" name="customerBranch" placeholder="สาขา" value={formData.customerBranch || ''} onChange={handleFormChange} />
+                            </div>
+                            <div className="form-group">
+                                <label>เลขที่เช็ค (Cheque No.)</label>
+                                <input type="text" name="chequeNo" placeholder="เลขเช็ค (ถ้ามี)" value={formData.chequeNo || ''} onChange={handleFormChange} />
+                            </div>
+                            <div className="form-group">
+                                <label>วันที่สั่งจ่ายเช็ค</label>
+                                <input type="date" name="chequeDate" value={formData.chequeDate || ''} onChange={handleFormChange} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px' }} />
                             </div>
                         </div>
                     </div>
@@ -2148,7 +2270,15 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         </div>
 
                         <div className="form-row">
-
+                            <div className="form-group" style={{ flex: 1 }}>
+                                <label>ผู้มีอำนาจลงนาม (ลายเซ็น)</label>
+                                <CustomSelect name="signer" value={formData.signer} onChange={handleFormChange}>
+                                    <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                            {availableSignatures.map(sig => (
+                                                <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
+                                            ))}
+                                        </CustomSelect>
+                            </div>
                             <div className="form-group" style={{ flex: 1 }}>
                                 <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <span>เงื่อนไขการหักมัดจำ</span>
@@ -2310,7 +2440,9 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
 
             {/* Print Container (Hidden on screen, Visible on print via CSS) */}
             <div id="q-print-container">
-                {isFda ? (
+                {[{ type: 'ORIGINAL', th: 'ต้นฉบับ', en: 'ORIGINAL' }, { type: 'COPY', th: 'สำเนา', en: 'COPY' }].map((pageInfo, pageIndex) => (
+                    <div key={pageIndex} className="print-page-wrapper">
+                        {isFda ? (
                     <div style={{ padding: '20px', fontFamily: "'Sarabun', sans-serif" }}>
                         {/* Header */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
@@ -2329,7 +2461,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             <tbody>
                                 <tr>
                                     <td rowSpan="4" style={{ width: '60%', textAlign: 'center', fontWeight: 'bold', fontSize: '16pt', border: '1px solid black', backgroundColor: '#ffffff', verticalAlign: 'middle' }}>
-                                        ใบเสร็จรับเงิน RECEIPT (ORIGINAL)
+                                        ใบเสร็จรับเงิน ({pageInfo.th})<br/>RECEIPT ({pageInfo.en})
                                     </td>
                                     <td style={{ width: '40%', border: '1px solid black', padding: '4px 8px', whiteSpace: 'nowrap' }}>
                                         <span>หมายเลขเอกสาร:</span> {formData.billNo || '-'}
@@ -2591,8 +2723,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                             </div>
                                             <div style={{ textAlign: 'center' }}>
                                                 <div style={{ height: '50px', position: 'relative' }}>
-                                                    {formData.signer === 'jutharat' && (
-                                                        <img src="/images/signatures/sign-jutharat.png" style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="signature" />
+                                                    {selectedSignature && (
+                                                        <img src={getSignatureUrl(selectedSignature.ImagePath)} style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="signature" onError={(e) => { e.target.onerror = null; e.target.src = selectedSignature.ImagePath; }} />
                                                     )}
                                                 </div>
                                                 <div style={{ position: 'relative', zIndex: 0 }}>_______________</div>
@@ -2600,7 +2732,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                             </div>
                                             <div style={{ textAlign: 'center' }}>
                                                 <div style={{ height: '50px', position: 'relative' }}>
-                                                    {formData.signer === 'jutharat' && (
+                                                    {formData.signer === 'thawat' && (
                                                         <img src="/images/signatures/sign-approver.png" style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="approver signature" />
                                                     )}
                                                 </div>
@@ -2637,13 +2769,13 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 </div>
                             </td>
                             <td style={{ width: '33%', textAlign: 'center', verticalAlign: 'middle', border: 'none', padding: '8px' }}>
-                                {isFda && <div style={{ color: 'red', fontSize: '11pt', fontWeight: 'bold', marginBottom: '8px' }}>{isEn ? '** For FDA Billing Invoice Only **' : '** ข้อมูลเฉพาะใบเสร็จรับเงิน RECEIPT (ORIGINAL) อย. (FDA) **'}</div>}
+                                {isFda && <div style={{ color: 'red', fontSize: '11pt', fontWeight: 'bold', marginBottom: '8px' }}>{isEn ? '** For FDA Billing Invoice Only **' : `** ข้อมูลเฉพาะใบเสร็จรับเงิน RECEIPT (${pageInfo.en}) อย. (FDA) **`}</div>}
                                 <div style={{ backgroundColor: '#2ecc71', color: 'white', borderRadius: '25px', padding: '8px 5px', position: 'relative' }}>
                                     <div style={{ fontSize: '15pt', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                                        {isEn ? 'RECEIPT (ORIGINAL)' : 'ใบเสร็จรับเงิน (ต้นฉบับ)'}
+                                        {isEn ? `RECEIPT (${pageInfo.en})` : `ใบเสร็จรับเงิน (${pageInfo.th})`}
                                     </div>
                                     {!isEn && <div style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '2px' }}>
-                                        RECEIPT (ORIGINAL)
+                                        RECEIPT ({pageInfo.en})
                                     </div>}
                                 </div>
                                 <div style={{ fontSize: '8pt', color: '#145a24', marginTop: '6px', fontWeight: 'bold', lineHeight: 1.4 }}>
@@ -2680,11 +2812,11 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                     <td style={{ padding: '2px 0', verticalAlign: 'top' }}>{formData.phone || '-'}</td>
                                 </tr>
                                 <tr>
-                                    <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                    <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                                         เลขประจำตัวผู้เสียภาษี :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>TAX ID</span>
                                     </td>
-                                    <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                    <td style={{ padding: '2px 0', verticalAlign: 'top' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
                                             <span>{formData.taxId || '-'}</span>
                                             <div style={{ fontSize: '7.5pt', marginLeft: 'auto', display: 'flex', gap: '15px', textAlign: 'left' }}>
                                                 <div>
@@ -2780,10 +2912,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 <th style={{ width: '7%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt' }}>
                                     ลำดับ<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Item</span>
                                 </th>
-                                <th style={{ width: '12%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt' }}>
-                                    รูปสินค้า<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Picture</span>
-                                </th>
-                                <th style={{ width: '35%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt' }}>
+                                <th style={{ width: '47%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt' }}>
                                     รายการสินค้า<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Description</span>
                                 </th>
                                 <th style={{ width: '10%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt' }}>
@@ -2804,9 +2933,6 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             {items.filter(it => it.name).map((item, idx, arr) => (
                                 <tr key={item.id} style={{ height: cellHeight, borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #ccc' }}>
                                     <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>{idx + 1}</td>
-                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>
-                                        {item.image && <img src={item.image} style={{ maxWidth: imgSize, maxHeight: imgSize, objectFit: 'contain', display: 'inline-block' }} alt="pic" />}
-                                    </td>
                                     <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'left', padding: '2px 8px' }}>{item.name}</td>
                                     <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>{item.qty ? `${Number(item.qty).toLocaleString('th-TH')} ${item.unit || 'ชิ้น'}` : ''}</td>
                                     <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'right', padding: '2px 8px' }}>{(parseFloat(item.price) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
@@ -2821,7 +2947,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             ))}
                             {items.filter(it => it.name).length === 0 && (
                                 <tr>
-                                    <td colSpan="7" style={{ height: '50px', textAlign: 'center', borderBottom: 'none' }}>ไม่มีรายการสินค้า</td>
+                                    <td colSpan="6" style={{ height: '50px', textAlign: 'center', borderBottom: 'none' }}>ไม่มีรายการสินค้า</td>
                                 </tr>
                             )}
                         </tbody>
@@ -2829,13 +2955,13 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         {/* Footer enclosed within the same rounded box */}
                         <tbody>
                             <tr>
-                                <td colSpan="4" rowSpan={
+                                <td colSpan="3" rowSpan={
                                     (formData.showDiscountInPrint && discountAmount > 0 ? 2 : 0) +
                                     ((isFda || formData.showVatInPrint) && vatAmount > 0 ? 1 : 0) +
                                     (formData.showShippingInPrint && shipping > 0 ? 1 : 0) +
                                     (formData.showDesignFeeInPrint && designFee > 0 ? 1 : 0) +
                                     (formData.showDepositInPrint && depositAmount > 0 ? 2 : 0) + 1
-                                } style={{ width: '54%', verticalAlign: 'top', padding: '5px 12px', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a' }}>
+                                } style={{ width: '64%', verticalAlign: 'top', padding: '5px 12px', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a' }}>
                                     <div className="print-notes-container" dangerouslySetInnerHTML={{ __html: formData.notes }} style={{ fontSize: '9pt', minHeight: '15px' }} />
                                     
                                     <div style={{ marginTop: '8px', padding: '5px 0' }}>
@@ -2843,13 +2969,13 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                             ช่องทางชำระเงิน :
                                         </div>
                                         <div style={{ display: 'flex', gap: '20px', alignItems: 'center', fontSize: '10pt' }}>
-                                            <label><span>☐</span> เงินสด (Cash)</label>
-                                            <label><span>☐</span> โอนเงิน (Bank Transfer)</label>
-                                            <label><span>☐</span> เช็ค (Cheque)</label>
+                                            <label><span>{formData.paymentMethod === 'cash' ? '☑' : '☐'}</span> เงินสด (Cash)</label>
+                                            <label><span>{formData.paymentMethod === 'transfer' ? '☑' : '☐'}</span> โอนเงิน (Bank Transfer)</label>
+                                            <label><span>{formData.paymentMethod === 'cheque' ? '☑' : '☐'}</span> เช็ค (Cheque)</label>
                                         </div>
                                         <div style={{ marginTop: '6px', fontSize: '9pt', lineHeight: 1.7 }}>
-                                            ธนาคาร (Bank) ........................................... สาขา (Branch) ...........................................<br />
-                                            เลขที่เช็ค (Cheque No.) ........................................... วันที่ ...........................................
+                                            ธนาคาร (Bank) <span style={{ padding: '0 8px' }}>{formData.customerBank ? <span style={{ textDecoration: 'underline', color: '#1a7a3a' }}>{formData.customerBank}</span> : '...........................................'}</span> สาขา (Branch) <span style={{ padding: '0 8px' }}>{formData.customerBranch ? <span style={{ textDecoration: 'underline', color: '#1a7a3a' }}>{formData.customerBranch}</span> : '...........................................'}</span><br />
+                                            เลขที่เช็ค (Cheque No.) <span style={{ padding: '0 8px' }}>{formData.chequeNo ? <span style={{ textDecoration: 'underline', color: '#1a7a3a' }}>{formData.chequeNo}</span> : '...........................................'}</span> วันที่ <span style={{ padding: '0 8px' }}>{formData.chequeDate ? <span style={{ textDecoration: 'underline', color: '#1a7a3a' }}>{new Date(formData.chequeDate).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span> : '...........................................'}</span>
                                         </div>
                                     </div>
                                 </td>
@@ -2932,7 +3058,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 </>
                             )}
                             <tr>
-                                <td colSpan="4" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '12pt', backgroundColor: '#d5f5e3', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', padding: '5px' }}>
+                                <td colSpan="3" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '12pt', backgroundColor: '#d5f5e3', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', padding: '5px' }}>
                                     <span style={{ fontStyle: 'italic' }}>{ThaiBaht(grandTotal)}</span>
                                 </td>
                                 <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderRight: '1px solid #1a7a3a', backgroundColor: '#d5f5e3', fontSize: '10pt' }}>
@@ -2964,17 +3090,19 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
 
                     <div style={{ flex: 1, border: '1.5px solid #1a7a3a', borderRadius: '8px', textAlign: 'center', fontSize: '10pt', padding: '15px 10px 10px 10px', position: 'relative' }}>
                         <div style={{ height: '35px', position: 'relative' }}>
-                            {formData.signer === 'jutharat' && (
-                                <img src="/images/signatures/sign-authorized.png" style={{ maxHeight: '70px', position: 'absolute', bottom: '-15px', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }} alt="signature" />
-                            )}
+                            {selectedSignature && (
+                                                        <img src={getSignatureUrl(selectedSignature.ImagePath)} style={{ maxHeight: '70px', position: 'absolute', bottom: '-15px', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }} alt="signature" onError={(e) => { e.target.onerror = null; e.target.src = selectedSignature.ImagePath; }} />
+                                                    )}
                         </div>
-                        <div>(<span style={{ display: 'inline-block', minWidth: '140px', margin: '0 5px' }}></span>)</div>
+                        <div>(.......................................................)</div>
                         <div style={{ marginTop: '4px', fontSize: '9pt' }}>ผู้มีอำนาจลงนาม / Authorized Signature</div>
                         <div style={{ marginTop: '4px', fontSize: '8pt', color: '#555' }}>วันที่ / Date ......./......./.......</div>
                     </div>
                 </div>
 </>
-                )}
+                        )}
+                    </div>
+                ))}
             </div>
 
             {/* Customer Selection Modal */}

@@ -5,6 +5,7 @@ import API_BASE from '../config';
 import CustomDatePicker from '../components/CustomDatePicker';
 import TaxIdInput from '../components/TaxIdInput';
 import CustomSelect from './CustomSelect';
+import { useSignatures } from '../hooks/useSignatures';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -696,6 +697,7 @@ const PRODUCT_IMAGES = {
 const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม', 'กระปุก', 'ขวด', 'ถุง', 'ซอง', 'หลอด', 'กล่อง', 'แผง', 'ขวด(โหล)', 'โหล'];
 
 export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHistory, hideControls }) {
+    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
 
@@ -1369,6 +1371,9 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
     else if (validItemsCount <= 5) { cellHeight = '50px'; imgSize = '40px'; }
     else if (validItemsCount === 6) { cellHeight = '40px'; imgSize = '34px'; }
     else { cellHeight = '35px'; imgSize = '30px'; }
+
+    const selectedSignature = availableSignatures.find(s => s.KeyName === formData.signer);
+
 
     return (
         <div className="q-form-wrapper">
@@ -2134,8 +2139,10 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 <label>ผู้เสนอราคา / ผู้วางบิล (ลายเซ็น)</label>
                                 <CustomSelect name="signer" value={formData.signer} onChange={handleFormChange}>
                                     <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                                    <option value="jutharat">จุฑารัตน์ วงค์คำเหลา</option>
-                                </CustomSelect>
+                                            {availableSignatures.map(sig => (
+                                                <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
+                                            ))}
+                                        </CustomSelect>
                             </div>
                             <div className="form-group" style={{ flex: 1 }}>
                                 <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2547,8 +2554,8 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                             </div>
                                             <div style={{ textAlign: 'center' }}>
                                                 <div style={{ height: '50px', position: 'relative' }}>
-                                                    {formData.signer === 'jutharat' && (
-                                                        <img src="/images/signatures/sign-jutharat.png" style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="signature" />
+                                                    {selectedSignature && (
+                                                        <img src={getSignatureUrl(selectedSignature.ImagePath)} style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="signature" onError={(e) => { e.target.onerror = null; e.target.src = selectedSignature.ImagePath; }} />
                                                     )}
                                                 </div>
                                                 <div style={{ position: 'relative', zIndex: 0 }}>_______________</div>
@@ -2556,7 +2563,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                             </div>
                                             <div style={{ textAlign: 'center' }}>
                                                 <div style={{ height: '50px', position: 'relative' }}>
-                                                    {formData.signer === 'jutharat' && (
+                                                    {formData.signer === 'thawat' && (
                                                         <img src="/images/signatures/sign-approver.png" style={{ maxHeight: '50px', position: 'absolute', bottom: '-8px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} alt="approver signature" />
                                                     )}
                                                 </div>
@@ -2915,11 +2922,11 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                     </div>
                     <div style={{ textAlign: 'center', fontSize: '10pt' }}>
                         <div style={{ height: '30px', position: 'relative' }}>
-                            {formData.signer === 'jutharat' && (
-                                <img src="/images/signatures/sign-jutharat.png" style={{ maxHeight: '40px', position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)' }} alt="signature" />
-                            )}
+                            {selectedSignature && (
+                                                        <img src={getSignatureUrl(selectedSignature.ImagePath)} style={{ maxHeight: '40px', position: 'absolute', bottom: '-10px', left: '50%', transform: 'translateX(-50%)' }} alt="signature" onError={(e) => { e.target.onerror = null; e.target.src = selectedSignature.ImagePath; }} />
+                                                    )}
                         </div>
-                        <div>({formData.signer === 'jutharat' ? '....................................................' : '..................................................'})</div>
+                        <div>(..................................................)</div>
                         <div style={{ marginTop: '2px' }}>ผู้เสนอราคา</div>
                     </div>
                 </div>
