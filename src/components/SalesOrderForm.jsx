@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Save, ArrowLeft, Plus, Trash2, Search, X, Loader2, Printer } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, Search, X, Loader2, Printer, FileText } from 'lucide-react';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import CustomDatePicker from './CustomDatePicker';
 import TaxIdInput from '../components/TaxIdInput';
 import CustomSelect from './CustomSelect';
+import ContractSelectorModal from './ContractSelectorModal';
+import QuotationSelectorModal from './QuotationSelectorModal';
+import { useSignatures } from '../hooks/useSignatures';
 import '../pages/PageCommon.css';
 
 const PRODUCT_CATALOG = {
@@ -93,18 +96,14 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     const [saving, setSaving] = useState(false);
     const [approvedQTs, setApprovedQTs] = useState([]);
     const [selectedQT, setSelectedQT] = useState('');
-    const [qtSearchText, setQtSearchText] = useState('');
-    const [showQtDropdown, setShowQtDropdown] = useState(false);
     const [isFetchingQT, setIsFetchingQT] = useState(false);
-
-    const filteredQTs = approvedQTs.filter(q => 
-        (q.QuotationNo || '').toLowerCase().includes(qtSearchText.toLowerCase()) || 
-        (q.CustomerName || '').toLowerCase().includes(qtSearchText.toLowerCase())
-    );
+    const [showQuotationModal, setShowQuotationModal] = useState(false);
+    const [showContractModal, setShowContractModal] = useState(false);
+    const [showPreview, setShowPreview] = useState(false);
+    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
 
     const handleClearQT = () => {
         setSelectedQT('');
-        setQtSearchText('');
         setFormData(prev => ({
             ...prev,
             customerName: '',
@@ -116,13 +115,24 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             discountPercent: 0,
             vatRate: 0,
             shippingCost: 0,
+            showDiscountInPrint: false,
+            showVatInPrint: false,
+            showShippingInPrint: false,
+            designFee: 500,
+            showDesignFeeInPrint: false,
+            depositPercent: '0',
+            customDepositAmount: 0,
+            showDepositInPrint: true,
             notes: '',
+            salesManager: 'jutharat',
+            productionManager: 'thawat',
         }));
         setItems([
             { id: 1, name: '', qty: '', unit: 'ชิ้น', price: '' }
         ]);
     };
     const [formData, setFormData] = useState({
+        salesOrderNo: '',
         docType: 'quotation_thc',
         customerName: '',
         address: '',
@@ -135,9 +145,19 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
         discountPercent: 0,
         vatRate: 0,
         shippingCost: 0,
+        showDiscountInPrint: false,
+        showVatInPrint: false,
+        showShippingInPrint: false,
+        designFee: 500,
+        showDesignFeeInPrint: false,
+        depositPercent: '0',
+        customDepositAmount: 0,
+        showDepositInPrint: true,
         customerPONumber: '',
         contractId: '',
         notes: '',
+        salesManager: 'jutharat',
+        productionManager: 'thawat',
     });
 
     const [items, setItems] = useState([
@@ -154,7 +174,22 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             } catch (err) { console.error('Error fetching approved QTs:', err); }
         };
         fetchApproved();
-    }, []);
+
+        if (!editId) {
+            const fetchNextNo = async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/sales-orders/next-number`);
+                    const json = await res.json();
+                    if (json.success && json.nextNumber) {
+                        setFormData(prev => ({ ...prev, salesOrderNo: json.nextNumber }));
+                    }
+                } catch (err) {
+                    console.error('Error fetching next SO no:', err);
+                }
+            };
+            fetchNextNo();
+        }
+    }, [editId]);
 
     const [showCustomerModal, setShowCustomerModal] = useState(false);
     const [customerList, setCustomerList] = useState([]);
@@ -221,6 +256,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                     if (json.success) {
                         const d = json.data;
                         setFormData({
+                            salesOrderNo: d.SalesOrderNo || '',
                             docType: d.DocType || 'quotation_thc',
                             customerName: d.CustomerName || '',
                             address: d.Address || '',
@@ -231,6 +267,14 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                             discountPercent: d.DiscountPercent || 0,
                             vatRate: d.VatRate || 0,
                             shippingCost: d.ShippingCost || 0,
+                            showDiscountInPrint: d.ShowDiscountInPrint || false,
+                            showVatInPrint: d.ShowVatInPrint || false,
+                            showShippingInPrint: d.ShowShippingInPrint !== undefined ? d.ShowShippingInPrint : false,
+                            designFee: d.DesignFee !== undefined ? parseFloat(d.DesignFee) : 500,
+                            showDesignFeeInPrint: d.ShowDesignFeeInPrint !== undefined ? d.ShowDesignFeeInPrint : false,
+                            depositPercent: d.DepositPercent || '0',
+                            customDepositAmount: d.DepositPercent === 'custom' ? d.DepositAmount : 0,
+                            showDepositInPrint: d.ShowDepositInPrint !== undefined ? d.ShowDepositInPrint : true,
                             customerPONumber: d.CustomerPONumber || '',
                             contractId: d.ContractID || '',
                             notes: d.Notes || '',
@@ -252,13 +296,13 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     // Auto-fill from Quotation
     const handleSelectQT = async (qtId) => {
         if (!qtId) { handleClearQT(); return; }
+        setSelectedQT(qtId); // <-- Set immediately so UI checkbox updates
         setIsFetchingQT(true);
         try {
             const res = await fetch(`${API_BASE}/sales-orders/from-quotation/${qtId}`);
             const json = await res.json();
             if (json.success) {
                 const d = json.data;
-                setSelectedQT(d.QuotationNo);
                 setFormData(prev => ({
                     ...prev,
                     docType: d.DocType || prev.docType,
@@ -267,8 +311,16 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                     phone: d.Phone || '',
                     taxId: d.TaxID || '',
                     discountPercent: d.DiscountPercent || 0,
+                    showDiscountInPrint: !!d.ShowDiscountInPrint,
                     vatRate: d.VatRate || 0,
+                    showVatInPrint: !!d.ShowVatInPrint,
                     shippingCost: d.ShippingCost || 0,
+                    showShippingInPrint: !!d.ShowShippingInPrint,
+                    designFee: d.DesignFee || 0,
+                    showDesignFeeInPrint: !!d.ShowDesignFeeInPrint,
+                    depositPercent: d.DepositPercent || '0',
+                    customDepositAmount: d.DepositAmount || '',
+                    showDepositInPrint: !!d.ShowDepositInPrint,
                     contractId: d.ContractID || '',
                     notes: '',
                 }));
@@ -306,11 +358,28 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
 
     // Calculations
     const subTotal = items.reduce((sum, i) => sum + ((parseFloat(i.qty) || 0) * (parseFloat(i.price) || 0)), 0);
-    const discountAmount = subTotal * (parseFloat(formData.discountPercent) || 0) / 100;
+    const discountAmount = formData.showDiscountInPrint ? (subTotal * (parseFloat(formData.discountPercent) || 0) / 100) : 0;
     const afterDiscount = subTotal - discountAmount;
-    const vatAmount = afterDiscount * (parseFloat(formData.vatRate) || 0) / 100;
-    const shipping = parseFloat(formData.shippingCost) || 0;
-    const grandTotal = afterDiscount + vatAmount + shipping;
+    const vatAmount = formData.showVatInPrint ? (afterDiscount * (parseFloat(formData.vatRate) || 0) / 100) : 0;
+    const shipping = formData.showShippingInPrint ? (parseFloat(formData.shippingCost) || 0) : 0;
+    const designFee = formData.showDesignFeeInPrint ? (parseFloat(formData.designFee) || 0) : 0;
+    const grandTotal = afterDiscount + vatAmount + shipping + designFee;
+
+    let depositAmount = 0;
+    if (formData.depositPercent === 'custom') {
+        depositAmount = parseFloat(formData.customDepositAmount) || 0;
+    } else {
+        depositAmount = grandTotal * (parseFloat(formData.depositPercent) || 0) / 100;
+    }
+    const remainingAmount = grandTotal - depositAmount;
+
+    // visibleRows covers the rows above GRAND TOTAL where the Notes column spans.
+    const visibleRows = 1 // TOTAL row
+        + (discountAmount > 0 ? 2 : 0) // DISCOUNT and BALANCE
+        + (formData.showVatInPrint ? 1 : 0)
+        + (formData.showShippingInPrint && shipping > 0 ? 1 : 0)
+        + (formData.showDesignFeeInPrint && designFee > 0 ? 1 : 0)
+        + (formData.showDepositInPrint && depositAmount > 0 ? 2 : 0); // DEPOSIT and BALANCE DUE
 
     const handleSave = async (e) => {
         e.preventDefault();
@@ -333,9 +402,22 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             taxId: formData.taxId,
             orderDate: formData.orderDate,
             deliveryDate: formData.deliveryDate || null,
-            subTotal, discountPercent: formData.discountPercent,
-            discountAmount, afterDiscount, vatRate: formData.vatRate,
-            vatAmount, shippingCost: shipping, grandTotal,
+            discountPercent: formData.discountPercent,
+            vatRate: formData.vatRate,
+            shippingCost: formData.shippingCost,
+            showDiscountInPrint: formData.showDiscountInPrint,
+            showVatInPrint: formData.showVatInPrint,
+            showShippingInPrint: formData.showShippingInPrint,
+            designFee: formData.designFee,
+            showDesignFeeInPrint: formData.showDesignFeeInPrint,
+            depositPercent: formData.depositPercent,
+            depositAmount: formData.depositPercent === 'custom' ? formData.customDepositAmount : depositAmount,
+            showDepositInPrint: formData.showDepositInPrint,
+            subTotal,
+            discountAmount,
+            afterDiscount,
+            vatAmount,
+            grandTotal,
             customerPONumber: formData.customerPONumber,
             contractId: formData.contractId,
             notes: formData.notes,
@@ -372,7 +454,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     const a4PageStyle = {
         width: '210mm',
         minHeight: '297mm',
-        padding: '15mm',
+        padding: '10mm 15mm',
         margin: '20px auto',
         background: '#fff',
         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
@@ -458,21 +540,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                         <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                                             เลขประจำตัวผู้เสียภาษี :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>TAX ID</span>
                                         </td>
-                                        <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                                <span>{formData.taxId || '-'}</span>
-                                                <div style={{ fontSize: '7.5pt', marginLeft: 'auto', display: 'flex', gap: '15px', textAlign: 'left' }}>
-                                                    <div>
-                                                        <span style={{ fontSize: '12pt', display: 'inline-block', transform: 'translateY(2px)' }}>{formData.taxBranch === 'head_office' ? '☑' : '☐'}</span> สำนักงานใหญ่<br />
-                                                        <span style={{ color: '#555', marginLeft: '12px' }}>Head Office</span>
-                                                    </div>
-                                                    <div>
-                                                        <span style={{ fontSize: '12pt', display: 'inline-block', transform: 'translateY(2px)' }}>{formData.taxBranch === 'branch' ? '☑' : '☐'}</span> สาขาที่ {formData.taxBranch === 'branch' ? formData.branchNo || '........' : '..........................'}<br />
-                                                        <span style={{ color: '#555', marginLeft: '12px' }}>Branch No.</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
+                                        <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.taxId || '-'}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -539,8 +607,8 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                     </div>
 
                     {/* Products Table */}
-                    <div style={{ border: '1.5px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px', minHeight: '230px', display: 'flex', flexDirection: 'column' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                    <div style={{ border: '1.5px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', height: '210px' }}>
                             <thead>
                                 <tr style={{ backgroundColor: '#d5f5e3' }}>
                                     <th style={{ width: '7%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt', fontWeight: 'bold' }}>
@@ -562,7 +630,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                             </thead>
                             <tbody>
                                 {items.map((item, idx) => (
-                                    <tr key={item.id}>
+                                    <tr key={item.id} style={{ height: '24px' }}>
                                         <td style={{ padding: '2px', textAlign: 'center', borderRight: '1px solid #1a7a3a', fontSize: '9pt', fontWeight: 300 }}>{idx + 1}</td>
                                         <td style={{ padding: '2px 4px', borderRight: '1px solid #1a7a3a', fontSize: '9pt', textAlign: 'left', fontWeight: 300 }}>{item.name}</td>
                                         <td style={{ padding: '2px', textAlign: 'center', borderRight: '1px solid #1a7a3a', fontSize: '9pt', fontWeight: 300 }}>{item.qty} {item.unit}</td>
@@ -570,18 +638,18 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                         <td style={{ padding: '2px 8px', textAlign: 'right', fontSize: '9pt', fontWeight: 300 }}>{((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0)).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                     </tr>
                                 ))}
+                                {/* Empty space filler that preserves vertical lines perfectly */}
+                                <tr style={{ height: 'auto' }}>
+                                    <td style={{ borderRight: '1px solid #1a7a3a' }}></td>
+                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', color: '#666', fontSize: '10pt', verticalAlign: 'top', paddingTop: '10px' }}>
+                                        {items.length === 0 ? 'ไม่มีรายการสินค้า' : ''}
+                                    </td>
+                                    <td style={{ borderRight: '1px solid #1a7a3a' }}></td>
+                                    <td style={{ borderRight: '1px solid #1a7a3a' }}></td>
+                                    <td></td>
+                                </tr>
                             </tbody>
                         </table>
-                        {/* Empty space filler that preserves vertical lines */}
-                        <div style={{ flex: 1, width: '100%', display: 'flex' }}>
-                            <div style={{ width: '7%', borderRight: '1px solid #1a7a3a' }}></div>
-                            <div style={{ width: '45%', borderRight: '1px solid #1a7a3a', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', color: '#666', fontSize: '10pt', padding: '10px' }}>
-                                {items.length === 0 ? 'ไม่มีรายการสินค้า' : ''}
-                            </div>
-                            <div style={{ width: '12%', borderRight: '1px solid #1a7a3a' }}></div>
-                            <div style={{ width: '18%', borderRight: '1px solid #1a7a3a' }}></div>
-                            <div style={{ width: '18%' }}></div>
-                        </div>
                     </div>
 
                     {/* Footer / Calculation */}
@@ -591,7 +659,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                 <tr>
                                     <td rowSpan={discountAmount > 0 ? 5 : 4} style={{ width: '54%', verticalAlign: 'top', padding: '5px 12px', borderRight: '1px solid #1a7a3a', borderTop: 'none', borderBottom: 'none' }}>
                                         <div style={{ fontSize: '9pt', minHeight: '15px' }}>
-                                            <b>หมายเหตุ:</b> {formData.notes || '-'}
+                                            <b>หมายเหตุ:</b> <div dangerouslySetInnerHTML={{ __html: formData.notes || '-' }} style={{ display: 'inline-block' }} />
                                         </div>
                                         <div style={{ marginTop: '8px', padding: '5px 0' }}>
                                             <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '10pt', color: '#1a7a3a' }}>
@@ -727,7 +795,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             </button>
 
             <div style={{ marginBottom: 24 }}>
-                <h1 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 4px', color: 'var(--text)' }}>
+                <h1 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 4px', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {viewOnly ? '📄 รายละเอียด Sales Order' : editId ? '✏️ แก้ไข Sales Order' : '📦 สร้าง Sales Order ใหม่'}
                 </h1>
                 <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0 }}>
@@ -735,114 +803,46 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                 </p>
             </div>
 
-            {/* ── อ้างอิง Quotation ── */}
-            {!editId && (
+            {/* ── เอกสารอ้างอิง (Quotation & Contract) ── */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-start' }}>
+                <div style={{ flex: '1 1 650px', display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
                 <div style={sectionStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border-light, #f1f5f9)' }}>
-                        <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, color: '#16a34a' }}>📋</div>
+                        <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, color: '#0284c7' }}>🔗</div>
                         <div>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>อ้างอิงใบเสนอราคา</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>เลือกจากใบเสนอราคาที่อนุมัติแล้ว หรือปล่อยว่างเพื่อสร้าง Manual</div>
+                            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>เอกสารอ้างอิง (Reference)</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>เลือกอ้างอิงจากใบเสนอราคา หรือ สัญญาที่เกี่ยวข้อง</div>
                         </div>
                     </div>
-                    <div style={{ position: 'relative' }}>
-                        <div style={{ 
-                            display: 'flex', alignItems: 'center', 
-                            border: selectedQT ? '1px solid #22c55e' : '1px solid var(--border)', 
-                            borderRadius: 6, 
-                            background: selectedQT ? '#f0fdf4' : '#fff', 
-                            padding: '0 12px' 
-                        }}>
-                            <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
-                            {isFetchingQT ? (
-                                <Loader2 size={16} color="#16a34a" style={{ animation: 'spin 1s linear infinite' }} />
-                            ) : selectedQT ? (
-                                <span style={{ color: '#16a34a', fontSize: 14 }}>✅</span>
-                            ) : (
-                                <Search size={16} color="#94a3b8" />
-                            )}
-                            <input 
-                                type="text" 
-                                placeholder="พิมพ์เลขที่ QT หรือชื่อลูกค้าเพื่อค้นหา (หรือปล่อยว่างเพื่อสร้าง Manual)" 
-                                value={isFetchingQT ? 'กำลังดึงข้อมูล...' : selectedQT ? `อ้างอิงจาก ${selectedQT} เรียบร้อย` : qtSearchText} 
-                                onChange={e => { setQtSearchText(e.target.value); setShowQtDropdown(true); }}
-                                onFocus={() => { if (!selectedQT) setShowQtDropdown(true); }}
-                                readOnly={!!selectedQT || isFetchingQT}
-                                style={{ 
-                                    width: '100%', border: 'none', padding: '10px', outline: 'none', fontSize: 13, 
-                                    background: 'transparent', 
-                                    color: selectedQT || isFetchingQT ? '#15803d' : 'var(--text)',
-                                    fontWeight: selectedQT ? 600 : 400
-                                }}
-                            />
-                            {selectedQT && !isFetchingQT ? (
-                                <button onClick={handleClearQT} style={{ background: '#fee2e2', border: 'none', cursor: 'pointer', padding: 4, borderRadius: '50%', color: '#ef4444', display: 'flex' }} title="ยกเลิกการอ้างอิง">
-                                    <X size={14} />
-                                </button>
-                            ) : qtSearchText && !selectedQT && !isFetchingQT ? (
-                                <button onClick={() => { setQtSearchText(''); setShowQtDropdown(true); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', display: 'flex' }}>
-                                    <X size={14} />
-                                </button>
-                            ) : null}
-                        </div>
-                        
-                        {!selectedQT && showQtDropdown && (
-                                <>
-                                    <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowQtDropdown(false)} />
-                                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid var(--border)', borderRadius: 6, marginTop: 4, maxHeight: 250, overflowY: 'auto', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-                                        {filteredQTs.length === 0 ? (
-                                            <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>
-                                                ไม่พบใบเสนอราคาที่ค้นหา
-                                            </div>
-                                        ) : (
-                                            filteredQTs.map(q => (
-                                                <div 
-                                                    key={q.QuotationID} 
-                                                    onClick={() => { handleSelectQT(q.QuotationID); setShowQtDropdown(false); setQtSearchText(''); }}
-                                                    style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-light)', cursor: 'pointer', transition: 'background 0.2s' }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.background = '#f8fafc'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
-                                                >
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                                        <strong style={{ color: 'var(--text)', fontSize: 13 }}>{q.QuotationNo}</strong>
-                                                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>฿{(q.GrandTotal || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{q.CustomerName}</div>
-                                                </div>
-                                            ))
-                                        )}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                </div>
-            )}
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        {/* Quotation Selection */}
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>อ้างอิงใบเสนอราคา (เลือกจากระบบ)</label>
+                            <div onClick={() => !(viewOnly || editId) && setShowQuotationModal(true)} style={{ border: '1px solid #cbd5e1', padding: '10px 14px', borderRadius: '8px', cursor: (viewOnly || editId) ? 'default' : 'pointer', background: (viewOnly || editId) ? '#f8fafc' : 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', minHeight: '42px', marginBottom: '16px' }}>
+                                <span style={{ color: selectedQT ? '#334155' : '#94a3b8' }}>
+                                    {selectedQT ? `อ้างอิงจาก ${approvedQTs.find(q => String(q.QuotationID) === String(selectedQT))?.QuotationNo || selectedQT}` : '-- ไม่ระบุใบเสนอราคา --'}
+                                </span>
+                                <span style={{ fontSize: '10px', color: '#94a3b8' }}>▼</span>
+                            </div>
 
-            {/* ── อ้างอิงสัญญา ── */}
-            <div style={sectionStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border-light, #f1f5f9)' }}>
-                    <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, color: '#d97706' }}>📄</div>
-                    <div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>อ้างอิงสัญญา</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>เลือกสัญญาเพื่อผูกข้อมูล หรือข้ามถ้าไม่มี</div>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>หมายเลขคำสั่งขาย (Sales Order No.)</label>
+                            <input type="text" name="salesOrderNo" value={formData.salesOrderNo || 'SO-YYYY-MMXXX'} readOnly style={{ ...inputStyle, background: '#f8fafc', color: '#64748b', cursor: 'not-allowed' }} />
+                        </div>
+
+                        {/* Contract Selection */}
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>อ้างอิงสัญญา (เลือกจากระบบ)</label>
+                            <div onClick={() => !(viewOnly || editId) && setShowContractModal(true)} style={{ border: '1px solid #cbd5e1', padding: '10px 14px', borderRadius: '8px', cursor: (viewOnly || editId) ? 'default' : 'pointer', background: (viewOnly || editId) ? '#f8fafc' : 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', minHeight: '42px' }}>
+                                <span style={{ color: formData.contractId ? '#334155' : '#94a3b8' }}>
+                                    {formData.contractId ? (contracts.find(c => String(c.ContractID) === String(formData.contractId))?.ContractNo + ' - ' + (contracts.find(c => String(c.ContractID) === String(formData.contractId))?.ContractName || '') || '-- ไม่ระบุสัญญา --') : '-- ไม่ระบุสัญญา / ไม่ได้เชื่อมโยง --'}
+                                </span>
+                                <span style={{ fontSize: '10px', color: '#94a3b8' }}>▼</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div>
-                    <CustomSelect 
-                        style={inputStyle} 
-                        name="contractId" 
-                        value={formData.contractId} 
-                        onChange={handleFormChange}
-                    >
-                        <option value="">-- ไม่ระบุสัญญา / ไม่ได้เชื่อมโยง --</option>
-                        {contracts.map(c => (
-                            <option key={c.ContractID} value={c.ContractID}>
-                                {c.ContractNo} - {c.ContractName} {c.CustomerName ? `(${c.CustomerName})` : ''}
-                            </option>
-                        ))}
-                    </CustomSelect>
-                </div>
-            </div>
+
 
             {/* ── ข้อมูลลูกค้า ── */}
             <div style={sectionStyle}>
@@ -851,12 +851,14 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                         <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--primary)' }}>👤</div>
                         <div>
                             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>ข้อมูลลูกค้า</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>ข้อมูลลูกค้าและรายละเอียดการสั่งซื้อ</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedQT ? 'ข้อมูลถูกดึงมาจากใบเสนอราคาอัตโนมัติ' : 'กรอกข้อมูลลูกค้าเอง หรือเลือกใบเสนอราคาด้านบนเพื่อดึงข้อมูลอัตโนมัติ'}</div>
                         </div>
                     </div>
-                    <button type="button" className="btn-primary" onClick={openCustomerModal} style={{ padding: '6px 12px', fontSize: '13px' }}>
-                        🔍 เลือกลูกค้าจากฐานข้อมูล
-                    </button>
+                    {isFetchingQT && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0284c7', fontSize: 13 }}>
+                            <Loader2 size={16} className="spin" /> กำลังดึงข้อมูล...
+                        </div>
+                    )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                     <div>
@@ -879,21 +881,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>เลขผู้เสียภาษี</label>
                         <TaxIdInput name="taxId" value={formData.taxId} onChange={handleFormChange} />
                     </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>สำนักงานใหญ่ / สาขา</label>
-                        <CustomSelect style={inputStyle} name="taxBranch" value={formData.taxBranch} onChange={handleFormChange}>
-                            <option value="head_office">สำนักงานใหญ่</option>
-                            <option value="branch">สาขา</option>
-                        </CustomSelect>
-                    </div>
-                    {formData.taxBranch === 'branch' ? (
-                        <div>
-                            <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>รหัสสาขา</label>
-                            <input style={inputStyle} name="branchNo" placeholder="เช่น 00001" value={formData.branchNo} onChange={handleFormChange} maxLength={5} />
-                        </div>
-                    ) : (
-                        <div></div>
-                    )}
+
                     <div>
                         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>วันที่สั่งซื้อ</label>
                         <CustomDatePicker style={inputStyle} name="orderDate" value={formData.orderDate} onChange={handleFormChange} />
@@ -916,37 +904,59 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                 </div>
 
                 {items.map((item, idx) => (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 14, border: '1px solid var(--border)', borderRadius: 6, marginBottom: 10, background: 'var(--bg-white)' }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', minWidth: 24, paddingTop: 10 }}>{idx + 1}.</span>
-                        <div style={{ flex: 3, minWidth: 200 }}>
-                            <input 
-                                style={inputStyle} 
-                                value={item.name} 
-                                onChange={e => handleItemChange(item.id, 'name', e.target.value)} 
-                                placeholder="ชื่อสินค้า" 
-                                list={`products_list_${item.id}`}
-                            />
-                            <datalist id={`products_list_${item.id}`}>
-                                {Object.keys(PRODUCT_CATALOG).map(pName => <option key={pName} value={pName} />)}
-                            </datalist>
+                    <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '15px', padding: '15px', border: '1px solid #e2e8f0', borderRadius: '12px', marginBottom: '15px', backgroundColor: 'white', position: 'relative', alignItems: 'stretch' }}>
+                        <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-start', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '30px', fontWeight: 600, color: 'var(--text-muted)', paddingTop: '10px' }}>
+                                {idx + 1}.
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div className="form-group" style={{ marginBottom: 0, display: 'flex', flexDirection: 'column' }}>
+                                    <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '6px', fontWeight: 500 }}>รายการสินค้า</label>
+                                    <input 
+                                        style={inputStyle} 
+                                        value={item.name} 
+                                        onChange={e => handleItemChange(item.id, 'name', e.target.value)} 
+                                        placeholder="คลิกหรือพิมพ์เพื่อเลือกสินค้า" 
+                                        list={`products_list_${item.id}`}
+                                    />
+                                    <datalist id={`products_list_${item.id}`}>
+                                        {Object.keys(PRODUCT_CATALOG).map(pName => <option key={pName} value={pName} />)}
+                                    </datalist>
+                                </div>
+                            </div>
+                            {items.length > 1 && (
+                                <button type="button" onClick={() => removeItem(item.id)} title="ลบรายการนี้" style={{ width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, background: '#fef2f2', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer', alignSelf: 'flex-end' }}>
+                                    <Trash2 size={18} />
+                                </button>
+                            )}
                         </div>
-                        <div style={{ flex: 1, minWidth: 80 }}>
-                            <input style={{ ...inputStyle, textAlign: 'right' }} type="number" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', e.target.value)} placeholder="จำนวน" />
+
+                        <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap', backgroundColor: '#f8fafc', padding: '12px 15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <div style={{ flex: '1 1 120px' }}>
+                                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '6px', fontWeight: 500 }}>จำนวน</label>
+                                <div style={{ display: 'flex', alignItems: 'center', background: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', overflow: 'hidden' }}>
+                                    <input type="number" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', e.target.value)} placeholder="0" style={{ flex: 1, minWidth: '60px', padding: '10px', border: 'none', outline: 'none', background: 'transparent' }} />
+                                    <div style={{ display: 'flex', alignItems: 'center', height: '100%', padding: '0 8px', borderLeft: '1px solid #cbd5e1', background: '#f8fafc' }}>
+                                        <input
+                                            type="text"
+                                            value={item.unit || ''}
+                                            placeholder="ชิ้น"
+                                            onChange={(e) => handleItemChange(item.id, 'unit', e.target.value)}
+                                            style={{ border: 'none', background: 'transparent', outline: 'none', fontSize: '13px', color: '#64748b', width: '45px', textAlign: 'center', padding: 0 }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div style={{ flex: '1 1 120px' }}>
+                                <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '6px', fontWeight: 500 }}>ราคาต่อหน่วย</label>
+                                <input type="number" style={{ ...inputStyle, width: '100%', textAlign: 'right' }} value={item.price} onChange={e => handleItemChange(item.id, 'price', e.target.value)} placeholder="0.00" />
+                            </div>
+                            <div style={{ flex: '1 1 120px', textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: '10px' }}>
+                                <div style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '16px' }}>
+                                    ฿{((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0)).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                </div>
+                            </div>
                         </div>
-                        <div style={{ flex: 1, minWidth: 70 }}>
-                            <input style={inputStyle} value={item.unit} onChange={e => handleItemChange(item.id, 'unit', e.target.value)} placeholder="หน่วย" />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 100 }}>
-                            <input style={{ ...inputStyle, textAlign: 'right' }} type="number" value={item.price} onChange={e => handleItemChange(item.id, 'price', e.target.value)} placeholder="ราคา/หน่วย" />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 90, textAlign: 'right', fontWeight: 600, color: 'var(--primary)', paddingTop: 10, fontSize: 13 }}>
-                            ฿{((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0)).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
-                        </div>
-                        {items.length > 1 && (
-                            <button onClick={() => removeItem(item.id)} style={{ width: 30, height: 30, border: 'none', background: '#fef2f2', color: '#ef4444', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 4 }}>
-                                <Trash2 size={14} />
-                            </button>
-                        )}
                     </div>
                 ))}
 
@@ -955,63 +965,493 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                 </button>
             </div>
 
-            {/* ── สรุปยอด ── */}
+            {/* ── เงื่อนไขการหักมัดจำ ── */}
             <div style={sectionStyle}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border-light, #f1f5f9)' }}>
-                    <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 8, color: '#d97706' }}>💰</div>
-                    <div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>สรุปยอดเงิน</div>
-                    </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)', margin: 0 }}>เงื่อนไขการหักมัดจำ</label>
+                    <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 'normal', color: '#64748b', margin: 0 }}>
+                        <input type="checkbox" name="showDepositInPrint" checked={formData.showDepositInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0, cursor: 'pointer' }} />
+                        แสดงในบิล
+                    </label>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 16 }}>
-                    <div>
-                        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>ส่วนลด (%)</label>
-                        <input style={inputStyle} type="number" name="discountPercent" value={formData.discountPercent} onChange={handleFormChange} />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>VAT (%)</label>
-                        <input style={inputStyle} type="number" name="vatRate" value={formData.vatRate} onChange={handleFormChange} />
-                    </div>
-                    <div>
-                        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>ค่าจัดส่ง (บาท)</label>
-                        <input style={inputStyle} type="number" name="shippingCost" value={formData.shippingCost} onChange={handleFormChange} />
-                    </div>
-                </div>
-                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 12 }}>
-                    {[
-                        { label: 'ยอดรวมก่อนส่วนลด', value: subTotal },
-                        formData.discountPercent > 0 && { label: `ส่วนลด (${formData.discountPercent}%)`, value: -discountAmount },
-                        formData.vatRate > 0 && { label: `VAT (${formData.vatRate}%)`, value: vatAmount },
-                        shipping > 0 && { label: 'ค่าจัดส่ง', value: shipping },
-                    ].filter(Boolean).map((row, i) => (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-light, #f1f5f9)' }}>
-                            <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{row.label}</span>
-                            <span style={{ fontSize: 13, fontWeight: 600 }}>฿{row.value.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                    ))}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', marginTop: 4 }}>
-                        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>ยอดรวมสุทธิ</span>
-                        <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>฿{grandTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
-                    </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <CustomSelect name="depositPercent" value={formData.depositPercent} onChange={handleFormChange} style={{ flex: 1 }}>
+                        <option value="0">-- ไม่มีมัดจำ --</option>
+                        <option value="30">มัดจำ 30%</option>
+                        <option value="40">มัดจำ 40%</option>
+                        <option value="50">มัดจำ 50%</option>
+                        <option value="custom">ระบุเอง</option>
+                    </CustomSelect>
+                    {formData.depositPercent === 'custom' && (
+                        <input style={{ ...inputStyle, flex: 1 }} type="number" name="customDepositAmount" placeholder="ระบุเงินมัดจำ" value={formData.customDepositAmount} onChange={handleFormChange} min="0" />
+                    )}
                 </div>
             </div>
 
             {/* ── หมายเหตุ ── */}
             <div style={sectionStyle}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>หมายเหตุ</label>
-                <textarea style={{ ...inputStyle, resize: 'vertical' }} rows={3} name="notes" value={formData.notes} onChange={handleFormChange} placeholder="หมายเหตุเพิ่มเติม..." />
+                <div 
+                    contentEditable
+                    onBlur={(e) => setFormData(prev => ({ ...prev, notes: e.target.innerHTML }))}
+                    dangerouslySetInnerHTML={{ __html: formData.notes }}
+                    style={{ ...inputStyle, minHeight: '80px', overflowY: 'auto', backgroundColor: '#fff' }}
+                    placeholder="หมายเหตุเพิ่มเติม..."
+                />
             </div>
 
-            {/* ── ปุ่ม ── */}
-            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button onClick={onBack} style={{ flex: 1, padding: '10px 16px', background: 'var(--bg-white)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-                    ยกเลิก
-                </button>
-                <button onClick={handleSave} disabled={saving} style={{ flex: 2, padding: '10px 16px', background: 'var(--primary, #4f46e5)', color: '#fff', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, opacity: saving ? 0.7 : 1 }}>
-                    <Save size={16} /> {saving ? 'กำลังบันทึก...' : editId ? 'บันทึกการแก้ไข' : 'สร้าง Sales Order'}
-                </button>
+            {/* ── ตั้งค่าลายเซ็น ── */}
+            <div style={sectionStyle}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--border-light, #f1f5f9)' }}>
+                    <div style={{ width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, color: '#16a34a' }}>🖋️</div>
+                    <div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>ตั้งค่าลายเซ็น (Signatures)</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>เลือกผู้เซ็นอนุมัติและผู้รับทราบ</div>
+                    </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>ผู้อนุมัติฝ่ายขาย / Sales Manager</label>
+                        <CustomSelect name="salesManager" value={formData.salesManager} onChange={handleFormChange}>
+                            <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                            {availableSignatures.map(sig => (
+                                <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
+                            ))}
+                        </CustomSelect>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>ผู้รับทราบการผลิต / Production</label>
+                        <CustomSelect name="productionManager" value={formData.productionManager} onChange={handleFormChange}>
+                            <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                            {availableSignatures.map(sig => (
+                                <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
+                            ))}
+                        </CustomSelect>
+                    </div>
+                </div>
             </div>
             
+            </div> {/* End q-main-left equivalent */}
+
+            {/* ── Sidebar (Summary & Buttons) ── */}
+            <div style={{ flex: '1 1 350px', position: 'sticky', top: '85px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: 'calc(100vh - 105px)', overflowY: 'auto' }}>
+                <div style={{ background: 'linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)', borderRadius: '15px', padding: '20px' }}>
+                    <h3 style={{ color: '#e65100', margin: '0 0 15px', fontSize: '18px' }}>💰 สรุปยอดเงิน</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed #ffb74d', alignItems: 'center' }}>
+                        <span style={{ color: '#e65100', fontSize: '13px' }}>รวมราคา / Sub Total</span>
+                        <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '13px' }}>{subTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed #ffb74d', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: '#e65100', fontSize: '13px' }}>ส่วนลด / Discount</span>
+                            <CustomSelect name="discountPercent" value={formData.discountPercent} onChange={handleFormChange} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: '#fff' }}>
+                                {[...Array(101)].map((_, i) => <option key={i} value={i}>{i}%</option>)}
+                            </CustomSelect>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                <input type="checkbox" name="showDiscountInPrint" checked={formData.showDiscountInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0 }} />
+                                แสดงในบิล
+                            </label>
+                        </div>
+                        <span style={{ fontWeight: 600, color: '#ef4444', fontSize: '13px' }}>
+                            {discountAmount > 0 ? `-${discountAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}` : '0.00'} บาท
+                        </span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed #ffb74d', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: '#e65100', fontSize: '13px' }}>ภาษีมูลค่าเพิ่ม (VAT)</span>
+                            <CustomSelect name="vatRate" value={formData.vatRate} onChange={handleFormChange} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: '#fff' }}>
+                                <option value="0">0%</option>
+                                <option value="7">7%</option>
+                            </CustomSelect>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                <input type="checkbox" name="showVatInPrint" checked={formData.showVatInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0 }} />
+                                แสดงในบิล
+                            </label>
+                        </div>
+                        <span style={{ fontWeight: 600, color: '#1e293b', fontSize: '13px' }}>
+                            {vatAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท
+                        </span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed #ffb74d', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: '#e65100', fontSize: '13px' }}>ค่าออกแบบ / Design Fee</span>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                <input type="checkbox" name="showDesignFeeInPrint" checked={formData.showDesignFeeInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0 }} />
+                                แสดงในบิล
+                            </label>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input type="number" style={{ width: '80px', padding: '4px 8px', border: '1px solid #fcd34d', borderRadius: '6px', textAlign: 'right', fontSize: '12px', outline: 'none' }} value={formData.designFee} onChange={handleFormChange} name="designFee" />
+                            <span style={{ color: '#1e293b', fontSize: '12px' }}>บาท</span>
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px dashed #ffb74d', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: '#e65100', fontSize: '13px' }}>ค่าจัดส่ง / Shipping</span>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                <input type="checkbox" name="showShippingInPrint" checked={formData.showShippingInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0 }} />
+                                แสดงในบิล
+                            </label>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <input type="number" style={{ width: '80px', padding: '4px 8px', border: '1px solid #fcd34d', borderRadius: '6px', textAlign: 'right', fontSize: '12px', outline: 'none' }} value={formData.shippingCost} onChange={handleFormChange} name="shippingCost" />
+                            <span style={{ color: '#1e293b', fontSize: '12px' }}>บาท</span>
+                        </div>
+                    </div>
+
+                    <div style={{ padding: '16px 0 0 0', marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#e65100', fontSize: '15px', fontWeight: 700 }}>ยอดเงินสุทธิ / Grand Total</span>
+                        <span style={{ color: '#d35400', fontSize: '20px', fontWeight: 700, letterSpacing: '-0.5px' }}>{grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                    </div>
+
+                    {depositAmount > 0 && (
+                        <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px dashed #ffb74d', marginTop: '10px', alignItems: 'center' }}>
+                                <span style={{ color: '#e65100', fontSize: '13px' }}>
+                                    ยอดชำระมัดจำ {formData.depositPercent !== 'custom' && formData.depositPercent !== '0' ? `(${formData.depositPercent}%)` : ''}
+                                </span>
+                                <span style={{ fontWeight: 600, color: '#f59e0b', fontSize: '13px' }}>
+                                    {depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', alignItems: 'center' }}>
+                                <span style={{ color: '#e65100', fontSize: '13px' }}>ยอดคงเหลือที่ต้องชำระ</span>
+                                <span style={{ fontWeight: 600, color: '#10b981', fontSize: '13px' }}>
+                                    {remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท
+                                </span>
+                            </div>
+                        </>
+                    )}
+                </div>
+
+                {/* ── ปุ่ม ── */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                    <button type="button" onClick={() => setShowPreview(true)} style={{ background: 'linear-gradient(135deg, #4f46e5, #6366f1)', color: '#fff', border: 'none', padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(79, 70, 229, 0.25)' }}>
+                        <FileText size={16} /> พิมพ์บิล
+                    </button>
+                    <button onClick={handleSave} disabled={saving} style={{ padding: '12px 16px', background: '#10b981', color: '#ffffff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', flex: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)', opacity: saving ? 0.7 : 1 }}>
+                        <Save size={16} /> {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+                    </button>
+                </div>
+            </div> {/* End q-sidebar */}
+            </div> {/* End grid */}
+
+            {/* ── Preview Modal ── */}
+            {showPreview && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1200, display: 'flex', flexDirection: 'column', alignItems: 'center', overflow: 'auto', padding: '20px 0' }}>
+                    <div style={{ width: '210mm', maxWidth: '95vw', marginBottom: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            <button onClick={() => { window.print(); }} style={{ padding: '8px 16px', background: '#0284c7', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                                <Printer size={16} /> พิมพ์เอกสาร
+                            </button>
+                            <button onClick={() => setShowPreview(false)} style={{ padding: '8px 16px', background: '#fff', color: '#334155', border: '1px solid #cbd5e1', borderRadius: 6, cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>
+                                ✕ ปิด
+                            </button>
+                        </div>
+                    </div>
+                    <div className="so-document" style={{ ...a4PageStyle, margin: '0 auto' }}>
+                        {/* Header */}
+                        <table style={{ width: '100%', borderCollapse: 'collapse', border: 'none', marginBottom: '0' }}>
+                            <tbody>
+                                <tr>
+                                    <td style={{ width: '12%', textAlign: 'center', verticalAlign: 'top', border: 'none', padding: '2px' }}>
+                                        <img src="https://lh3.googleusercontent.com/d/10lptwep_aBvzXnQUHFAyS8cou2nrYyKK" style={{ maxWidth: '100px', maxHeight: '100px', objectFit: 'contain' }} alt="Logo" />
+                                    </td>
+                                    <td style={{ width: '55%', padding: '2px 8px', verticalAlign: 'top', border: 'none' }}>
+                                        <div style={{ color: '#1a7a3a', fontWeight: 'bold', fontSize: '13.5pt', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
+                                            วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์ (สำนักงานใหญ่)
+                                        </div>
+                                        <div style={{ fontSize: '9pt', marginTop: '1px', whiteSpace: 'nowrap' }}>
+                                            Thai Herb Centers(THC)Community Enterprise (HEAD OFFICE)
+                                        </div>
+                                        <div style={{ fontSize: '9pt', marginTop: '1px' }}>
+                                            6/10 หมู่ที่ 2 ต.ไทรม้า อ.เมืองนนทบุรี จ.นนทบุรี 11000
+                                        </div>
+                                        <div style={{ fontSize: '8pt' }}>
+                                            6/10 Moo 2 Sai Ma subdistrict,Mueang Nonthaburi District,Nonthabui Province,Thailand 11000
+                                        </div>
+                                        <div style={{ fontSize: '9pt', marginTop: '1px' }}>
+                                            โทร:083-9799389 / เลขประจำตัวผู้เสียภาษี 099-200438186-0
+                                        </div>
+                                    </td>
+                                    <td style={{ width: '35%', textAlign: 'center', verticalAlign: 'top', border: 'none', padding: '2px 8px' }}>
+                                        <div style={{ backgroundColor: '#2ecc71', color: 'white', borderRadius: '25px', padding: '8px 5px' }}>
+                                            <div style={{ fontSize: '15pt', fontWeight: 'bold', whiteSpace: 'nowrap' }}>ใบสั่งขาย</div>
+                                            <div style={{ fontSize: '12pt', fontWeight: 'bold', marginTop: '2px' }}>SALES ORDER</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        {/* Customer Info */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                            <div style={{ width: '65%', border: '1.5px solid #1a7a3a', borderRadius: '8px', padding: '6px 12px', boxSizing: 'border-box' }}>
+                                <table style={{ width: '100%', border: 'none', fontSize: '10pt', borderCollapse: 'collapse' }}>
+                                    <tbody>
+                                        <tr>
+                                            <td style={{ width: '38%', fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
+                                                ชื่อลูกค้า:<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Customer Name</span>
+                                            </td>
+                                            <td style={{ width: '62%', padding: '2px 0', verticalAlign: 'top' }}>{formData.customerName || '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
+                                                ที่อยู่:<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Address</span>
+                                            </td>
+                                            <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}>{formData.address || '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
+                                                โทรศัพท์:<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Tel. No.</span>
+                                            </td>
+                                            <td style={{ padding: '2px 0', verticalAlign: 'top' }}>{formData.phone || '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
+                                                เลขประจำตัวผู้เสียภาษี:<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>TAX ID</span>
+                                            </td>
+                                            <td style={{ padding: '2px 0', verticalAlign: 'top' }}>{formData.taxId || '-'}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div style={{ width: '33%', border: '1.5px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden', boxSizing: 'border-box' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt' }}>
+                                    <tbody>
+                                        <tr style={{ backgroundColor: '#d5f5e3' }}>
+                                            <td style={{ width: '40%', fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
+                                                เลขที่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>No.</span>
+                                            </td>
+                                            <td style={{ width: '60%', padding: '4px 8px', borderBottom: '1px solid #1a7a3a', fontWeight: 'bold' }}>{formData.salesOrderNo || 'SO-YYYY-MMXXX'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
+                                                วันที่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Date</span>
+                                            </td>
+                                            <td style={{ padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>{formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
+                                                อ้างอิง QT :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Ref. QT</span>
+                                            </td>
+                                            <td style={{ padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>{selectedQT ? (approvedQTs.find(q => String(q.QuotationID) === String(selectedQT))?.QuotationNo || '-') : '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', padding: '4px 8px' }}>
+                                                กำหนดส่ง :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Deliver By</span>
+                                            </td>
+                                            <td style={{ padding: '4px 8px' }}>{formData.deliveryDate ? new Date(formData.deliveryDate).toLocaleDateString('th-TH') : '-'}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+
+                        {/* Products Table */}
+                        <div style={{ border: '1.5px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden', marginBottom: '8px' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', height: '210px' }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: '#d5f5e3' }}>
+                                        <th style={{ width: '7%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt', fontWeight: 'bold' }}>
+                                            ลำดับ<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Item</span>
+                                        </th>
+                                        <th style={{ width: '45%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt', fontWeight: 'bold' }}>
+                                            รายการสินค้า<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Description</span>
+                                        </th>
+                                        <th style={{ width: '12%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt', fontWeight: 'bold' }}>
+                                            จำนวน<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Quantity</span>
+                                        </th>
+                                        <th style={{ width: '18%', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt', fontWeight: 'bold' }}>
+                                            ราคาต่อหน่วย<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Unit Price</span>
+                                        </th>
+                                        <th style={{ width: '18%', borderBottom: '1px solid #1a7a3a', padding: '4px 2px', fontSize: '9pt', fontWeight: 'bold' }}>
+                                            จำนวนเงิน<br /><span style={{ fontWeight: 'normal', fontSize: '8pt' }}>Amount</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {items.filter(i => i.name).map((item, idx) => (
+                                        <tr key={item.id} style={{ height: '24px' }}>
+                                            <td style={{ padding: '2px', textAlign: 'center', borderRight: '1px solid #1a7a3a', fontSize: '9pt', fontWeight: 300 }}>{idx + 1}</td>
+                                            <td style={{ padding: '2px 4px', borderRight: '1px solid #1a7a3a', fontSize: '9pt', textAlign: 'left', fontWeight: 300 }}>{item.name}</td>
+                                            <td style={{ padding: '2px', textAlign: 'center', borderRight: '1px solid #1a7a3a', fontSize: '9pt', fontWeight: 300 }}>{item.qty} {item.unit}</td>
+                                            <td style={{ padding: '2px 8px', textAlign: 'right', borderRight: '1px solid #1a7a3a', fontSize: '9pt', fontWeight: 300 }}>{parseFloat(item.price || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                            <td style={{ padding: '2px 8px', textAlign: 'right', fontSize: '9pt', fontWeight: 300 }}>{((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0)).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                        </tr>
+                                    ))}
+                                    {/* Empty space filler that preserves vertical lines perfectly */}
+                                    <tr style={{ height: 'auto' }}>
+                                        <td style={{ borderRight: '1px solid #1a7a3a' }}></td>
+                                        <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', color: '#666', fontSize: '10pt', verticalAlign: 'top', paddingTop: '10px' }}>
+                                            {items.filter(it => it.name).length === 0 ? 'ไม่มีรายการสินค้า' : ''}
+                                        </td>
+                                        <td style={{ borderRight: '1px solid #1a7a3a' }}></td>
+                                        <td style={{ borderRight: '1px solid #1a7a3a' }}></td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Footer / Calculation */}
+                        <div style={{ border: '1.5px solid #1a7a3a', borderRadius: '8px', overflow: 'hidden' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                                <tbody>
+                                    <tr>
+                                        <td rowSpan={visibleRows} style={{ width: '54%', verticalAlign: 'top', padding: '5px 12px', borderRight: '1px solid #1a7a3a', borderTop: 'none', borderBottom: 'none' }}>
+                                            <div style={{ fontSize: '9pt', minHeight: '15px' }}>
+                                                <b>หมายเหตุ:</b> <div dangerouslySetInnerHTML={{ __html: formData.notes || '-' }} style={{ display: 'inline-block' }} />
+                                            </div>
+                                        </td>
+                                        <td style={{ width: '33%', fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderTop: 'none', fontSize: '9pt' }}>
+                                            ยอดรวม<br /><span style={{ fontSize: '8pt', fontWeight: 'normal' }}>TOTAL</span>
+                                        </td>
+                                        <td style={{ width: '13%', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderTop: 'none', fontSize: '10pt' }}>
+                                            {subTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                        </td>
+                                    </tr>
+                                    {discountAmount > 0 && (
+                                        <>
+                                            <tr>
+                                                <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '9pt', color: 'red' }}>
+                                                    หักส่วนลด {formData.discountPercent > 0 ? `(${formData.discountPercent}%)` : ''}<br /><span style={{ fontSize: '8pt', fontWeight: 'normal', color: 'red' }}>DISCOUNT</span>
+                                                </td>
+                                                <td style={{ textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', color: 'red' }}>
+                                                    {discountAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '9pt' }}>
+                                                    คงเหลือ<br /><span style={{ fontSize: '8pt', fontWeight: 'normal' }}>BALANCE</span>
+                                                </td>
+                                                <td style={{ textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt' }}>
+                                                    {afterDiscount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        </>
+                                    )}
+                                    {formData.showVatInPrint && (
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '9pt' }}>
+                                                ภาษีมูลค่าเพิ่ม {formData.vatRate > 0 ? `(${formData.vatRate}%)` : ''}<br /><span style={{ fontSize: '8pt', fontWeight: 'normal' }}>VAT</span>
+                                            </td>
+                                            <td style={{ textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt' }}>
+                                                {vatAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {formData.showShippingInPrint && shipping > 0 && (
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '9pt' }}>
+                                                ค่าจัดส่ง<br /><span style={{ fontSize: '8pt', fontWeight: 'normal' }}>SHIPPING COST</span>
+                                            </td>
+                                            <td style={{ textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt' }}>
+                                                {shipping.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {formData.showDesignFeeInPrint && designFee > 0 && (
+                                        <tr>
+                                            <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '9pt' }}>
+                                                ค่าออกแบบ<br /><span style={{ fontSize: '8pt', fontWeight: 'normal' }}>DESIGN FEE</span>
+                                            </td>
+                                            <td style={{ textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt' }}>
+                                                {designFee.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {formData.showDepositInPrint && depositAmount > 0 && (
+                                        <>
+                                            <tr>
+                                                <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '9pt', color: 'red' }}>
+                                                    ยอดชำระมัดจำ {formData.depositPercent !== 'custom' && formData.depositPercent !== '0' ? `(${formData.depositPercent}%)` : ''}<br /><span style={{ fontSize: '8pt', fontWeight: 'normal', color: 'red' }}>DEPOSIT</span>
+                                                </td>
+                                                <td style={{ textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', color: 'red' }}>
+                                                    {depositAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderRight: '1px solid #1a7a3a', borderBottom: '1px solid #ccc', fontSize: '9pt', color: 'red' }}>
+                                                    ยอดคงเหลือที่ต้องชำระ<br /><span style={{ fontSize: '8pt', fontWeight: 'normal', color: 'red' }}>REMAINING BALANCE</span>
+                                                </td>
+                                                <td style={{ textAlign: 'right', padding: '3px 10px', fontSize: '10pt', borderBottom: '1px solid #ccc', color: 'red' }}>
+                                                    {remainingAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                                </td>
+                                            </tr>
+                                        </>
+                                    )}
+                                    <tr>
+                                        <td style={{ width: '54%', textAlign: 'center', fontWeight: 'bold', fontSize: '12pt', backgroundColor: '#e6e6e6', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', padding: '5px' }}>
+                                            <span>{ThaiBaht(grandTotal)}</span>
+                                        </td>
+                                        <td style={{ width: '33%', fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderRight: '1px solid #1a7a3a', backgroundColor: '#e6e6e6', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', fontSize: '10pt' }}>
+                                            จำนวนเงินรวมทั้งสิ้น<br /><span style={{ fontSize: '8pt', fontWeight: 'normal' }}>GRAND TOTAL</span>
+                                        </td>
+                                        <td style={{ width: '13%', textAlign: 'right', fontWeight: 'bold', textDecoration: 'underline', backgroundColor: '#e6e6e6', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', padding: '5px 10px', fontSize: '11pt' }}>
+                                            {grandTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Signatures */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', gap: '15px' }}>
+                            <div style={{ flex: 1, border: '1px solid #1a7a3a', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+                                <div style={{ height: '35px' }}></div>
+                                <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px' }}></div>
+                                <div style={{ fontSize: '10pt' }}>ผู้จัดทำ / Prepared By</div>
+                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                            </div>
+                            <div style={{ flex: 1, border: '1px solid #1a7a3a', borderRadius: '8px', padding: '10px', textAlign: 'center', position: 'relative' }}>
+                                <div style={{ height: '35px', position: 'relative' }}>
+                                    {formData.salesManager && availableSignatures?.find(s => s.KeyName === formData.salesManager) && (
+                                        <img 
+                                            src={getSignatureUrl(availableSignatures.find(s => s.KeyName === formData.salesManager).ImagePath)} 
+                                            style={{ maxHeight: '40px', position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} 
+                                            alt="signature" 
+                                            onError={(e) => { e.target.onerror = null; e.target.src = availableSignatures.find(s => s.KeyName === formData.salesManager).ImagePath; }} 
+                                        />
+                                    )}
+                                </div>
+                                <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px', position: 'relative', zIndex: 2 }}></div>
+                                <div style={{ fontSize: '10pt' }}>ผู้อนุมัติฝ่ายขาย / Sales Manager</div>
+                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                            </div>
+                            <div style={{ flex: 1, border: '1px solid #1a7a3a', borderRadius: '8px', padding: '10px', textAlign: 'center', position: 'relative' }}>
+                                <div style={{ height: '35px', position: 'relative' }}>
+                                    {formData.productionManager && availableSignatures?.find(s => s.KeyName === formData.productionManager) && (
+                                        <img 
+                                            src={getSignatureUrl(availableSignatures.find(s => s.KeyName === formData.productionManager).ImagePath)} 
+                                            style={{ maxHeight: '40px', position: 'absolute', bottom: '-4px', left: '50%', transform: 'translateX(-50%)', zIndex: 1 }} 
+                                            alt="signature" 
+                                            onError={(e) => { e.target.onerror = null; e.target.src = availableSignatures.find(s => s.KeyName === formData.productionManager).ImagePath; }} 
+                                        />
+                                    )}
+                                </div>
+                                <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px', position: 'relative', zIndex: 2 }}></div>
+                                <div style={{ fontSize: '10pt' }}>ผู้รับทราบการผลิต / Production</div>
+                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <style>{`
+                        @page { size: A4; margin: 0mm; }
+                        @media print {
+                            body { margin: 0 !important; padding: 0 !important; background-color: #fff !important; }
+                            body * { visibility: hidden; }
+                            .so-document, .so-document * { visibility: visible; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                            .so-document { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 5mm 10mm !important; box-sizing: border-box !important; box-shadow: none !important; }
+                        }
+                    `}</style>
+                </div>
+            )}
             {/* Customer Selection Modal */}
             {showCustomerModal && (
                 <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center' }}>
@@ -1060,6 +1500,22 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                     </div>
                 </div>
             )}
+            
+            <QuotationSelectorModal 
+                show={showQuotationModal}
+                onClose={() => setShowQuotationModal(false)}
+                quotations={approvedQTs}
+                selectedQuotationId={selectedQT}
+                onSelect={handleSelectQT}
+            />
+
+            <ContractSelectorModal 
+                show={showContractModal}
+                onClose={() => setShowContractModal(false)}
+                contracts={contracts}
+                selectedContractId={formData.contractId}
+                onSelect={(id) => setFormData(prev => ({ ...prev, contractId: id }))}
+            />
         </div>
     );
 }

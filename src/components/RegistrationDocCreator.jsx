@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import CustomerSelectorModal from './CustomerSelectorModal';
+import ContractSelectorModal from './ContractSelectorModal';
 import { ArrowLeft, FileText, Users, FileSignature, ChevronDown, Check, Save, Printer, Loader2 } from 'lucide-react';
 import { useAlert } from './CustomAlert';
 import { PDFDocument } from 'pdf-lib';
@@ -36,6 +38,8 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
     );
     const [customerData, setCustomerData] = useState(null);
     const [customerSearch, setCustomerSearch] = useState('');
+    const [showCustomerModal, setShowCustomerModal] = useState(false);
+    const [showContractModal, setShowContractModal] = useState(false);
     const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
     const [sharedFormData, setSharedFormData] = useState({ writtenAt: undefined, documentDate: undefined });
     const [draggedTab, setDraggedTab] = useState(null);
@@ -631,55 +635,74 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
             <div className="no-print" style={cardStyle}>
                 <h3 style={sectionTitle}><Users size={18} color="#2563eb" /> ข้อมูลลูกค้าและสัญญา</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    {/* Customer Dropdown */}
-                    <div style={{ position: 'relative' }}>
+                    {/* Customer Selection */}
+                    <div>
                         <label style={labelStyle}>เลือกลูกค้า *</label>
-                        <input
-                            style={inputStyle}
-                            value={customerSearch}
-                            onChange={e => { setCustomerSearch(e.target.value); setShowCustomerDropdown(true); }}
-                            onFocus={() => setShowCustomerDropdown(true)}
-                            onBlur={() => setTimeout(() => setShowCustomerDropdown(false), 200)}
-                            placeholder="พิมพ์ชื่อหรือรหัสลูกค้าเพื่อค้นหา..."
+                        <button
+                            type="button"
+                            onClick={() => setShowCustomerModal(true)}
+                            style={{
+                                ...inputStyle,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: '#fff',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                color: customerData ? '#0f172a' : '#94a3b8'
+                            }}
+                        >
+                            {customerData ? `${customerData.CustomerCode} - ${customerData.CustomerName}` : 'คลิกเพื่อเลือกลูกค้า...'}
+                            <span style={{ fontSize: '12px', color: '#cbd5e1' }}>▼</span>
+                        </button>
+                        <CustomerSelectorModal 
+                            show={showCustomerModal} 
+                            onClose={() => setShowCustomerModal(false)} 
+                            customers={customers}
+                            selectedCustomerId={customerData ? customerData.CustomerID : null}
+                            onSelect={(c) => { 
+                                if (c) {
+                                    handleSelectCustomer(c);
+                                } else {
+                                    setCustomerData(null);
+                                    setSelectedCustomerId(null);
+                                    setCustomerSearch('');
+                                }
+                                setShowCustomerModal(false); 
+                            }} 
                         />
-                        {showCustomerDropdown && filteredCustomers.length > 0 && (
-                            <ul style={{
-                                position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '200px',
-                                overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '8px',
-                                zIndex: 1000, margin: 0, padding: 0, listStyle: 'none',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                            }}>
-                                {filteredCustomers.slice(0, 20).map(c => (
-                                    <li
-                                        key={c.CustomerID}
-                                        onClick={() => handleSelectCustomer(c)}
-                                        style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: '14px' }}
-                                        onMouseEnter={e => e.target.style.background = '#f8fafc'}
-                                        onMouseLeave={e => e.target.style.background = 'transparent'}
-                                    >
-                                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{c.CustomerName}</div>
-                                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>{c.CustomerCode} • {c.Phone || '-'}</div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
                     </div>
 
-                    {/* Contract Dropdown */}
+                    {/* Contract Selection */}
                     <div>
                         <label style={labelStyle}>อ้างอิงสัญญา (เลือกจากระบบ)</label>
-                        <CustomSelect
-                            style={{ ...inputStyle, appearance: 'auto' }}
-                            value={selectedContractId}
-                            onChange={e => setSelectedContractId(e.target.value)}
+                        <button
+                            type="button"
+                            onClick={() => setShowContractModal(true)}
+                            style={{
+                                ...inputStyle,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: '#fff',
+                                cursor: 'pointer',
+                                textAlign: 'left',
+                                color: selectedContractId ? '#0f172a' : '#94a3b8'
+                            }}
                         >
-                            <option value="">-- เลือกสัญญา --</option>
-                            {contracts.map(c => (
-                                <option key={c.ContractID} value={c.ContractID}>
-                                    {c.ContractNo} - {c.ContractName}
-                                </option>
-                            ))}
-                        </CustomSelect>
+                            {selectedContractId ? contracts.find(c => String(c.ContractID) === String(selectedContractId))?.ContractNo + ' - ' + contracts.find(c => String(c.ContractID) === String(selectedContractId))?.ContractName : '-- เลือกสัญญา --'}
+                            <span style={{ fontSize: '12px', color: '#cbd5e1' }}>▼</span>
+                        </button>
+                        <ContractSelectorModal 
+                            show={showContractModal} 
+                            onClose={() => setShowContractModal(false)} 
+                            contracts={contracts} 
+                            selectedContractId={selectedContractId}
+                            onSelect={(id) => {
+                                setSelectedContractId(id);
+                                setShowContractModal(false);
+                            }} 
+                        />
                     </div>
                 </div>
 

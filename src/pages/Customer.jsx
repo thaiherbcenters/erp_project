@@ -512,7 +512,7 @@ export default function Customer() {
                             <div>
                                 <label style={labelStyle}>สถานะ</label>
                                 <CustomSelect style={inputStyle} value={form.statusId} onChange={e => setForm({ ...form, statusId: parseInt(e.target.value) })}>
-                                    {statuses.map(s => <option key={s.CustomerStatusID} value={s.CustomerStatusID}>{getStatusThai(s.StatusName)} ({s.StatusName})</option>)}
+                                    {statuses.filter(s => s.StatusName === 'Active' || s.StatusName === 'Suspended').map(s => <option key={s.CustomerStatusID} value={s.CustomerStatusID}>{getStatusThai(s.StatusName)} ({s.StatusName})</option>)}
                                 </CustomSelect>
                             </div>
                         </div>

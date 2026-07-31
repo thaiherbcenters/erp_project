@@ -5,6 +5,30 @@ import API_BASE from '../config';
 import CustomDatePicker from './CustomDatePicker';
 import './ContractManagement.css';
 
+const getAutoContractStatus = (startDate, endDate) => {
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    
+    let start = null;
+    let end = null;
+    if (startDate) {
+        start = new Date(startDate);
+        start.setHours(0,0,0,0);
+    }
+    if (endDate) {
+        end = new Date(endDate);
+        end.setHours(0,0,0,0);
+    }
+
+    if (start && now < start) {
+        return 'รอดำเนินการ';
+    }
+    if (end && now > end) {
+        return 'สิ้นสุด/หมดอายุ';
+    }
+    return 'กำลังดำเนินการ';
+};
+
 const ContractManagement = ({ onViewDocument }) => {
     const { showAlert } = useAlert();
     const [contracts, setContracts] = useState([]);
@@ -302,7 +326,15 @@ const ContractManagement = ({ onViewDocument }) => {
                                         <td>{c.ContractName}</td>
                                         <td>{c.StartDate ? new Date(c.StartDate).toLocaleDateString('th-TH') : '-'}</td>
                                         <td>{c.EndDate ? new Date(c.EndDate).toLocaleDateString('th-TH') : '-'}</td>
-                                        <td><span className="status-badge progress">{c.Status}</span></td>
+                                        <td><span className={`status-badge ${
+                                            (() => {
+                                                const s = getAutoContractStatus(c.StartDate, c.EndDate);
+                                                if (s === 'รอดำเนินการ') return 'pending';
+                                                if (s === 'กำลังดำเนินการ') return 'progress';
+                                                if (s === 'สิ้นสุด/หมดอายุ') return 'rejected';
+                                                return 'progress';
+                                            })()
+                                        }`}>{getAutoContractStatus(c.StartDate, c.EndDate)}</span></td>
                                         <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                                             <button className="btn-icon view" onClick={() => handleViewDetails(c)} title="ดูรายละเอียด">
                                                 <Eye size={16} />
@@ -330,7 +362,15 @@ const ContractManagement = ({ onViewDocument }) => {
                         <div className="contract-modal-body">
                             <div className="contract-info-grid">
                                 <div><span className="info-label">เลขที่สัญญา:</span> <span className="fw-500">{viewModalData.ContractNo}</span></div>
-                                <div><span className="info-label">สถานะ:</span> <span className="status-badge progress">{viewModalData.Status}</span></div>
+                                <div><span className="info-label">สถานะ:</span> <span className={`status-badge ${
+                                    (() => {
+                                        const s = getAutoContractStatus(viewModalData.StartDate, viewModalData.EndDate);
+                                        if (s === 'รอดำเนินการ') return 'pending';
+                                        if (s === 'กำลังดำเนินการ') return 'progress';
+                                        if (s === 'สิ้นสุด/หมดอายุ') return 'rejected';
+                                        return 'progress';
+                                    })()
+                                }`}>{getAutoContractStatus(viewModalData.StartDate, viewModalData.EndDate)}</span></div>
                                 <div style={{ gridColumn: '1 / -1' }}><span className="info-label">ชื่อโปรเจกต์:</span> {viewModalData.ContractName}</div>
                                 <div><span className="info-label">วันที่เริ่มต้น:</span> {viewModalData.StartDate ? new Date(viewModalData.StartDate).toLocaleDateString('th-TH') : '-'}</div>
                                 <div><span className="info-label">วันที่สิ้นสุด:</span> {viewModalData.EndDate ? new Date(viewModalData.EndDate).toLocaleDateString('th-TH') : '-'}</div>
@@ -359,7 +399,15 @@ const ContractManagement = ({ onViewDocument }) => {
                                                 <td>{doc.documentTypeLabel || doc.DocumentType}</td>
                                                 <td>{doc.primaryDoc?.DocumentNo || doc.DocumentNo || '-'}</td>
                                                 <td>{doc.primaryDoc?.DocumentDate || doc.DocumentDate ? new Date(doc.primaryDoc?.DocumentDate || doc.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
-                                                <td><span className="status-badge progress">{doc.Status}</span></td>
+                                                <td><span className={`status-badge ${
+                                                    (() => {
+                                                        const s = doc.Status || '';
+                                                        if (s === 'ร่าง' || s.includes('รอ')) return 'pending';
+                                                        if (s === 'พร้อมใช้' || s.includes('อนุมัติ') || s.includes('เสร็จ') || s.includes('ส่ง') || s.includes('ลงนาม')) return 'approved';
+                                                        if (s.includes('ยกเลิก') || s.includes('ปฏิเสธ')) return 'rejected';
+                                                        return 'progress';
+                                                    })()
+                                                }`}>{doc.Status}</span></td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div className="action-buttons justify-center" style={{ display: 'flex', gap: '8px' }}>
                                                         <button className="btn-icon" title="ดูเอกสารฉบับพิมพ์" onClick={() => handlePrintDoc(doc)} style={{ color: '#2563eb', background: '#eff6ff', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center' }}>

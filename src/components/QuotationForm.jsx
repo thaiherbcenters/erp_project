@@ -5,6 +5,8 @@ import API_BASE from '../config';
 import CustomDatePicker from '../components/CustomDatePicker';
 import TaxIdInput from '../components/TaxIdInput';
 import CustomSelect from './CustomSelect';
+import ContractSelectorModal from './ContractSelectorModal';
+import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import '../pages/PageCommon.css';
 
@@ -444,7 +446,7 @@ const styles = `
 }
 
 /* ===== Responsive ===== */
-@media (max-width: 1024px) {
+@media (max-width: 1366px) {
     .q-main-grid {
         grid-template-columns: 1fr;
     }
@@ -720,6 +722,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
 
     const [addProductModal, setAddProductModal] = useState({ visible: false, targetItemId: null, name: '', image: null });
     const [showCustomerModal, setShowCustomerModal] = useState(false);
+    const [showContractModal, setShowContractModal] = useState(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
     const [customBanks, setCustomBanks] = useState(() => {
@@ -761,7 +764,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
-        signer: '',
+        signer: 'jutharat',
         notes: DEFAULT_NORMAL_NOTES,
         showDiscountInPrint: false,
         showVatInPrint: false,
@@ -962,7 +965,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                             shippingCost: data.ShippingCost || 0,
                             depositPercent: data.DepositPercent || '0',
                             customDepositAmount: data.DepositPercent === 'custom' ? data.DepositAmount : 0,
-                            signer: data.Signer || '',
+                            signer: data.Signer || 'jutharat',
                             notes: data.Notes || '',
                             showDiscountInPrint: data.ShowDiscountInPrint,
                             showVatInPrint: data.ShowVatInPrint,
@@ -1448,8 +1451,11 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
 
             <div className="q-container" style={{ display: viewOnly ? 'none' : 'block' }}>
                 <div style={{ marginBottom: '16px' }}>
-                    <button className="btn-back-text" onClick={onBack}>
-                        <ArrowLeft size={16} /> กลับหน้าหลัก
+                    <button
+                        onClick={onBack}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '15px' }}
+                    >
+                        <ArrowLeft size={18} /> กลับสู่หน้าหลัก
                     </button>
                 </div>
                 
@@ -1474,14 +1480,12 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                         <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: '14px' }}>
                             <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label>อ้างอิงสัญญา (เลือกจากระบบ)</label>
-                                <CustomSelect name="contractId" value={formData.contractId} onChange={handleFormChange}>
-                                    <option value="">-- ไม่ระบุสัญญา / ไม่ได้เชื่อมโยง --</option>
-                                    {contracts.map(c => (
-                                        <option key={c.ContractID} value={c.ContractID}>
-                                            {c.ContractNo} - {c.ContractName} {c.CustomerName ? `(${c.CustomerName})` : ''}
-                                        </option>
-                                    ))}
-                                </CustomSelect>
+                                <div onClick={() => setShowContractModal(true)} style={{ border: '1px solid #cbd5e1', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px', minHeight: '42px' }}>
+                                    <span style={{ color: formData.contractId ? '#334155' : '#94a3b8' }}>
+                                        {formData.contractId ? (contracts.find(c => String(c.ContractID) === String(formData.contractId))?.ContractNo + ' - ' + (contracts.find(c => String(c.ContractID) === String(formData.contractId))?.ContractName || '') || '-- ไม่ระบุสัญญา --') : '-- ไม่ระบุสัญญา / ไม่ได้เชื่อมโยง --'}
+                                    </span>
+                                    <span style={{ fontSize: '10px', color: '#94a3b8' }}>▼</span>
+                                </div>
                             </div>
                             <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label>เลือกลูกค้า (จากระบบ)</label>
@@ -2935,53 +2939,22 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
             </div>
 
             {/* Customer Selection Modal */}
-            {showCustomerModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: '#fff', borderRadius: '10px', width: '700px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h2 style={{ margin: 0, fontSize: '18px' }}>เลือกลูกค้า</h2>
-                            <button onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888' }}>&times;</button>
-                        </div>
-                        <div style={{ padding: '16px 24px', borderBottom: '1px solid #eee' }}>
-                            <input 
-                                type="text" 
-                                placeholder="ค้นหาชื่อ, รหัส, ผู้ติดต่อ..." 
-                                value={customerSearchTerm}
-                                onChange={(e) => setCustomerSearchTerm(e.target.value)}
-                                style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
-                            />
-                        </div>
-                        <div style={{ overflowY: 'auto', flex: 1, padding: '0' }}>
-                            <table className="data-table" style={{ border: 'none', minWidth: '100%' }}>
-                                <thead>
-                                    <tr>
-                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>รหัสลูกค้า</th>
-                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>ชื่อลูกค้า</th>
-                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>ผู้ติดต่อ</th>
-                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1, textAlign: 'center' }}>เลือก</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
-                                        <tr key={c.CustomerID} className="hover-row">
-                                            <td style={{ color: '#4f46e5', fontWeight: '500' }}>{c.CustomerCode}</td>
-                                            <td style={{ fontWeight: '500' }}>{c.CustomerName}</td>
-                                            <td>{c.ContactPerson || '-'}</td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                <button type="button" onClick={() => { handleSelectCustomer(c); setShowCustomerModal(false); }} className="btn-primary" style={{ padding: '4px 12px', fontSize: '12px' }}>
-                                                    เลือก
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr><td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: '#999' }}>ไม่พบข้อมูลลูกค้า</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <CustomerSelectorModal 
+                show={showCustomerModal} 
+                onClose={() => setShowCustomerModal(false)} 
+                customers={customerList}
+                selectedCustomerId={formData.customerId}
+                onSelect={(customer) => { 
+                    if (customer) {
+                        handleSelectCustomer(customer); 
+                    } else {
+                        handleSelectCustomer({
+                            CustomerID: '', CustomerName: '', ContactPerson: '', Phone: '', Email: '', Address: '', TaxID: '', TaxBranch: 'head_office', BranchNo: '', CustomerTypeID: ''
+                        });
+                    }
+                    setShowCustomerModal(false); 
+                }} 
+            />
 
             {/* Add Custom Product Modal */}
             {addProductModal.visible && (
@@ -3167,6 +3140,13 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                     </div>
                 </div>
             )}
-        </div>
+        
+            <ContractSelectorModal 
+                show={showContractModal} 
+                onClose={() => setShowContractModal(false)} 
+                contracts={contracts} 
+                selectedContractId={formData.contractId}
+                onSelect={(id) => handleFormChange({ target: { name: 'contractId', value: id } })} 
+            /></div>
     );
 }

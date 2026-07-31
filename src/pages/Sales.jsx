@@ -29,8 +29,57 @@ import PowerOfAttorneyForm from '../components/PowerOfAttorneyForm';
 import RegistrationDocCreator from '../components/RegistrationDocCreator';
 import ContractManagement from '../components/ContractManagement';
 import API_BASE from '../config';
+import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 import './DocumentControl.css';
+
+
+const InlineStatusDropdown = ({ value, onChange, options, badgeClassFn, fallbackClass = 'status-badge status-approved' }) => {
+    let computedClass = fallbackClass;
+    if (badgeClassFn) {
+        computedClass = `badge ${badgeClassFn(value || '')}`;
+    } else {
+        // Simple heuristic for fallback class
+        const v = value || '';
+        if (v === 'ร่าง' || v.includes('รอ')) computedClass = 'badge badge-neutral';
+        else if (v === 'พร้อมใช้' || v.includes('อนุมัติ') || v.includes('เสร็จ') || v.includes('ส่ง')) computedClass = 'badge badge-success';
+        else if (v.includes('ยกเลิก')) computedClass = 'badge badge-danger';
+        else computedClass = 'badge badge-info';
+    }
+
+    // Determine colors based on computedClass to style CustomSelect directly
+    let customStyles = {};
+    if (computedClass.includes('badge-success') || computedClass.includes('status-approved')) {
+        customStyles = { background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' };
+    } else if (computedClass.includes('badge-danger') || computedClass.includes('status-rejected')) {
+        customStyles = { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' };
+    } else if (computedClass.includes('badge-info')) {
+        customStyles = { background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' };
+    } else if (computedClass.includes('badge-warning')) {
+        customStyles = { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' };
+    } else {
+        customStyles = { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' };
+    }
+
+    return (
+        <div onClick={(e) => e.stopPropagation()} style={{ minWidth: '130px', display: 'inline-block' }}>
+            <CustomSelect
+                value={value || 'ร่าง'}
+                onChange={(e) => onChange(e.target.value)}
+                usePortal={true}
+                style={{
+                    padding: '2px 8px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    minHeight: '26px',
+                    ...customStyles
+                }}
+            >
+                {options.map(s => <option key={s} value={s}>{s}</option>)}
+            </CustomSelect>
+        </div>
+    );
+};
 
 export default function Sales() {
     const { showAlert, showConfirm, showLoading, hideLoading } = useAlert();
@@ -395,6 +444,59 @@ export default function Sales() {
             showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
         }
     };
+
+    // ── กำหนดสถานะที่เป็นไปได้ของเอกสารฝ่ายขาย ──
+    const SALES_DOC_STATUSES = ['ร่าง', 'พร้อมใช้'];
+
+    // ── อัปเดตสถานะแบบด่วนจากหน้าตาราง ──
+    const handleUpdateDocStatus = async (id, docType, newStatus) => {
+        if (!id || !newStatus) return;
+        try {
+            let endpoint = '';
+            switch (docType) {
+                case 'Quotation': endpoint = `${API_BASE}/quotations/${id}/status`; break;
+                case 'Billing': endpoint = `${API_BASE}/billing-invoices/${id}/status`; break;
+                case 'TaxInvoice': endpoint = `${API_BASE}/tax-invoices/${id}/status`; break;
+                case 'DeliveryOrder': endpoint = `${API_BASE}/delivery-orders/${id}/status`; break;
+                case 'Receipt': endpoint = `${API_BASE}/receipts/${id}/status`; break;
+                default: return;
+            }
+            
+            const res = await fetch(endpoint, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify({ status: newStatus })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showAlert('สำเร็จ', `อัปเดตสถานะเป็น "${newStatus}" เรียบร้อยแล้ว`, 'success');
+                // อัปเดต state ตัวแปร local โดยตรงเพื่อไม่ต้อง fetch ใหม่หมด
+                switch (docType) {
+                    case 'Quotation':
+                        setLocalQuotations(prev => prev.map(item => item.QuotationID === id ? { ...item, Status: newStatus } : item));
+                        break;
+                    case 'Billing':
+                        setLocalBillings(prev => prev.map(item => item.BillingID === id ? { ...item, Status: newStatus } : item));
+                        break;
+                    case 'TaxInvoice':
+                        setLocalTaxInvoices(prev => prev.map(item => item.TaxInvoiceID === id ? { ...item, Status: newStatus } : item));
+                        break;
+                    case 'DeliveryOrder':
+                        setLocalDeliveryOrders(prev => prev.map(item => item.DeliveryOrderID === id ? { ...item, Status: newStatus } : item));
+                        break;
+                    case 'Receipt':
+                        setReceipts(prev => prev.map(item => item.ReceiptID === id ? { ...item, Status: newStatus } : item));
+                        break;
+                }
+            } else {
+                showAlert('ข้อผิดพลาด', data.message || 'ไม่สามารถอัปเดตสถานะได้', 'error');
+            }
+        } catch (err) {
+            console.error('Error updating status:', err);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        }
+    };
+
 
     const handleViewDocHistory = async (documentNo, type = 'poa', defaultTab = 'versions') => {
         setHistoryDocumentNo(documentNo);
@@ -799,7 +901,14 @@ export default function Sales() {
                                                 <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{q.QuotationNo}</td>
                                                 <td>{q.CustomerName}</td>
                                                 <td>฿{(q.GrandTotal || 0).toLocaleString()}</td>
-                                                <td><span className={`badge ${getQuotationStatusClass(q.Status)}`}>{q.Status}</span></td>
+                                                <td>
+                                                    <InlineStatusDropdown
+                                                        value={q.Status}
+                                                        options={SALES_DOC_STATUSES}
+                                                        badgeClassFn={getQuotationStatusClass}
+                                                        onChange={(newVal) => handleUpdateDocStatus(q.QuotationID, 'Quotation', newVal)}
+                                                    />
+                                                </td>
                                             </tr>
                                         ))}
                                         {localQuotations.length === 0 && (
@@ -895,7 +1004,6 @@ export default function Sales() {
                                             <th>ลูกค้า</th>
                                             <th>ยอดรวม (บาท)</th>
                                             <th>วันที่</th>
-                                            <th>ใช้ได้ถึง</th>
                                             <th>สถานะ</th>
                                             <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
@@ -916,32 +1024,34 @@ export default function Sales() {
                                                 <td>{q.CustomerName || q.customer}</td>
                                                 <td>{(q.GrandTotal || q.total || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
                                                 <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : q.date}</td>
-                                                <td>{q.ValidUntil ? new Date(q.ValidUntil).toLocaleDateString('th-TH') : q.validUntil}</td>
                                                 <td>
-                                                    <span className={`badge ${getQuotationStatusClass(q.Status || q.status)}`}>
-                                                        {q.Status || q.status}
-                                                    </span>
-                                                </td>
+<InlineStatusDropdown
+                                                        value={q.Status || q.status}
+                                                        options={SALES_DOC_STATUSES}
+                                                        badgeClassFn={getQuotationStatusClass}
+                                                        onChange={(newVal) => handleUpdateDocStatus(q.QuotationID || q.id, 'Quotation', newVal)}
+                                                    />
+</td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                         <button 
-                                                            className="doc-action-btn"
+                                                            className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700"
                                                             title="ดูรายละเอียด"
                                                             onClick={() => setPreviewQuotationId(q.QuotationID || q.id)}
                                                         >
-                                                            <Eye size={15} />
+                                                            <Eye size={16} />
                                                         </button>
                                                         {q.Revision > 0 && (
                                                             <button 
-                                                                className="doc-action-btn"
+                                                                className="btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700"
                                                                 title="ประวัติ"
                                                                 onClick={() => handleViewHistory(q.QuotationID || q.id)}
                                                             >
-                                                                <Clock size={15} />
+                                                                <Clock size={16} />
                                                             </button>
                                                         )}
                                                         <button 
-                                                            className="doc-action-btn"
+                                                            className="btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700"
                                                             title="แก้ไข"
                                                             onClick={() => {
                                                                 setEditingQuotationId(q.QuotationID || q.id);
@@ -950,14 +1060,14 @@ export default function Sales() {
                                                                 setShowQuotationForm(true);
                                                             }}
                                                         >
-                                                            <Edit size={15} />
+                                                            <Edit size={16} />
                                                         </button>
                                                         <button 
-                                                            className="doc-action-btn doc-action-btn-danger"
+                                                            className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700"
                                                             title="ลบ"
                                                             onClick={() => handleDeleteQuotation(q.QuotationID || q.id)}
                                                         >
-                                                            <Trash2 size={15} />
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     </div>
                                                 </td>
@@ -1086,10 +1196,13 @@ export default function Sales() {
                                                     <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                                     <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
                                                     <td style={{ textAlign: 'center' }}>
-                                                        <span className="status-badge status-approved">
-                                                            {q.Status || 'Active'}
-                                                        </span>
-                                                    </td>
+<InlineStatusDropdown
+                                                        value={q.Status || q.status}
+                                                        options={SALES_DOC_STATUSES}
+                                                        
+                                                        onChange={(newVal) => handleUpdateDocStatus(q.TaxInvoiceID || q.id, 'TaxInvoice', newVal)}
+                                                    />
+</td>
                                                     <td style={{ textAlign: 'center' }}>
                                                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                             <button
@@ -1254,10 +1367,13 @@ export default function Sales() {
                                                     <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                                     <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
                                                     <td style={{ textAlign: 'center' }}>
-                                                        <span className="status-badge status-approved">
-                                                            {q.Status || 'Active'}
-                                                        </span>
-                                                    </td>
+<InlineStatusDropdown
+                                                        value={q.Status || q.status}
+                                                        options={SALES_DOC_STATUSES}
+                                                        
+                                                        onChange={(newVal) => handleUpdateDocStatus(q.DeliveryOrderID || q.id, 'DeliveryOrder', newVal)}
+                                                    />
+</td>
                                                     <td style={{ textAlign: 'center' }}>
                                                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                             <button
@@ -1416,10 +1532,12 @@ export default function Sales() {
                                                     <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                                     <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
                                                     <td style={{ textAlign: 'center' }}>
-                                                        <span className="status-badge status-approved">
-                                                            {q.Status || 'Active'}
-                                                        </span>
-                                                    </td>
+                                                    <InlineStatusDropdown
+                                                        value={q.Status || q.status}
+                                                        options={SALES_DOC_STATUSES}
+                                                        onChange={(newVal) => handleUpdateDocStatus(q.ReceiptID, 'Receipt', newVal)}
+                                                    />
+                                                </td>
                                                     <td style={{ textAlign: 'center' }}>
                                                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                             <button
@@ -1573,18 +1691,18 @@ export default function Sales() {
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                         {o.Status === 'ร่าง' && (
-                                                            <button className="doc-action-btn" title="ส่งให้ Planner" style={{ background: '#dbeafe', color: '#2563eb' }} onClick={() => handleSendToPlanner(o)}>
-                                                                <Send size={15} />
+                                                            <button className="btn-icon text-slate-600 hover:bg-slate-50 hover:text-slate-700" title="ส่งให้ Planner" style={{ background: '#dbeafe', color: '#2563eb' }} onClick={() => handleSendToPlanner(o)}>
+                                                                <Send size={16} />
                                                             </button>
                                                         )}
-                                                        <button className="doc-action-btn" title="ดูรายละเอียด" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(true); setShowSOForm(true); }}>
-                                                            <Eye size={15} />
+                                                        <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดูรายละเอียด" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(true); setShowSOForm(true); }}>
+                                                            <Eye size={16} />
                                                         </button>
-                                                        <button className="doc-action-btn" title="แก้ไข" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(false); setShowSOForm(true); }}>
-                                                            <Edit size={15} />
+                                                        <button className="btn-icon text-amber-500 hover:bg-amber-50 hover:text-amber-600" title="แก้ไข" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(false); setShowSOForm(true); }}>
+                                                            <Edit size={16} />
                                                         </button>
-                                                        <button className="doc-action-btn doc-action-btn-danger" title="ลบ" onClick={() => handleDeleteSO(o.SalesOrderID)}>
-                                                            <Trash2 size={15} />
+                                                        <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" title="ลบ" onClick={() => handleDeleteSO(o.SalesOrderID)}>
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     </div>
                                                 </td>
@@ -1682,41 +1800,43 @@ export default function Sales() {
                                             <td>{((b.GrandTotal) || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
                                             <td>{b.BillDate ? new Date(b.BillDate).toLocaleDateString('th-TH') : '-'}</td>
                                             <td>
-                                                <span className={`badge ${b.Status === 'อนุมัติ' ? 'badge-success' : b.Status === 'รอตรวจสอบ' ? 'badge-info' : 'badge-neutral'}`}>
-                                                    {b.Status || 'ร่าง'}
-                                                </span>
+                                                <InlineStatusDropdown
+                                                    value={b.Status || b.status}
+                                                    options={SALES_DOC_STATUSES}
+                                                    onChange={(newVal) => handleUpdateDocStatus(b.BillingInvoiceID || b.id, 'BillingInvoice', newVal)}
+                                                />
                                             </td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                     <button 
-                                                        className="doc-action-btn"
+                                                        className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700"
                                                         title="ดูรายละเอียด"
                                                         onClick={() => setPreviewBillingId(b.BillingInvoiceID)}
                                                     >
-                                                        <Eye size={15} />
+                                                        <Eye size={16} />
                                                     </button>
                                                     {(b.Revision > 0) && (
                                                         <button 
-                                                            className="doc-action-btn"
+                                                            className="btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700"
                                                             title="ประวัติ"
                                                             onClick={() => handleViewHistory(b.BillingInvoiceID, 'BillingInvoice')}
                                                         >
-                                                            <Clock size={15} />
+                                                            <Clock size={16} />
                                                         </button>
                                                     )}
                                                     <button 
-                                                        className="doc-action-btn"
+                                                        className="btn-icon text-amber-500 hover:bg-amber-50 hover:text-amber-600"
                                                         title="แก้ไข"
                                                         onClick={() => { setEditingBillingId(b.BillingInvoiceID); setShowBillingForm(true); }}
                                                     >
-                                                        <Edit size={15} />
+                                                        <Edit size={16} />
                                                     </button>
                                                     <button 
-                                                        className="doc-action-btn doc-action-btn-danger"
+                                                        className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700"
                                                         title="ลบ"
                                                         onClick={() => handleDeleteBilling(b.BillingInvoiceID)}
                                                     >
-                                                        <Trash2 size={15} />
+                                                        <Trash2 size={16} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -1920,7 +2040,7 @@ export default function Sales() {
                             setShowSOForm(true);
                             setReturnTab('sales_contracts');
                             setSearchParams({ tab: 'sales_orders' });
-                        } else if (docType === 'poa' || docType === 'corp_rep' || docType === 'herbal_cert') {
+                        } else if (['poa', 'corp_rep', 'herbal_cert', 'torbor1', 'contract_mfg', 'pdpa_consent', 'safety_cert'].includes(docType)) {
                             // สำหรับเอกสารทางกฎหมาย ให้ดึง PDF มาพรีวิว
                             showLoading('กำลังเปิดเอกสาร...', 'กรุณารอสักครู่ ระบบกำลังสร้าง PDF');
                             fetch(`${API_BASE}/print`, {
@@ -2176,7 +2296,7 @@ export default function Sales() {
                                                     #{h.HistoryID}
                                                 </span>
                                                 <button
-                                                    className="doc-action-btn"
+                                                    className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700"
                                                     title="ดูเอกสาร"
                                                     style={{ background: '#e0f2fe', color: '#0284c7', width: '24px', height: '24px' }}
                                                     onClick={() => {

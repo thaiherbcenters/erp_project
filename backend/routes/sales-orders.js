@@ -30,6 +30,20 @@ const generateSONumber = async (pool) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 0. GET /next-number — ดึงเลข Sales Order ถัดไป
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/next-number', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const nextNo = await generateSONumber(pool);
+        res.json({ success: true, nextNumber: nextNo });
+    } catch (err) {
+        console.error('Error generating next SO number:', err);
+        res.status(500).json({ success: false, message: 'Failed to generate next number', error: err.message });
+    }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 1. GET /  — ดึงรายการ SO ทั้งหมด
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
