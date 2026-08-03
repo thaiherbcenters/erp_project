@@ -19,7 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     Search, Plus, Filter, CalendarDays, PieChart, Activity,
     CheckCircle, Wrench, Package, ClipboardList, AlertTriangle,
-    ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock, Play, ShoppingCart
+    ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock, Play, ShoppingCart, FileText, UserCheck
 } from 'lucide-react';
 import API_BASE from '../config';
 import { usePlanner } from '../context/PlannerContext';
@@ -28,6 +28,8 @@ import { useProduction } from '../context/ProductionContext';
 import { useAlert } from '../components/CustomAlert';
 import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
+import ProductionOrderPreview from '../components/ProductionOrderPreview';
+import { useSignatures } from '../hooks/useSignatures';
 import './PageCommon.css';
 import './Planning.css';
 
@@ -40,16 +42,47 @@ export default function Planning() {
     const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS } = useRnD();
     const { qcRequests } = useProduction();
     const { showAlert, showConfirm } = useAlert();
+    const { signatures: dbSignatures } = useSignatures();
+
+    const hasSignature = (nameStr) => {
+        if (!nameStr) return false;
+        if (dbSignatures && dbSignatures.length > 0) {
+            return dbSignatures.some(s => 
+                (s.FullName && nameStr.includes(s.FullName)) ||
+                (s.SignerName && nameStr.includes(s.SignerName)) ||
+                (s.KeyName && nameStr.toLowerCase().includes(s.KeyName.toLowerCase())) ||
+                (s.FullName && s.FullName.includes(nameStr))
+            );
+        }
+        return nameStr.includes('ธวัช') || nameStr.includes('จุฑารัตน์');
+    };
+
+    const getSignatureSelectStyle = (baseStyle, val) => {
+        const isSigned = hasSignature(val);
+        return {
+            ...baseStyle,
+            background: isSigned ? '#f0fdf4' : '#fff',
+            borderColor: isSigned ? '#86efac' : (baseStyle.borderColor || '#cbd5e1'),
+            fontWeight: isSigned ? 600 : 400,
+            color: isSigned ? '#15803d' : '#1e293b',
+        };
+    };
+
+    const signatureOptions = (dbSignatures && dbSignatures.length > 0)
+        ? Array.from(new Set(dbSignatures.map(s => s.FullName || s.SignerName || s.KeyName).filter(Boolean)))
+        : ['ธวัช จรุงพิรวงศ์', 'จุฑารัตน์ วงค์คำเหลา'];
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
     const [soFilter, setSOFilter] = useState('');
     const [selectedJob, setSelectedJob] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [previewJob, setPreviewJob] = useState(null);
     const [isCreating, setIsCreating] = useState(false);
     const [createForm, setCreateForm] = useState({
         formulaId: '',
         formulaName: '',
+        productName: '',
         batchQty: 1,
         batchSize: 0,
         totalQty: 0,
@@ -62,19 +95,24 @@ export default function Planning() {
         customerName: '',
         customerPO: '',
         productionType: 'ผลิตตามแผน',
+        requestedBy: 'จุฑารัตน์ วงค์คำเหลา',
+        checkedBy: 'นางสาวกิรณา เลิศมณี',
+        approvedBy: 'ธวัช จรุงพิรวงศ์',
+        responsibleBy: 'นายวันปิยะ คงกำเหนิด',
     });
 
     const [pendingSalesOrders, setPendingSalesOrders] = useState([]);
+    const [allSalesOrders, setAllSalesOrders] = useState([]);
     const [loadingSOs, setLoadingSOs] = useState(false);
     const [viewingSODetail, setViewingSODetail] = useState(null);
     const [showSODetailModal, setShowSODetailModal] = useState(false);
 
     useEffect(() => {
-        if (currentTab === 'planning_overview') {
+        if (currentTab === 'planning_overview' || showCreateModal) {
             // Only show loading indicator if it's currently empty (first load)
             fetchPendingSalesOrders(pendingSalesOrders.length === 0);
         }
-    }, [currentTab, jobs]);
+    }, [currentTab, jobs, showCreateModal]);
 
     const fetchPendingSalesOrders = async (showLoading = true) => {
         if (showLoading) setLoadingSOs(true);
@@ -82,6 +120,7 @@ export default function Planning() {
             const res = await fetch(`${API_BASE}/sales-orders`);
             const json = await res.json();
             if (json.success) {
+                setAllSalesOrders(json.data || []);
                 const pending = json.data.filter(so => {
                     if (so.Status !== 'ส่ง Planner แล้ว') return false;
                     // กรองออกถ้ามีการสร้าง JO จาก SO นี้ไปแล้ว
@@ -118,6 +157,10 @@ export default function Planning() {
                         planDate: new Date().toISOString().split('T')[0],
                         notes: '',
                         created: alreadyCreated,
+                        requestedBy: 'จุฑารัตน์ วงค์คำเหลา',
+                        checkedBy: 'นางสาวกิรณา เลิศมณี',
+                        approvedBy: 'ธวัช จรุงพิรวงศ์',
+                        responsibleBy: 'นายวันปิยะ คงกำเหนิด',
                     };
                 });
                 setSOPlanData({
@@ -175,6 +218,10 @@ export default function Planning() {
             customerName: soPlanData.customerName,
             customerPO: soPlanData.customerPO,
             productionType: 'ผลิตตามออร์เดอร์ (OEM)',
+            requestedBy: item.requestedBy || '',
+            checkedBy: item.checkedBy || '',
+            approvedBy: item.approvedBy || 'ธวัช จรุงพิรวงศ์',
+            responsibleBy: item.responsibleBy || '',
         };
 
         const res = await createJob(jobData);
@@ -254,50 +301,64 @@ export default function Planning() {
                                                     <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>จำนวนที่ต้องผลิต: <strong style={{ color: 'var(--primary)' }}>{Number(item.Qty || 0).toLocaleString('th-TH')} {item.Unit || 'ชิ้น'}</strong></div>
                                                 </div>
                                             </div>
-                                            {item.created && (
-                                                <span className="badge badge-success" style={{ fontSize: 11 }}>✅ สร้างแล้ว</span>
-                                            )}
+                                            {item.created && (() => {
+                                                // หา JO ที่ตรงกับ item นี้
+                                                const matchedJob = jobs.find(j => j.notes && j.notes.includes(`SO: ${soPlanData.soNo}`) && j.notes.includes(`สินค้า: ${item.ItemName}`));
+                                                return (
+                                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                                        <span className="badge badge-success" style={{ fontSize: 11 }}>✅ สร้างแล้ว</span>
+                                                        {matchedJob && (
+                                                            <button
+                                                                onClick={() => { setShowSOPlanModal(false); setPreviewJob(matchedJob); }}
+                                                                style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #a7f3d0', background: '#ecfdf5', cursor: 'pointer', fontSize: 11, color: '#065f46', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}
+                                                            >
+                                                                <FileText size={12} /> พรีวิวเอกสาร
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
 
                                         {/* Row 2: Formula select + Details */}
                                         {!item.created && (
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                                                {/* สูตรการผลิต */}
-                                                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                                                    <div style={{ flex: 1, minWidth: 200 }}>
-                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>สูตรการผลิต <span style={{ color: '#ef4444' }}>*</span></label>
-                                                        <CustomSelect
-                                                            style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 13 }}
-                                                            value={item.selectedFormulaId}
-                                                            onChange={(e) => handleSOItemFormulaChange(idx, e.target.value)}
-                                                        >
-                                                            <option value="">-- เลือกสูตร --</option>
-                                                            {approvedFormulas.map(f => (
-                                                                <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize.toLocaleString()} {f.unit}/batch)</option>
-                                                            ))}
-                                                        </CustomSelect>
-                                                    </div>
-                                                    {matchedFormula && (
-                                                        <div style={{ fontSize: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '6px 10px', minWidth: 180 }}>
-                                                            <div style={{ color: '#92400e', fontWeight: 600, marginBottom: 2 }}>OEM — ผลิตพอดีจำนวนสั่ง</div>
-                                                            <div style={{ color: '#78716c' }}>สูตรอ้างอิง: <strong>{bSize.toLocaleString()} {matchedFormula.unit}/batch</strong></div>
-                                                            <div style={{ color: '#78716c' }}>สเกลวัตถุดิบ: <strong style={{ color: '#0369a1' }}>{bSize > 0 ? ((item.Qty / bSize) * 100).toFixed(1) : 0}%</strong> ของสูตรหลัก</div>
-                                                        </div>
-                                                    )}
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                                                {/* ── สูตรการผลิต (full width) ── */}
+                                                <div>
+                                                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontWeight: 500 }}>สูตรการผลิต <span style={{ color: '#ef4444' }}>*</span></label>
+                                                    <CustomSelect
+                                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 13, boxSizing: 'border-box' }}
+                                                        value={item.selectedFormulaId}
+                                                        onChange={(e) => handleSOItemFormulaChange(idx, e.target.value)}
+                                                    >
+                                                        <option value="">-- เลือกสูตร --</option>
+                                                        {approvedFormulas.map(f => (
+                                                            <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize.toLocaleString()} {f.unit}/batch)</option>
+                                                        ))}
+                                                    </CustomSelect>
                                                 </div>
 
-                                                {/* รายละเอียดการวางแผน */}
-                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                                                {/* ── OEM Info (แสดงเมื่อเลือกสูตรแล้ว) ── */}
+                                                {matchedFormula && (
+                                                    <div style={{ display: 'flex', gap: 12, fontSize: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 14px', alignItems: 'center' }}>
+                                                        <span style={{ color: '#92400e', fontWeight: 600, whiteSpace: 'nowrap' }}>OEM — ผลิตพอดีจำนวนสั่ง</span>
+                                                        <span style={{ color: '#78716c' }}>สูตรอ้างอิง: <strong>{bSize.toLocaleString()} {matchedFormula.unit}/batch</strong></span>
+                                                        <span style={{ color: '#78716c' }}>สเกลวัตถุดิบ: <strong style={{ color: '#0369a1' }}>{bSize > 0 ? ((item.Qty / bSize) * 100).toFixed(1) : 0}%</strong> ของสูตรหลัก</span>
+                                                    </div>
+                                                )}
+
+                                                {/* ── รายละเอียดการวางแผน (4 ช่อง เท่ากัน) ── */}
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                                                     <div>
-                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>ประเภทการผลิต</label>
-                                                        <div style={{ padding: '7px 10px', borderRadius: 6, border: '1.5px solid #fde68a', fontSize: 12, fontWeight: 600, color: '#92400e', background: '#fffbeb', textAlign: 'center' }}>
-                                                            ผลิตตามออร์เดอร์ (OEM)
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontWeight: 500 }}>ประเภทการผลิต</label>
+                                                        <div style={{ padding: '8px 12px', borderRadius: 8, border: '1.5px solid #fde68a', fontSize: 12, fontWeight: 600, color: '#92400e', background: '#fffbeb', textAlign: 'center', height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box' }}>
+                                                            ผลิตตาม OEM
                                                         </div>
                                                     </div>
                                                     <div>
-                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>ความสำคัญ <span style={{ color: '#ef4444' }}>*</span></label>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontWeight: 500 }}>ความสำคัญ <span style={{ color: '#ef4444' }}>*</span></label>
                                                         <CustomSelect
-                                                            style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12 }}
+                                                            style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 12, height: 38, boxSizing: 'border-box' }}
                                                             value={item.priority}
                                                             onChange={(e) => handleSOItemFieldChange(idx, 'priority', e.target.value)}
                                                         >
@@ -307,17 +368,16 @@ export default function Planning() {
                                                         </CustomSelect>
                                                     </div>
                                                     <div>
-                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>วันเริ่มผลิต</label>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontWeight: 500 }}>วันเริ่มผลิต</label>
                                                         <CustomDatePicker
-                                                            style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, boxSizing: 'border-box' }}
                                                             value={item.planDate}
                                                             onChange={(e) => handleSOItemFieldChange(idx, 'planDate', e.target.value)}
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>สายการผลิต</label>
+                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontWeight: 500 }}>สายการผลิต</label>
                                                         <CustomSelect
-                                                            style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12 }}
+                                                            style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 12, height: 38, boxSizing: 'border-box' }}
                                                             value={item.assignedLine}
                                                             onChange={(e) => handleSOItemFieldChange(idx, 'assignedLine', e.target.value)}
                                                         >
@@ -328,21 +388,113 @@ export default function Planning() {
                                                     </div>
                                                 </div>
 
-                                                {/* หมายเหตุ + ปุ่มสร้าง */}
-                                                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-                                                    <div style={{ flex: 1 }}>
-                                                        <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 3 }}>ข้อมูลเพิ่มเติม / หมายเหตุ</label>
-                                                        <input
-                                                            type="text"
-                                                            style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, boxSizing: 'border-box' }}
-                                                            placeholder="เช่น ติดฉลากภาษาอังกฤษ, ห่อพิเศษ"
-                                                            value={item.notes || ''}
-                                                            onChange={(e) => handleSOItemFieldChange(idx, 'notes', e.target.value)}
-                                                        />
+                                                {/* ── หมายเหตุ (full width) ── */}
+                                                <div>
+                                                    <label style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginBottom: 4, fontWeight: 500 }}>ข้อมูลเพิ่มเติม / หมายเหตุ</label>
+                                                    <input
+                                                        type="text"
+                                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 12, boxSizing: 'border-box', height: 38 }}
+                                                        placeholder="เช่น ติดฉลากภาษาอังกฤษ, ห่อพิเศษ"
+                                                        value={item.notes || ''}
+                                                        onChange={(e) => handleSOItemFieldChange(idx, 'notes', e.target.value)}
+                                                    />
+                                                </div>
+
+                                                {/* ── ผู้ลงนามและอนุมัติเอกสาร (4 ฝ่าย) ── */}
+                                                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                                    <label style={{ fontSize: 11, color: '#334155', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8, fontWeight: 600 }}>
+                                                        <UserCheck size={14} color="#7c3aed" /> ผู้ลงนามและอนุมัติเอกสาร (4 ฝ่าย)
+                                                    </label>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                                                        <div>
+                                                            <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 3, fontWeight: 500 }}>ผู้ขอสั่งผลิต (วางแผน)</label>
+                                                            <CustomSelect 
+                                                                style={getSignatureSelectStyle({ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, height: 34, boxSizing: 'border-box' }, item.requestedBy)}
+                                                                value={item.requestedBy || ''}
+                                                                onChange={(e) => handleSOItemFieldChange(idx, 'requestedBy', e.target.value)}
+                                                            >
+                                                                <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                                                {signatureOptions.map(name => (
+                                                                    <option key={name} value={name}>
+                                                                        {name}{hasSignature(name) ? ' (มีลายเซ็น)' : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </CustomSelect>
+                                                        </div>
+                                                        <div>
+                                                            <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 3, fontWeight: 500 }}>ผู้ตรวจสอบ (บัญชี)</label>
+                                                            <CustomSelect 
+                                                                style={getSignatureSelectStyle({ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, height: 34, boxSizing: 'border-box' }, item.checkedBy)}
+                                                                value={item.checkedBy || ''}
+                                                                onChange={(e) => handleSOItemFieldChange(idx, 'checkedBy', e.target.value)}
+                                                            >
+                                                                <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                                                {signatureOptions.map(name => (
+                                                                    <option key={name} value={name}>
+                                                                        {name}{hasSignature(name) ? ' (มีลายเซ็น)' : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </CustomSelect>
+                                                        </div>
+                                                        <div>
+                                                            <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 3, fontWeight: 500 }}>ผู้อนุมัติ (บริหาร)</label>
+                                                            <CustomSelect 
+                                                                style={getSignatureSelectStyle({ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, height: 34, boxSizing: 'border-box' }, item.approvedBy)}
+                                                                value={item.approvedBy || 'ธวัช จรุงพิรวงศ์'}
+                                                                onChange={(e) => handleSOItemFieldChange(idx, 'approvedBy', e.target.value)}
+                                                            >
+                                                                <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                                                {signatureOptions.map(name => (
+                                                                    <option key={name} value={name}>
+                                                                        {name} {name.includes('ธวัช') ? ' (มีลายเซ็น)' : ''}
+                                                                    </option>
+                                                                ))}
+                                                            </CustomSelect>
+                                                        </div>
+                                                        <div>
+                                                            <label style={{ fontSize: 10, color: 'var(--text-muted)', display: 'block', marginBottom: 3, fontWeight: 500 }}>ผู้รับผิดชอบ (ผลิต)</label>
+                                                            <CustomSelect 
+                                                                style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, height: 34, boxSizing: 'border-box' }}
+                                                                value={item.responsibleBy || ''}
+                                                                onChange={(e) => handleSOItemFieldChange(idx, 'responsibleBy', e.target.value)}
+                                                            >
+                                                                <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                                                {signatureOptions.map(name => (
+                                                                    <option key={name} value={name}>{name}</option>
+                                                                ))}
+                                                            </CustomSelect>
+                                                        </div>
                                                     </div>
+                                                </div>
+
+                                                {/* ── ปุ่มดำเนินการ (ชิดขวา) ── */}
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                                    <button
+                                                        style={{ padding: '8px 16px', fontSize: 12, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, borderRadius: 8, border: '1px solid #a7f3d0', background: '#ecfdf5', color: '#065f46', cursor: 'pointer', fontWeight: 500, fontFamily: 'inherit' }}
+                                                        onClick={() => {
+                                                            const formula = MOCK_FORMULAS.find(f => f.id === item.selectedFormulaId);
+                                                            setPreviewJob({
+                                                                id: `(ยังไม่สร้าง)`,
+                                                                formulaId: item.selectedFormulaId || '',
+                                                                formulaName: formula ? formula.name : item.ItemName,
+                                                                itemName: item.ItemName,
+                                                                productName: item.ItemName,
+                                                                totalQty: item.Qty || 0,
+                                                                unit: item.Unit || 'ชิ้น',
+                                                                planDate: item.planDate || new Date().toISOString().split('T')[0],
+                                                                dueDate: soPlanData.deliveryDate ? new Date(soPlanData.deliveryDate).toISOString().split('T')[0] : '',
+                                                                assignedLine: item.assignedLine || 'Line A',
+                                                                notes: `OEM — อ้างอิงจาก SO: ${soPlanData.soNo} | สินค้า: ${item.ItemName} | ลูกค้า: ${soPlanData.customerName || '-'}`,
+                                                                createdBy: '',
+                                                            });
+                                                        }}
+                                                        title="พรีวิวเอกสารคำสั่งผลิต"
+                                                    >
+                                                        <FileText size={14} /> พรีวิวเอกสาร
+                                                    </button>
                                                     <button
                                                         className="btn-primary"
-                                                        style={{ padding: '8px 16px', fontSize: 12, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
+                                                        style={{ padding: '8px 20px', fontSize: 12, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}
                                                         onClick={() => handleCreateJobFromSOItem(idx)}
                                                         disabled={creatingItemIdx === idx}
                                                     >
@@ -457,6 +609,7 @@ export default function Planning() {
                 ...prev,
                 formulaId: formula.id,
                 formulaName: formula.name,
+                productName: prev.productName || formula.name,
                 batchSize: formula.batchSize,
                 unit: formula.unit,
                 totalQty: batchQty * formula.batchSize,
@@ -486,9 +639,10 @@ export default function Planning() {
             await showAlert('สำเร็จ', 'สร้างใบสั่งผลิตสำเร็จ!', 'success');
             setShowCreateModal(false);
             setCreateForm({
-                formulaId: '', formulaName: '', batchQty: 1, batchSize: 0, totalQty: 0, unit: '',
+                formulaId: '', formulaName: '', productName: '', batchQty: 1, batchSize: 0, totalQty: 0, unit: '',
                 priority: 'ปกติ', planDate: new Date().toISOString().split('T')[0], dueDate: '',
                 assignedLine: 'Line A', notes: '', customerName: '', customerPO: '', productionType: 'ผลิตตามแผน',
+                requestedBy: 'จุฑารัตน์ วงค์คำเหลา', checkedBy: 'นางสาวกิรณา เลิศมณี', approvedBy: 'ธวัช จรุงพิรวงศ์', responsibleBy: 'นายวันปิยะ คงกำเหนิด',
             });
         } else {
             showAlert('เกิดข้อผิดพลาด', 'สร้างไม่สำเร็จ: ' + res.message, 'error');
@@ -732,17 +886,24 @@ export default function Planning() {
         return (
             <div className="planning-list">
 
-                <div className="toolbar">
-                    <div className="toolbar-left">
+                {/* ── Toolbar ── */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                    {/* Row 1: ค้นหา + ปุ่มสร้าง */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                         {hasSectionPermission('planning_list_search') && (
-                            <div className="search-group">
+                            <div className="search-group" style={{ maxWidth: 400 }}>
                                 <div className="search-input-wrap">
                                     <Search size={16} />
-                                    <input type="text" placeholder="ค้นหาใบสั่งผลิต..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                    <input type="text" placeholder="ค้นหาใบสั่งผลิต... (เลขที่ JO, ชื่อสินค้า, SO)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                 </div>
-                                <button className="search-btn">ค้นหา</button>
                             </div>
                         )}
+                        {hasSectionPermission('planning_list_action') && (
+                            <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}><Plus size={16} /> สร้างใบสั่งผลิต</button>
+                        )}
+                    </div>
+                    {/* Row 2: กรองสถานะ + กรอง SO */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <div className="plan-filter-group">
                             {statuses.map(s => (
                                 <button key={s} className={`plan-filter-btn ${statusFilter === s ? 'active' : ''}`} onClick={() => setStatusFilter(s)}>
@@ -754,7 +915,7 @@ export default function Planning() {
                             <CustomSelect 
                                 value={soFilter} 
                                 onChange={(e) => setSOFilter(e.target.value)}
-                                style={{ padding: '6px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, color: soFilter ? '#0369a1' : 'var(--text-muted)', background: soFilter ? '#e0f2fe' : 'var(--card-bg)' }}
+                                style={{ width: 160, padding: '5px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, color: soFilter ? '#0369a1' : 'var(--text-muted)', background: soFilter ? '#e0f2fe' : 'var(--card-bg)' }}
                             >
                                 <option value="">ทุก SO</option>
                                 {soList.map(so => (
@@ -763,27 +924,35 @@ export default function Planning() {
                             </CustomSelect>
                         )}
                     </div>
-                    {hasSectionPermission('planning_list_action') && (
-                        <button className="btn-primary" onClick={() => setShowCreateModal(true)}><Plus size={16} /> สร้างใบสั่งผลิต</button>
-                    )}
                 </div>
 
                 {hasSectionPermission('planning_list_table') && (
-                    <div className="card table-card">
-                        <table className="data-table">
+                    <div className="card table-card" style={{ overflow: 'auto' }}>
+                        <table className="data-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: 1000 }}>
+                            <colgroup>
+                                <col style={{ width: 155 }} />
+                                <col style={{ width: 135 }} />
+                                <col style={{ width: 'auto' }} />
+                                <col style={{ width: 80 }} />
+                                <col style={{ width: 70 }} />
+                                <col style={{ width: 70 }} />
+                                <col style={{ width: 100 }} />
+                                <col style={{ width: 100 }} />
+                                <col style={{ width: 90 }} />
+                                <col style={{ width: 100 }} />
+                            </colgroup>
                             <thead>
                                 <tr>
-                                    <th>เลขที่</th>
+                                    <th>เลขที่ JO</th>
                                     <th>อ้างอิง SO</th>
-                                    <th>สูตร (จาก R&D)</th>
-                                    <th>ผลิตภัณฑ์</th>
-                                    <th>จำนวนรวม</th>
-                                    <th>ความสำคัญ</th>
-                                    <th>ไลน์ผลิต</th>
-                                    <th>กำหนดเสร็จ</th>
-                                    <th>สถานะ</th>
-                                    <th>Progress</th>
-                                    <th></th>
+                                    <th>ผลิตภัณฑ์ / สูตร</th>
+                                    <th style={{ textAlign: 'center' }}>จำนวน</th>
+                                    <th style={{ textAlign: 'center' }}>สำคัญ</th>
+                                    <th style={{ textAlign: 'center' }}>ไลน์</th>
+                                    <th style={{ textAlign: 'center' }}>กำหนดเสร็จ</th>
+                                    <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                    <th style={{ textAlign: 'center' }}>Progress</th>
+                                    <th style={{ textAlign: 'center' }}>จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -799,10 +968,8 @@ export default function Planning() {
                                             latestQcs[key] = q;
                                         }
                                     });
-                                    // ถ้ามีอย่างน้อย 1 Task ที่ผล QC ล่าสุดคือ 'ไม่ผ่าน' ถือว่า Job นี้ติดปัญหา
                                     const hasRejected = Object.values(latestQcs).some(q => q.status === 'ไม่ผ่าน');
                                     
-                                    // คำนวณ Status ที่จะแสดง
                                     let displayStatus = job.status;
                                     let badgeClass = getStatusBadge(job.status);
                                     if (hasRejected && job.status !== 'เสร็จสิ้น') {
@@ -810,16 +977,22 @@ export default function Planning() {
                                         badgeClass = 'badge-danger';
                                     }
 
+                                    const progressColor = job.status === 'เสร็จสิ้น' ? 'var(--success)' : hasRejected ? 'var(--danger)' : 'var(--primary)';
+
                                     return (
                                         <tr key={job.id} style={hasRejected ? { background: '#fef2f2' } : {}}>
-                                            <td className="text-bold" style={{ whiteSpace: 'nowrap', color: hasRejected ? '#dc2626' : 'inherit' }}>
-                                                {hasRejected && <AlertTriangle size={14} color="#dc2626" style={{ marginRight: 6, verticalAlign: 'text-bottom' }} />}
-                                                {job.id}
+                                            {/* ── เลขที่ JO ── */}
+                                            <td style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                    {hasRejected && <AlertTriangle size={13} color="#dc2626" style={{ flexShrink: 0 }} />}
+                                                    <span style={{ fontWeight: 600, fontSize: 12, color: hasRejected ? '#dc2626' : 'var(--primary)', letterSpacing: '0.3px' }}>{job.id}</span>
+                                                </div>
                                             </td>
-                                            <td>
+                                            {/* ── อ้างอิง SO ── */}
+                                            <td style={{ verticalAlign: 'middle' }}>
                                                 {soRef ? (
                                                     <span 
-                                                        style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap' }}
+                                                        style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-block' }}
                                                         onClick={() => setSOFilter(soRef)}
                                                         title={`กรอง SO: ${soRef}`}
                                                     >
@@ -829,26 +1002,50 @@ export default function Planning() {
                                                     <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
                                                 )}
                                             </td>
-                                            <td style={{ whiteSpace: 'nowrap' }}><span className="plan-formula-ref">{job.formulaId}</span></td>
-                                            <td>{job.formulaName}</td>
-                                            <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{job.totalQty.toLocaleString()} {job.unit}</td>
-                                            <td><span className={`badge ${getPriorityBadge(job.priority)}`}>{job.priority}</span></td>
-                                            <td><span className={`badge ${getLineBadge(job.assignedLine)}`}>{job.assignedLine}</span></td>
-                                            <td style={{ whiteSpace: 'nowrap' }}>{job.dueDate}</td>
-                                            <td><span className={`status-badge ${badgeClass}`}>{displayStatus}</span></td>
-                                            <td>
-                                                <div className="progress-container">
-                                                    <div className="progress-bar" style={{ width: `${job.progress}%`, backgroundColor: job.status === 'เสร็จสิ้น' ? 'var(--success)' : hasRejected ? 'var(--danger)' : 'var(--primary)' }}></div>
+                                            {/* ── ผลิตภัณฑ์ / สูตร (รวมกัน) ── */}
+                                            <td style={{ verticalAlign: 'middle', overflow: 'hidden' }}>
+                                                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={job.formulaName}>
+                                                    {job.formulaName}
+                                                </div>
+                                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                                                    <span className="plan-formula-ref" style={{ fontSize: 10 }}>{job.formulaId}</span>
+                                                </div>
+                                            </td>
+                                            {/* ── จำนวน ── */}
+                                            <td style={{ textAlign: 'center', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                                                {job.totalQty.toLocaleString()}
+                                                <div style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>{job.unit}</div>
+                                            </td>
+                                            {/* ── ความสำคัญ ── */}
+                                            <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                                <span className={`badge ${getPriorityBadge(job.priority)}`} style={{ fontSize: 11 }}>{job.priority}</span>
+                                            </td>
+                                            {/* ── ไลน์ผลิต ── */}
+                                            <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                                <span className={`badge ${getLineBadge(job.assignedLine)}`} style={{ fontSize: 11 }}>{job.assignedLine}</span>
+                                            </td>
+                                            {/* ── กำหนดเสร็จ ── */}
+                                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap', fontSize: 12, verticalAlign: 'middle' }}>{job.dueDate}</td>
+                                            {/* ── สถานะ ── */}
+                                            <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                                <span className={`status-badge ${badgeClass}`} style={{ fontSize: 11 }}>{displayStatus}</span>
+                                            </td>
+                                            {/* ── Progress ── */}
+                                            <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                                <div className="progress-container" style={{ minWidth: 60 }}>
+                                                    <div className="progress-bar" style={{ width: `${job.progress}%`, backgroundColor: progressColor }}></div>
                                                     <span className="progress-text">{job.progress}%</span>
                                                 </div>
                                             </td>
-                                            <td>
-                                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                                    <button className="btn-sm" onClick={() => setSelectedJob(job)}><Eye size={14} /></button>
+                                            {/* ── จัดการ ── */}
+                                            <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                                                <div style={{ display: 'inline-flex', gap: 3, alignItems: 'center', background: 'var(--bg)', borderRadius: 6, padding: '2px 3px' }}>
+                                                    <button className="btn-sm" onClick={() => setSelectedJob(job)} title="ดูรายละเอียด" style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><Eye size={14} /></button>
+                                                    <button className="btn-sm" style={{ background: '#d1fae5', color: '#065f46', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} onClick={() => setPreviewJob(job)} title="พรีวิวเอกสาร"><FileText size={14} /></button>
                                                     {job.status === 'รอผลิต' && (
                                                         <button 
                                                             className="btn-sm" 
-                                                            style={{ background: '#e0e7ff', color: '#4338ca' }} 
+                                                            style={{ background: '#e0e7ff', color: '#4338ca', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} 
                                                             title="ปล่อยให้ฝ่ายผลิต" 
                                                             onClick={() => handleReleaseJob(job.id)}
                                                         >
@@ -861,7 +1058,7 @@ export default function Planning() {
                                     );
                                 })}
                                 {filtered.length === 0 && (
-                                    <tr><td colSpan="12" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบข้อมูล</td></tr>
+                                    <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบข้อมูล</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -1063,7 +1260,15 @@ export default function Planning() {
                                 <span className={`badge ${getLineBadge(job.assignedLine)}`}>{job.assignedLine}</span>
                             </div>
                         </div>
-                        <button className="rnd-modal-close" onClick={() => setSelectedJob(null)}><XCircle size={22} /></button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                onClick={() => { setSelectedJob(null); setPreviewJob(job); }}
+                                style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #a7f3d0', background: '#ecfdf5', cursor: 'pointer', fontSize: '13px', color: '#065f46', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500, whiteSpace: 'nowrap' }}
+                            >
+                                <FileText size={14} /> พรีวิวเอกสาร
+                            </button>
+                            <button className="rnd-modal-close" onClick={() => setSelectedJob(null)}><XCircle size={22} /></button>
+                        </div>
                     </div>
 
                     <div className="rnd-modal-body">
@@ -1115,14 +1320,20 @@ export default function Planning() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {formula.ingredients.map((ing, idx) => (
+                                            {formula.ingredients.map((ing, idx) => {
+                                                // Strip HTML tags from ingredient name (some DB entries contain <p> wrappers)
+                                                const cleanName = ing.name
+                                                    ? ing.name.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim()
+                                                    : '-';
+                                                return (
                                                 <tr key={idx}>
-                                                    <td>{ing.name}</td>
+                                                    <td>{cleanName}</td>
                                                     <td style={{ color: 'var(--text-muted)' }}>{ing.qty}</td>
                                                     <td style={{ fontWeight: 700, color: isOEM ? '#0369a1' : 'var(--text)' }}>{(ing.qty * scaleFactor).toFixed(2)}</td>
                                                     <td>{ing.unit}</td>
                                                 </tr>
-                                            ))}
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -1141,223 +1352,372 @@ export default function Planning() {
         if (!showCreateModal) return null;
         const approvedFormulas = MOCK_FORMULAS.filter(f => f.status === 'อนุมัติ');
         const selectedFormula = MOCK_FORMULAS.find(f => f.id === createForm.formulaId);
-        
+
+        // Shared input style
+        const inputStyle = { width: '100%', padding: '9px 14px', borderRadius: 8, border: '1.5px solid #cbd5e1', fontSize: 13, fontFamily: 'inherit', boxSizing: 'border-box', height: 40, outline: 'none', transition: 'all 0.2s', background: '#fff' };
+        const labelStyle = { display: 'block', fontSize: 12, fontWeight: 600, color: '#334155', marginBottom: 6 };
+        const sectionHeaderStyle = { fontSize: 14, fontWeight: 700, color: '#1e293b', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #f1f5f9', paddingBottom: 8 };
+
         return (
             <div className="rnd-modal-overlay" onClick={() => { setShowCreateModal(false); setCreateFromSOData(null); }}>
-                <div className="rnd-modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
-                    <div className="rnd-modal-header">
+                <div className="rnd-modal" style={{ maxWidth: 880, width: '92%' }} onClick={(e) => e.stopPropagation()}>
+                    {/* ── Header ── */}
+                    <div className="rnd-modal-header" style={{ borderBottom: '1px solid #e2e8f0', padding: '18px 28px', background: '#f8fafc' }}>
                         <div>
-                            <h2>สร้างใบสั่งผลิตใหม่</h2>
-                            <div className="rnd-modal-meta">
-                                <span className="badge badge-primary">Production Plan</span>
-                            </div>
+                            <h2 style={{ margin: 0, fontSize: 19, fontWeight: 700, color: '#0f172a' }}>สร้างใบสั่งผลิตใหม่</h2>
+                            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>ระบุข้อมูลสูตร กำหนดการ และจำนวนเพื่อสร้าง Job Order ใหม่</p>
                         </div>
-                        <button className="rnd-modal-close" onClick={() => { setShowCreateModal(false); setCreateFromSOData(null); }}><XCircle size={22} /></button>
+                        <button className="rnd-modal-close" onClick={() => { setShowCreateModal(false); setCreateFromSOData(null); }}><XCircle size={24} /></button>
                     </div>
-                    <div className="rnd-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                        {/* ── SO Reference Info ── */}
-                        {createFromSOData && (
-                            <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 14, marginBottom: 18 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontWeight: 600, fontSize: 14, color: '#0369a1' }}>
-                                    <ShoppingCart size={15} /> ข้อมูลจากคำสั่งขาย: {createFromSOData.soNo}
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 12, marginBottom: 10 }}>
-                                    <div><span style={{ color: 'var(--text-muted)' }}>ลูกค้า:</span> <strong>{createFromSOData.customerName}</strong></div>
-                                    <div><span style={{ color: 'var(--text-muted)' }}>กำหนดส่ง:</span> <strong style={{ color: '#dc2626' }}>{createFromSOData.deliveryDate ? new Date(createFromSOData.deliveryDate).toLocaleDateString('th-TH') : '-'}</strong></div>
-                                </div>
-                                <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-                                    <thead>
-                                        <tr style={{ borderBottom: '1px solid #bae6fd', color: '#0369a1' }}>
-                                            <th style={{ padding: '4px 6px', textAlign: 'left', width: 30 }}>#</th>
-                                            <th style={{ padding: '4px 6px', textAlign: 'left' }}>ชื่อสินค้า</th>
-                                            <th style={{ padding: '4px 6px', textAlign: 'right' }}>จำนวน</th>
-                                            <th style={{ padding: '4px 6px', textAlign: 'left' }}>หน่วย</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {createFromSOData.items.map((item, idx) => (
-                                            <tr key={idx} style={{ borderBottom: '1px solid #e0f2fe' }}>
-                                                <td style={{ padding: '4px 6px' }}>{idx + 1}</td>
-                                                <td style={{ padding: '4px 6px', fontWeight: 500 }}>{item.ItemName}</td>
-                                                <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: '#0369a1' }}>{Number(item.Qty || 0).toLocaleString('th-TH')}</td>
-                                                <td style={{ padding: '4px 6px' }}>{item.Unit || 'ชิ้น'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+
+                    <div className="rnd-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', padding: '24px 28px' }}>
+
+                        {/* ══ Section: อ้างอิงจาก SO ══ */}
+                        <div style={{ marginBottom: 24, background: '#f8fafc', padding: 18, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                            <div style={sectionHeaderStyle}>
+                                <ShoppingCart size={18} color="#0284c7" />
+                                <span>อ้างอิงจากคำสั่งขาย (Sales Order)</span>
+                                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginLeft: 'auto' }}>(ไม่บังคับ)</span>
                             </div>
-                        )}
-                        {/* ── Section 1: สูตรการผลิต ── */}
-                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Beaker size={16} style={{ color: '#7b7bf5' }} /> เลือกสูตรการผลิต (จาก R&D)
-                        </h4>
-                        <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
-                            <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
-                                <label>สูตรที่อนุมัติแล้ว <span style={{ color: '#ef4444' }}>*</span></label>
-                                <CustomSelect 
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.formulaId} 
-                                    onChange={(e) => handleFormulaSelect(e.target.value)}
+                            {createFromSOData ? (
+                                <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, padding: 14 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, fontSize: 14, color: '#0369a1' }}>
+                                            <ShoppingCart size={15} /> {createFromSOData.soNo}
+                                        </div>
+                                        <button 
+                                            style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 12, textDecoration: 'underline' }}
+                                            onClick={() => setCreateFromSOData(null)}
+                                        >ยกเลิกลิงก์</button>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 13 }}>
+                                        <div><span style={{ color: '#64748b' }}>ลูกค้า:</span> <strong>{createFromSOData.customerName}</strong></div>
+                                        <div><span style={{ color: '#64748b' }}>กำหนดส่ง:</span> <strong style={{ color: '#dc2626' }}>{createFromSOData.deliveryDate ? new Date(createFromSOData.deliveryDate).toLocaleDateString('th-TH') : '-'}</strong></div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <CustomSelect
+                                    style={{ ...inputStyle, height: 42 }}
+                                    value=""
+                                    onChange={async (e) => {
+                                        const soId = e.target.value;
+                                        if (!soId) return;
+                                        const list = allSalesOrders.length > 0 ? allSalesOrders : pendingSalesOrders;
+                                        const selectedSO = list.find(so => String(so.SalesOrderID) === String(soId));
+                                        if (selectedSO) {
+                                            setShowCreateModal(false);
+                                            setCreateFromSOData(null);
+                                            handleCreateFromSO(selectedSO);
+                                        } else {
+                                            try {
+                                                const res = await fetch(`${API_BASE}/sales-orders/${soId}`);
+                                                const json = await res.json();
+                                                if (json.success) {
+                                                    setShowCreateModal(false);
+                                                    setCreateFromSOData(null);
+                                                    handleCreateFromSO(json.data);
+                                                }
+                                            } catch (err) { console.error(err); }
+                                        }
+                                    }}
                                 >
-                                    <option value="">-- เลือกสูตร --</option>
-                                    {approvedFormulas.map(f => (
-                                        <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize} {f.unit}/batch)</option>
+                                    <option value="">-- กรอกข้อมูลเอง (ไม่ระบุ SO) --</option>
+                                    {(allSalesOrders.length > 0 ? allSalesOrders : pendingSalesOrders).map(so => (
+                                        <option key={so.SalesOrderID} value={so.SalesOrderID}>
+                                            {so.SalesOrderNo} — {so.CustomerName} ({so.Status || 'คำสั่งขาย'})
+                                        </option>
                                     ))}
                                 </CustomSelect>
+                            )}
+                        </div>
+
+                        {/* ══ Section: สูตรและจำนวนการผลิต ══ */}
+                        <div style={{ marginBottom: 24, background: '#fff', padding: 18, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                            <div style={sectionHeaderStyle}>
+                                <Beaker size={18} color="#6366f1" />
+                                <span>สูตรการผลิตและปริมาณ</span>
                             </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                <div>
+                                    <label style={labelStyle}>ชื่อผลิตภัณฑ์ที่สั่งผลิตจริง <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <input 
+                                        type="text" 
+                                        style={inputStyle}
+                                        value={createForm.productName} 
+                                        onChange={(e) => setCreateForm({...createForm, productName: e.target.value})}
+                                        placeholder="เช่น ยาสเปรย์ผสมกระดูกไก่ดำ ตรา นารีเฮิร์บ"
+                                    />
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>สูตรการผลิตที่อนุมัติแล้ว <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <CustomSelect 
+                                        style={inputStyle}
+                                        value={createForm.formulaId} 
+                                        onChange={(e) => handleFormulaSelect(e.target.value)}
+                                    >
+                                        <option value="">-- เลือกสูตรจาก R&D --</option>
+                                        {approvedFormulas.map(f => (
+                                            <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize} {f.unit}/batch)</option>
+                                        ))}
+                                    </CustomSelect>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 14, alignItems: 'end' }}>
+                                <div>
+                                    <label style={labelStyle}>ยอดผลิตที่ต้องการรวม <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <input type="number" min="1" style={inputStyle}
+                                        value={createForm.totalQty}
+                                        onChange={(e) => handleTotalQtyChange(e.target.value)}
+                                        placeholder="ใส่จำนวนรวมที่ต้องการ"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label style={labelStyle}>ขนาดต่อ Batch</label>
+                                    <div style={{ ...inputStyle, background: '#f8fafc', display: 'flex', alignItems: 'center', fontWeight: 600, color: '#475569' }}>
+                                        {createForm.batchSize > 0 ? `${createForm.batchSize.toLocaleString()} ${createForm.unit}` : '—'}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label style={labelStyle}>จำนวน Batch</label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <input type="number" min="1"
+                                            style={{ ...inputStyle, width: 75, textAlign: 'center', fontWeight: 700, color: '#4338ca', borderColor: '#818cf8', flexShrink: 0 }}
+                                            value={createForm.batchQty}
+                                            onChange={(e) => setCreateForm(prev => ({ ...prev, batchQty: parseInt(e.target.value) || 1 }))}
+                                        />
+                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#4338ca' }}>Batch</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             {selectedFormula && (
-                                <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1', background: '#f0fdf4', padding: 12, borderRadius: 8 }}>
-                                    <label style={{ color: '#059669' }}>รายละเอียดสูตร</label>
-                                    <span style={{ fontSize: 13 }}>
-                                        {selectedFormula.description}<br/>
-                                        <strong>Batch Size:</strong> {selectedFormula.batchSize} {selectedFormula.unit} | 
-                                        <strong> อายุสินค้า:</strong> {selectedFormula.shelfLife} | 
-                                        <strong> Version:</strong> {selectedFormula.version}
-                                    </span>
+                                <div style={{ marginTop: 14, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#166534' }}>
+                                    <strong>รายละเอียดสูตร:</strong> {selectedFormula.name} — {selectedFormula.description} (อายุ: {selectedFormula.shelfLife} | Ver. {selectedFormula.version})
                                 </div>
                             )}
                         </div>
 
-                        {/* ── Section 2: จำนวนการผลิต ── */}
-                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Package size={16} style={{ color: '#1e88e5' }} /> จำนวนการผลิต
-                        </h4>
-                        <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
-                            <div className="rnd-modal-info-item">
-                                <label>ยอดผลิตที่ต้องการรวม <span style={{ color: '#ef4444' }}>*</span></label>
-                                <input type="number" min="1"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.totalQty}
-                                    onChange={(e) => handleTotalQtyChange(e.target.value)}
-                                    placeholder="ใส่จำนวณรวมที่ต้องการ"
-                                />
+                        {/* ══ Section: กำหนดการและสายการผลิต ══ */}
+                        <div style={{ marginBottom: 24, background: '#fff', padding: 18, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                            <div style={sectionHeaderStyle}>
+                                <CalendarDays size={18} color="#d97706" />
+                                <span>การวางแผนและกำหนดการผลิต</span>
                             </div>
-                            <div className="rnd-modal-info-item">
-                                <label>ขนาดต่อ Batch</label>
-                                <span style={{ fontSize: 16, fontWeight: 700, color: '#7b7bf5' }}>
-                                    {createForm.batchSize > 0 ? `${createForm.batchSize.toLocaleString()} ${createForm.unit}` : '—'}
-                                </span>
-                            </div>
-                            <div className="rnd-modal-info-item" style={{ background: '#f0ebff', padding: 12, borderRadius: 8 }}>
-                                <label style={{ color: '#7b7bf5', fontWeight: 700 }}>จำนวน Batch (จำนวนใบงาน)</label>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                                    <input 
-                                        type="number" min="1"
-                                        style={{ width: '80px', padding: '6px 12px', borderRadius: 8, border: '1.5px solid #c4b5fd', fontSize: 16, fontWeight: 700, color: '#5b21b6' }}
-                                        value={createForm.batchQty}
-                                        onChange={(e) => setCreateForm(prev => ({ ...prev, batchQty: parseInt(e.target.value) || 1 }))}
-                                    />
-                                    <span style={{ fontSize: 16, fontWeight: 800, color: '#5b21b6' }}>Batch</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+                                <div>
+                                    <label style={labelStyle}>ประเภทการผลิต</label>
+                                    <CustomSelect style={inputStyle}
+                                        value={createForm.productionType}
+                                        onChange={(e) => setCreateForm({...createForm, productionType: e.target.value})}
+                                    >
+                                        <option value="ผลิตตามแผน">ผลิตตามแผน (MTS)</option>
+                                        <option value="ผลิตตามออร์เดอร์ (OEM)">ผลิตตามออร์เดอร์ (OEM)</option>
+                                        <option value="ผลิตเร่งด่วน">ผลิตเร่งด่วน (Urgent)</option>
+                                        <option value="ผลิตทดสอบ">ผลิตทดสอบ (Trial Run)</option>
+                                    </CustomSelect>
                                 </div>
-                                <p style={{ margin: '4px 0 0', fontSize: 11, color: '#7b7bf5' }}>* ระบบจะแยกเป็นหลายใบงานตามจำนวนเครื่องผสม สามารถแก้เป็น 1 ได้ถ้าต้องการใบเดียว</p>
+                                <div>
+                                    <label style={labelStyle}>ความสำคัญ <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <CustomSelect style={inputStyle}
+                                        value={createForm.priority}
+                                        onChange={(e) => setCreateForm({...createForm, priority: e.target.value})}
+                                    >
+                                        <option value="ต่ำ">ต่ำ</option>
+                                        <option value="ปกติ">ปกติ</option>
+                                        <option value="สูง">สูง (ด่วน)</option>
+                                    </CustomSelect>
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>สายการผลิต (Line)</label>
+                                    <CustomSelect style={inputStyle}
+                                        value={createForm.assignedLine}
+                                        onChange={(e) => setCreateForm({...createForm, assignedLine: e.target.value})}
+                                    >
+                                        <option value="Line A">Line A (สายหลัก)</option>
+                                        <option value="Line B">Line B (สายรอง)</option>
+                                        <option value="Line C">Line C (สารเคมี)</option>
+                                    </CustomSelect>
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>วันเริ่มผลิต</label>
+                                    <CustomDatePicker 
+                                        value={createForm.planDate}
+                                        onChange={(e) => setCreateForm({...createForm, planDate: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>กำหนดเสร็จ <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <CustomDatePicker
+                                        value={createForm.dueDate}
+                                        onChange={(e) => setCreateForm({...createForm, dueDate: e.target.value})}
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        {/* ── Section 3: การวางแผน ── */}
-                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <CalendarDays size={16} style={{ color: '#f59e0b' }} /> การวางแผนและกำหนดการ
-                        </h4>
-                        <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
-                            <div className="rnd-modal-info-item">
-                                <label>ประเภทการผลิต</label>
-                                <CustomSelect style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.productionType}
-                                    onChange={(e) => setCreateForm({...createForm, productionType: e.target.value})}
-                                >
-                                    <option value="ผลิตตามแผน">ผลิตตามแผน (MTS)</option>
-                                    <option value="ผลิตตามออร์เดอร์ (OEM)">ผลิตตามออร์เดอร์ (OEM)</option>
-                                    <option value="ผลิตเร่งด่วน">ผลิตเร่งด่วน (Urgent)</option>
-                                    <option value="ผลิตทดสอบ">ผลิตทดสอบ (Trial Run)</option>
-                                </CustomSelect>
+                        {/* ══ Section: ข้อมูลเพิ่มเติม ══ */}
+                        <div style={{ marginBottom: 24, background: '#fff', padding: 18, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                            <div style={sectionHeaderStyle}>
+                                <ClipboardList size={18} color="#059669" />
+                                <span>ข้อมูลลูกค้าและคำสั่งพิเศษ</span>
+                                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginLeft: 'auto' }}>(ไม่บังคับ)</span>
                             </div>
-                            <div className="rnd-modal-info-item">
-                                <label>ความสำคัญ <span style={{ color: '#ef4444' }}>*</span></label>
-                                <CustomSelect style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.priority}
-                                    onChange={(e) => setCreateForm({...createForm, priority: e.target.value})}
-                                >
-                                    <option value="ต่ำ">ต่ำ</option>
-                                    <option value="ปกติ">ปกติ</option>
-                                    <option value="สูง">สูง (ด่วน)</option>
-                                </CustomSelect>
-                            </div>
-                            <div className="rnd-modal-info-item">
-                                <label>วันเริ่มผลิต</label>
-                                <CustomDatePicker 
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.planDate}
-                                    onChange={(e) => setCreateForm({...createForm, planDate: e.target.value})}
-                                />
-                            </div>
-                            <div className="rnd-modal-info-item">
-                                <label>กำหนดเสร็จ <span style={{ color: '#ef4444' }}>*</span></label>
-                                <CustomDatePicker
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.dueDate}
-                                    onChange={(e) => setCreateForm({...createForm, dueDate: e.target.value})}
-                                />
-                            </div>
-                            <div className="rnd-modal-info-item">
-                                <label>สายการผลิต (Production Line)</label>
-                                <CustomSelect style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.assignedLine}
-                                    onChange={(e) => setCreateForm({...createForm, assignedLine: e.target.value})}
-                                >
-                                    <option value="Line A">Line A (สายหลัก)</option>
-                                    <option value="Line B">Line B (สายรอง)</option>
-                                    <option value="Line C">Line C (สารเคมี)</option>
-                                </CustomSelect>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                                <div>
+                                    <label style={labelStyle}>ชื่อแบรนด์ / ชื่อลูกค้า</label>
+                                    <input type="text" placeholder="เช่น มานะคท, บจก.สมุนไพรไทย" style={inputStyle}
+                                        value={createForm.customerName}
+                                        onChange={(e) => setCreateForm({...createForm, customerName: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>เลขที่ PO / เลขอ้างอิง</label>
+                                    <input type="text" placeholder="เช่น PO-2026-0510" style={inputStyle}
+                                        value={createForm.customerPO}
+                                        onChange={(e) => setCreateForm({...createForm, customerPO: e.target.value})}
+                                    />
+                                </div>
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <label style={labelStyle}>หมายเหตุ / คำสั่งพิเศษ</label>
+                                    <textarea rows={2} placeholder="เช่น ต้องติดฉลากภาษาอังกฤษ, ห่อพิเศษสำหรับส่งออก"
+                                        style={{ ...inputStyle, height: 'auto', resize: 'vertical' }}
+                                        value={createForm.notes}
+                                        onChange={(e) => setCreateForm({...createForm, notes: e.target.value})}
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        {/* ── Section 4: ข้อมูลลูกค้า (ถ้ามี) ── */}
-                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <ClipboardList size={16} style={{ color: '#059669' }} /> ข้อมูลเพิ่มเติม (ถ้ามี)
-                        </h4>
-                        <div className="rnd-modal-info-grid" style={{ marginBottom: 20 }}>
-                            <div className="rnd-modal-info-item">
-                                <label>ชื่อลูกค้า / บริษัท</label>
-                                <input type="text" placeholder="เช่น บจก.สมุนไพรไทย"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.customerName}
-                                    onChange={(e) => setCreateForm({...createForm, customerName: e.target.value})}
-                                />
+                        {/* ══ Section: ผู้ลงนามและอนุมัติเอกสาร ══ */}
+                        <div style={{ marginBottom: 24, background: '#fff', padding: 18, borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                            <div style={sectionHeaderStyle}>
+                                <UserCheck size={18} color="#7c3aed" />
+                                <span>ผู้ลงนามและอนุมัติเอกสาร (4 ฝ่าย)</span>
                             </div>
-                            <div className="rnd-modal-info-item">
-                                <label>เลขที่ PO / เลขอ้างอิง</label>
-                                <input type="text" placeholder="เช่น PO-2026-0510"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14 }}
-                                    value={createForm.customerPO}
-                                    onChange={(e) => setCreateForm({...createForm, customerPO: e.target.value})}
-                                />
-                            </div>
-                            <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
-                                <label>หมายเหตุ / คำสั่งพิเศษ</label>
-                                <textarea rows={3} placeholder="เช่น ต้องติดฉลากภาษาอังกฤษ, ห่อพิเศษสำหรับส่งออก"
-                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1.5px solid #e5e7eb', fontSize: 14, resize: 'vertical' }}
-                                    value={createForm.notes}
-                                    onChange={(e) => setCreateForm({...createForm, notes: e.target.value})}
-                                />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+                                <div>
+                                    <label style={labelStyle}>ผู้ขอสั่งผลิต (วางแผน)</label>
+                                    <CustomSelect 
+                                        style={getSignatureSelectStyle(inputStyle, createForm.requestedBy)}
+                                        value={createForm.requestedBy}
+                                        onChange={(e) => setCreateForm({...createForm, requestedBy: e.target.value})}
+                                    >
+                                        <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                        {signatureOptions.map(name => (
+                                            <option key={name} value={name}>
+                                                {name}{hasSignature(name) ? ' (มีลายเซ็น)' : ''}
+                                            </option>
+                                        ))}
+                                    </CustomSelect>
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>ผู้ตรวจสอบ (บัญชี)</label>
+                                    <CustomSelect 
+                                        style={getSignatureSelectStyle(inputStyle, createForm.checkedBy)}
+                                        value={createForm.checkedBy}
+                                        onChange={(e) => setCreateForm({...createForm, checkedBy: e.target.value})}
+                                    >
+                                        <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                        {signatureOptions.map(name => (
+                                            <option key={name} value={name}>
+                                                {name}{hasSignature(name) ? ' (มีลายเซ็น)' : ''}
+                                            </option>
+                                        ))}
+                                    </CustomSelect>
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>ผู้อนุมัติ (บริหาร)</label>
+                                    <CustomSelect 
+                                        style={getSignatureSelectStyle(inputStyle, createForm.approvedBy)}
+                                        value={createForm.approvedBy}
+                                        onChange={(e) => setCreateForm({...createForm, approvedBy: e.target.value})}
+                                    >
+                                        <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                        {signatureOptions.map(name => (
+                                            <option key={name} value={name}>
+                                                {name}{hasSignature(name) ? ' (มีลายเซ็น)' : ''}
+                                            </option>
+                                        ))}
+                                    </CustomSelect>
+                                </div>
+                                <div>
+                                    <label style={labelStyle}>ผู้รับผิดชอบ (ผลิต)</label>
+                                    <CustomSelect 
+                                        style={getSignatureSelectStyle(inputStyle, createForm.responsibleBy)}
+                                        value={createForm.responsibleBy}
+                                        onChange={(e) => setCreateForm({...createForm, responsibleBy: e.target.value})}
+                                    >
+                                        <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
+                                        {signatureOptions.map(name => (
+                                            <option key={name} value={name}>
+                                                {name}{hasSignature(name) ? ' (มีลายเซ็น)' : ''}
+                                            </option>
+                                        ))}
+                                    </CustomSelect>
+                                </div>
                             </div>
                         </div>
 
                         {/* ── Summary ── */}
                         {createForm.formulaId && (
-                            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: 16, marginBottom: 8 }}>
+                            <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: 10, padding: '16px 20px' }}>
                                 <strong style={{ color: '#1d4ed8', fontSize: 14 }}>📋 สรุปใบสั่งผลิต</strong>
-                                <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.8, color: '#374151' }}>
-                                    <div>สูตร: <strong>{createForm.formulaName}</strong> ({createForm.formulaId})</div>
-                                    <div>ผลิต: <strong>{createForm.batchQty} batch × {createForm.batchSize.toLocaleString()} = {createForm.totalQty.toLocaleString()} {createForm.unit}</strong></div>
+                                <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.8, color: '#334155', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 20px' }}>
+                                    <div>ผลิตภัณฑ์: <strong>{createForm.productName || createForm.formulaName}</strong></div>
+                                    <div>สูตรการผลิต: <strong>{createForm.formulaName}</strong> ({createForm.formulaId})</div>
+                                    <div>ยอดผลิต: <strong>{createForm.batchQty} batch × {createForm.batchSize.toLocaleString()} = {createForm.totalQty.toLocaleString()} {createForm.unit}</strong></div>
                                     <div>ไลน์: <strong>{createForm.assignedLine}</strong> | ความสำคัญ: <strong>{createForm.priority}</strong></div>
                                     <div>กำหนดการ: {createForm.planDate} → {createForm.dueDate || '(ยังไม่ระบุ)'}</div>
-                                    {createForm.customerName && <div>ลูกค้า: <strong>{createForm.customerName}</strong> {createForm.customerPO && `(${createForm.customerPO})`}</div>}
+                                    {createFromSOData && <div style={{ gridColumn: '1 / -1', color: '#0369a1' }}>🔗 อ้างอิง SO: <strong>{createFromSOData.soNo}</strong></div>}
+                                    {createForm.customerName && <div style={{ gridColumn: '1 / -1' }}>ลูกค้า: <strong>{createForm.customerName}</strong> {createForm.customerPO && `(${createForm.customerPO})`}</div>}
                                 </div>
                             </div>
                         )}
                     </div>
-                    <div className="rnd-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '16px 24px', borderTop: '1px solid #e5e7eb' }}>
+
+                    {/* ── Footer ── */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, padding: '16px 28px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
                         <button className="btn-secondary" onClick={() => setShowCreateModal(false)} disabled={isCreating}>ยกเลิก</button>
-                        <button className="btn-primary" onClick={handleCreateSubmit} disabled={isCreating || !createForm.formulaId}>
+                        <button 
+                            type="button" 
+                            className="btn-secondary" 
+                            style={{ background: '#ecfdf5', color: '#047857', border: '1.5px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 14, fontWeight: 600, cursor: createForm.formulaId ? 'pointer' : 'not-allowed', opacity: createForm.formulaId ? 1 : 0.6 }}
+                            onClick={() => {
+                                if (!createForm.formulaId) return showAlert('ข้อมูลไม่ครบ', 'กรุณาเลือกสูตรการผลิตก่อนพรีวิว', 'warning');
+                                const draftJob = {
+                                    id: 'JO-DRAFT',
+                                    formulaId: createForm.formulaId,
+                                    formulaName: createForm.productName || createForm.formulaName || selectedFormula?.name || 'ผลิตภัณฑ์',
+                                    productName: createForm.productName || createForm.formulaName || selectedFormula?.name || 'ผลิตภัณฑ์',
+                                    batchSize: createForm.batchSize || 0,
+                                    batchQty: createForm.batchQty || 1,
+                                    totalQty: createForm.totalQty || 0,
+                                    unit: createForm.unit || 'ชิ้น',
+                                    priority: createForm.priority || 'ปกติ',
+                                    assignedLine: createForm.assignedLine || 'Line A',
+                                    planDate: createForm.planDate || new Date().toISOString().split('T')[0],
+                                    dueDate: createForm.dueDate || new Date().toISOString().split('T')[0],
+                                    status: 'รอผลิต',
+                                    progress: 0,
+                                    notes: createForm.productName ? `สินค้า: ${createForm.productName} | ${createForm.notes || ''}` : createForm.notes,
+                                    customerName: createForm.customerName || (createFromSOData ? createFromSOData.customerName : ''),
+                                    customerPO: createForm.customerPO || '',
+                                    requestedBy: createForm.requestedBy,
+                                    checkedBy: createForm.checkedBy,
+                                    approvedBy: createForm.approvedBy,
+                                    responsibleBy: createForm.responsibleBy,
+                                };
+                                setPreviewJob(draftJob);
+                            }}
+                            disabled={!createForm.formulaId}
+                        >
+                            <FileText size={16} /> พรีวิวเอกสาร
+                        </button>
+                        <button className="btn-primary" onClick={handleCreateSubmit} disabled={isCreating || !createForm.formulaId} style={{ padding: '8px 20px', fontSize: 14 }}>
                             {isCreating ? 'กำลังสร้าง...' : '✅ สร้างใบสั่งผลิต'}
                         </button>
                     </div>
@@ -1409,6 +1769,7 @@ export default function Planning() {
             {renderCreateModal()}
             {renderSODetailModal()}
             {renderSOPlanModal()}
+            {previewJob && <ProductionOrderPreview job={previewJob} onClose={() => setPreviewJob(null)} />}
         </div>
     );
 }

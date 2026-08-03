@@ -4,6 +4,23 @@ const { poolPromise, sql } = require('../config/db');
 const { getDatePrefix, getShortDatePrefix } = require('../utils/sequence');
 const { authorizeRoles } = require('../middleware/authorize');
 
+// ── Auto-migrate: add signature columns if missing ──
+(async () => {
+    try {
+        const pool = await poolPromise;
+        const cols = ['RequestedBy', 'CheckedBy', 'ApprovedBy', 'ResponsibleBy'];
+        for (const col of cols) {
+            await pool.request().query(`
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Planner' AND COLUMN_NAME='${col}')
+                ALTER TABLE Planner ADD ${col} NVARCHAR(200) NULL
+            `);
+        }
+        console.log('[Planner] Signature columns ensured.');
+    } catch (e) {
+        console.error('[Planner] Migration error:', e.message);
+    }
+})();
+
 // Get all planner jobs
 router.get('/', async (req, res) => {
     try {
@@ -72,7 +89,11 @@ router.get('/', async (req, res) => {
                 assignedLine: job.AssignedLine,
                 notes: job.Notes,
                 createdBy: job.CreatedBy,
-                progress: progress
+                progress: progress,
+                requestedBy: job.RequestedBy || '',
+                checkedBy: job.CheckedBy || '',
+                approvedBy: job.ApprovedBy || '',
+                responsibleBy: job.ResponsibleBy || '',
             };
         });
 
@@ -115,16 +136,18 @@ router.put('/:id/status', authorizeRoles('admin', 'executive', 'planner'), async
 router.post('/', authorizeRoles('admin', 'executive', 'planner'), async (req, res) => {
     try {
         const { 
-            formulaId, formulaName, batchQty, batchSize, totalQty, unit, 
+            formulaId, formulaName, productName, batchQty, batchSize, totalQty, unit, 
             priority, planDate, dueDate, assignedLine, notes, createdBy,
-            customerName, customerPO, productionType
+            customerName, customerPO, productionType,
+            requestedBy, checkedBy, approvedBy, responsibleBy
         } = req.body;
         
         // Build enriched notes
         let fullNotes = notes || '';
         if (productionType) fullNotes = `[${productionType}] ${fullNotes}`;
-        if (customerName) fullNotes += ` | ลูกค้า: ${customerName}`;
-        if (customerPO) fullNotes += ` (${customerPO})`;
+        if (productName && !fullNotes.includes('สินค้า:')) fullNotes += ` | สินค้า: ${productName}`;
+        if (customerName && !fullNotes.includes('ลูกค้า:')) fullNotes += ` | ลูกค้า: ${customerName}`;
+        if (customerPO && !fullNotes.includes(customerPO)) fullNotes += ` (${customerPO})`;
         
         const pool = await poolPromise;
         
@@ -155,15 +178,21 @@ router.post('/', authorizeRoles('admin', 'executive', 'planner'), async (req, re
             .input('AssignedLine', sql.NVarChar, assignedLine || 'Line A')
             .input('Notes', sql.NVarChar, fullNotes)
             .input('CreatedBy', sql.VarChar, createdBy || 'system')
+            .input('RequestedBy', sql.NVarChar, requestedBy || '')
+            .input('CheckedBy', sql.NVarChar, checkedBy || '')
+            .input('ApprovedBy', sql.NVarChar, approvedBy || '')
+            .input('ResponsibleBy', sql.NVarChar, responsibleBy || '')
             .query(`
                 INSERT INTO Planner (
                     PlannerID, FormulaID, FormulaName, BatchQty, BatchSize, TotalQty, Unit, 
-                    Status, Priority, PlanDate, DueDate, AssignedLine, Notes, CreatedBy
+                    Status, Priority, PlanDate, DueDate, AssignedLine, Notes, CreatedBy,
+                    RequestedBy, CheckedBy, ApprovedBy, ResponsibleBy
                 )
                 OUTPUT INSERTED.*
                 VALUES (
                     @PlannerID, @FormulaID, @FormulaName, @BatchQty, @BatchSize, @TotalQty, @Unit, 
-                    @Status, @Priority, @PlanDate, @DueDate, @AssignedLine, @Notes, @CreatedBy
+                    @Status, @Priority, @PlanDate, @DueDate, @AssignedLine, @Notes, @CreatedBy,
+                    @RequestedBy, @CheckedBy, @ApprovedBy, @ResponsibleBy
                 )
             `);
             

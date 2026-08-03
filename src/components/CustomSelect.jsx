@@ -29,10 +29,14 @@ const CustomSelect = ({ value, onChange, name, className, style = {}, children, 
         if (isOpen) {
             if (usePortal && containerRef.current) {
                 const rect = containerRef.current.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const openUpwards = spaceBelow < 220 && rect.top > 200;
+                
                 setPortalStyle({
-                    top: rect.bottom + window.scrollY,
-                    left: rect.left + window.scrollX,
-                    width: Math.max(rect.width, 150)
+                    top: openUpwards ? 'auto' : (rect.bottom + 4) + 'px',
+                    bottom: openUpwards ? (window.innerHeight - rect.top + 4) + 'px' : 'auto',
+                    left: rect.left + 'px',
+                    width: Math.max(rect.width, 120) + 'px'
                 });
             }
             document.addEventListener('mousedown', handleClickOutside);
@@ -103,19 +107,20 @@ const CustomSelect = ({ value, onChange, name, className, style = {}, children, 
 
             {isOpen && (usePortal ? createPortal(
                 <div style={{
-                    position: 'absolute',
-                    top: (portalStyle.top + 6) + 'px',
-                    left: portalStyle.left + 'px',
-                    width: portalStyle.width + 'px',
+                    position: 'fixed',
+                    top: portalStyle.top,
+                    bottom: portalStyle.bottom,
+                    left: portalStyle.left,
+                    width: portalStyle.width,
                     background: '#fff',
-                    border: '1px solid #e2e8f0',
+                    border: '1px solid #cbd5e1',
                     borderRadius: '8px',
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                    zIndex: 9999,
-                    maxHeight: '250px',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    zIndex: 999999,
+                    maxHeight: '220px',
                     overflowY: 'auto',
                     padding: '4px',
-                    minWidth: '150px'
+                    minWidth: '120px'
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
                 >

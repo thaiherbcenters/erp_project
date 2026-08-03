@@ -94,11 +94,15 @@ router.get('/status/approved', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query(`
             SELECT 
-                QuotationID, QuotationNo, ContractID, CustomerName, BillDate, 
-                GrandTotal, Status
-            FROM Quotation
-            WHERE Status != N'สร้าง SO แล้ว'
-            ORDER BY QuotationID DESC
+                q.QuotationID, q.QuotationNo, q.ContractID, q.CustomerName, q.BillDate, 
+                q.GrandTotal, q.Status,
+                CASE 
+                    WHEN q.Status = N'สร้าง SO แล้ว' THEN 1
+                    WHEN EXISTS (SELECT 1 FROM SalesOrder so WHERE so.QuotationID = q.QuotationID OR so.QuotationNo = q.QuotationNo) THEN 1
+                    ELSE 0 
+                END AS IsUsed
+            FROM Quotation q
+            ORDER BY q.QuotationID DESC
         `);
         res.json({ success: true, data: result.recordset });
     } catch (err) {

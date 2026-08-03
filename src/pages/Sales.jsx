@@ -17,7 +17,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
-import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search, Copy, Upload, Download, UploadCloud } from 'lucide-react';
+import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search, Copy, Upload, Download, UploadCloud, RotateCcw } from 'lucide-react';
 import { MOCK_CUSTOMERS } from '../data/mockData';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
@@ -126,6 +126,7 @@ export default function Sales() {
     const [localSalesOrders, setLocalSalesOrders] = useState([]);
     const [editingSOId, setEditingSOId] = useState(null);
     const [isSOViewOnly, setIsSOViewOnly] = useState(false);
+    const [previewSOId, setPreviewSOId] = useState(null);
 
     // ── State: POA ──
     const [showPOAForm, setShowPOAForm] = useState(false);
@@ -429,6 +430,7 @@ export default function Sales() {
             else if (docType === 'TaxInvoice') endpoint = `${API_BASE}/tax-invoices/${id}/history`;
             else if (docType === 'Receipt') endpoint = `${API_BASE}/receipts/${id}/history`;
             else if (docType === 'DeliveryOrder') endpoint = `${API_BASE}/delivery-orders/${id}/history`;
+            else if (docType === 'SalesOrder') endpoint = `${API_BASE}/sales-orders/${id}/history`;
             
             const res = await fetch(endpoint);
             const json = await res.json();
@@ -678,6 +680,32 @@ export default function Sales() {
         } catch (err) {
             console.error('Error sending to planner:', err);
             showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการส่งข้อมูล', 'error');
+        }
+    };
+
+    const handleRevertSOToDraft = async (so) => {
+        const ok = await showConfirm(
+            'ยืนยันดึงกลับเป็นร่าง',
+            `คุณต้องการดึงคำสั่งขาย ${so.SalesOrderNo} กลับมาเป็นสถานะ 'ร่าง' เพื่อแก้ไขใช่หรือไม่?`,
+            'warning'
+        );
+        if (!ok) return;
+        try {
+            const res = await fetch(`${API_BASE}/sales-orders/${so.SalesOrderID}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'ร่าง' })
+            });
+            const json = await res.json();
+            if (json.success) {
+                setLocalSalesOrders(prev => prev.map(s => s.SalesOrderID === so.SalesOrderID ? { ...s, Status: 'ร่าง' } : s));
+                showAlert('สำเร็จ', `ดึง ${so.SalesOrderNo} กลับมาเป็นสถานะ 'ร่าง' เรียบร้อยแล้ว สามารถแก้ไขข้อมูลได้ทันที`, 'success');
+            } else {
+                showAlert('ข้อผิดพลาด', json.message, 'error');
+            }
+        } catch (err) {
+            console.error('Error reverting SO to draft:', err);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการดึงเอกสารกลับ', 'error');
         }
     };
 
@@ -1681,7 +1709,14 @@ export default function Sales() {
                                         ) : filteredOrders.map((o, idx) => (
                                             <tr key={o.SalesOrderID}>
                                                 <td>{idx + 1}</td>
-                                                <td className="text-bold">{o.SalesOrderNo}</td>
+                                                <td className="text-bold">
+                                                    {o.SalesOrderNo}
+                                                    {o.Revision > 0 && (
+                                                        <span style={{ fontSize: '11px', background: '#e0e7ff', color: '#3730a3', padding: '1px 6px', borderRadius: '4px', marginLeft: '6px', fontWeight: 600 }}>
+                                                            v.{o.Revision + 1}
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td>{o.QuotationNo || '—'}</td>
                                                 <td>{o.CustomerName}</td>
                                                 <td>{o.CustomerPONumber || '—'}</td>
@@ -1690,20 +1725,38 @@ export default function Sales() {
                                                 <td><span className={`badge ${getOrderStatusClass(o.Status)}`}>{o.Status}</span></td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
-                                                        {o.Status === 'ร่าง' && (
-                                                            <button className="btn-icon text-slate-600 hover:bg-slate-50 hover:text-slate-700" title="ส่งให้ Planner" style={{ background: '#dbeafe', color: '#2563eb' }} onClick={() => handleSendToPlanner(o)}>
-                                                                <Send size={16} />
+                                                        {o.Revision > 0 && (
+                                                            <button className="btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700" style={{ color: '#9333ea', background: '#faf5ff' }} title="ดูประวัติการแก้ไข (History)" onClick={() => handleViewHistory(o.SalesOrderID, 'SalesOrder')}>
+                                                                <History size={16} />
                                                             </button>
                                                         )}
-                                                        <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดูรายละเอียด" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(true); setShowSOForm(true); }}>
-                                                            <Eye size={16} />
-                                                        </button>
-                                                        <button className="btn-icon text-amber-500 hover:bg-amber-50 hover:text-amber-600" title="แก้ไข" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(false); setShowSOForm(true); }}>
-                                                            <Edit size={16} />
-                                                        </button>
-                                                        <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" title="ลบ" onClick={() => handleDeleteSO(o.SalesOrderID)}>
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        {o.Status === 'ร่าง' ? (
+                                                            <>
+                                                                <button className="btn-icon text-slate-600 hover:bg-slate-50 hover:text-slate-700" title="ส่งให้ Planner" style={{ background: '#dbeafe', color: '#2563eb' }} onClick={() => handleSendToPlanner(o)}>
+                                                                    <Send size={16} />
+                                                                </button>
+                                                                <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดูรายละเอียด" onClick={() => setPreviewSOId(o.SalesOrderID)}>
+                                                                    <Eye size={16} />
+                                                                </button>
+                                                                <button className="btn-icon text-amber-500 hover:bg-amber-50 hover:text-amber-600" title="แก้ไข" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(false); setShowSOForm(true); }}>
+                                                                    <Edit size={16} />
+                                                                </button>
+                                                                <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" title="ลบ" onClick={() => handleDeleteSO(o.SalesOrderID)}>
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดูรายละเอียด" onClick={() => setPreviewSOId(o.SalesOrderID)}>
+                                                                    <Eye size={16} />
+                                                                </button>
+                                                                {o.Status === 'ส่ง Planner แล้ว' && (
+                                                                    <button className="btn-icon text-amber-600 hover:bg-amber-50 hover:text-amber-700" title="ดึงกลับมาเป็นร่างเพื่อแก้ไข" style={{ background: '#fef3c7', color: '#d97706' }} onClick={() => handleRevertSOToDraft(o)}>
+                                                                        <RotateCcw size={16} />
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -2035,11 +2088,7 @@ export default function Sales() {
                         } else if (docType === 'Receipt' || docType === 'ใบเสร็จรับเงิน') {
                             setPreviewDocModal({ type: 'Receipt', id: docId, hideEdit: true });
                         } else if (docType === 'Sales Order' || docType === 'ใบสั่งขาย' || docType === 'ใบสั่งซื้อ') {
-                            setEditingSOId(docId);
-                            setIsSOViewOnly(true);
-                            setShowSOForm(true);
-                            setReturnTab('sales_contracts');
-                            setSearchParams({ tab: 'sales_orders' });
+                            setPreviewSOId({ id: docId, hideEdit: true });
                         } else if (['poa', 'corp_rep', 'herbal_cert', 'torbor1', 'contract_mfg', 'pdpa_consent', 'safety_cert'].includes(docType)) {
                             // สำหรับเอกสารทางกฎหมาย ให้ดึง PDF มาพรีวิว
                             showLoading('กำลังเปิดเอกสาร...', 'กรุณารอสักครู่ ระบบกำลังสร้าง PDF');
@@ -2303,6 +2352,8 @@ export default function Sales() {
                                                         setShowHistoryModal(false);
                                                         if (historyDocType === 'BillingInvoice') {
                                                             setPreviewBillingId(`history-${h.HistoryID}`);
+                                                        } else if (historyDocType === 'SalesOrder') {
+                                                            setPreviewSOId(`history-${h.HistoryID}`);
                                                         } else if (historyDocType === 'TaxInvoice' || historyDocType === 'DeliveryOrder' || historyDocType === 'Receipt') {
                                                             setPreviewDocModal({ type: historyDocType, id: `history-${h.HistoryID}` });
                                                         } else {
@@ -2368,6 +2419,67 @@ export default function Sales() {
                                 hideControls={true}
                                 onBack={() => setPreviewQuotationId(null)}
                                 onSave={() => setPreviewQuotationId(null)}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Preview Sales Order Popup Modal ── */}
+            {previewSOId && (
+                <div className="pdf-preview-overlay" onClick={() => setPreviewSOId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: '12px', width: '95%', maxWidth: '900px', height: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Eye size={18} /> พรีวิวใบสั่งขาย
+                            </h3>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                {(() => {
+                                    const soId = typeof previewSOId === 'object' && previewSOId !== null ? previewSOId.id : previewSOId;
+                                    const soHideEdit = typeof previewSOId === 'object' && previewSOId !== null ? previewSOId.hideEdit : false;
+                                    const currentSO = localSalesOrders.find(s => s.SalesOrderID === soId || s.SalesOrderNo === soId);
+                                    const isDraft = !currentSO || currentSO.Status === 'ร่าง';
+
+                                    return !String(soId).startsWith('history-') && !soHideEdit && (
+                                        isDraft ? (
+                                            <button
+                                                onClick={() => {
+                                                    setPreviewSOId(null);
+                                                    setEditingSOId(soId);
+                                                    setIsSOViewOnly(false);
+                                                    setShowSOForm(true);
+                                                }}
+                                                style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', cursor: 'pointer', fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            >
+                                                <Edit size={14} /> แก้ไข
+                                            </button>
+                                        ) : (currentSO?.Status === 'ส่ง Planner แล้ว' && (
+                                            <button
+                                                onClick={async () => {
+                                                    setPreviewSOId(null);
+                                                    await handleRevertSOToDraft(currentSO);
+                                                }}
+                                                style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid #fcd34d', background: '#fffbeb', cursor: 'pointer', fontSize: '13px', color: '#b45309', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                            >
+                                                <RotateCcw size={14} /> ดึงกลับเป็นร่าง
+                                            </button>
+                                        ))
+                                    );
+                                })()}
+                                <button
+                                    onClick={() => setPreviewSOId(null)}
+                                    style={{ padding: '6px 14px', borderRadius: '6px', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '13px' }}
+                                >
+                                    ✕ ปิด
+                                </button>
+                            </div>
+                        </div>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '0' }}>
+                            <SalesOrderForm
+                                editId={typeof previewSOId === 'object' && previewSOId !== null ? previewSOId.id : previewSOId}
+                                viewOnly={true}
+                                onBack={() => setPreviewSOId(null)}
+                                onSave={() => setPreviewSOId(null)}
                             />
                         </div>
                     </div>
