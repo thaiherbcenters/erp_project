@@ -11,11 +11,14 @@
  *   - แสดง/ซ่อนรหัสผ่าน (Eye icon)
  *   - Loading spinner ขณะล็อกอิน
  *   - แสดง error message เมื่อล็อกอินผิดพลาด
+ *   - ป้องกัน Chrome autofill/save password แบบเด็ดขาด
+ *     (ใช้ type="text" + CSS text-security แทน type="password"
+ *      เพื่อไม่ให้ Chrome ตรวจพบว่าเป็น login form)
  *
  * =============================================================================
  */
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Eye, EyeOff, ShieldCheck, Lock, User } from 'lucide-react';
@@ -32,8 +35,11 @@ export default function Login() {
 
     const { login } = useAuth();
     const navigate = useNavigate();
+    const formRef = useRef(null);
 
     // ── Handle submit ──
+    // ใช้ formRef.reset() ก่อน navigate เพื่อล้างค่าใน DOM
+    // ป้องกัน Chrome จับค่าไปบันทึก
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -43,12 +49,23 @@ export default function Login() {
 
         const result = await login(username, password);
         if (result.success) {
+            // ล้าง state + DOM ก่อน navigate เพื่อไม่ให้ Chrome จับค่าไปบันทึก
+            setUsername('');
+            setPassword('');
+            if (formRef.current) formRef.current.reset();
             navigate(result.redirectPath);
         } else {
             setError(result.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
             setIsLoading(false);
         }
     };
+
+    // Style สำหรับ mask password ด้วย CSS แทน type="password"
+    // วิธีนี้ Chrome จะไม่เห็นว่ามี password field → ไม่ถาม "บันทึกรหัสผ่าน?"
+    const maskedStyle = !showPassword ? {
+        WebkitTextSecurity: 'disc',
+        textSecurity: 'disc',
+    } : {};
 
     return (
         <div className="login-page">
@@ -73,8 +90,12 @@ export default function Login() {
                         <p>กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งานระบบ</p>
                     </div>
 
-                    {/* ฟอร์ม Login */}
-                    <form onSubmit={handleSubmit} className="login-form">
+                    {/* ฟอร์ม Login — ไม่ใช้ <form> tag เพื่อป้องกัน Chrome ตรวจจับ */}
+                    <div
+                        ref={formRef}
+                        className="login-form"
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(e); }}
+                    >
                         {/* Error message */}
                         {error && (
                             <div className="login-error">
@@ -83,35 +104,47 @@ export default function Login() {
                             </div>
                         )}
 
-                        {/* Username */}
+                        {/* Username — ใช้ name แปลก ๆ ไม่ให้ Chrome จำ */}
                         <div className="form-group">
-                            <label htmlFor="username">ชื่อผู้ใช้งาน</label>
+                            <label>ชื่อผู้ใช้งาน</label>
                             <div className="input-wrapper">
                                 <User size={18} className="input-icon" />
                                 <input
-                                    id="username"
                                     type="text"
+                                    name="erp_xfield_u"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     placeholder="กรอกชื่อผู้ใช้งาน"
-                                    required
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck="false"
+                                    data-lpignore="true"
+                                    data-1p-ignore="true"
                                     autoFocus
                                 />
                             </div>
                         </div>
 
-                        {/* Password + toggle visibility */}
+                        {/* Password — ใช้ type="text" + CSS mask แทน type="password" */}
+                        {/* วิธีนี้ Chrome ไม่เห็น password field → ไม่ถาม save password เด็ดขาด */}
                         <div className="form-group">
-                            <label htmlFor="password">รหัสผ่าน</label>
+                            <label>รหัสผ่าน</label>
                             <div className="input-wrapper">
                                 <Lock size={18} className="input-icon" />
                                 <input
-                                    id="password"
-                                    type={showPassword ? 'text' : 'password'}
+                                    type="text"
+                                    name="erp_xfield_p"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="กรอกรหัสผ่าน"
-                                    required
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck="false"
+                                    data-lpignore="true"
+                                    data-1p-ignore="true"
+                                    style={maskedStyle}
                                 />
                                 <button
                                     type="button"
@@ -126,13 +159,14 @@ export default function Login() {
 
                         {/* Submit button */}
                         <button
-                            type="submit"
+                            type="button"
                             className={`btn-login ${isLoading ? 'loading' : ''}`}
-                            disabled={isLoading}
+                            disabled={isLoading || !username || !password}
+                            onClick={handleSubmit}
                         >
                             {isLoading ? <span className="spinner"></span> : 'เข้าสู่ระบบ'}
                         </button>
-                    </form>
+                    </div>
 
                     {/* Footer */}
                     <div className="login-footer">
