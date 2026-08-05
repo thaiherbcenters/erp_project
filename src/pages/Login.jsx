@@ -103,11 +103,10 @@ export default function Login() {
                                     autoComplete="off"
                                     data-lpignore="true"
                                     data-1p-ignore="true"
+                                    placeholder=" "
                                 />
                                 {/* Custom placeholder — ไม่ใช้ native placeholder เพราะ Thai font bug */}
-                                {!username && (
-                                    <span className="custom-placeholder">กรอกชื่อผู้ใช้งาน</span>
-                                )}
+                                <span className="custom-placeholder">กรอกชื่อผู้ใช้งาน</span>
                             </div>
                         </div>
 
@@ -126,11 +125,10 @@ export default function Login() {
                                     autoComplete="off"
                                     data-lpignore="true"
                                     data-1p-ignore="true"
+                                    placeholder=" "
                                 />
                                 {/* Custom placeholder */}
-                                {!password && (
-                                    <span className="custom-placeholder">กรอกรหัสผ่าน</span>
-                                )}
+                                <span className="custom-placeholder">กรอกรหัสผ่าน</span>
                                 <button
                                     type="button"
                                     className="toggle-password"

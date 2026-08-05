@@ -110,6 +110,8 @@ const bindFields = (req, data, isUpdate = false, oldDoc = {}) => {
         'SalesChannel', 'ProductSummary'
     ];
     strFieldsSection5.forEach(f => req.input(f, sql.NVarChar, data[f] || oldDoc[f] || null));
+    req.input('CustomProductDetails', sql.NVarChar, parseJSONField(data.CustomProductDetails || oldDoc.CustomProductDetails));
+    req.input('Section5FieldOrder', sql.NVarChar, parseJSONField(data.Section5FieldOrder || oldDoc.Section5FieldOrder));
 };
 
 const getInsertFieldsStr = () => `
@@ -126,7 +128,7 @@ const getInsertFieldsStr = () => `
     ImportLicenseeName, ImportLicenseNo, ImportOperatorName, ImportPlaceName, ImportAddressNo, ImportSoi, ImportRoad, ImportMoo, ImportSubDistrict, ImportDistrict, ImportProvince, ImportPostcode, ImportPhone, ImportForeignMfgName, ImportForeignMfgAddress,
     RelatedManufacturers,
     RecipeOtherName, RecipeFormat, RecipeQuantity, RecipeActiveIngredients, RecipeExtracts, RecipeExcipients, 
-    ProductAppearance, ProductPackSize, ProductMfgProcess, ProductIndication, ProductDosage, ProductPreparation, ProductCondition, ProductStorage, ProductContraindication, ProductWarning, ProductPrecaution, ProductAdverseReaction, SalesChannel, ProductSummary,
+    ProductAppearance, ProductPackSize, ProductMfgProcess, ProductIndication, ProductDosage, ProductPreparation, ProductCondition, ProductStorage, ProductContraindication, ProductWarning, ProductPrecaution, ProductAdverseReaction, SalesChannel, ProductSummary, CustomProductDetails, Section5FieldOrder,
     AttachedDocuments, Status, CreatedAt, UpdatedAt
 `.replace(/\s+/g, ' ').trim();
 
@@ -145,7 +147,7 @@ const getInsertValuesStr = (hasVersion = false) => `
     @ImportLicenseeName, @ImportLicenseNo, @ImportOperatorName, @ImportPlaceName, @ImportAddressNo, @ImportSoi, @ImportRoad, @ImportMoo, @ImportSubDistrict, @ImportDistrict, @ImportProvince, @ImportPostcode, @ImportPhone, @ImportForeignMfgName, @ImportForeignMfgAddress,
     @RelatedManufacturers,
     @RecipeOtherName, @RecipeFormat, @RecipeQuantity, @RecipeActiveIngredients, @RecipeExtracts, @RecipeExcipients,
-    @ProductAppearance, @ProductPackSize, @ProductMfgProcess, @ProductIndication, @ProductDosage, @ProductPreparation, @ProductCondition, @ProductStorage, @ProductContraindication, @ProductWarning, @ProductPrecaution, @ProductAdverseReaction, @SalesChannel, @ProductSummary,
+    @ProductAppearance, @ProductPackSize, @ProductMfgProcess, @ProductIndication, @ProductDosage, @ProductPreparation, @ProductCondition, @ProductStorage, @ProductContraindication, @ProductWarning, @ProductPrecaution, @ProductAdverseReaction, @SalesChannel, @ProductSummary, @CustomProductDetails, @Section5FieldOrder,
     @AttachedDocuments, @Status, GETDATE(), GETDATE()
 `.replace(/\s+/g, ' ').trim();
 
@@ -163,7 +165,7 @@ const getUpdateFieldsStr = () => `
     ImportLicenseeName = @ImportLicenseeName, ImportLicenseNo = @ImportLicenseNo, ImportOperatorName = @ImportOperatorName, ImportPlaceName = @ImportPlaceName, ImportAddressNo = @ImportAddressNo, ImportSoi = @ImportSoi, ImportRoad = @ImportRoad, ImportMoo = @ImportMoo, ImportSubDistrict = @ImportSubDistrict, ImportDistrict = @ImportDistrict, ImportProvince = @ImportProvince, ImportPostcode = @ImportPostcode, ImportPhone = @ImportPhone, ImportForeignMfgName = @ImportForeignMfgName, ImportForeignMfgAddress = @ImportForeignMfgAddress,
     RelatedManufacturers = @RelatedManufacturers,
     RecipeOtherName = @RecipeOtherName, RecipeFormat = @RecipeFormat, RecipeQuantity = @RecipeQuantity, RecipeActiveIngredients = @RecipeActiveIngredients, RecipeExtracts = @RecipeExtracts, RecipeExcipients = @RecipeExcipients,
-    ProductAppearance = @ProductAppearance, ProductPackSize = @ProductPackSize, ProductMfgProcess = @ProductMfgProcess, ProductIndication = @ProductIndication, ProductDosage = @ProductDosage, ProductPreparation = @ProductPreparation, ProductCondition = @ProductCondition, ProductStorage = @ProductStorage, ProductContraindication = @ProductContraindication, ProductWarning = @ProductWarning, ProductPrecaution = @ProductPrecaution, ProductAdverseReaction = @ProductAdverseReaction, SalesChannel = @SalesChannel, ProductSummary = @ProductSummary,
+    ProductAppearance = @ProductAppearance, ProductPackSize = @ProductPackSize, ProductMfgProcess = @ProductMfgProcess, ProductIndication = @ProductIndication, ProductDosage = @ProductDosage, ProductPreparation = @ProductPreparation, ProductCondition = @ProductCondition, ProductStorage = @ProductStorage, ProductContraindication = @ProductContraindication, ProductWarning = @ProductWarning, ProductPrecaution = @ProductPrecaution, ProductAdverseReaction = @ProductAdverseReaction, SalesChannel = @SalesChannel, ProductSummary = @ProductSummary, CustomProductDetails = @CustomProductDetails, Section5FieldOrder = @Section5FieldOrder,
     AttachedDocuments = @AttachedDocuments, Status = @Status, UpdatedAt = GETDATE()
 `.replace(/\s+/g, ' ').trim();
 
@@ -185,6 +187,12 @@ router.get('/', async (req, res) => {
         const docs = result.recordset.map(d => {
             if (d.RelatedManufacturers && typeof d.RelatedManufacturers === 'string') {
                 try { d.RelatedManufacturers = JSON.parse(d.RelatedManufacturers); } catch (e) {}
+            }
+            if (d.CustomProductDetails && typeof d.CustomProductDetails === 'string') {
+                try { d.CustomProductDetails = JSON.parse(d.CustomProductDetails); } catch (e) {}
+            }
+            if (d.Section5FieldOrder && typeof d.Section5FieldOrder === 'string') {
+                try { d.Section5FieldOrder = JSON.parse(d.Section5FieldOrder); } catch (e) {}
             }
             return d;
         });
@@ -220,6 +228,8 @@ router.get('/:id', async (req, res) => {
             doc.RecipeExtracts = parseJSON(doc.RecipeExtracts);
             doc.RecipeExcipients = parseJSON(doc.RecipeExcipients);
             doc.AttachedDocuments = parseJSON(doc.AttachedDocuments);
+            doc.CustomProductDetails = parseJSON(doc.CustomProductDetails);
+            doc.Section5FieldOrder = parseJSON(doc.Section5FieldOrder);
 
             res.json({ success: true, data: doc });
         } else {

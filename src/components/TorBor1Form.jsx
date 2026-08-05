@@ -1,17 +1,53 @@
 import React, { useState, useEffect, forwardRef, useImperativeHandle, useCallback, useMemo } from 'react';
 import { useAlert } from './CustomAlert';
-import { FileText, User, Building2, Globe, Check, ChevronRight, Plus, Trash2, Factory, Ship, Database, X } from 'lucide-react';
+import { FileText, User, Building2, Globe, Check, ChevronRight, Plus, Trash2, Factory, Ship, Database, X, AlignLeft, AlignCenter, AlignRight, Save, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import TextAlign from '@tiptap/extension-text-align';
+import TextStyle from '@tiptap/extension-text-style';
+import { Extension } from '@tiptap/core';
 import API_BASE from '../config';
 import './PowerOfAttorneyForm.css';
 import NameInputWithTitle from './NameInputWithTitle';
 import IdCardInput from './IdCardInput';
 import CustomDatePicker from './CustomDatePicker';
 
+const FontSize = Extension.create({
+    name: 'fontSize',
+    addOptions() { return { types: ['textStyle'] }; },
+    addGlobalAttributes() {
+        return [
+            {
+                types: this.options.types,
+                attributes: {
+                    fontSize: {
+                        default: null,
+                        parseHTML: element => element.style.fontSize?.replace(/['"]+/g, ''),
+                        renderHTML: attributes => {
+                            if (!attributes.fontSize) return {};
+                            return { style: `font-size: ${attributes.fontSize}` };
+                        },
+                    },
+                },
+            },
+        ];
+    },
+    addCommands() {
+        return {
+            setFontSize: fontSize => ({ chain }) => chain().setMark('textStyle', { fontSize }).run(),
+            unsetFontSize: () => ({ chain }) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
+        };
+    },
+});
+
 const TipTapCell = ({ value, onChange, readOnly, style }) => {
     const editor = useEditor({
-        extensions: [StarterKit],
+        extensions: [
+            StarterKit,
+            TextAlign.configure({ types: ['heading', 'paragraph'] }),
+            TextStyle,
+            FontSize,
+        ],
         content: value || '',
         editable: !readOnly,
         onUpdate: ({ editor }) => {
@@ -21,38 +57,58 @@ const TipTapCell = ({ value, onChange, readOnly, style }) => {
 
     useEffect(() => {
         if (editor && value !== editor.getHTML()) {
-            // Only update if the value is different to avoid cursor jumps
-            // TipTap sometimes formats HTML slightly differently, so a simple string comparison might trigger unnecessarily,
-            // but for completely new data it will work.
             editor.commands.setContent(value || '');
         }
     }, [value, editor]);
 
     if (!editor) return null;
 
+    const FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '20px'];
+
     return (
         <div style={{ ...style, display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
             {editor && <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
-                <div style={{ background: '#333', padding: '4px', borderRadius: '4px', display: 'flex', gap: '4px' }}>
+                <div style={{ background: '#333', padding: '6px', borderRadius: '8px', display: 'flex', gap: '6px', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                    <select 
+                        onChange={(e) => editor.chain().focus().setFontSize(e.target.value).run()} 
+                        style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none' }}
+                        value={editor.getAttributes('textStyle').fontSize || '14px'}
+                    >
+                        <option value="">ขนาด</option>
+                        {FONT_SIZES.map(size => (
+                            <option key={size} value={size}>{size.replace('px', '')}</option>
+                        ))}
+                    </select>
+                    <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 2px' }}></div>
                     <button
                         type="button"
                         onClick={() => editor.chain().focus().toggleBold().run()}
-                        style={{ 
-                            background: editor.isActive('bold') ? '#555' : 'transparent', 
-                            color: '#fff', 
-                            border: 'none', 
-                            padding: '4px 8px', 
-                            borderRadius: '4px', 
-                            cursor: 'pointer', 
-                            fontWeight: 'bold',
-                            fontSize: '12px'
-                        }}
-                    >
-                        B
-                    </button>
+                        style={{ background: editor.isActive('bold') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
+                    >B</button>
+                    <button
+                        type="button"
+                        onClick={() => editor.chain().focus().toggleItalic().run()}
+                        style={{ background: editor.isActive('italic') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', fontStyle: 'italic', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
+                    >I</button>
+                    <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 2px' }}></div>
+                    <button
+                        type="button"
+                        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+                        style={{ background: editor.isActive({ textAlign: 'left' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    ><AlignLeft size={14} /></button>
+                    <button
+                        type="button"
+                        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+                        style={{ background: editor.isActive({ textAlign: 'center' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    ><AlignCenter size={14} /></button>
+                    <button
+                        type="button"
+                        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+                        style={{ background: editor.isActive({ textAlign: 'right' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    ><AlignRight size={14} /></button>
                 </div>
             </BubbleMenu>}
-            <EditorContent editor={editor} style={{ flex: 1 }} />
+            <EditorContent editor={editor} style={{ flex: 1 }} className="tiptap-cell-editor" />
         </div>
     );
 };
@@ -139,8 +195,8 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         // กรณีผลิตในประเทศ
         ProdLicenseeName: 'นายธวัช จรุงพิรวงศ์', ProdLicenseNo: 'HB 12-1-67-1',
         ProdOperatorName: '-', ProdPlaceName: 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์',
-        ProdAddressNo: '6/10', ProdSoi: '-', ProdRoad: '-', ProdMoo: '2', ProdSubDistrict: 'ไทรม้า',
-        ProdDistrict: 'เมืองนนทบุรี', ProdProvince: 'นนทบุรี', ProdPostcode: '11000', ProdPhone: '-',
+        ProdAddressNo: '6/8', ProdSoi: '-', ProdRoad: '-', ProdMoo: '2', ProdSubDistrict: 'ไทรม้า',
+        ProdDistrict: 'เมืองนนทบุรี', ProdProvince: 'นนทบุรี', ProdPostcode: '11000', ProdPhone: '0839799389',
 
         // กรณีแบ่งบรรจุ
         RepackRegNo: '-',
@@ -166,7 +222,15 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         ProductAppearance: '', ProductPackSize: '', ProductMfgProcess: '', ProductIndication: '',
         ProductDosage: '', ProductPreparation: '', ProductCondition: '', ProductStorage: '',
         ProductContraindication: '', ProductWarning: '', ProductPrecaution: '', ProductAdverseReaction: '',
-        SalesChannel: '', ProductSummary: '',
+        SalesChannel: '', ProductSummary: '', CustomProductDetails: [],
+        Section5FieldOrder: [
+            { type: 'standard', key: 'ProductAppearance' }, { type: 'standard', key: 'ProductPackSize' },
+            { type: 'standard', key: 'ProductMfgProcess' }, { type: 'standard', key: 'ProductIndication' },
+            { type: 'standard', key: 'ProductDosage' }, { type: 'standard', key: 'ProductPreparation' },
+            { type: 'standard', key: 'ProductCondition' }, { type: 'standard', key: 'ProductStorage' },
+            { type: 'standard', key: 'ProductContraindication' }, { type: 'standard', key: 'ProductWarning' },
+            { type: 'standard', key: 'ProductPrecaution' }, { type: 'standard', key: 'ProductAdverseReaction' }
+        ],
         AttachedDocuments: {
             doc1: false, doc2: false, doc3: false, doc4: false, doc5: false,
             doc6_1: false, doc6_2: false, doc6_3: false, doc6_4: false, doc6_5: false, doc6_6: false,
@@ -177,6 +241,10 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
     const [formulas, setFormulas] = useState([]);
     const [showFormulaModal, setShowFormulaModal] = useState(false);
     const [currentDocId, setCurrentDocId] = useState(documentId);
+    const [linkedFormulaId, setLinkedFormulaId] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [hasFormatChanges, setHasFormatChanges] = useState(false);
+    const [draggedSection5Idx, setDraggedSection5Idx] = useState(null);
 
     // Fetch saved data when editing
     useEffect(() => {
@@ -188,8 +256,30 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                 const json = await res.json();
                 if (json.success && json.data) {
                     const d = json.data;
+                    if (d.FormulaID) setLinkedFormulaId(d.FormulaID);
+                    
+                    // Backwards compatibility migration for Section5FieldOrder
+                    let order = d.Section5FieldOrder;
+                    if (!order || order.length === 0) {
+                        order = [
+                            { type: 'standard', key: 'ProductAppearance' }, { type: 'standard', key: 'ProductPackSize' },
+                            { type: 'standard', key: 'ProductMfgProcess' }, { type: 'standard', key: 'ProductIndication' },
+                            { type: 'standard', key: 'ProductDosage' }, { type: 'standard', key: 'ProductPreparation' },
+                            { type: 'standard', key: 'ProductCondition' }, { type: 'standard', key: 'ProductStorage' },
+                            { type: 'standard', key: 'ProductContraindication' }, { type: 'standard', key: 'ProductWarning' },
+                            { type: 'standard', key: 'ProductPrecaution' }, { type: 'standard', key: 'ProductAdverseReaction' }
+                        ];
+                        if (d.CustomProductDetails && d.CustomProductDetails.length > 0) {
+                            d.CustomProductDetails.forEach(c => {
+                                order.push({ type: 'custom', title: c.title, content: c.content, id: c.id || Date.now().toString() + Math.random().toString(36).substr(2, 5) });
+                            });
+                        }
+                    }
+
                     setForm(prev => ({
                         ...prev,
+                        ...d,
+                        Section5FieldOrder: order,
                         ReceiptNo: d.ReceiptNo || prev.ReceiptNo,
                         ReceiptDate: d.ReceiptDate ? new Date(d.ReceiptDate).toISOString().split('T')[0] : prev.ReceiptDate,
                         ReceiverName: d.ReceiverName || prev.ReceiverName,
@@ -331,6 +421,9 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
     const handleSelectFormula = (formula) => {
         if (!formula || !formula.ingredients) return;
         
+        setLinkedFormulaId(formula.id);
+        setHasFormatChanges(false);
+        
         const active = [];
         const extract = [];
         const inactive = [];
@@ -376,31 +469,107 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         
         const hasInstructions = Object.keys(instructions).length > 0;
         
-        setForm(prev => ({
-            ...prev,
-            RecipeActiveIngredients: active.length > 0 ? active : [{ thaiName: '', engName: '', latinName: '', partUsed: '', quantity: '' }],
-            RecipeExtracts: extract.length > 0 ? extract : [{ extractName: '', latinName: '', partUsed: '', solvent: '', ratio: '', quantity: '' }],
-            RecipeExcipients: inactive.length > 0 ? inactive : [{ name: '', casNumber: '', function: '', quantity: '' }],
+        setForm(prev => {
+            const nextState = {
+                ...prev,
+                // Map product details if they exist in instructions
+                ProductAppearance: hasInstructions ? (instructions.ProductAppearance || '') : prev.ProductAppearance,
+                ProductPackSize: hasInstructions ? (instructions.ProductPackSize || '') : prev.ProductPackSize,
+                ProductMfgProcess: hasInstructions ? (instructions.ProductMfgProcess || '') : prev.ProductMfgProcess,
+                ProductIndication: hasInstructions ? (instructions.ProductIndication || '') : prev.ProductIndication,
+                ProductDosage: hasInstructions ? (instructions.ProductDosage || '') : prev.ProductDosage,
+                ProductPreparation: hasInstructions ? (instructions.ProductPreparation || '') : prev.ProductPreparation,
+                ProductCondition: hasInstructions ? (instructions.ProductCondition || '') : prev.ProductCondition,
+                ProductStorage: hasInstructions ? (instructions.ProductStorage || '') : prev.ProductStorage,
+                ProductContraindication: hasInstructions ? (instructions.ProductContraindication || '') : prev.ProductContraindication,
+                ProductWarning: hasInstructions ? (instructions.ProductWarning || '') : prev.ProductWarning,
+                ProductPrecaution: hasInstructions ? (instructions.ProductPrecaution || '') : prev.ProductPrecaution,
+                ProductAdverseReaction: hasInstructions ? (instructions.ProductAdverseReaction || '') : prev.ProductAdverseReaction,
+                SalesChannel: hasInstructions ? (instructions.SalesChannel || '') : prev.SalesChannel,
+                ProductSummary: hasInstructions ? (instructions.ProductSummary || '') : prev.ProductSummary
+            };
             
-            // Map product details if they exist in instructions
-            ProductAppearance: hasInstructions ? (instructions.ProductAppearance || '') : prev.ProductAppearance,
-            ProductPackSize: hasInstructions ? (instructions.ProductPackSize || '') : prev.ProductPackSize,
-            ProductMfgProcess: hasInstructions ? (instructions.ProductMfgProcess || '') : prev.ProductMfgProcess,
-            ProductIndication: hasInstructions ? (instructions.ProductIndication || '') : prev.ProductIndication,
-            ProductDosage: hasInstructions ? (instructions.ProductDosage || '') : prev.ProductDosage,
-            ProductPreparation: hasInstructions ? (instructions.ProductPreparation || '') : prev.ProductPreparation,
-            ProductCondition: hasInstructions ? (instructions.ProductCondition || '') : prev.ProductCondition,
-            ProductStorage: hasInstructions ? (instructions.ProductStorage || '') : prev.ProductStorage,
-            ProductContraindication: hasInstructions ? (instructions.ProductContraindication || '') : prev.ProductContraindication,
-            ProductWarning: hasInstructions ? (instructions.ProductWarning || '') : prev.ProductWarning,
-            ProductPrecaution: hasInstructions ? (instructions.ProductPrecaution || '') : prev.ProductPrecaution,
-            ProductAdverseReaction: hasInstructions ? (instructions.ProductAdverseReaction || '') : prev.ProductAdverseReaction,
-            SalesChannel: hasInstructions ? (instructions.SalesChannel || '') : prev.SalesChannel,
-            ProductSummary: hasInstructions ? (instructions.ProductSummary || '') : prev.ProductSummary
-        }));
+            if (formula.torbor1Format) {
+                if (formula.torbor1Format.RecipeActiveIngredients) {
+                    nextState.RecipeActiveIngredients = formula.torbor1Format.RecipeActiveIngredients;
+                    nextState.RecipeExtracts = formula.torbor1Format.RecipeExtracts || [];
+                    nextState.RecipeExcipients = formula.torbor1Format.RecipeExcipients || [];
+                }
+                
+                // Override text fields if they exist in torbor1Format
+                const fieldsToOverride = ['ProductAppearance', 'ProductPackSize', 'ProductMfgProcess', 'ProductIndication', 'ProductDosage', 'ProductPreparation', 'ProductCondition', 'ProductStorage', 'ProductContraindication', 'ProductWarning', 'ProductPrecaution', 'ProductAdverseReaction'];
+                fieldsToOverride.forEach(f => {
+                    if (formula.torbor1Format[f] !== undefined) {
+                        nextState[f] = formula.torbor1Format[f];
+                    }
+                });
+                if (formula.torbor1Format.Section5FieldOrder) {
+                    nextState.Section5FieldOrder = formula.torbor1Format.Section5FieldOrder;
+                } else if (formula.torbor1Format.CustomProductDetails && formula.torbor1Format.CustomProductDetails.length > 0) {
+                    // Backwards compatibility migration
+                    const newOrder = [...nextState.Section5FieldOrder];
+                    formula.torbor1Format.CustomProductDetails.forEach(c => {
+                        newOrder.push({ type: 'custom', title: c.title, content: c.content, id: c.id || Date.now().toString() });
+                    });
+                    nextState.Section5FieldOrder = newOrder;
+                }
+            }
+            
+            if (!formula.torbor1Format || !formula.torbor1Format.RecipeActiveIngredients) {
+                nextState.RecipeActiveIngredients = active.length > 0 ? active : [{ thaiName: '', engName: '', latinName: '', partUsed: '', quantity: '' }];
+                nextState.RecipeExtracts = extract.length > 0 ? extract : [{ extractName: '', latinName: '', partUsed: '', solvent: '', ratio: '', quantity: '' }];
+                nextState.RecipeExcipients = inactive.length > 0 ? inactive : [{ name: '', casNumber: '', function: '', quantity: '' }];
+            }
+            return nextState;
+        });
         
         setShowFormulaModal(false);
-        showAlert('success', 'ดึงข้อมูลสูตรตำรับสำเร็จ');
+        if (formula.torbor1Format) {
+            showAlert('success', 'ดึงข้อมูลสูตรตำรับสำเร็จ (โหลดรูปแบบตารางที่เคยบันทึกไว้)');
+        } else {
+            showAlert('success', 'ดึงข้อมูลสูตรตำรับสำเร็จ');
+        }
+    };
+
+    const handleSaveFormulaFormat = async () => {
+        if (!linkedFormulaId) return;
+        try {
+            const torbor1Format = {
+                RecipeActiveIngredients: form.RecipeActiveIngredients,
+                RecipeExtracts: form.RecipeExtracts,
+                RecipeExcipients: form.RecipeExcipients,
+                ProductAppearance: form.ProductAppearance,
+                ProductPackSize: form.ProductPackSize,
+                ProductMfgProcess: form.ProductMfgProcess,
+                ProductIndication: form.ProductIndication,
+                ProductDosage: form.ProductDosage,
+                ProductPreparation: form.ProductPreparation,
+                ProductCondition: form.ProductCondition,
+                ProductStorage: form.ProductStorage,
+                ProductContraindication: form.ProductContraindication,
+                ProductWarning: form.ProductWarning,
+                ProductPrecaution: form.ProductPrecaution,
+                ProductAdverseReaction: form.ProductAdverseReaction,
+                CustomProductDetails: form.CustomProductDetails,
+                Section5FieldOrder: form.Section5FieldOrder
+            };
+            
+            const res = await fetch(`${API_BASE}/rnd/formulas/${linkedFormulaId}/torbor1-format`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ torbor1Format })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showAlert('success', 'บันทึกรูปแบบตารางกลับไปยังสูตรหลักสำเร็จแล้ว');
+                setHasFormatChanges(false);
+            } else {
+                showAlert('error', 'เกิดข้อผิดพลาดในการบันทึกรูปแบบตาราง');
+            }
+        } catch (err) {
+            console.error('Error saving formula format:', err);
+            showAlert('error', 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+        }
     };
 
     useEffect(() => {
@@ -519,7 +688,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                     nextForm.ProdLicenseeName = nextForm.ProdLicenseeName || 'นายธวัช จรุงพิรวงศ์';
                     nextForm.ProdLicenseNo = nextForm.ProdLicenseNo || 'HB 12-1-67-1';
                     nextForm.ProdPlaceName = nextForm.ProdPlaceName || 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์';
-                    nextForm.ProdAddressNo = nextForm.ProdAddressNo || '6/10';
+                    nextForm.ProdAddressNo = nextForm.ProdAddressNo || '6/8';
                     nextForm.ProdMoo = nextForm.ProdMoo || '2';
                     nextForm.ProdSubDistrict = nextForm.ProdSubDistrict || 'ไทรม้า';
                     nextForm.ProdDistrict = nextForm.ProdDistrict || 'เมืองนนทบุรี';
@@ -528,7 +697,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                     nextForm.ProdOperatorName = nextForm.ProdOperatorName || '-';
                     nextForm.ProdSoi = nextForm.ProdSoi || '-';
                     nextForm.ProdRoad = nextForm.ProdRoad || '-';
-                    nextForm.ProdPhone = nextForm.ProdPhone || '-';
+                    nextForm.ProdPhone = nextForm.ProdPhone || '0839799389';
                 } else if (value === 'นำเข้า') {
                     // Clear Prod fields
                     nextForm.ProdLicenseeName = ''; nextForm.ProdLicenseNo = '';
@@ -597,48 +766,57 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
     const addActiveIngredient = () => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeActiveIngredients: [...(prev.RecipeActiveIngredients || []), { thaiName: '', engName: '', latinName: '', partUsed: '', quantity: '' }] }));
+        setHasFormatChanges(true);
     };
     const removeActiveIngredient = (index) => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeActiveIngredients: (prev.RecipeActiveIngredients || []).filter((_, i) => i !== index) }));
+        setHasFormatChanges(true);
     };
     const handleActiveIngredientChange = (index, field, val) => {
         if (readOnly) return;
         const list = [...(form.RecipeActiveIngredients || [])];
         list[index] = { ...list[index], [field]: val };
         setForm({ ...form, RecipeActiveIngredients: list });
+        setHasFormatChanges(true);
     };
 
     // --- Extracts ---
     const addExtract = () => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeExtracts: [...(prev.RecipeExtracts || []), { extractName: '', latinName: '', partUsed: '', solvent: '', ratio: '', quantity: '' }] }));
+        setHasFormatChanges(true);
     };
     const removeExtract = (index) => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeExtracts: (prev.RecipeExtracts || []).filter((_, i) => i !== index) }));
+        setHasFormatChanges(true);
     };
     const handleExtractChange = (index, field, val) => {
         if (readOnly) return;
         const list = [...(form.RecipeExtracts || [])];
         list[index] = { ...list[index], [field]: val };
         setForm({ ...form, RecipeExtracts: list });
+        setHasFormatChanges(true);
     };
 
     // --- Excipients ---
     const addExcipient = () => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeExcipients: [...(prev.RecipeExcipients || []), { name: '', casNumber: '', function: '', quantity: '' }] }));
+        setHasFormatChanges(true);
     };
     const removeExcipient = (index) => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeExcipients: (prev.RecipeExcipients || []).filter((_, i) => i !== index) }));
+        setHasFormatChanges(true);
     };
     const handleExcipientChange = (index, field, val) => {
         if (readOnly) return;
         const list = [...(form.RecipeExcipients || [])];
         list[index] = { ...list[index], [field]: val };
         setForm({ ...form, RecipeExcipients: list });
+        setHasFormatChanges(true);
     };
 
 
@@ -732,6 +910,33 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         Field.displayName = 'TextAreaField';
         return Field;
     }, [handleChange, readOnly]);
+
+    const TipTapField = useMemo(() => {
+        const Field = ({ label, name, value, disabled = false, minHeight = '80px' }) => {
+            let formattedValue = value || '';
+            if (formattedValue && !formattedValue.includes('<p>')) {
+                formattedValue = formattedValue.split('\n').map(line => `<p>${line}</p>`).join('');
+            }
+            return (
+                <div className="poa-field full" style={{ marginBottom: '14px' }}>
+                    <label>{label}</label>
+                    <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '8px 12px', minHeight, background: (disabled || readOnly) ? '#f9fafb' : '#fff' }}>
+                        <TipTapCell
+                            value={formattedValue}
+                            onChange={(val) => {
+                                setForm(prev => ({ ...prev, [name]: val }));
+                                if (linkedFormulaId) setHasFormatChanges(true);
+                            }}
+                            readOnly={disabled || readOnly}
+                            style={{ minHeight }}
+                        />
+                    </div>
+                </div>
+            );
+        };
+        Field.displayName = 'TipTapField';
+        return Field;
+    }, [setForm, readOnly, linkedFormulaId]);
 
     // Applicant types moved outside
 
@@ -1265,13 +1470,20 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: colors.primaryDark }}>มีวัตถุอันเป็นส่วนประกอบ คือ</p>
                         {!readOnly && (
-                            <button type="button" onClick={() => setShowFormulaModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer' }}>
-                                <Database size={14} /> ดึงข้อมูลสูตรตำรับ (R&D)
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                {linkedFormulaId && hasFormatChanges && (
+                                    <button type="button" onClick={handleSaveFormulaFormat} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', border: `1px solid ${colors.success}`, background: '#fff', color: colors.success, cursor: 'pointer', boxShadow: '0 2px 4px -1px rgba(16, 185, 129, 0.1)' }}>
+                                        <Save size={14} /> บันทึกรูปแบบตาราง (R&D)
+                                    </button>
+                                )}
+                                <button type="button" onClick={() => setShowFormulaModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer' }}>
+                                    <Database size={14} /> ดึงข้อมูลสูตรตำรับ (R&D)
+                                </button>
+                            </div>
                         )}
                     </div>
                     <div style={{ border: `1px solid ${colors.border}`, borderRadius: '10px', overflow: 'hidden' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr 1fr 1fr 50px', background: colors.primary, color: '#fff' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 2.2fr 2.8fr 1.1fr 1.1fr 40px', background: colors.primary, color: '#fff' }}>
                             <div style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700' }}>ชื่อภาษาไทย</div>
                             <div style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', borderLeft: '1px solid rgba(255,255,255,0.15)' }}>ชื่ออังกฤษ</div>
                             <div style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', borderLeft: '1px solid rgba(255,255,255,0.15)' }}>ชื่อวิทยาศาสตร์/ละติน</div>
@@ -1280,7 +1492,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                             <div style={{ padding: '12px 16px', borderLeft: '1px solid rgba(255,255,255,0.15)' }}></div>
                         </div>
                         {(form.RecipeActiveIngredients || []).map((row, idx) => (
-                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.5fr 1fr 1fr 50px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.8fr 2.2fr 2.8fr 1.1fr 1.1fr 40px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
                                 <div style={{ padding: '4px', display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.thaiName || ''} onChange={(val) => handleActiveIngredientChange(idx, 'thaiName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.engName || ''} onChange={(val) => handleActiveIngredientChange(idx, 'engName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.latinName || ''} onChange={(val) => handleActiveIngredientChange(idx, 'latinName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
@@ -1303,7 +1515,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                 <div style={{ marginBottom: '24px' }}>
                     <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '700', color: colors.primaryDark }}>กรณีเป็นสารสกัด ให้แจ้งรายละเอียดในตารางข้างล่าง</p>
                     <div style={{ border: `1px solid ${colors.border}`, borderRadius: '10px', overflow: 'hidden' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 1fr 1fr 1fr 50px', background: colors.primary, color: '#fff' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1.5fr 1.5fr 2fr 1.5fr 40px', background: colors.primary, color: '#fff' }}>
                             <div style={{ padding: '12px 8px', fontSize: '12px', fontWeight: '700' }}>ชื่อสารสกัด</div>
                             <div style={{ padding: '12px 8px', fontSize: '12px', fontWeight: '700', borderLeft: '1px solid rgba(255,255,255,0.15)' }}>ชื่อวิทยาศาสตร์</div>
                             <div style={{ padding: '12px 8px', fontSize: '12px', fontWeight: '700', borderLeft: '1px solid rgba(255,255,255,0.15)' }}>ส่วนที่ใช้</div>
@@ -1313,7 +1525,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                             <div style={{ padding: '12px 4px', borderLeft: '1px solid rgba(255,255,255,0.15)' }}></div>
                         </div>
                         {(form.RecipeExtracts || []).map((row, idx) => (
-                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 1fr 1fr 1fr 50px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1.5fr 1.5fr 2fr 1.5fr 40px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
                                 <div style={{ padding: '4px', display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.extractName || ''} onChange={(val) => handleExtractChange(idx, 'extractName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.latinName || ''} onChange={(val) => handleExtractChange(idx, 'latinName', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.partUsed || ''} onChange={(val) => handleExtractChange(idx, 'partUsed', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
@@ -1337,7 +1549,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                 <div>
                     <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: '700', color: colors.primaryDark }}>ชื่อสารช่วย</p>
                     <div style={{ border: `1px solid ${colors.border}`, borderRadius: '10px', overflow: 'hidden' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 50px', background: colors.primary, color: '#fff' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2.5fr 2fr 40px', background: colors.primary, color: '#fff' }}>
                             <div style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700' }}>ชื่อภาษาไทย/อังกฤษ</div>
                             <div style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', borderLeft: '1px solid rgba(255,255,255,0.15)' }}>CAS number</div>
                             <div style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '700', borderLeft: '1px solid rgba(255,255,255,0.15)' }}>หน้าที่</div>
@@ -1345,7 +1557,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                             <div style={{ padding: '12px 16px', borderLeft: '1px solid rgba(255,255,255,0.15)' }}></div>
                         </div>
                         {(form.RecipeExcipients || []).map((row, idx) => (
-                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 50px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
+                            <div key={idx} style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 2.5fr 2fr 40px', borderTop: `1px solid ${colors.border}`, background: idx % 2 === 0 ? '#fff' : '#fafbfc' }}>
                                 <div style={{ padding: '4px', display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.name || ''} onChange={(val) => handleExcipientChange(idx, 'name', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.casNumber || ''} onChange={(val) => handleExcipientChange(idx, 'casNumber', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
                                 <div style={{ padding: '4px', borderLeft: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}><TipTapCell value={row.function || ''} onChange={(val) => handleExcipientChange(idx, 'function', val)} readOnly={readOnly} style={{ flex: 1, minHeight: '40px' }} /></div>
@@ -1372,18 +1584,149 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                 </h4>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <TextAreaField label="ลักษณะ" name="ProductAppearance" value={form.ProductAppearance} rows={3} />
-                    <TextAreaField label="ขนาดบรรจุ" name="ProductPackSize" value={form.ProductPackSize} rows={3} />
-                    <TextAreaField label="กรรมวิธีการผลิต" name="ProductMfgProcess" value={form.ProductMfgProcess} rows={4} />
-                    <TextAreaField label="สรรพคุณ/ข้อบ่งใช้/ ข้อความกล่าวอ้างทางสุขภาพ" name="ProductIndication" value={form.ProductIndication} rows={4} />
-                    <TextAreaField label="ขนาดและวิธีการใช้" name="ProductDosage" value={form.ProductDosage} rows={3} />
-                    <TextAreaField label="วิธีเตรียมก่อนรับประทาน" name="ProductPreparation" value={form.ProductPreparation} rows={3} />
-                    <TextAreaField label="เงื่อนไขการรับประทาน" name="ProductCondition" value={form.ProductCondition} rows={3} />
-                    <TextAreaField label="การเก็บรักษา / อายุการเก็บรักษา" name="ProductStorage" value={form.ProductStorage} rows={3} />
-                    <TextAreaField label="ข้อห้ามใช้" name="ProductContraindication" value={form.ProductContraindication} rows={3} />
-                    <TextAreaField label="คำเตือน" name="ProductWarning" value={form.ProductWarning} rows={3} />
-                    <TextAreaField label="ข้อควรระวัง" name="ProductPrecaution" value={form.ProductPrecaution} rows={3} />
-                    <TextAreaField label="อาการไม่พึงประสงค์" name="ProductAdverseReaction" value={form.ProductAdverseReaction} rows={3} />
+                    {form.Section5FieldOrder && form.Section5FieldOrder.map((fieldMeta, idx) => {
+                        const standardFieldsMeta = {
+                            'ProductAppearance': { label: 'ลักษณะ', minHeight: '80px' },
+                            'ProductPackSize': { label: 'ขนาดบรรจุ', minHeight: '80px' },
+                            'ProductMfgProcess': { label: 'กรรมวิธีการผลิต', minHeight: '120px' },
+                            'ProductIndication': { label: 'สรรพคุณ/ข้อบ่งใช้/ ข้อความกล่าวอ้างทางสุขภาพ', minHeight: '120px' },
+                            'ProductDosage': { label: 'ขนาดและวิธีการใช้', minHeight: '80px' },
+                            'ProductPreparation': { label: 'วิธีเตรียมก่อนรับประทาน', minHeight: '80px' },
+                            'ProductCondition': { label: 'เงื่อนไขการรับประทาน', minHeight: '80px' },
+                            'ProductStorage': { label: 'การเก็บรักษา / อายุการเก็บรักษา', minHeight: '80px' },
+                            'ProductContraindication': { label: 'ข้อห้ามใช้', minHeight: '80px' },
+                            'ProductWarning': { label: 'คำเตือน', minHeight: '80px' },
+                            'ProductPrecaution': { label: 'ข้อควรระวัง', minHeight: '80px' },
+                            'ProductAdverseReaction': { label: 'อาการไม่พึงประสงค์', minHeight: '80px' }
+                        };
+
+                        const handleDragStart = (e) => {
+                            if (readOnly) {
+                                e.preventDefault();
+                                return;
+                            }
+                            setDraggedSection5Idx(idx);
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', idx);
+                        };
+
+                        const handleDragOver = (e) => {
+                            e.preventDefault(); // Necessary to allow dropping
+                        };
+
+                        const handleDrop = (e) => {
+                            e.preventDefault();
+                            if (readOnly || draggedSection5Idx === null || draggedSection5Idx === idx) return;
+                            
+                            setForm(prev => {
+                                const newOrder = [...prev.Section5FieldOrder];
+                                const itemToMove = newOrder.splice(draggedSection5Idx, 1)[0];
+                                newOrder.splice(idx, 0, itemToMove);
+                                return { ...prev, Section5FieldOrder: newOrder };
+                            });
+                            if (linkedFormulaId) setHasFormatChanges(true);
+                            setDraggedSection5Idx(null);
+                        };
+
+                        const handleDragEnd = () => {
+                            setDraggedSection5Idx(null);
+                        };
+
+                        return (
+                            <div 
+                                key={fieldMeta.id || fieldMeta.key} 
+                                onDragStart={handleDragStart}
+                                onDragOver={handleDragOver}
+                                onDrop={handleDrop}
+                                onDragEnd={handleDragEnd}
+                                style={{ 
+                                    position: 'relative', 
+                                    background: 'transparent', 
+                                    padding: '0', 
+                                    border: 'none', 
+                                    borderRadius: '8px', 
+                                    marginBottom: '14px',
+                                    opacity: draggedSection5Idx === idx ? 0.5 : 1,
+                                    cursor: readOnly ? 'default' : 'auto'
+                                }}
+                            >
+                                {!readOnly && (
+                                    <div style={{ position: 'absolute', top: '30px', right: '0', display: 'flex', gap: '4px', zIndex: 10, alignItems: 'center' }}>
+                                        <div style={{ color: '#94a3b8', cursor: 'grab', display: 'flex', padding: '4px' }} title="ลากเพื่อย้ายตำแหน่ง" 
+                                            onMouseDown={(e) => { e.currentTarget.parentNode.parentNode.setAttribute('draggable', 'true'); }}
+                                            onMouseUp={(e) => { e.currentTarget.parentNode.parentNode.removeAttribute('draggable'); }}
+                                        >
+                                            <GripVertical size={18} />
+                                        </div>
+                                        <button type="button" onClick={() => {
+                                            setForm(prev => {
+                                                const newOrder = [...prev.Section5FieldOrder];
+                                                newOrder.splice(idx, 1);
+                                                return { ...prev, Section5FieldOrder: newOrder };
+                                            });
+                                            if (linkedFormulaId) setHasFormatChanges(true);
+                                        }} style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', color: '#ef4444' }} title="ลบหัวข้อ"><Trash2 size={16} /></button>
+                                    </div>
+                                )}
+                                
+                                <div style={{ width: '100%' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '8px', paddingRight: '90px' }}>
+                                        <input 
+                                            type="text" 
+                                            value={fieldMeta.customTitle !== undefined ? fieldMeta.customTitle : (fieldMeta.type === 'standard' ? (standardFieldsMeta[fieldMeta.key]?.label || fieldMeta.key) : fieldMeta.title)} 
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setForm(prev => {
+                                                    const newOrder = [...prev.Section5FieldOrder];
+                                                    if (newOrder[idx].type === 'standard') {
+                                                        newOrder[idx].customTitle = val;
+                                                    } else {
+                                                        newOrder[idx].title = val;
+                                                    }
+                                                    return { ...prev, Section5FieldOrder: newOrder };
+                                                });
+                                                if (linkedFormulaId) setHasFormatChanges(true);
+                                            }} 
+                                            disabled={readOnly}
+                                            placeholder="คลิกเพื่อตั้งชื่อหัวข้อ..."
+                                            style={{ ...labelStyle, background: 'transparent', border: 'none', padding: 0, width: '100%', outline: 'none', marginBottom: 0 }}
+                                        />
+                                    </div>
+                                    <div className="tiptap-field-wrapper" style={{ border: `1px solid ${colors.border}`, borderRadius: '10px', background: readOnly ? '#f9fafb' : '#fff' }}>
+                                        <TipTapCell
+                                            value={fieldMeta.type === 'standard' ? form[fieldMeta.key] : fieldMeta.content}
+                                            onChange={(val) => {
+                                                setForm(prev => {
+                                                    if (fieldMeta.type === 'standard') {
+                                                        return { ...prev, [fieldMeta.key]: val };
+                                                    } else {
+                                                        const newOrder = [...prev.Section5FieldOrder];
+                                                        newOrder[idx].content = val;
+                                                        return { ...prev, Section5FieldOrder: newOrder };
+                                                    }
+                                                });
+                                                if (linkedFormulaId) setHasFormatChanges(true);
+                                            }}
+                                            readOnly={readOnly}
+                                            style={{ minHeight: fieldMeta.type === 'standard' ? (standardFieldsMeta[fieldMeta.key]?.minHeight || '80px') : '80px' }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    
+                    {!readOnly && (
+                        <button type="button" onClick={() => {
+                            setForm(prev => ({
+                                ...prev, 
+                                Section5FieldOrder: [...(prev.Section5FieldOrder || []), { type: 'custom', title: '', content: '', id: Date.now().toString() + Math.random().toString(36).substr(2, 5) }]
+                            }));
+                            if (linkedFormulaId) setHasFormatChanges(true);
+                        }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', border: `1px dashed ${colors.primary}`, background: colors.primaryLight, color: colors.primary, cursor: 'pointer', width: 'max-content', marginBottom: '20px' }}>
+                            <Plus size={16} /> เพิ่มหัวข้อเพิ่มเติม
+                        </button>
+                    )}
                     
                     {/* Sales Channel */}
                     <div style={{ width: '100%', marginBottom: '14px', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>

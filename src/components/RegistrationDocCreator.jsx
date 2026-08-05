@@ -1099,7 +1099,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                             )}
                         </div>
                     </div>
-                    <button onClick={() => setShowPrintModal(true)} disabled={isSaving || isPrinting} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>
+                    <button onClick={() => { if (selectedDocTypes.length <= 1) { handlePrint('current'); } else { setShowPrintModal(true); } }} disabled={isSaving || isPrinting} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px' }}>
                         <Printer size={18} /> {isPrinting ? 'กำลังสร้าง PDF...' : 'พรีวิว / พิมพ์'}
                     </button>
                     {!(initialStatus === 'ลูกค้าลงนามแล้ว' && docStatus === 'ลูกค้าลงนามแล้ว') && (

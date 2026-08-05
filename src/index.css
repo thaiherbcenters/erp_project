@@ -22,10 +22,30 @@
   line-height: 1.5;
   font-weight: 400;
   color: var(--text);
-  font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Ensure TipTap editor styles render correctly */
+.ProseMirror em, .tiptap em {
+  font-style: italic !important;
+}
+.ProseMirror strong, .tiptap strong {
+  font-weight: bold !important;
+}
+.tiptap-cell-editor .ProseMirror {
+  outline: none;
+  min-height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.tiptap-cell-editor .ProseMirror p {
+  margin: 0;
+  width: 100%;
+}
+
 
 * {
   margin: 0;

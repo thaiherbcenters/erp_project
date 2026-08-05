@@ -5,10 +5,16 @@
  * and manually adjusts their diacritic positions.
  */
 
-function drawThaiText(pdfPage, text, startX, startY, size, font, color) {
+function drawThaiText(pdfPage, text, x, y, size, font, color, italic = false) {
     if (!text) return;
     
-    let currentX = startX;
+    let currentX = x;
+    const startY = y;
+    
+    const baseOpts = { size, font, color };
+    if (italic) {
+        baseOpts.ySkew = { type: 'degrees', angle: 15 };
+    }
     
     // 1. Sara Am with Tone: นำ้ or น้ ำ
     // 2. Tall Consonant with Tone or Upper Vowel: ฟ้, ปิ, ฟิ้
@@ -22,7 +28,7 @@ function drawThaiText(pdfPage, text, startX, startY, size, font, color) {
         // Draw preceding safe text
         const beforeStr = text.substring(lastIndex, match.index);
         if (beforeStr) {
-            pdfPage.drawText(beforeStr, { x: currentX, y: startY, size, font, color });
+            pdfPage.drawText(beforeStr, { ...baseOpts, x: currentX, y: startY });
             currentX += font.widthOfTextAtSize(beforeStr, size);
         }
         
@@ -36,13 +42,13 @@ function drawThaiText(pdfPage, text, startX, startY, size, font, color) {
             const tone = toneMatch ? toneMatch[1] : '';
             
             const baseAm = base + '\u0E33';
-            pdfPage.drawText(baseAm, { x: currentX, y: startY, size, font, color });
+            pdfPage.drawText(baseAm, { ...baseOpts, x: currentX, y: startY });
             
             if (tone) {
                 let toneX = currentX + font.widthOfTextAtSize(base, size);
                 if (['ป','ฝ','ฟ','ฬ'].includes(base[0])) toneX -= size * 0.15;
                 const toneY = startY + (size * 0.25);
-                pdfPage.drawText(tone, { x: toneX, y: toneY, size, font, color });
+                pdfPage.drawText(tone, { ...baseOpts, x: toneX, y: toneY });
             }
             
             currentX += font.widthOfTextAtSize(baseAm, size);
@@ -54,16 +60,16 @@ function drawThaiText(pdfPage, text, startX, startY, size, font, color) {
             const upperVowel = upperVowelMatch ? upperVowelMatch[1] : '';
             const tone = toneMatch ? toneMatch[1] : '';
             
-            pdfPage.drawText(base, { x: currentX, y: startY, size, font, color });
+            pdfPage.drawText(base, { ...baseOpts, x: currentX, y: startY });
             let markX = currentX + font.widthOfTextAtSize(base, size) - (size * 0.15);
             
             if (upperVowel) {
-                pdfPage.drawText(upperVowel, { x: markX, y: startY, size, font, color });
+                pdfPage.drawText(upperVowel, { ...baseOpts, x: markX, y: startY });
             }
             
             if (tone) {
                 const toneY = upperVowel ? startY + (size * 0.25) : startY;
-                pdfPage.drawText(tone, { x: markX, y: toneY, size, font, color });
+                pdfPage.drawText(tone, { ...baseOpts, x: markX, y: toneY });
             }
             
             currentX += font.widthOfTextAtSize(base, size); // Vowels/Tones are zero-width
@@ -76,11 +82,11 @@ function drawThaiText(pdfPage, text, startX, startY, size, font, color) {
             const upperVowel = upperVowelMatch ? upperVowelMatch[1] : '';
             const tone = toneMatch ? toneMatch[1] : '';
             
-            pdfPage.drawText(base + upperVowel, { x: currentX, y: startY, size, font, color });
+            pdfPage.drawText(base + upperVowel, { ...baseOpts, x: currentX, y: startY });
             
             const toneX = currentX + font.widthOfTextAtSize(base, size);
             const toneY = startY + (size * 0.25); // Shift tone UP
-            pdfPage.drawText(tone, { x: toneX, y: toneY, size, font, color });
+            pdfPage.drawText(tone, { ...baseOpts, x: toneX, y: toneY });
             
             currentX += font.widthOfTextAtSize(base + upperVowel, size);
         }
@@ -91,7 +97,7 @@ function drawThaiText(pdfPage, text, startX, startY, size, font, color) {
     // Draw remaining safe text
     const remaining = text.substring(lastIndex);
     if (remaining) {
-        pdfPage.drawText(remaining, { x: currentX, y: startY, size, font, color });
+        pdfPage.drawText(remaining, { ...baseOpts, x: currentX, y: startY });
     }
 }
 
@@ -148,57 +154,99 @@ function wrapThaiText(text, maxWidth, size, font) {
 }
 
 function parseHTMLToParagraphs(html) {
-    if (!html) return [[]];
-    
-    // Clean and normalize HTML tags from React Quill
-    let text = html
-        .replace(/<p><br><\/p>/gi, '\n')
-        .replace(/<\/p>\s*<p>/gi, '\n')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/p>/gi, '\n')
-        .replace(/<p>/gi, '');
-        
-    // Strip everything except <strong> and <b>
-    text = text.replace(/<(?!strong\b|\/strong\b|b\b|\/b\b)[^>]+>/gi, '').trim();
-    
-    const lines = text.split(/\r?\n/);
+    if (!html) return [{ align: 'left', chunks: [] }];
+
+    // Match paragraph blocks or similar block elements
+    const pRegex = /<p([^>]*)>(.*?)<\/p>/gi;
     const paragraphs = [];
-    const regex = /<(strong|b)>(.*?)<\/\1>/gis;
-    
-    for (const line of lines) {
-        if (!line) {
-            paragraphs.push([]);
-            continue;
-        }
+    let pMatch;
+    let hasParagraphs = false;
+
+    while ((pMatch = pRegex.exec(html)) !== null) {
+        hasParagraphs = true;
+        const pAttrs = pMatch[1];
+        const pContent = pMatch[2];
         
+        let align = 'left';
+        if (pAttrs.includes('text-align: center')) align = 'center';
+        else if (pAttrs.includes('text-align: right')) align = 'right';
+        else if (pAttrs.includes('text-align: justify')) align = 'justify';
+        
+        paragraphs.push({ align, content: pContent });
+    }
+
+    if (!hasParagraphs) {
+        paragraphs.push({ align: 'left', content: html });
+    }
+
+    const parsedParagraphs = [];
+
+    for (const p of paragraphs) {
         const segments = [];
+        let isBold = false;
+        let isItalic = false;
+        let fontSize = null;
+
+        let content = p.content.replace(/<(?!strong\b|\/strong\b|b\b|\/b\b|em\b|\/em\b|i\b|\/i\b|span\b|\/span\b)[^>]+>/gi, '');
+        const tagRegex = /<(strong|b|em|i|\/strong|\/b|\/em|\/i|\/span|span[^>]*)>/gi;
         let lastIndex = 0;
         let match;
-        
-        regex.lastIndex = 0;
-        while ((match = regex.exec(line)) !== null) {
+
+        while ((match = tagRegex.exec(content)) !== null) {
             if (match.index > lastIndex) {
-                segments.push({ text: line.substring(lastIndex, match.index), bold: false });
+                segments.push({ 
+                    text: content.substring(lastIndex, match.index), 
+                    bold: isBold, 
+                    italic: isItalic,
+                    size: fontSize
+                });
             }
-            segments.push({ text: match[2], bold: true });
-            lastIndex = regex.lastIndex;
+            
+            const tag = match[1];
+            const lowerTag = tag.toLowerCase();
+            
+            if (lowerTag === 'strong' || lowerTag === 'b') isBold = true;
+            else if (lowerTag === '/strong' || lowerTag === '/b') isBold = false;
+            else if (lowerTag === 'em' || lowerTag === 'i') isItalic = true;
+            else if (lowerTag === '/em' || lowerTag === '/i') isItalic = false;
+            else if (lowerTag.startsWith('span')) {
+                const sizeMatch = lowerTag.match(/font-size:\s*(\d+)px/);
+                if (sizeMatch) {
+                    fontSize = parseInt(sizeMatch[1], 10);
+                }
+            }
+            else if (lowerTag === '/span') {
+                fontSize = null; 
+            }
+            
+            lastIndex = tagRegex.lastIndex;
         }
-        
-        if (lastIndex < line.length) {
-            segments.push({ text: line.substring(lastIndex), bold: false });
+
+        if (lastIndex < content.length) {
+            segments.push({ 
+                text: content.substring(lastIndex), 
+                bold: isBold, 
+                italic: isItalic,
+                size: fontSize
+            });
         }
-        
-        if (segments.length === 0 && line.length > 0) {
-            segments.push({ text: line, bold: false });
+
+        const validSegments = segments.filter(s => s.text.length > 0).map(s => {
+            s.text = s.text.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+            return s;
+        });
+
+        if (validSegments.length > 0) {
+            parsedParagraphs.push({ align: p.align, chunks: validSegments });
+        } else {
+            parsedParagraphs.push({ align: p.align, chunks: [{ text: '', bold: false, italic: false, size: null }] });
         }
-        
-        paragraphs.push(segments);
     }
-    
-    return paragraphs;
+
+    return parsedParagraphs;
 }
 
-function wrapThaiTextRich(html, maxWidth, size, font, boldFont) {
+function wrapThaiTextRich(html, maxWidth, defaultSize, font, boldFont) {
     if (!html) return [];
     if (!boldFont) boldFont = font;
     
@@ -212,43 +260,49 @@ function wrapThaiTextRich(html, maxWidth, size, font, boldFont) {
         segmenter = null;
     }
     
-    for (const paragraph of paragraphs) {
-        if (paragraph.length === 0) {
-            wrappedLines.push([]);
+    for (const p of paragraphs) {
+        const paragraphChunks = p.chunks;
+        if (paragraphChunks.length === 0 || (paragraphChunks.length === 1 && paragraphChunks[0].text.trim() === '')) {
+            // Empty paragraph = blank line from Enter key. Push a space so PDF renders it as a real line.
+            wrappedLines.push({ align: p.align, chunks: [{ text: ' ', bold: false, italic: false, size: null }] });
             continue;
         }
         
         if (maxWidth <= 0 || !segmenter) {
-            wrappedLines.push(paragraph);
+            wrappedLines.push({ align: p.align, chunks: paragraphChunks });
             continue;
         }
         
         let currentLineChunks = [];
         let currentLineWidth = 0;
         
-        for (const chunk of paragraph) {
+        for (const chunk of paragraphChunks) {
             const activeFont = chunk.bold ? boldFont : font;
+            const size = chunk.size || defaultSize;
             const words = Array.from(segmenter.segment(chunk.text)).map(s => s.segment);
             
             for (const word of words) {
                 const wordWidth = activeFont.widthOfTextAtSize(word, size);
                 
                 if (currentLineWidth + wordWidth > maxWidth && currentLineWidth > 0) {
-                    wrappedLines.push(currentLineChunks);
-                    currentLineChunks = [{ text: word, bold: chunk.bold }];
+                    wrappedLines.push({ align: p.align, chunks: currentLineChunks });
+                    currentLineChunks = [{ text: word, bold: chunk.bold, italic: chunk.italic, size }];
                     currentLineWidth = wordWidth;
                 } else {
-                    if (currentLineChunks.length > 0 && currentLineChunks[currentLineChunks.length - 1].bold === chunk.bold) {
+                    if (currentLineChunks.length > 0 && 
+                        currentLineChunks[currentLineChunks.length - 1].bold === chunk.bold &&
+                        currentLineChunks[currentLineChunks.length - 1].italic === chunk.italic &&
+                        currentLineChunks[currentLineChunks.length - 1].size === size) {
                         currentLineChunks[currentLineChunks.length - 1].text += word;
                     } else {
-                        currentLineChunks.push({ text: word, bold: chunk.bold });
+                        currentLineChunks.push({ text: word, bold: chunk.bold, italic: chunk.italic, size });
                     }
                     currentLineWidth += wordWidth;
                 }
             }
         }
         if (currentLineChunks.length > 0) {
-            wrappedLines.push(currentLineChunks);
+            wrappedLines.push({ align: p.align, chunks: currentLineChunks });
         }
     }
     

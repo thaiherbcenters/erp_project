@@ -60,17 +60,36 @@ function drawFilledRect(page, x, y, w, h, color) {
 function drawCellTextMultiline(page, lines, x, y, cellWidth, cellHeight, font, fontSize, boldFont) {
     if (!lines || lines.length === 0) return;
     
-    const lineHeight = fontSize * 1.3;
     const padding = 3;
-    const totalTextHeight = lines.length * lineHeight;
-    
-    let textY = y + (cellHeight / 2) + (totalTextHeight / 2) - lineHeight + (fontSize * 0.15);
-    
-    if (totalTextHeight > cellHeight - padding * 2) {
-        textY = y + cellHeight - padding - (fontSize * 0.85);
-    }
+    let totalTextHeight = 0;
+    const lineInfo = [];
     
     for (const line of lines) {
+        let maxLineSize = fontSize;
+        if (line && typeof line === 'object' && !Array.isArray(line) && line.chunks) {
+            for (const chunk of line.chunks) {
+                if (chunk.size && chunk.size > maxLineSize) maxLineSize = chunk.size;
+            }
+        } else if (Array.isArray(line)) {
+            for (const chunk of line) {
+                if (chunk.size && chunk.size > maxLineSize) maxLineSize = chunk.size;
+            }
+        }
+        const lh = maxLineSize * 1.3;
+        lineInfo.push({ maxLineSize, lh });
+        totalTextHeight += lh;
+    }
+    
+    let textY = y + (cellHeight / 2) + (totalTextHeight / 2) - lineInfo[0].lh + (lineInfo[0].maxLineSize * 0.15);
+    
+    if (totalTextHeight > cellHeight - padding * 2) {
+        textY = y + cellHeight - padding - (lineInfo[0].maxLineSize * 0.85);
+    }
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const lh = lineInfo[i].lh;
+        
         if (typeof line === 'string') {
             const str = line;
             let actualSize = fontSize;
@@ -81,27 +100,62 @@ function drawCellTextMultiline(page, lines, x, y, cellWidth, cellHeight, font, f
             }
             const textX = x + padding;
             drawThaiText(page, str, textX, textY, actualSize, font, TEXT_COLOR);
+            textY -= lh;
         } else if (Array.isArray(line)) {
             const maxWidth = cellWidth - (padding * 2);
             let totalWidth = 0;
             for (const chunk of line) {
                 const activeFont = (chunk.bold && boldFont) ? boldFont : font;
-                totalWidth += activeFont.widthOfTextAtSize(chunk.text, fontSize);
+                const size = chunk.size || fontSize;
+                totalWidth += activeFont.widthOfTextAtSize(chunk.text, size);
             }
             
             let actualSize = fontSize;
+            let scale = 1;
             if (totalWidth > maxWidth && maxWidth > 0) {
-                actualSize = fontSize * (maxWidth / totalWidth);
+                scale = maxWidth / totalWidth;
             }
             
             let currentX = x + padding;
             for (const chunk of line) {
                 const activeFont = (chunk.bold && boldFont) ? boldFont : font;
-                drawThaiText(page, chunk.text, currentX, textY, actualSize, activeFont, TEXT_COLOR);
-                currentX += activeFont.widthOfTextAtSize(chunk.text, actualSize);
+                const size = (chunk.size || fontSize) * scale;
+                drawThaiText(page, chunk.text, currentX, textY, size, activeFont, TEXT_COLOR, chunk.italic);
+                currentX += activeFont.widthOfTextAtSize(chunk.text, size);
             }
+            textY -= lh;
+        } else if (line && typeof line === 'object') {
+            const align = line.align || 'left';
+            const chunks = line.chunks || [];
+            
+            const maxWidth = cellWidth - (padding * 2);
+            let totalWidth = 0;
+            for (const chunk of chunks) {
+                const activeFont = (chunk.bold && boldFont) ? boldFont : font;
+                const size = chunk.size || fontSize;
+                totalWidth += activeFont.widthOfTextAtSize(chunk.text, size);
+            }
+            
+            let scale = 1;
+            if (totalWidth > maxWidth && maxWidth > 0) {
+                scale = maxWidth / totalWidth;
+            }
+            
+            let currentX = x + padding;
+            if (align === 'center') {
+                currentX = x + (cellWidth - (totalWidth * scale)) / 2;
+            } else if (align === 'right') {
+                currentX = x + cellWidth - padding - (totalWidth * scale);
+            }
+            
+            for (const chunk of chunks) {
+                const activeFont = (chunk.bold && boldFont) ? boldFont : font;
+                const size = (chunk.size || fontSize) * scale;
+                drawThaiText(page, chunk.text, currentX, textY, size, activeFont, TEXT_COLOR, chunk.italic);
+                currentX += activeFont.widthOfTextAtSize(chunk.text, size);
+            }
+            textY -= lh;
         }
-        textY -= lineHeight;
     }
 }
 
@@ -654,29 +708,71 @@ function renderTorbor1Page4And5(pdfDoc, font, boldFont, dingbatsFont, data) {
     drawThaiText(currentPage, headerText, MARGIN_LEFT + (cellWidth - hw)/2, y - headerHeight + 8, 16, boldFont, TEXT_COLOR);
     y -= headerHeight;
 
-    const fields = [
-        { title: 'ลักษณะ', key: 'ProductAppearance' },
-        { title: 'ขนาดบรรจุ', key: 'ProductPackSize' },
-        { title: 'กรรมวิธีการผลิต', key: 'ProductMfgProcess' },
-        { title: 'สรรพคุณ/ข้อบ่งใช้/ ข้อความกล่าวอ้างทางสุขภาพ', key: 'ProductIndication' },
-        { title: 'ขนาดและวิธีการใช้', key: 'ProductDosage' },
-        { title: 'วิธีเตรียมก่อนรับประทาน', key: 'ProductPreparation' },
-        { title: 'เงื่อนไขการรับประทาน', key: 'ProductCondition' },
-        { title: 'การเก็บรักษา / อายุการเก็บรักษา', key: 'ProductStorage' },
-        { title: 'ข้อห้ามใช้', key: 'ProductContraindication' },
-        { title: 'คำเตือน', key: 'ProductWarning' },
-        { title: 'ข้อควรระวัง', key: 'ProductPrecaution' },
-        { title: 'อาการไม่พึงประสงค์', key: 'ProductAdverseReaction' },
+    let fields = [];
+    const standardTitles = {
+        'ProductAppearance': 'ลักษณะ',
+        'ProductPackSize': 'ขนาดบรรจุ',
+        'ProductMfgProcess': 'กรรมวิธีการผลิต',
+        'ProductIndication': 'สรรพคุณ/ข้อบ่งใช้/ ข้อความกล่าวอ้างทางสุขภาพ',
+        'ProductDosage': 'ขนาดและวิธีการใช้',
+        'ProductPreparation': 'วิธีเตรียมก่อนรับประทาน',
+        'ProductCondition': 'เงื่อนไขการรับประทาน',
+        'ProductStorage': 'การเก็บรักษา / อายุการเก็บรักษา',
+        'ProductContraindication': 'ข้อห้ามใช้',
+        'ProductWarning': 'คำเตือน',
+        'ProductPrecaution': 'ข้อควรระวัง',
+        'ProductAdverseReaction': 'อาการไม่พึงประสงค์'
+    };
+
+    let order = null;
+    if (data.Section5FieldOrder) {
+        order = typeof data.Section5FieldOrder === 'string' ? JSON.parse(data.Section5FieldOrder) : data.Section5FieldOrder;
+    }
+
+    if (order && Array.isArray(order) && order.length > 0) {
+        order.forEach((meta) => {
+            if (meta.type === 'standard') {
+                fields.push({ title: meta.customTitle || standardTitles[meta.key] || meta.key, key: meta.key });
+            } else if (meta.type === 'custom') {
+                const dynamicKey = `CustomProductDetails_${meta.id}`;
+                data[dynamicKey] = meta.content;
+                fields.push({ title: meta.title, key: dynamicKey });
+            }
+        });
+    } else {
+        // Fallback for old documents
+        Object.keys(standardTitles).forEach(key => {
+            fields.push({ title: standardTitles[key], key });
+        });
+        if (data.CustomProductDetails) {
+            let customArr = typeof data.CustomProductDetails === 'string' ? JSON.parse(data.CustomProductDetails) : data.CustomProductDetails;
+            if (Array.isArray(customArr)) {
+                customArr.forEach((custom, index) => {
+                    if (custom.title && custom.title.trim() !== '') {
+                        const dynamicKey = `CustomProductDetails_fallback_${index}`;
+                        data[dynamicKey] = custom.content;
+                        fields.push({ title: custom.title, key: dynamicKey });
+                    }
+                });
+            }
+        }
+    }
+    
+    fields.push(
         { title: 'ช่องทางการขาย (สำหรับเจ้าหน้าที่กรอก)', key: 'SalesChannel', isCheckboxes: true },
         { title: 'บทสรุป ด้านคุณภาพ ความปลอดภัย และประสิทธิภาพ', key: 'ProductSummary' }
-    ];
+    );
 
     for (const field of fields) {
         const titleHeight = fontSize * 1.3;
         let contentLines = [];
         
         if (!field.isCheckboxes) {
-            const text = String(data[field.key] || '');
+            let text = String(data[field.key] || '');
+            // Convert plain text newlines to <p> tags if it's not already HTML
+            if (text && !text.match(/<p\b/i)) {
+                text = text.split('\n').map(line => `<p>${line}</p>`).join('');
+            }
             contentLines = wrapThaiTextRich(text, cellWidth - 12, fontSize, font, boldFont);
         }
         
@@ -749,10 +845,19 @@ function renderTorbor1Page4And5(pdfDoc, font, boldFont, dingbatsFont, data) {
                     
                     // Check if line is empty
                     let isEmpty = false;
+                    let lineChunks = [];
+                    let align = 'left';
+
                     if (typeof line === 'string') {
                         isEmpty = line.trim() === '';
+                        lineChunks = [{ text: line, bold: false, italic: false, size: null }];
                     } else if (Array.isArray(line)) {
                         isEmpty = line.every(chunk => chunk.text.trim() === '');
+                        lineChunks = line;
+                    } else if (line && typeof line === 'object') {
+                        align = line.align || 'left';
+                        lineChunks = line.chunks || [];
+                        isEmpty = lineChunks.length === 0 || lineChunks.every(chunk => chunk.text.trim() === '');
                     }
                     
                     // Skip empty lines if they appear at the very top of a new page inside a cell
@@ -762,14 +867,28 @@ function renderTorbor1Page4And5(pdfDoc, font, boldFont, dingbatsFont, data) {
                     isTopOfPage = false; // Once we hit a non-empty line (or draw something), it's no longer the top
                     
                     let lineY = y - (fontSize * 0.85);
-                    if (typeof line === 'string') {
-                        drawThaiText(currentPage, line, MARGIN_LEFT + 6, lineY + 1, fontSize, font, TEXT_COLOR);
-                    } else if (Array.isArray(line)) {
-                        let curX = MARGIN_LEFT + 6;
-                        for (const chunk of line) {
+                    
+                    if (!isEmpty) {
+                        // Calculate total width for alignment
+                        let totalWidth = 0;
+                        for (const chunk of lineChunks) {
                             const actF = chunk.bold ? boldFont : font;
-                            drawThaiText(currentPage, chunk.text, curX, lineY + 1, fontSize, actF, TEXT_COLOR);
-                            curX += actF.widthOfTextAtSize(chunk.text, fontSize);
+                            const size = chunk.size || fontSize;
+                            totalWidth += actF.widthOfTextAtSize(chunk.text, size);
+                        }
+                        
+                        let curX = MARGIN_LEFT + 6;
+                        if (align === 'center') {
+                            curX = MARGIN_LEFT + (cellWidth - totalWidth) / 2;
+                        } else if (align === 'right') {
+                            curX = MARGIN_LEFT + cellWidth - 6 - totalWidth;
+                        }
+
+                        for (const chunk of lineChunks) {
+                            const actF = chunk.bold ? boldFont : font;
+                            const size = chunk.size || fontSize;
+                            drawThaiText(currentPage, chunk.text, curX, lineY + 1, size, actF, TEXT_COLOR, chunk.italic);
+                            curX += actF.widthOfTextAtSize(chunk.text, size);
                         }
                     }
                     y -= (fontSize * 1.3);

@@ -35,6 +35,7 @@ router.get('/formulas', async (req, res) => {
             shelfLife: f.ShelfLife,
             description: f.Description,
             instructions: f.InstructionsJSON ? JSON.parse(f.InstructionsJSON) : [],
+            torbor1Format: f.TorBor1FormatJSON ? JSON.parse(f.TorBor1FormatJSON) : null,
             createdBy: f.CreatedBy,
             createdDate: formatDateLocal(f.CreatedDate),
             approvedBy: f.ApprovedBy,
@@ -94,6 +95,7 @@ router.get('/formulas/:id', async (req, res) => {
             shelfLife: f.ShelfLife,
             description: f.Description,
             instructions: f.InstructionsJSON ? JSON.parse(f.InstructionsJSON) : [],
+            torbor1Format: f.TorBor1FormatJSON ? JSON.parse(f.TorBor1FormatJSON) : null,
             createdBy: f.CreatedBy,
             createdDate: formatDateLocal(f.CreatedDate),
             approvedBy: f.ApprovedBy,
@@ -588,6 +590,24 @@ router.put('/formulas/:id/pharm-approve', authorizeRoles('admin', 'executive', '
     } catch (err) {
         console.error('Error pharm approve:', err);
         res.status(500).json({ message: 'Error' });
+    }
+});
+
+// =====================================================================
+// PUT /api/rnd/formulas/:id/torbor1-format — Save TorBor1 format
+// =====================================================================
+router.put('/formulas/:id/torbor1-format', async (req, res) => {
+    try {
+        const { torbor1Format } = req.body;
+        const pool = await poolPromise;
+        await pool.request()
+            .input('FormulaID', sql.VarChar, req.params.id)
+            .input('TorBor1FormatJSON', sql.NVarChar, JSON.stringify(torbor1Format || {}))
+            .query('UPDATE RnD_Formulas SET TorBor1FormatJSON=@TorBor1FormatJSON WHERE FormulaID=@FormulaID');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error saving torbor1 format:', err);
+        res.status(500).json({ message: 'Error saving torbor1 format' });
     }
 });
 

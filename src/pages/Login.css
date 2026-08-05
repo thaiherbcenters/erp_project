@@ -375,3 +375,7 @@
     justify-content: center;
   }
 }
+/* ซ่อน custom placeholder เมื่อ input มีค่า (หรือถูก autofill) */
+.login-page .input-wrapper input:not(:placeholder-shown) ~ .custom-placeholder {
+  display: none;
+}
