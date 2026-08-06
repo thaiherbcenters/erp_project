@@ -157,7 +157,7 @@ router.post('/formulas', authorizeRoles('admin', 'executive', 'rnd'), async (req
                 for (const ing of ingredients) {
                     await new sql.Request(transaction)
                         .input('FormulaID', sql.VarChar, newId)
-                        .input('MaterialID', sql.VarChar, ing.materialId || '')
+                        .input('MaterialID', sql.VarChar, ing.materialId || null)
                         .input('MaterialName', sql.NVarChar, ing.name || '')
                         .input('Qty', sql.Decimal(10, 2), ing.qty || 0)
                         .input('Unit', sql.NVarChar, ing.unit || '')
@@ -287,7 +287,7 @@ router.put('/formulas/:id', authorizeRoles('admin', 'executive', 'rnd'), async (
                 for (const ing of ingredients) {
                     await new sql.Request(transaction)
                         .input('FormulaID', sql.VarChar, req.params.id)
-                        .input('MaterialID', sql.VarChar, ing.materialId || '')
+                        .input('MaterialID', sql.VarChar, ing.materialId || null)
                         .input('MaterialName', sql.NVarChar, ing.name || '')
                         .input('Qty', sql.Decimal(10, 2), ing.qty || 0)
                         .input('Unit', sql.NVarChar, ing.unit || '')
@@ -303,7 +303,7 @@ router.put('/formulas/:id', authorizeRoles('admin', 'executive', 'rnd'), async (
         } catch (txErr) { await transaction.rollback(); throw txErr; }
     } catch (err) {
         console.error('Error updating formula:', err);
-        res.status(500).json({ message: 'Error updating formula' });
+        res.status(500).json({ success: false, message: err.message || 'Error updating formula' });
     }
 });
 
@@ -330,7 +330,10 @@ router.delete('/formulas/:id', authorizeRoles('admin', 'executive', 'rnd'), asyn
         } catch (txErr) { await transaction.rollback(); throw txErr; }
     } catch (err) {
         console.error('Error deleting formula:', err);
-        res.status(500).json({ message: 'Error deleting formula' });
+        if (err.number === 547) {
+            return res.status(400).json({ success: false, message: 'ไม่สามารถลบสูตรนี้ได้ เนื่องจากถูกนำไปใช้งานในระบบแล้ว' });
+        }
+        res.status(500).json({ success: false, message: err.message || 'เกิดข้อผิดพลาดในการลบสูตร' });
     }
 });
 

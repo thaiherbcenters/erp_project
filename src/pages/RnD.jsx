@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useRnD } from '../context/RnDContext';
 import { useAlert } from '../components/CustomAlert';
+import { TipTapCell } from '../components/TipTapCell';
 import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
@@ -123,26 +124,32 @@ export default function RnD() {
 
     // ── Handlers ──
     const handleCreateFormula = async () => {
-        if (!formulaForm.name) return alert('กรุณาระบุชื่อสูตร');
+        if (!formulaForm.name) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อสูตร', 'error');
+        const hasEmptyName = formulaForm.ingredients.some(ing => !ing.name || ing.name.trim() === '');
+        if (hasEmptyName) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อวัตถุดิบให้ครบทุกรายการ หรือลบรายการที่ไม่ได้ใช้ออก', 'error');
+        
         setSaving(true);
         const res = await createFormula(formulaForm);
         setSaving(false);
-        if (res.success) { alert('สร้างสูตรสำเร็จ!'); setShowCreateFormula(false); setFormulaForm(emptyFormulaForm); }
-        else alert('เกิดข้อผิดพลาด');
+        if (res.success) { showAlert('สำเร็จ', 'สร้างสูตรสำเร็จ!', 'success'); setShowCreateFormula(false); setFormulaForm(emptyFormulaForm); }
+        else showAlert('เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการสร้างสูตร', 'error');
     };
 
     const handleEditFormula = async () => {
-        if (!formulaForm.name) return alert('กรุณาระบุชื่อสูตร');
+        if (!formulaForm.name) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อสูตร', 'error');
+        const hasEmptyName = formulaForm.ingredients.some(ing => !ing.name || ing.name.trim() === '<p></p>' || ing.name.trim() === '');
+        if (hasEmptyName) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อวัตถุดิบให้ครบทุกรายการ หรือลบรายการที่ไม่ได้ใช้ออก', 'error');
+        
         setSaving(true);
-        const res = await updateFormula(selectedFormula.id, formulaForm);
+        const res = await updateFormula(formulaForm.id, formulaForm);
         setSaving(false);
-        if (res.success) { alert('บันทึกสำเร็จ!'); setShowEditFormula(false); setSelectedFormula(null); }
-        else alert('เกิดข้อผิดพลาด');
+        if (res.success) { showAlert('สำเร็จ', 'บันทึกสำเร็จ!', 'success'); setShowEditFormula(false); }
+        else showAlert('เกิดข้อผิดพลาด', res.message || 'เกิดข้อผิดพลาดในการบันทึก', 'error');
     };
 
     const handleStatusChange = async (formula, newStatus) => {
         const res = await updateFormulaStatus(formula.id, newStatus, 'Admin');
-        if (res.success) alert(`เปลี่ยนสถานะเป็น "${newStatus}" สำเร็จ!`);
+        if (res.success) showAlert('สำเร็จ', `เปลี่ยนสถานะเป็น "${newStatus}" สำเร็จ!`, 'success');
     };
 
     const handleDeleteFormula = async (id, name) => {
@@ -152,31 +159,32 @@ export default function RnD() {
         const res = await deleteFormula(id);
         setSaving(false);
         if (res.success) {
-            alert('ลบสูตรสำเร็จ!');
+            showAlert('สำเร็จ', 'ลบสูตรสำเร็จ!', 'success');
             if (selectedFormula?.id === id) setSelectedFormula(null);
         } else {
-            alert('เกิดข้อผิดพลาดในการลบสูตร');
+            showAlert('ไม่สามารถลบได้', res.message || 'เกิดข้อผิดพลาดในการลบสูตร', 'error');
         }
     };
 
     const openEditFormula = (f) => {
         setFormulaForm({
+            id: f.id,
             name: f.name, category: f.category, version: f.version, batchSize: f.batchSize,
             unit: f.unit, shelfLife: f.shelfLife, description: f.description,
             instructions: f.instructions?.length ? f.instructions : [''],
             ingredients: f.ingredients?.length ? f.ingredients : [{ materialId: '', name: '', qty: 0, unit: '', type: 'active', engName: '', latinName: '', partUsed: '' }],
         });
-        setSelectedFormula(f);
+        setSelectedFormula(null); // Close preview modal if it was open
         setShowEditFormula(true);
     };
 
     const handleCreateProject = async () => {
-        if (!projectForm.name) return alert('กรุณาระบุชื่อโครงการ');
+        if (!projectForm.name) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อโครงการ', 'error');
         setSaving(true);
         const res = await createProject(projectForm);
         setSaving(false);
-        if (res.success) { alert('สร้างโครงการสำเร็จ!'); setShowCreateProject(false); setProjectForm({ name: '', category: '', researcher: '', startDate: '', targetDate: '', formulaRef: '' }); }
-        else alert('เกิดข้อผิดพลาด');
+        if (res.success) { showAlert('สำเร็จ', 'สร้างโครงการสำเร็จ!', 'success'); setShowCreateProject(false); setProjectForm({ name: '', category: '', researcher: '', startDate: '', targetDate: '', formulaRef: '' }); }
+        else showAlert('เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการสร้างโครงการ', 'error');
     };
 
     const handleCreateExperiment = async () => {
@@ -527,7 +535,7 @@ export default function RnD() {
                                             <tr key={idx}>
                                                 <td>{idx + 1}</td>
                                                 <td className="text-bold">{ing.materialId}</td>
-                                                <td>{ing.name}</td>
+                                                <td dangerouslySetInnerHTML={{ __html: ing.name || '' }} />
                                                 <td style={{ fontWeight: 600 }}>{ing.qty}</td>
                                                 <td>{ing.unit}</td>
                                                 <td style={{ color: '#6b7280' }}>{mat ? `฿${mat.costPerUnit.toLocaleString()}` : '—'}</td>
@@ -584,11 +592,11 @@ export default function RnD() {
                     <div className="rnd-modal-header">
                         <div>
                             <h2>{isEdit ? '✏️ แก้ไขสูตร' : '➕ สร้างสูตรใหม่'}</h2>
-                            <div className="rnd-modal-meta"><span className="badge badge-primary">{isEdit ? selectedFormula?.id : 'New Formula'}</span></div>
+                            <div className="rnd-modal-meta"><span className="badge badge-primary">{isEdit ? formulaForm.id : 'New Formula'}</span></div>
                         </div>
                         <button className="rnd-modal-close" onClick={() => { setShowCreateFormula(false); setShowEditFormula(false); }}><XCircle size={22} /></button>
                     </div>
-                    <div className="rnd-modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+                    <div className="rnd-modal-body" style={{ padding: '20px 24px 24px' }}>
                         {/* ข้อมูลทั่วไป */}
                         <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                             <FlaskConical size={16} style={{ color: '#7b7bf5' }} /> ข้อมูลทั่วไป
@@ -642,14 +650,42 @@ export default function RnD() {
                                         <option value="">-- เลือกวัตถุดิบ --</option>
                                         {materials.map(m => <option key={m.id} value={m.id}>{m.id} — {m.name} ({m.unit})</option>)}
                                     </CustomSelect>
+
                                     <input type="number" style={{ ...inputStyle, width: 80 }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateIngredient(idx, 'qty', parseFloat(e.target.value) || 0)} />
                                     <span style={{ color: '#6b7280', fontSize: 13, minWidth: 30 }}>{ing.unit}</span>
                                     <button onClick={() => removeIngredient(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444' }}><Trash2 size={16} /></button>
                                 </div>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    <input type="text" style={{ ...inputStyle, flex: 1, fontSize: 13 }} placeholder="ชื่ออังกฤษ (ถ้ามี)" value={ing.engName || ''} onChange={e => updateIngredient(idx, 'engName', e.target.value)} />
-                                    <input type="text" style={{ ...inputStyle, flex: 1, fontSize: 13 }} placeholder="ชื่อวิทยาศาสตร์/ละติน" value={ing.latinName || ''} onChange={e => updateIngredient(idx, 'latinName', e.target.value)} />
-                                    <input type="text" style={{ ...inputStyle, flex: 1, fontSize: 13 }} placeholder="ส่วนที่ใช้" value={ing.partUsed || ''} onChange={e => updateIngredient(idx, 'partUsed', e.target.value)} />
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                                    {!ing.materialId && (
+                                        <div style={{ flex: 1, background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '4px' }}>
+                                            <TipTapCell 
+                                                value={ing.name || ''} 
+                                                onChange={val => updateIngredient(idx, 'name', val)}
+                                                placeholder="ชื่อวัตถุดิบ (กำหนดเอง)"
+                                            />
+                                        </div>
+                                    )}
+                                    <div style={{ flex: 1, background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '4px' }}>
+                                        <TipTapCell 
+                                            value={ing.engName || ''} 
+                                            onChange={val => updateIngredient(idx, 'engName', val)}
+                                            placeholder="ชื่ออังกฤษ (ถ้ามี)"
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1, background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '4px' }}>
+                                        <TipTapCell 
+                                            value={ing.latinName || ''} 
+                                            onChange={val => updateIngredient(idx, 'latinName', val)}
+                                            placeholder="ชื่อวิทยาศาสตร์/ละติน"
+                                        />
+                                    </div>
+                                    <div style={{ flex: 1, background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '4px' }}>
+                                        <TipTapCell 
+                                            value={ing.partUsed || ''} 
+                                            onChange={val => updateIngredient(idx, 'partUsed', val)}
+                                            placeholder="ส่วนที่ใช้"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         ))}

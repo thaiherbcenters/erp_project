@@ -451,8 +451,8 @@ const ContractMfgForm = forwardRef(({ documentId, customerData, contractData, in
                         <label>ลงชื่อ (ผู้ว่าจ้าง - ซ้ายบน)</label>
                         <input
                             type="text"
-                            value={formData.EmployerName || ''}
-                            onChange={(e) => handleChange('EmployerName', e.target.value)}
+                            value={formData.EmployerRep || formData.EmployerName || ''}
+                            onChange={(e) => handleChange('EmployerRep', e.target.value)}
                             placeholder="ชื่อ-นามสกุล..."
                         />
                     </div>

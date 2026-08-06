@@ -39,7 +39,7 @@ const NameInputWithTitle = ({ value, onChange, placeholder }) => {
             </div>
             <input 
                 type="text" 
-                value={value || ''} 
+                value={parsed.name} 
                 onChange={handleNameChange} 
                 placeholder={placeholder} 
                 style={{ width: '100%', padding: '8px', border: '1px solid #cbd5e1', borderRadius: '4px' }}

@@ -10,6 +10,13 @@ export function RnDProvider({ children }) {
     const [experiments, setExperiments] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const getAuthHeaders = useCallback((isJson = true) => {
+        const token = localStorage.getItem('erp_token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+        if (isJson) headers['Content-Type'] = 'application/json';
+        return headers;
+    }, []);
+
     const fetchFormulas = useCallback(async () => {
         try {
             const res = await fetch(`${API_BASE}/rnd/formulas`);
@@ -65,7 +72,7 @@ export function RnDProvider({ children }) {
         try {
             const res = await fetch(`${API_BASE}/rnd/formulas`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body: JSON.stringify(formulaData),
             });
             if (res.ok) {
@@ -82,17 +89,18 @@ export function RnDProvider({ children }) {
     const updateFormula = useCallback(async (id, data) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/formulas/${id}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
             });
             if (res.ok) { fetchFormulas(); return { success: true }; }
-            return { success: false, message: 'Failed' };
+            const errorData = await res.json().catch(() => ({}));
+            return { success: false, message: errorData.message || 'Failed' };
         } catch (err) { return { success: false, message: 'Server error' }; }
     }, [fetchFormulas]);
 
     const updateFormulaStatus = useCallback(async (id, status, approvedBy) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/formulas/${id}/status`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, approvedBy }),
+                method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ status, approvedBy }),
             });
             if (res.ok) { fetchFormulas(); return { success: true }; }
             return { success: false, message: 'Failed' };
@@ -101,16 +109,17 @@ export function RnDProvider({ children }) {
 
     const deleteFormula = useCallback(async (id) => {
         try {
-            const res = await fetch(`${API_BASE}/rnd/formulas/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE}/rnd/formulas/${id}`, { method: 'DELETE', headers: getAuthHeaders(false) });
             if (res.ok) { fetchFormulas(); return { success: true }; }
-            return { success: false, message: 'Failed' };
+            const errorData = await res.json().catch(() => ({}));
+            return { success: false, message: errorData.message || 'Failed' };
         } catch (err) { return { success: false, message: 'Server error' }; }
     }, [fetchFormulas]);
 
     const createMaterial = useCallback(async (data) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/materials`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
             });
             if (res.ok) { fetchMaterials(); return { success: true }; }
             return { success: false, message: 'Failed' };
@@ -120,7 +129,7 @@ export function RnDProvider({ children }) {
     const updateMaterial = useCallback(async (id, data) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/materials/${id}`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
             });
             if (res.ok) { fetchMaterials(); return { success: true }; }
             return { success: false, message: 'Failed' };
@@ -129,7 +138,7 @@ export function RnDProvider({ children }) {
 
     const deleteMaterial = useCallback(async (id) => {
         try {
-            const res = await fetch(`${API_BASE}/rnd/materials/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE}/rnd/materials/${id}`, { method: 'DELETE', headers: getAuthHeaders(false) });
             if (res.ok) { fetchMaterials(); return { success: true }; }
             return { success: false, message: 'Failed' };
         } catch (err) { return { success: false, message: 'Server error' }; }
@@ -138,7 +147,7 @@ export function RnDProvider({ children }) {
     const createProject = useCallback(async (data) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/projects`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
             });
             if (res.ok) { fetchProjects(); return { success: true }; }
             return { success: false, message: 'Failed' };
@@ -148,7 +157,7 @@ export function RnDProvider({ children }) {
     const createExperiment = useCallback(async (data) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/experiments`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
             });
             if (res.ok) { fetchExperiments(); return { success: true }; }
             return { success: false, message: 'Failed' };
@@ -167,7 +176,7 @@ export function RnDProvider({ children }) {
     const submitFormulaTest = useCallback(async (data) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/formula-tests`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+                method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
             });
             if (res.ok) { fetchFormulas(); return { success: true }; }
             return { success: false };
@@ -177,7 +186,7 @@ export function RnDProvider({ children }) {
     const pharmApprove = useCallback(async (formulaId, approvedBy, approved) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/formulas/${formulaId}/pharm-approve`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ approvedBy, approved }),
+                method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify({ approvedBy, approved }),
             });
             if (res.ok) { fetchFormulas(); return { success: true }; }
             return { success: false };

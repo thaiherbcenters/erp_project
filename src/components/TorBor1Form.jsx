@@ -6,112 +6,12 @@ import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
 import TextStyle from '@tiptap/extension-text-style';
 import { Extension } from '@tiptap/core';
+import { TipTapCell } from './TipTapCell';
 import API_BASE from '../config';
 import './PowerOfAttorneyForm.css';
 import NameInputWithTitle from './NameInputWithTitle';
 import IdCardInput from './IdCardInput';
 import CustomDatePicker from './CustomDatePicker';
-
-const FontSize = Extension.create({
-    name: 'fontSize',
-    addOptions() { return { types: ['textStyle'] }; },
-    addGlobalAttributes() {
-        return [
-            {
-                types: this.options.types,
-                attributes: {
-                    fontSize: {
-                        default: null,
-                        parseHTML: element => element.style.fontSize?.replace(/['"]+/g, ''),
-                        renderHTML: attributes => {
-                            if (!attributes.fontSize) return {};
-                            return { style: `font-size: ${attributes.fontSize}` };
-                        },
-                    },
-                },
-            },
-        ];
-    },
-    addCommands() {
-        return {
-            setFontSize: fontSize => ({ chain }) => chain().setMark('textStyle', { fontSize }).run(),
-            unsetFontSize: () => ({ chain }) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
-        };
-    },
-});
-
-const TipTapCell = ({ value, onChange, readOnly, style }) => {
-    const editor = useEditor({
-        extensions: [
-            StarterKit,
-            TextAlign.configure({ types: ['heading', 'paragraph'] }),
-            TextStyle,
-            FontSize,
-        ],
-        content: value || '',
-        editable: !readOnly,
-        onUpdate: ({ editor }) => {
-            onChange(editor.getHTML());
-        },
-    });
-
-    useEffect(() => {
-        if (editor && value !== editor.getHTML()) {
-            editor.commands.setContent(value || '');
-        }
-    }, [value, editor]);
-
-    if (!editor) return null;
-
-    const FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '20px'];
-
-    return (
-        <div style={{ ...style, display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
-            {editor && <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
-                <div style={{ background: '#333', padding: '6px', borderRadius: '8px', display: 'flex', gap: '6px', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                    <select 
-                        onChange={(e) => editor.chain().focus().setFontSize(e.target.value).run()} 
-                        style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none' }}
-                        value={editor.getAttributes('textStyle').fontSize || '14px'}
-                    >
-                        <option value="">ขนาด</option>
-                        {FONT_SIZES.map(size => (
-                            <option key={size} value={size}>{size.replace('px', '')}</option>
-                        ))}
-                    </select>
-                    <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 2px' }}></div>
-                    <button
-                        type="button"
-                        onClick={() => editor.chain().focus().toggleBold().run()}
-                        style={{ background: editor.isActive('bold') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
-                    >B</button>
-                    <button
-                        type="button"
-                        onClick={() => editor.chain().focus().toggleItalic().run()}
-                        style={{ background: editor.isActive('italic') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', fontStyle: 'italic', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
-                    >I</button>
-                    <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 2px' }}></div>
-                    <button
-                        type="button"
-                        onClick={() => editor.chain().focus().setTextAlign('left').run()}
-                        style={{ background: editor.isActive({ textAlign: 'left' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                    ><AlignLeft size={14} /></button>
-                    <button
-                        type="button"
-                        onClick={() => editor.chain().focus().setTextAlign('center').run()}
-                        style={{ background: editor.isActive({ textAlign: 'center' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                    ><AlignCenter size={14} /></button>
-                    <button
-                        type="button"
-                        onClick={() => editor.chain().focus().setTextAlign('right').run()}
-                        style={{ background: editor.isActive({ textAlign: 'right' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '4px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                    ><AlignRight size={14} /></button>
-                </div>
-            </BubbleMenu>}
-            <EditorContent editor={editor} style={{ flex: 1 }} className="tiptap-cell-editor" />
-        </div>
-    );
-};
 
 // ─── Design Tokens ───
 const colors = {
@@ -473,20 +373,20 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             const nextState = {
                 ...prev,
                 // Map product details if they exist in instructions
-                ProductAppearance: hasInstructions ? (instructions.ProductAppearance || '') : prev.ProductAppearance,
-                ProductPackSize: hasInstructions ? (instructions.ProductPackSize || '') : prev.ProductPackSize,
-                ProductMfgProcess: hasInstructions ? (instructions.ProductMfgProcess || '') : prev.ProductMfgProcess,
-                ProductIndication: hasInstructions ? (instructions.ProductIndication || '') : prev.ProductIndication,
-                ProductDosage: hasInstructions ? (instructions.ProductDosage || '') : prev.ProductDosage,
-                ProductPreparation: hasInstructions ? (instructions.ProductPreparation || '') : prev.ProductPreparation,
-                ProductCondition: hasInstructions ? (instructions.ProductCondition || '') : prev.ProductCondition,
-                ProductStorage: hasInstructions ? (instructions.ProductStorage || '') : prev.ProductStorage,
-                ProductContraindication: hasInstructions ? (instructions.ProductContraindication || '') : prev.ProductContraindication,
-                ProductWarning: hasInstructions ? (instructions.ProductWarning || '') : prev.ProductWarning,
-                ProductPrecaution: hasInstructions ? (instructions.ProductPrecaution || '') : prev.ProductPrecaution,
-                ProductAdverseReaction: hasInstructions ? (instructions.ProductAdverseReaction || '') : prev.ProductAdverseReaction,
-                SalesChannel: hasInstructions ? (instructions.SalesChannel || '') : prev.SalesChannel,
-                ProductSummary: hasInstructions ? (instructions.ProductSummary || '') : prev.ProductSummary
+                ProductAppearance: hasInstructions ? (instructions.ProductAppearance || '') : '',
+                ProductPackSize: hasInstructions ? (instructions.ProductPackSize || '') : '',
+                ProductMfgProcess: hasInstructions ? (instructions.ProductMfgProcess || '') : '',
+                ProductIndication: hasInstructions ? (instructions.ProductIndication || '') : '',
+                ProductDosage: hasInstructions ? (instructions.ProductDosage || '') : '',
+                ProductPreparation: hasInstructions ? (instructions.ProductPreparation || '') : '',
+                ProductCondition: hasInstructions ? (instructions.ProductCondition || '') : '',
+                ProductStorage: hasInstructions ? (instructions.ProductStorage || '') : '',
+                ProductContraindication: hasInstructions ? (instructions.ProductContraindication || '') : '',
+                ProductWarning: hasInstructions ? (instructions.ProductWarning || '') : '',
+                ProductPrecaution: hasInstructions ? (instructions.ProductPrecaution || '') : '',
+                ProductAdverseReaction: hasInstructions ? (instructions.ProductAdverseReaction || '') : '',
+                SalesChannel: hasInstructions ? (instructions.SalesChannel || '') : '',
+                ProductSummary: hasInstructions ? (instructions.ProductSummary || '') : ''
             };
             
             if (formula.torbor1Format) {
@@ -519,6 +419,16 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                 nextState.RecipeActiveIngredients = active.length > 0 ? active : [{ thaiName: '', engName: '', latinName: '', partUsed: '', quantity: '' }];
                 nextState.RecipeExtracts = extract.length > 0 ? extract : [{ extractName: '', latinName: '', partUsed: '', solvent: '', ratio: '', quantity: '' }];
                 nextState.RecipeExcipients = inactive.length > 0 ? inactive : [{ name: '', casNumber: '', function: '', quantity: '' }];
+            }
+            if (!formula.torbor1Format || (!formula.torbor1Format.Section5FieldOrder && !(formula.torbor1Format.CustomProductDetails && formula.torbor1Format.CustomProductDetails.length > 0))) {
+                nextState.Section5FieldOrder = [
+                    { type: 'standard', key: 'ProductAppearance' }, { type: 'standard', key: 'ProductPackSize' },
+                    { type: 'standard', key: 'ProductMfgProcess' }, { type: 'standard', key: 'ProductIndication' },
+                    { type: 'standard', key: 'ProductDosage' }, { type: 'standard', key: 'ProductPreparation' },
+                    { type: 'standard', key: 'ProductCondition' }, { type: 'standard', key: 'ProductStorage' },
+                    { type: 'standard', key: 'ProductContraindication' }, { type: 'standard', key: 'ProductWarning' },
+                    { type: 'standard', key: 'ProductPrecaution' }, { type: 'standard', key: 'ProductAdverseReaction' }
+                ];
             }
             return nextState;
         });
@@ -563,6 +473,14 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
             if (data.success) {
                 showAlert('success', 'บันทึกรูปแบบตารางกลับไปยังสูตรหลักสำเร็จแล้ว');
                 setHasFormatChanges(false);
+                
+                // Update the local formulas state so re-selecting uses the new format
+                setFormulas(prev => prev.map(f => {
+                    if (f.id === linkedFormulaId || f.FormulaID === linkedFormulaId) {
+                        return { ...f, torbor1Format };
+                    }
+                    return f;
+                }));
             } else {
                 showAlert('error', 'เกิดข้อผิดพลาดในการบันทึกรูปแบบตาราง');
             }
@@ -1476,8 +1394,8 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                                         <Save size={14} /> บันทึกรูปแบบตาราง (R&D)
                                     </button>
                                 )}
-                                <button type="button" onClick={() => setShowFormulaModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', border: 'none', background: colors.primary, color: '#fff', cursor: 'pointer' }}>
-                                    <Database size={14} /> ดึงข้อมูลสูตรตำรับ (R&D)
+                                <button type="button" onClick={() => setShowFormulaModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', border: 'none', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', cursor: 'pointer', boxShadow: '0 2px 6px -1px rgba(16, 185, 129, 0.35)' }}>
+                                    <Database size={14} /> เลือกสูตรตำรับ (R&D)
                                 </button>
                             </div>
                         )}

@@ -11,24 +11,9 @@ async function createFormula() {
             const newId = 'FM-011';
             await new sql.Request(transaction)
                 .input('FormulaID', sql.VarChar, newId)
-                .query('DELETE FROM RnD_Formula_Ingredients WHERE FormulaID = @FormulaID; DELETE FROM RnD_Formulas WHERE FormulaID = @FormulaID;');
-
             await new sql.Request(transaction)
                 .input('FormulaID', sql.VarChar, newId)
-                .input('Name', sql.NVarChar, 'ยาสเปรย์ผสมกระดูกไก่ดำ ตรา นารีเฮิร์บ')
-                .input('Category', sql.NVarChar, 'ยาสเปรย์')
-                .input('Version', sql.VarChar, 'v1.0')
-                .input('Status', sql.VarChar, 'อนุมัติ')
-                .input('BatchSize', sql.Int, 6600)
-                .input('Unit', sql.NVarChar, 'กรัม')
-                .input('ShelfLife', sql.NVarChar, '24 เดือน')
-                .input('Description', sql.NVarChar, 'สูตรยาสเปรย์ผสมกระดูกไก่ดำ')
-                .input('InstructionsJSON', sql.NVarChar, '[]')
-                .input('CreatedBy', sql.VarChar, 'system')
-                .query(`
-                    INSERT INTO RnD_Formulas (FormulaID, Name, Category, Version, Status, BatchSize, Unit, ShelfLife, Description, InstructionsJSON, CreatedBy, CreatedDate)
-                    VALUES (@FormulaID, @Name, @Category, @Version, @Status, @BatchSize, @Unit, @ShelfLife, @Description, @InstructionsJSON, @CreatedBy, GETDATE())
-                `);
+                .query('DELETE FROM RnD_Formula_Ingredients WHERE FormulaID = @FormulaID;');
 
             const ingredients = [
                 { 

@@ -351,11 +351,19 @@ router.post('/', async (req, res) => {
                             
                             // adjustedY is typically the bottom of the box. 
                             // For multiline, we should start rendering from the top of the box.
-                            const startLineY = (adjustedY + boxHeight) - lineHeight;
+                            let startLineY = (adjustedY + boxHeight) - lineHeight;
+                            if (field.valign === 'middle' && boxHeight > 0) {
+                                startLineY = (adjustedY + boxHeight) - ((boxHeight - totalHeight) / 2) - lineHeight;
+                            }
                             
                             for (let i = 0; i < lines.length; i++) {
                                 const lineY = startLineY - (i * lineHeight);
-                                drawThaiText(pdfPage, lines[i], x, lineY, currentFontSize, activeFont, rgb(0, 0, 0));
+                                let drawX = x;
+                                if (field.align === 'center' && boxWidth > 0) {
+                                    const lineWidth = activeFont.widthOfTextAtSize(lines[i], currentFontSize);
+                                    drawX = x + (boxWidth - lineWidth) / 2;
+                                }
+                                drawThaiText(pdfPage, lines[i], drawX, lineY, currentFontSize, activeFont, rgb(0, 0, 0));
                             }
                         } else {
                             // Auto-shrink font size if text overflows the bounding box for single line
@@ -364,8 +372,19 @@ router.post('/', async (req, res) => {
                                 fieldFontSize = fieldFontSize * (boxWidth / textWidth);
                             }
 
+                            let drawX = x;
+                            if (field.align === 'center' && boxWidth > 0) {
+                                const finalWidth = activeFont.widthOfTextAtSize(finalValue, fieldFontSize);
+                                drawX = x + (boxWidth - finalWidth) / 2;
+                            }
+                            
+                            let drawY = adjustedY;
+                            if (field.valign === 'middle' && boxHeight > 0) {
+                                drawY = adjustedY + (boxHeight / 2) - (fieldFontSize * 0.35);
+                            }
+
                             // Apply Custom Thai Renderer to fix Sara Am, floating vowels, and tone marks
-                            drawThaiText(pdfPage, finalValue, x, adjustedY, fieldFontSize, activeFont, rgb(0, 0, 0));
+                            drawThaiText(pdfPage, finalValue, drawX, drawY, fieldFontSize, activeFont, rgb(0, 0, 0));
                         }
                     }
                 }
@@ -428,10 +447,10 @@ router.post('/', async (req, res) => {
                             const dynamicCopied = await mergedPdf.copyPages(tempPdf, tempPageIndices);
                             dynamicCopied.forEach(p => mergedPdf.addPage(p));
                             
-                            // Copy pages after page 5 (pages 6+ = indices 5, 6, ...)
-                            if (templatePageCount > 5) {
+                            // Copy pages after page 5 (pages 6+ = indices 6, 7, ...), skipping index 5 (the old hardcoded signature page)
+                            if (templatePageCount > 6) {
                                 const afterIndices = [];
-                                for (let i = 5; i < templatePageCount; i++) afterIndices.push(i);
+                                for (let i = 6; i < templatePageCount; i++) afterIndices.push(i);
                                 const afterPages = await mergedPdf.copyPages(pdfDoc, afterIndices);
                                 afterPages.forEach(p => mergedPdf.addPage(p));
                             }

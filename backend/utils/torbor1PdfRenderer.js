@@ -944,6 +944,65 @@ function renderTorbor1Page4And5(pdfDoc, font, boldFont, dingbatsFont, data) {
         }
         y -= 4; // spacing between items
     }
+    
+    // ── Draw Signature Block ──
+    const reqSpace = 340;
+    if (y - reqSpace < MARGIN_BOTTOM) {
+        currentPage = pdfDoc.addPage([A4_WIDTH, A4_HEIGHT]);
+        y = A4_HEIGHT - MARGIN_TOP;
+        pageNum++;
+        const thaiPageNum = toThaiNumeral(pageNum);
+        drawThaiText(currentPage, `–${thaiPageNum}–`, (A4_WIDTH - font.widthOfTextAtSize(`–${thaiPageNum}–`, 14)) / 2, y, 14, font, TEXT_COLOR);
+        y -= 28;
+    } else {
+        y -= 20; // extra spacing before signature block if on same page
+    }
+
+    const sigFontSize = 14;
+    const lineHeight = sigFontSize * 1.4;
+    drawThaiText(currentPage, 'ข้าพเจ้าขอรับรองว่า', MARGIN_LEFT, y, sigFontSize, boldFont, TEXT_COLOR);
+    y -= lineHeight;
+
+    const sigLines = [
+        { text: '๑. ข้าพเจ้า มีคุณสมบัติตามมาตรา ๑๙ (๒) และ (๓) และไม่มีลักษณะต้องห้ามตามมาตรา ๑๙ (๖) (๗)', indent: 20 },
+        { text: '(๘) หรือ (๙) แห่ง พระราชบัญญัติผลิตภัณฑ์สมุนไพร พ.ศ. ๒๕๖๒ และได้แนบหลักฐาน ดังต่อไปนี้', indent: 40 },
+        { text: '(๑) เอกสารแสดงคุณสมบัติของผู้ขออนุญาตตามมาตรา ๑๙', indent: 60 },
+        { text: '(๑.๑) สำเนาใบสำคัญถิ่นที่อยู่ (กรณีบุคคลต่างด้าวเป็นผู้ขออนุญาต)', indent: 80 },
+        { text: '(๑.๒) ใบรับรองของผู้ประกอบวิชาชีพเวชกรรม ซึ่งรับรองว่าผู้ขออนุญาตไม่เป็นโรค', indent: 80 },
+        { text: 'ตามมาตรา ๑๙ (๘) แห่งพระราชบัญญัติผลิตภัณฑ์สมุนไพร พ.ศ. ๒๕๖๒', indent: 40 },
+        { text: '๒. เมื่อมีคำสั่งจากภาครัฐให้แก้ไขรายการในทะเบียนตำรับผลิตภัณฑ์สมุนไพรจะยื่นคำขอแก้ไขหรือแจ้ง', indent: 20 },
+        { text: 'ผู้อนุญาตตามระยะเวลาและเงื่อนไขที่กำหนด', indent: 40 },
+        { text: '๓. เมื่อมีคำสั่งจากภาครัฐให้เรียกเก็บคืนผลิตภัณฑ์สมุนไพรจากตลาด ข้าพเจ้าจะดำเนินการเรียกเก็บคืน', indent: 20 },
+        { text: 'จากตลาด และจะหยุดขาย ผลิตภัณฑ์สมุนไพรทันที และ', indent: 40 },
+        { text: 'กรณีที่ไม่ได้เป็นผู้ผลิตหรือนำเข้าผลิตภัณฑ์สมุนไพรเอง ข้าพเจ้าจะแจ้งให้ผู้ผลิตหรือนำเข้าผลิตภัณฑ์', indent: 60 },
+        { text: 'สมุนไพรทราบและหยุดการผลิตหรือนำเข้าผลิตภัณฑ์สมุนไพรทันที', indent: 40 },
+        { text: 'ข้าพเจ้าขอรับรองว่าข้อมูลที่ให้ไว้เป็นความจริงทุกประการ', indent: 40 }
+    ];
+
+    for (const item of sigLines) {
+        drawThaiText(currentPage, item.text, MARGIN_LEFT + item.indent, y, sigFontSize, font, TEXT_COLOR);
+        y -= lineHeight;
+    }
+
+    y -= 30; // Spacing before signature lines
+
+    const sigLineX = MARGIN_LEFT + 150;
+    drawThaiText(currentPage, '(ลายมือชื่อ) .................................................................... ผู้ขอขึ้นทะเบียนตำรับ', sigLineX, y, sigFontSize, font, TEXT_COLOR);
+    y -= lineHeight + 5;
+    drawThaiText(currentPage, '(.......................................................................) (ตัวบรรจง)', sigLineX + 25, y, sigFontSize, font, TEXT_COLOR);
+    y -= lineHeight + 5;
+    drawThaiText(currentPage, '(ตราประทับสำคัญของนิติบุคคล (ถ้ามี))', sigLineX + 28, y, sigFontSize, font, TEXT_COLOR);
+    
+    y -= 40; // Spacing before footer
+
+    // Draw footer line
+    drawRect(currentPage, MARGIN_LEFT, y + 10, CONTENT_WIDTH, 1);
+    
+    // Draw footer text with checkboxes (using dingbats for symbols if needed, or just unicode)
+    // "หมายเหตุ: ใส่เครื่องหมาย ✓ ในช่อง ⬜ และ ◯ หน้าข้อความที่ต้องการ"
+    const footerY = y - 10;
+    drawThaiText(currentPage, 'หมายเหตุ:', MARGIN_LEFT, footerY, 12, boldFont, TEXT_COLOR);
+    drawThaiText(currentPage, 'ใส่เครื่องหมาย ✓ ในช่อง ⬜ และ ◯ หน้าข้อความที่ต้องการ', MARGIN_LEFT + 55, footerY, 12, font, TEXT_COLOR);
 }
 
 module.exports = {
