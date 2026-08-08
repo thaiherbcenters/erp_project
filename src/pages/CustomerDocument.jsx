@@ -13,6 +13,7 @@ import {
     XCircle, Users, Plus, ArrowLeft, Search, Eye, Edit2, MapPin,
     Hash, Briefcase, MessageSquare, Factory, Store, Landmark, Package, Loader, Trash2
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 import './CustomerDocument.css';
@@ -27,6 +28,7 @@ const CUSTOMER_TYPES = [
 
 export default function CustomerDocument({ hasPermission }) {
     const { showConfirm } = useAlert();
+    const { canCreate, canUpdate, canDelete } = useAuth();
 
     if (!hasPermission('document_customers_form')) {
         return <div className="doc-no-access">ไม่มีสิทธิ์เข้าถึงหน้านี้</div>;
@@ -106,9 +108,11 @@ export default function CustomerDocument({ hasPermission }) {
                         </div>
                         <button className="search-btn">ค้นหา</button>
                     </div>
-                    <button className="btn-primary" onClick={() => setViewMode('create')} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Plus size={18} /> สร้างเอกสารข้อมูลลูกค้า
-                    </button>
+                    {canCreate('document_customers') && (
+                        <button className="btn-primary" onClick={() => setViewMode('create')} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Plus size={18} /> สร้างเอกสารข้อมูลลูกค้า
+                        </button>
+                    )}
                 </div>
                 <div className="card table-card">
                     <div className="doc-section-header">
@@ -132,7 +136,9 @@ export default function CustomerDocument({ hasPermission }) {
                                     <td>{cust.contact}</td><td>{cust.phone}</td><td>{cust.date}</td>
                                     <td style={{ textAlign: 'center' }}>
                                         <button className="doc-action-btn" title="ดูข้อมูล"><Eye size={15} /></button>
-                                        <button className="doc-action-btn" title="แก้ไข"><Edit2 size={15} /></button>
+                                        {canUpdate('document_customers') && (
+                                            <button className="doc-action-btn" title="แก้ไข"><Edit2 size={15} /></button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

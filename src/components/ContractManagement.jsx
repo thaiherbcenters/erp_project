@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Search, FileText, Eye, X, Paperclip } from 'lucide-react';
 import { useAlert } from './CustomAlert';
+import { useAuth } from '../context/AuthContext';
 import API_BASE from '../config';
 import CustomDatePicker from './CustomDatePicker';
 import './ContractManagement.css';
@@ -31,6 +32,7 @@ const getAutoContractStatus = (startDate, endDate) => {
 
 const ContractManagement = ({ onViewDocument }) => {
     const { showAlert } = useAlert();
+    const { canCreate, canDelete } = useAuth();
     const [contracts, setContracts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -266,9 +268,11 @@ const ContractManagement = ({ onViewDocument }) => {
                         />
                     </div>
                 </div>
-                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={handleToggleForm}>
-                    <Plus size={16} /> {showForm ? 'ยกเลิก' : 'เพิ่มสัญญาใหม่'}
-                </button>
+                {canCreate('sales_contracts') && (
+                    <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={handleToggleForm}>
+                        <Plus size={16} /> {showForm ? 'ยกเลิก' : 'เพิ่มสัญญาใหม่'}
+                    </button>
+                )}
             </div>
 
             {showForm && (
@@ -335,13 +339,17 @@ const ContractManagement = ({ onViewDocument }) => {
                                                 return 'progress';
                                             })()
                                         }`}>{getAutoContractStatus(c.StartDate, c.EndDate)}</span></td>
-                                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                                            <button className="btn-icon view" onClick={() => handleViewDetails(c)} title="ดูรายละเอียด">
-                                                <Eye size={16} />
-                                            </button>
-                                            <button className="btn-icon delete" onClick={() => handleDelete(c.ContractID, c.ContractNo)} title="ลบสัญญา">
-                                                <Trash2 size={16} />
-                                            </button>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <div className="contract-actions">
+                                                <button className="btn-icon view" onClick={() => handleViewDetails(c)} title="ดูรายละเอียด">
+                                                    <Eye size={16} />
+                                                </button>
+                                                {canDelete('sales_contracts') && (
+                                                    <button className="btn-icon delete" onClick={() => handleDelete(c.ContractID, c.ContractNo)} title="ลบสัญญา">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

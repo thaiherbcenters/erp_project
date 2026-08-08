@@ -4,7 +4,8 @@ import { Search, ChevronDown, UploadCloud, Edit2, Loader, Eye, Download, Trash2,
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../components/CustomAlert';
 import { DOCUMENT_PARTS, DOCUMENT_CATEGORIES } from '../documentData';
-import API_BASE from '../../config';import CustomSelect from '../../components/CustomSelect';
+import API_BASE from '../../config';
+import CustomSelect from '../../components/CustomSelect';
 
 
 // Shared Utilities
@@ -26,7 +27,7 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
     if (!hasPermission('document_list_search'))
         return <div className="doc-no-access">ไม่มีสิทธิ์เข้าถึงหน้านี้</div>;
 
-    const { currentUser } = useAuth();
+    const { currentUser, canCreate, canDelete } = useAuth();
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('all');
@@ -106,17 +107,19 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                             </div>
                             <button className="search-btn">ค้นหา</button>
                         </div>
-                        <button
-                            className="doc-upload-btn"
-                            onClick={() => {
-                                setShowUploadModal(true);
-                                setUploadResult(null);
-                            }}
-                            title="อัปโหลดเอกสาร"
-                        >
-                            <UploadCloud size={17} />
-                            <span>อัปโหลดเอกสาร</span>
-                        </button>
+                        {canCreate('document_list') && (
+                            <button
+                                className="doc-upload-btn"
+                                onClick={() => {
+                                    setShowUploadModal(true);
+                                    setUploadResult(null);
+                                }}
+                                title="อัปโหลดเอกสาร"
+                            >
+                                <UploadCloud size={17} />
+                                <span>อัปโหลดเอกสาร</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -401,25 +404,27 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                                             >
                                                 <Download size={15} />
                                             </button>
-                                            <button
-                                                className="doc-action-btn doc-action-btn-danger"
-                                                title="ลบเอกสาร"
-                                                onClick={async () => {
-                                                    const ok = await showConfirm('ยืนยันการลบ', `ต้องการลบเอกสาร "${doc.id} - ${doc.name}" หรือไม่?\n\nการลบจะลบทั้งข้อมูลในระบบและไฟล์เอกสารจริง`, 'warning');
-                                                    if (!ok) return;
-                                                    try {
-                                                        const res = await fetch(`${API_BASE}/documents/${doc.id}?user=${currentUser?.username || 'Unknown'}`, { method: 'DELETE' });
-                                                        const data = await res.json();
-                                                        if (!res.ok) throw new Error(data.message || 'ลบไม่สำเร็จ');
-                                                        showAlert('สำเร็จ', 'ลบเอกสารสำเร็จ', 'success');
-                                                        window.location.reload();
-                                                    } catch (err) {
-                                                        showAlert('เกิดข้อผิดพลาด', `เกิดข้อผิดพลาด: ${err.message}`, 'error');
-                                                    }
-                                                }}
-                                            >
-                                                <Trash2 size={15} />
-                                            </button>
+                                            {canDelete('document_list') && (
+                                                <button
+                                                    className="doc-action-btn doc-action-btn-danger"
+                                                    title="ลบเอกสาร"
+                                                    onClick={async () => {
+                                                        const ok = await showConfirm('ยืนยันการลบ', `ต้องการลบเอกสาร "${doc.id} - ${doc.name}" หรือไม่?\n\nการลบจะลบทั้งข้อมูลในระบบและไฟล์เอกสารจริง`, 'warning');
+                                                        if (!ok) return;
+                                                        try {
+                                                            const res = await fetch(`${API_BASE}/documents/${doc.id}?user=${currentUser?.username || 'Unknown'}`, { method: 'DELETE' });
+                                                            const data = await res.json();
+                                                            if (!res.ok) throw new Error(data.message || 'ลบไม่สำเร็จ');
+                                                            showAlert('สำเร็จ', 'ลบเอกสารสำเร็จ', 'success');
+                                                            window.location.reload();
+                                                        } catch (err) {
+                                                            showAlert('เกิดข้อผิดพลาด', `เกิดข้อผิดพลาด: ${err.message}`, 'error');
+                                                        }
+                                                    }}
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

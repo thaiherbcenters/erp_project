@@ -116,7 +116,7 @@ export const ALL_PAGES = [
         ],
       },
       {
-        id: 'stock_data', name: 'Data STOCK',
+        id: 'stock_data', name: 'ข้อมูลสต็อกสินค้า',
         sections: [
           { id: 'stock_data_search', name: 'ค้นหาสินค้า' },
           { id: 'stock_data_table', name: 'ตารางยอดคงเหลือ' },

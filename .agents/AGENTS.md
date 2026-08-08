@@ -31,3 +31,6 @@ When rendering text fields in PDFs, respect the frontend configuration and imple
 - The PDF generation system has been upgraded to support bold text rendering.
 - It determines if a field should be bold by checking `field.fontWeight === 'bold'`, `field.fontWeight === '700'`, `field.isBold === true`, or inheriting `templateConfig.defaultFontWeight === 'bold'`.
 - When bold text is required, it dynamically selects and loads the `-Bold.ttf` version of the font (e.g. `Sarabun-Bold.ttf`) from `fontUrls` and maps it to `activeFont`. Ensure that `fontUrls` maintains the `{ regular: '...', bold: '...' }` object structure for font families.
+
+## UI Permission Wrapping
+When creating new pages, features, or action buttons (Create/Edit/Delete), ALWAYS wrap them with the canCreate(page_id), canUpdate(page_id), and canDelete(page_id) permission checks imported from useAuth(). Double-check that the string ID passed matches the EXACT page_id defined in src/data/mockData.js to prevent missing buttons for users with valid permissions.

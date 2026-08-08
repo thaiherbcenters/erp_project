@@ -30,6 +30,8 @@ router.get('/formulas', async (req, res) => {
             category: f.Category,
             version: f.Version,
             status: f.Status,
+            formulaType: f.FormulaType,
+            unitSize: f.UnitSize,
             batchSize: f.BatchSize,
             unit: f.Unit,
             shelfLife: f.ShelfLife,
@@ -90,6 +92,8 @@ router.get('/formulas/:id', async (req, res) => {
             category: f.Category,
             version: f.Version,
             status: f.Status,
+            formulaType: f.FormulaType,
+            unitSize: f.UnitSize,
             batchSize: f.BatchSize,
             unit: f.Unit,
             shelfLife: f.ShelfLife,
@@ -122,7 +126,7 @@ router.get('/formulas/:id', async (req, res) => {
 // =====================================================================
 router.post('/formulas', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
-        const { name, category, version, batchSize, unit, shelfLife, description, instructions, ingredients, createdBy } = req.body;
+        const { name, category, formulaType, version, batchSize, unit, unitSize, shelfLife, description, instructions, ingredients, createdBy } = req.body;
         const pool = await poolPromise;
 
         // Generate ID
@@ -138,18 +142,20 @@ router.post('/formulas', authorizeRoles('admin', 'executive', 'rnd'), async (req
                 .input('FormulaID', sql.VarChar, newId)
                 .input('Name', sql.NVarChar, name)
                 .input('Category', sql.NVarChar, category || '')
+                .input('FormulaType', sql.NVarChar, formulaType || 'สูตรทั่วไป')
                 .input('Version', sql.VarChar, version || 'v1.0')
                 .input('Status', sql.NVarChar, 'ร่าง')
                 .input('BatchSize', sql.Int, batchSize || 0)
                 .input('Unit', sql.NVarChar, unit || '')
+                .input('UnitSize', sql.Decimal(18, 4), unitSize || 0)
                 .input('ShelfLife', sql.NVarChar, shelfLife || '')
                 .input('Description', sql.NVarChar, description || '')
                 .input('InstructionsJSON', sql.NVarChar, JSON.stringify(instructions || []))
                 .input('CreatedBy', sql.NVarChar, createdBy || 'system')
                 .input('CreatedDate', sql.Date, new Date())
                 .query(`
-                    INSERT INTO RnD_Formulas (FormulaID, Name, Category, Version, Status, BatchSize, Unit, ShelfLife, Description, InstructionsJSON, CreatedBy, CreatedDate)
-                    VALUES (@FormulaID, @Name, @Category, @Version, @Status, @BatchSize, @Unit, @ShelfLife, @Description, @InstructionsJSON, @CreatedBy, @CreatedDate)
+                    INSERT INTO RnD_Formulas (FormulaID, Name, Category, FormulaType, Version, Status, BatchSize, Unit, UnitSize, ShelfLife, Description, InstructionsJSON, CreatedBy, CreatedDate)
+                    VALUES (@FormulaID, @Name, @Category, @FormulaType, @Version, @Status, @BatchSize, @Unit, @UnitSize, @ShelfLife, @Description, @InstructionsJSON, @CreatedBy, @CreatedDate)
                 `);
 
             // Insert ingredients
@@ -261,7 +267,7 @@ router.get('/experiments', async (req, res) => {
 // =====================================================================
 router.put('/formulas/:id', authorizeRoles('admin', 'executive', 'rnd'), async (req, res) => {
     try {
-        const { name, category, version, batchSize, unit, shelfLife, description, instructions, ingredients } = req.body;
+        const { name, category, formulaType, version, batchSize, unit, unitSize, shelfLife, description, instructions, ingredients } = req.body;
         const pool = await poolPromise;
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
@@ -270,13 +276,15 @@ router.put('/formulas/:id', authorizeRoles('admin', 'executive', 'rnd'), async (
                 .input('FormulaID', sql.VarChar, req.params.id)
                 .input('Name', sql.NVarChar, name)
                 .input('Category', sql.NVarChar, category || '')
+                .input('FormulaType', sql.NVarChar, formulaType || 'สูตรทั่วไป')
                 .input('Version', sql.VarChar, version || 'v1.0')
                 .input('BatchSize', sql.Int, batchSize || 0)
                 .input('Unit', sql.NVarChar, unit || '')
+                .input('UnitSize', sql.Decimal(18, 4), unitSize || 0)
                 .input('ShelfLife', sql.NVarChar, shelfLife || '')
                 .input('Description', sql.NVarChar, description || '')
                 .input('InstructionsJSON', sql.NVarChar, JSON.stringify(instructions || []))
-                .query(`UPDATE RnD_Formulas SET Name=@Name, Category=@Category, Version=@Version, BatchSize=@BatchSize, Unit=@Unit, ShelfLife=@ShelfLife, Description=@Description, InstructionsJSON=@InstructionsJSON WHERE FormulaID=@FormulaID`);
+                .query(`UPDATE RnD_Formulas SET Name=@Name, Category=@Category, FormulaType=@FormulaType, Version=@Version, BatchSize=@BatchSize, Unit=@Unit, UnitSize=@UnitSize, ShelfLife=@ShelfLife, Description=@Description, InstructionsJSON=@InstructionsJSON WHERE FormulaID=@FormulaID`);
 
             // Replace ingredients
             await new sql.Request(transaction)
@@ -379,10 +387,12 @@ router.post('/materials', authorizeRoles('admin', 'executive', 'rnd'), async (re
             .input('MaterialID', sql.VarChar, newId)
             .input('Name', sql.NVarChar, name)
             .input('Unit', sql.NVarChar, unit || '')
+                .input('UnitSize', sql.Decimal(18, 4), unitSize || 0)
             .input('Stock', sql.Decimal(10, 2), stock || 0)
             .input('MinStock', sql.Decimal(10, 2), minStock || 0)
             .input('CostPerUnit', sql.Decimal(10, 2), costPerUnit || 0)
             .input('Category', sql.NVarChar, category || '')
+                .input('FormulaType', sql.NVarChar, formulaType || 'สูตรทั่วไป')
             .query('INSERT INTO RnD_RawMaterials (MaterialID, Name, Unit, Stock, MinStock, CostPerUnit, Category) VALUES (@MaterialID, @Name, @Unit, @Stock, @MinStock, @CostPerUnit, @Category)');
 
         res.status(201).json({ success: true, materialId: newId });
@@ -403,10 +413,12 @@ router.put('/materials/:id', authorizeRoles('admin', 'executive', 'rnd'), async 
             .input('MaterialID', sql.VarChar, req.params.id)
             .input('Name', sql.NVarChar, name)
             .input('Unit', sql.NVarChar, unit || '')
+                .input('UnitSize', sql.Decimal(18, 4), unitSize || 0)
             .input('Stock', sql.Decimal(10, 2), stock || 0)
             .input('MinStock', sql.Decimal(10, 2), minStock || 0)
             .input('CostPerUnit', sql.Decimal(10, 2), costPerUnit || 0)
             .input('Category', sql.NVarChar, category || '')
+                .input('FormulaType', sql.NVarChar, formulaType || 'สูตรทั่วไป')
             .query('UPDATE RnD_RawMaterials SET Name=@Name, Unit=@Unit, Stock=@Stock, MinStock=@MinStock, CostPerUnit=@CostPerUnit, Category=@Category WHERE MaterialID=@MaterialID');
         res.json({ success: true });
     } catch (err) {
@@ -447,6 +459,7 @@ router.post('/projects', authorizeRoles('admin', 'executive', 'rnd'), async (req
             .input('Code', sql.VarChar, newCode)
             .input('Name', sql.NVarChar, name)
             .input('Category', sql.NVarChar, category || '')
+                .input('FormulaType', sql.NVarChar, formulaType || 'สูตรทั่วไป')
             .input('Researcher', sql.NVarChar, researcher || '')
             .input('StartDate', sql.Date, startDate || new Date())
             .input('TargetDate', sql.Date, targetDate)

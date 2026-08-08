@@ -11,11 +11,35 @@ const { authorizeRoles } = require('../middleware/authorize');
 // Get all stock items
 router.get('/', async (req, res) => {
     try {
+        const { search, category, page, limit } = req.query;
         const pool = await poolPromise;
-        const result = await pool.request().query(`
-            SELECT * FROM Stock_Items 
-            ORDER BY UpdatedAt DESC
-        `);
+        
+        let queryStr = `SELECT * FROM Stock_Items WHERE (IsHidden = 0 OR IsHidden IS NULL)`;
+        
+        if (category && category !== 'all' && category !== 'ทั้งหมด') {
+            queryStr += ` AND Category = @Category`;
+        }
+        
+        if (search) {
+            queryStr += ` AND (ProductName LIKE @Search OR ItemID LIKE @Search OR Category LIKE @Search)`;
+        }
+        
+        queryStr += ` ORDER BY UpdatedAt DESC`;
+
+        const request = pool.request();
+        if (category && category !== 'all' && category !== 'ทั้งหมด') {
+            request.input('Category', sql.NVarChar, category);
+        }
+        if (search) {
+            request.input('Search', sql.NVarChar, `%${search}%`);
+        }
+
+        const result = await request.query(queryStr);
+
+        let p = parseInt(page) || 1;
+        let l = parseInt(limit) || 50;
+        let totalItems = result.recordset.length;
+        let totalPages = Math.ceil(totalItems / l);
 
         const items = result.recordset.map(row => ({
             id: row.ItemID,
@@ -28,8 +52,13 @@ router.get('/', async (req, res) => {
             status: row.Quantity <= 0 ? 'สินค้าหมด' : row.Quantity <= row.MinStock ? 'สินค้าเหลือน้อย' : 'มีสินค้า',
             updatedAt: row.UpdatedAt
         }));
+        
+        const pagedItems = items.slice((p - 1) * l, p * l);
 
-        res.json(items);
+        res.json({
+            data: pagedItems,
+            pagination: { page: p, limit: l, totalPages, totalItems }
+        });
     } catch (err) {
         console.error('Error fetching stock:', err);
         res.status(500).json({ message: 'Error fetching stock' });
@@ -39,11 +68,24 @@ router.get('/', async (req, res) => {
 // Get stock logs (history)
 router.get('/logs', async (req, res) => {
     try {
+        const { search, page, limit } = req.query;
         const pool = await poolPromise;
-        const result = await pool.request().query(`
-            SELECT * FROM Stock_Logs 
-            ORDER BY CreatedAt DESC
-        `);
+        
+        let queryStr = `SELECT * FROM Stock_Logs WHERE 1=1`;
+        if (search) {
+            queryStr += ` AND (ProductName LIKE @Search OR RefNo LIKE @Search OR Notes LIKE @Search)`;
+        }
+        queryStr += ` ORDER BY CreatedAt DESC`;
+
+        const request = pool.request();
+        if (search) request.input('Search', sql.NVarChar, `%${search}%`);
+        
+        const result = await request.query(queryStr);
+        
+        let p = parseInt(page) || 1;
+        let l = parseInt(limit) || 50;
+        let totalItems = result.recordset.length;
+        let totalPages = Math.ceil(totalItems / l);
 
         const logs = result.recordset.map(row => ({
             id: row.LogID,
@@ -58,7 +100,12 @@ router.get('/logs', async (req, res) => {
             date: row.CreatedAt ? new Date(row.CreatedAt).toLocaleString('th-TH') : ''
         }));
 
-        res.json(logs);
+        const pagedLogs = logs.slice((p - 1) * l, p * l);
+
+        res.json({
+            data: pagedLogs,
+            pagination: { page: p, limit: l, totalPages, totalItems }
+        });
     } catch (err) {
         console.error('Error fetching stock logs:', err);
         res.status(500).json({ message: 'Error fetching stock logs' });
@@ -99,8 +146,8 @@ router.post('/receive', authorizeRoles('admin', 'executive', 'stock', 'planner')
                     WHERE ItemID = @ItemID
                 `);
         } else {
-            // Create new stock item
-            itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK-${getDatePrefix()}`, 3);
+            // Create new stock item (usually from production = FG)
+            itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', 'FG', 3);
             await pool.request()
                 .input('ItemID', sql.VarChar, itemId)
                 .input('FormulaID', sql.VarChar, formulaId || null)
@@ -135,6 +182,63 @@ router.post('/receive', authorizeRoles('admin', 'executive', 'stock', 'planner')
     } catch (err) {
         console.error('Error receiving stock:', err);
         res.status(500).json({ message: 'Error receiving stock' });
+    }
+});
+
+// Get Dashboard Summary
+router.get('/dashboard', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        
+        // 1. KPIs
+        const kpiRes = await pool.request().query(`
+            SELECT 
+                COUNT(*) as totalItems,
+                ISNULL(SUM(Quantity), 0) as totalQty,
+                SUM(CASE WHEN Quantity < MinStock AND Quantity > 0 THEN 1 ELSE 0 END) as lowStockCount,
+                SUM(CASE WHEN Quantity <= 0 THEN 1 ELSE 0 END) as outOfStockCount
+            FROM Stock_Items
+        `);
+
+        // 2. Category Distribution
+        const catRes = await pool.request().query(`
+            SELECT Category as name, COUNT(*) as value, ISNULL(SUM(Quantity), 0) as totalQty
+            FROM Stock_Items
+            GROUP BY Category
+        `);
+
+        // 3. Top 5 Items
+        const topRes = await pool.request().query(`
+            SELECT TOP 5 ProductName, Quantity
+            FROM Stock_Items
+            ORDER BY Quantity DESC
+        `);
+
+        // 4. Low Stock List
+        const lowRes = await pool.request().query(`
+            SELECT ItemID, ProductName, Quantity, MinStock, Category
+            FROM Stock_Items
+            WHERE Quantity < MinStock
+            ORDER BY (Quantity - MinStock) ASC
+        `);
+
+        // 5. Recent Movements
+        const moveRes = await pool.request().query(`
+            SELECT TOP 5 LogID, ItemID, ProductName, Type, Quantity, RefNo, RefType, CreatedAt
+            FROM Stock_Logs
+            ORDER BY CreatedAt DESC
+        `);
+
+        res.json({
+            kpi: kpiRes.recordset[0],
+            categoryDistribution: catRes.recordset,
+            topItems: topRes.recordset,
+            lowStockItems: lowRes.recordset,
+            recentMovements: moveRes.recordset
+        });
+    } catch (err) {
+        console.error('Error fetching stock dashboard:', err);
+        res.status(500).json({ message: 'Error fetching dashboard data' });
     }
 });
 
@@ -325,6 +429,151 @@ router.get('/logs/:batchNo/detail', async (req, res) => {
     } catch (err) {
         console.error('Error fetching log detail:', err);
         res.status(500).json({ message: 'Error fetching log detail' });
+    }
+});
+
+// Update stock item (and optional adjust qty)
+router.put('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, category, unit, adjustQty, adjustReason } = req.body;
+        const pool = await poolPromise;
+        const transaction = new sql.Transaction(pool);
+        
+        await transaction.begin();
+
+        try {
+            // Update stock item
+            await transaction.request()
+                .input('ItemID', sql.VarChar, id)
+                .input('ProductName', sql.NVarChar, name)
+                .input('Category', sql.NVarChar, category)
+                .input('Unit', sql.NVarChar, unit)
+                .query(`
+                    UPDATE Stock_Items 
+                    SET ProductName = @ProductName, 
+                        Category = @Category, 
+                        Unit = @Unit,
+                        UpdatedAt = GETDATE()
+                    WHERE ItemID = @ItemID
+                `);
+
+            // Handle adjustment if provided
+            const qty = Number(adjustQty);
+            if (qty !== 0 && adjustReason) {
+                // Adjust quantity
+                await transaction.request()
+                    .input('ItemID', sql.VarChar, id)
+                    .input('AdjustQty', sql.Int, qty)
+                    .query(`
+                        UPDATE Stock_Items
+                        SET Quantity = Quantity + @AdjustQty
+                        WHERE ItemID = @ItemID
+                    `);
+                
+                // Add log
+                await transaction.request()
+                    .input('ItemID', sql.VarChar, id)
+                    .input('Type', sql.VarChar, qty > 0 ? 'ADJ_IN' : 'ADJ_OUT')
+                    .input('Quantity', sql.Int, Math.abs(qty))
+                    .input('ProductName', sql.NVarChar, name)
+                    .input('Notes', sql.NVarChar, adjustReason)
+                    .input('CreatedBy', sql.VarChar, req.user?.username || 'system')
+                    .query(`
+                        INSERT INTO Stock_Logs (ItemID, Type, Quantity, ProductName, Notes, CreatedBy)
+                        VALUES (@ItemID, @Type, @Quantity, @ProductName, @Notes, @CreatedBy)
+                    `);
+            }
+
+            await transaction.commit();
+            res.json({ message: 'อัปเดตข้อมูลสินค้าสำเร็จ' });
+        } catch (err) {
+            await transaction.rollback();
+            throw err;
+        }
+    } catch (err) {
+        console.error('Error updating stock item:', err);
+        res.status(500).json({ message: 'Error updating stock item' });
+    }
+});
+
+// Soft delete stock item
+router.delete('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await poolPromise;
+        
+        await pool.request()
+            .input('ItemID', sql.VarChar, id)
+            .query(`
+                UPDATE Stock_Items 
+                SET IsHidden = 1, UpdatedAt = GETDATE()
+                WHERE ItemID = @ItemID
+            `);
+            
+        res.json({ message: 'ซ่อนสินค้าสำเร็จ' });
+    } catch (err) {
+        console.error('Error soft deleting stock item:', err);
+        res.status(500).json({ message: 'Error soft deleting stock item' });
+    }
+});
+
+// Add new stock item
+router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res) => {
+    try {
+        const { name, category, unit, initialQty, adjustReason } = req.body;
+        const pool = await poolPromise;
+        const transaction = new sql.Transaction(pool);
+        
+        await transaction.begin();
+
+        try {
+            // Generate ItemID based on category
+            let prefix = 'STK';
+            if (category === 'สินค้าสำเร็จรูป') prefix = 'FG';
+            else if (category === 'วัตถุดิบ') prefix = 'RM';
+            else if (category === 'บรรจุภัณฑ์') prefix = 'PM';
+            else if (category === 'วัสดุสิ้นเปลือง') prefix = 'SP';
+            
+            const itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', prefix, 3);
+            
+            // Insert item
+            await transaction.request()
+                .input('ItemID', sql.VarChar, itemId)
+                .input('ProductName', sql.NVarChar, name)
+                .input('Category', sql.NVarChar, category)
+                .input('Quantity', sql.Int, Number(initialQty) || 0)
+                .input('Unit', sql.NVarChar, unit)
+                .query(`
+                    INSERT INTO Stock_Items (ItemID, ProductName, Category, Quantity, Unit, IsHidden)
+                    VALUES (@ItemID, @ProductName, @Category, @Quantity, @Unit, 0)
+                `);
+
+            // Add log if initial qty > 0
+            const qty = Number(initialQty) || 0;
+            if (qty > 0) {
+                await transaction.request()
+                    .input('ItemID', sql.VarChar, itemId)
+                    .input('Type', sql.VarChar, 'ADJ_IN')
+                    .input('Quantity', sql.Int, qty)
+                    .input('ProductName', sql.NVarChar, name)
+                    .input('Notes', sql.NVarChar, adjustReason || 'เพิ่มสินค้ารายการใหม่')
+                    .input('CreatedBy', sql.VarChar, req.user?.username || 'system')
+                    .query(`
+                        INSERT INTO Stock_Logs (ItemID, Type, Quantity, ProductName, Notes, CreatedBy)
+                        VALUES (@ItemID, @Type, @Quantity, @ProductName, @Notes, @CreatedBy)
+                    `);
+            }
+
+            await transaction.commit();
+            res.status(201).json({ message: 'เพิ่มรายการสินค้าสำเร็จ', itemId });
+        } catch (err) {
+            await transaction.rollback();
+            throw err;
+        }
+    } catch (err) {
+        console.error('Error adding stock item:', err);
+        res.status(500).json({ message: 'Error adding stock item' });
     }
 });
 

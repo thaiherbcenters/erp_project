@@ -28,13 +28,14 @@ import { useProduction } from '../context/ProductionContext';
 import { useAlert } from '../components/CustomAlert';
 import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
+import { PRODUCT_LIST } from '../data/billingData';
 import ProductionOrderPreview from '../components/ProductionOrderPreview';
 import { useSignatures } from '../hooks/useSignatures';
 import './PageCommon.css';
 import './Planning.css';
 
 export default function Planning() {
-    const { getVisibleSubPages, hasSectionPermission } = useAuth();
+    const { getVisibleSubPages, hasSectionPermission, canCreate, canUpdate, canDelete } = useAuth();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('planning');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
@@ -898,7 +899,7 @@ export default function Planning() {
                                 </div>
                             </div>
                         )}
-                        {hasSectionPermission('planning_list_action') && (
+                        {hasSectionPermission('planning_list_action') && canCreate('planning_list') && (
                             <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}><Plus size={16} /> สร้างใบสั่งผลิต</button>
                         )}
                     </div>
@@ -1042,7 +1043,7 @@ export default function Planning() {
                                                 <div style={{ display: 'inline-flex', gap: 3, alignItems: 'center', background: 'var(--bg)', borderRadius: 6, padding: '2px 3px' }}>
                                                     <button className="btn-sm" onClick={() => setSelectedJob(job)} title="ดูรายละเอียด" style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><Eye size={14} /></button>
                                                     <button className="btn-sm" style={{ background: '#d1fae5', color: '#065f46', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} onClick={() => setPreviewJob(job)} title="พรีวิวเอกสาร"><FileText size={14} /></button>
-                                                    {job.status === 'รอผลิต' && (
+                                                    {job.status === 'รอผลิต' && canUpdate('planning_list') && (
                                                         <button 
                                                             className="btn-sm" 
                                                             style={{ background: '#e0e7ff', color: '#4338ca', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} 
@@ -1173,41 +1174,7 @@ export default function Planning() {
         );
     };
 
-    // ══════════════════════════════════════════════════════════════════
-    // 4. Gantt Chart (Placeholder)
-    // ══════════════════════════════════════════════════════════════════
-    const renderGantt = () => (
-        <div className="planning-gantt">
 
-            <div className="card">
-                {/* Simple timeline bars */}
-                <div className="plan-timeline">
-                    {jobs.filter(j => j.status !== 'เสร็จสิ้น').map(job => (
-                        <div key={job.id} className="plan-timeline-row">
-                            <div className="plan-timeline-label">
-                                <span className="plan-timeline-id">{job.id}</span>
-                                <span className="plan-timeline-name">{job.formulaName}</span>
-                            </div>
-                            <div className="plan-timeline-bar-container">
-                                <div className="plan-timeline-bar"
-                                    style={{
-                                        width: `${Math.max(job.progress, 10)}%`,
-                                        background: (job.status === 'รอผลิต' || job.status === 'รอเริ่มงาน') ? '#e2e8f0' : 'linear-gradient(90deg, #7b7bf5, #a78bfa)'
-                                    }}>
-                                    <span>{job.progress}%</span>
-                                </div>
-                                <div className="plan-timeline-dates">
-                                    <span>{job.planDate}</span>
-                                    <ArrowRight size={12} />
-                                    <span>{job.dueDate}</span>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
 
     // ══════════════════════════════════════════════════════════════════
     // 5. QC Link (Placeholder)
@@ -1441,13 +1408,15 @@ export default function Planning() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
                                 <div>
                                     <label style={labelStyle}>ชื่อผลิตภัณฑ์ที่สั่งผลิตจริง <span style={{ color: '#ef4444' }}>*</span></label>
-                                    <input 
-                                        type="text" 
-                                        style={inputStyle}
+                                    <CustomSelect 
                                         value={createForm.productName} 
                                         onChange={(e) => setCreateForm({...createForm, productName: e.target.value})}
-                                        placeholder="เช่น ยาสเปรย์ผสมกระดูกไก่ดำ ตรา นารีเฮิร์บ"
-                                    />
+                                    >
+                                        <option value="">-- เลือกผลิตภัณฑ์ที่ต้องการผลิต --</option>
+                                        {PRODUCT_LIST.map(p => (
+                                            <option key={p} value={p}>{p}</option>
+                                        ))}
+                                    </CustomSelect>
                                 </div>
                                 <div>
                                     <label style={labelStyle}>สูตรการผลิตที่อนุมัติแล้ว <span style={{ color: '#ef4444' }}>*</span></label>

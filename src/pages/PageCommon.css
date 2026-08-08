@@ -847,3 +847,5 @@
 .react-datepicker__triangle {
     display: none !important;
 }
+.badge-primary { background-color: #dbeafe; color: #1e3a8a; border: 1px solid #bfdbfe; }
+

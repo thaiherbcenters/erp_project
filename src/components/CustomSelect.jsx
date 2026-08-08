@@ -11,7 +11,7 @@ const CustomSelect = ({ value, onChange, name, className, style = {}, children, 
     const options = Children.toArray(children)
         .filter(child => child.type === 'option')
         .map(child => ({
-            value: child.props.value,
+            value: child.props.value !== undefined ? child.props.value : child.props.children,
             label: child.props.children,
             disabled: child.props.disabled
         }));

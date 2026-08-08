@@ -20,7 +20,7 @@ import { Search } from 'lucide-react';
 import './PageCommon.css';
 
 export default function Procurement() {
-    const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
+    const { hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate } = useAuth();
     const visibleSubPages = getVisibleSubPages('procurement');
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'procurement_dashboard';
@@ -165,7 +165,9 @@ export default function Procurement() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            <button className="btn-primary">+ สร้างใบขอซื้อ (PR)</button>
+                            {canCreate('procurement_pr') && (
+                                <button className="btn-primary">+ สร้างใบขอซื้อ (PR)</button>
+                            )}
                         </div>
                     )}
 
@@ -223,7 +225,9 @@ export default function Procurement() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            <button className="btn-primary">+ สร้างใบสั่งซื้อ (PO)</button>
+                            {canCreate('procurement_po') && (
+                                <button className="btn-primary">+ สร้างใบสั่งซื้อ (PO)</button>
+                            )}
                         </div>
                     )}
 
@@ -283,7 +287,9 @@ export default function Procurement() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            <button className="btn-primary">+ บันทึกรับสินค้า</button>
+                            {canCreate('procurement_recv') && (
+                                <button className="btn-primary">+ บันทึกรับสินค้า</button>
+                            )}
                         </div>
                     )}
 

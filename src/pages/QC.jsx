@@ -16,12 +16,15 @@ import { useRnD } from '../context/RnDContext';
 import API_BASE from '../config';
 import { Search } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
+import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 import './QC.css';
 
 export default function QC() {
+    const { canCreate, canUpdate, canDelete } = useAuth();
     const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
     const { qcRequests, submitQcResult, getPendingQcRequests } = useProduction();
+    const { showAlert } = useAlert();
     const visibleSubPages = getVisibleSubPages('qc');
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'qc_dashboard';
@@ -51,16 +54,16 @@ export default function QC() {
     }, [fetchFormulaTests]);
 
     const handleSubmitTest = async () => {
-        if (!testFormData.formulaId || !testFormData.overallResult) return alert('กรุณาเลือกสูตรและระบุผลทดสอบ');
+        if (!testFormData.formulaId || !testFormData.overallResult) return showAlert('คำเตือน', 'กรุณาเลือกสูตรและระบุผลทดสอบ', 'warning');
         setTestSaving(true);
         const res = await submitFormulaTest(testFormData);
         setTestSaving(false);
         if (res.success) {
-            alert('บันทึกผลทดสอบสำเร็จ!');
+            showAlert('สำเร็จ', 'บันทึกผลทดสอบสำเร็จ!', 'success');
             setShowTestForm(false);
             setTestFormData({ formulaId: '', testedBy: '', pH: '', viscosity: '', color: '', smell: '', stability: '', microbial: '', overallResult: '', notes: '' });
             loadFormulaTests();
-        } else alert('เกิดข้อผิดพลาด');
+        } else showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกได้ กรุณาลองใหม่', 'error');
     };
 
     const [incomings, setIncomings] = useState([]);
@@ -223,9 +226,9 @@ export default function QC() {
                                     </div>
                                     
                                     <div className="qc-pending-actions">
-                                        <button className="qc-btn qc-btn-inspect" onClick={() => openInspectModal(req)}>
+                                        {canUpdate('qc_inprocess') && (<button className="qc-btn qc-btn-inspect" onClick={() => openInspectModal(req)}>
                                             🔍 ตรวจสอบคุณภาพ
-                                        </button>
+                                        </button>)}
                                     </div>
                                 </div>
                             ))}
@@ -312,9 +315,11 @@ export default function QC() {
                                 <button className="btn-danger" onClick={handleRejectClick}>
                                     ❌ ไม่ผ่าน
                                 </button>
-                                <button className="btn-primary" onClick={() => handleInspectSubmit('ผ่าน')}>
-                                    ✅ ผ่าน QC (Approve)
-                                </button>
+                                {canCreate('qc_formula_lab') && (
+                                    <button className="btn-primary" onClick={() => handleInspectSubmit('ผ่าน')}>
+                                        ✅ ผ่าน QC (Approve)
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -530,7 +535,7 @@ export default function QC() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            <button className="btn-primary">+ ตรวจรับวัตถุดิบ</button>
+                            {canCreate('qc_incoming') && (<button className="btn-primary">+ ตรวจรับวัตถุดิบ</button>)}
                         </div>
                     )}
                     {hasSectionPermission('qc_incoming_table') && (
@@ -611,7 +616,7 @@ export default function QC() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            <button className="btn-danger">+ สร้าง NCR</button>
+                            {canCreate('qc_defect') && (<button className="btn-danger">+ สร้าง NCR</button>)}
                         </div>
                     )}
                     {hasSectionPermission('qc_defect_table') && (
@@ -773,7 +778,7 @@ export default function QC() {
                             <p className="text-muted" style={{ marginTop: '0.5rem' }}>
                                 สามารถดึงรายงานสรุป (Monthly / Yearly QC Report) จากส่วนนี้
                             </p>
-                            <button className="btn-primary" style={{ marginTop: '1.5rem' }}>สร้างรายงานใหม่</button>
+                            {canCreate('qc_reports') && (<button className="btn-primary" style={{ marginTop: '1.5rem' }}>สร้างรายงานใหม่</button>)}
                         </div>
                     )}
                 </div>

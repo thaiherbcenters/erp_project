@@ -7,12 +7,15 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle, Search } from 'lucide-react';
+import { Eye, Edit3, Trash2, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle, Search, Plus } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import './PageCommon.css';
 
 export default function Stock() {
-    const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
+    const { hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate, canUpdate, canDelete } = useAuth();
+    const { showAlert } = useAlert();
     const visibleSubPages = getVisibleSubPages('stock');
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'stock_data';
@@ -22,6 +25,7 @@ export default function Stock() {
     const [searchLogs, setSearchLogs] = useState('');
     const [appliedSearchStock, setAppliedSearchStock] = useState('');
     const [appliedSearchLogs, setAppliedSearchLogs] = useState('');
+    const [activeCategory, setActiveCategory] = useState('สินค้าสำเร็จรูป');
     const [stockItems, setStockItems] = useState([]);
     const [stockLogs, setStockLogs] = useState([]);
     const [stockPagination, setStockPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
@@ -34,6 +38,24 @@ export default function Stock() {
     const [logDetailLoading, setLogDetailLoading] = useState(false);
     const [logDetail, setLogDetail] = useState(null);
 
+    // ── Edit & Delete State ──
+    const [editItem, setEditItem] = useState(null);
+    const [editForm, setEditForm] = useState({ name: '', category: '', unit: '', adjustQty: 0, adjustReason: '' });
+    const [editSaving, setEditSaving] = useState(false);
+    const [showAdjust, setShowAdjust] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState(null);
+    const [deleteLoading, setDeleteLoading] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // ── Add Item State ──
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [addForm, setAddForm] = useState({ name: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', adjustReason: '' });
+    const [addSaving, setAddSaving] = useState(false);
+
+    // ── Dashboard State ──
+    const [dashboardData, setDashboardData] = useState(null);
+    const [dashboardLoading, setDashboardLoading] = useState(true);
+
     // ── Auto-search Debounce ──
     useEffect(() => {
         const t = setTimeout(() => { setAppliedSearchStock(searchStock); setStockPagination(p => ({...p, page: 1})); }, 400);
@@ -45,6 +67,29 @@ export default function Stock() {
         return () => clearTimeout(t);
     }, [searchLogs]);
 
+    // ── Fetch Dashboard Data ──
+    useEffect(() => {
+        if (activeTab === 'stock_dashboard') {
+            const fetchDashboard = async () => {
+                try {
+                    setDashboardLoading(true);
+                    const res = await fetch(`${API_BASE}/stock/dashboard`, {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        setDashboardData(data);
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch dashboard", err);
+                } finally {
+                    setDashboardLoading(false);
+                }
+            };
+            fetchDashboard();
+        }
+    }, [activeTab]);
+
     // ── Fetch real data from API (with Pagination & Search) ──
     useEffect(() => {
         const fetchData = async () => {
@@ -52,7 +97,7 @@ export default function Stock() {
             try {
                 // Fetch Stock Data
                 if (activeTab === 'stock_data' || activeTab === 'stock_dashboard') {
-                    const res = await fetch(`${API_BASE}/stock?page=${stockPagination.page}&limit=${stockPagination.limit}&search=${encodeURIComponent(appliedSearchStock)}`);
+                    const res = await fetch(`${API_BASE}/stock?page=${stockPagination.page}&limit=${stockPagination.limit}&search=${encodeURIComponent(appliedSearchStock)}&category=${encodeURIComponent(activeCategory)}`);
                     if (res.ok) {
                         const json = await res.json();
                         setStockItems(json.data || json); // Support both old and new formats
@@ -76,7 +121,7 @@ export default function Stock() {
             }
         };
         fetchData();
-    }, [activeTab, stockPagination.page, logsPagination.page, appliedSearchStock, appliedSearchLogs]);
+    }, [activeTab, stockPagination.page, logsPagination.page, appliedSearchStock, appliedSearchLogs, activeCategory, refreshTrigger]);
 
     // ── Fetch detail for selected item ──
     const openDetail = async (item) => {
@@ -108,6 +153,113 @@ export default function Stock() {
             console.error('Failed to fetch log detail:', err);
         } finally {
             setLogDetailLoading(false);
+        }
+    };
+
+    // ── Open Edit Modal ──
+    const openEdit = (item) => {
+        setEditItem(item);
+        setShowAdjust(false);
+        setEditForm({
+            name: item.name || '',
+            category: item.category || '',
+            unit: item.unit || '',
+            adjustQty: 0,
+            adjustReason: ''
+        });
+    };
+
+    // ── Save New Item ──
+    const saveNewItem = async () => {
+        if (!addForm.name.trim()) {
+            showAlert('แจ้งเตือน', 'กรุณาระบุชื่อสินค้า', 'warning');
+            return;
+        }
+        setAddSaving(true);
+        try {
+            const res = await fetch(`${API_BASE}/stock`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+                body: JSON.stringify(addForm)
+            });
+            if (res.ok) {
+                showAlert('สำเร็จ', 'เพิ่มรายการสินค้าสำเร็จ', 'success');
+                setShowAddModal(false);
+                setAddForm({ name: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', adjustReason: '' });
+                // Force fetch
+                setRefreshTrigger(prev => prev + 1);
+            } else {
+                showAlert('ผิดพลาด', 'ไม่สามารถเพิ่มสินค้าได้', 'error');
+            }
+        } catch (err) {
+            console.error('Failed to add item:', err);
+            showAlert('ผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึก', 'error');
+        } finally {
+            setAddSaving(false);
+        }
+    };
+
+    // ── Save Edit ──
+    const saveEdit = async () => {
+        if (!editItem) return;
+
+        if (Number(editForm.adjustQty) !== 0 && !editForm.adjustReason.trim()) {
+            showAlert('แจ้งเตือน', 'กรุณาระบุสาเหตุหรือที่มาของการปรับปรุงจำนวนสินค้า', 'warning');
+            return;
+        }
+
+        setEditSaving(true);
+        try {
+            const res = await fetch(`${API_BASE}/stock/${editItem.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify(editForm)
+            });
+            if (res.ok) {
+                // Update local state
+                setStockItems(prev => prev.map(s => s.id === editItem.id ? { 
+                    ...s, 
+                    ...editForm, 
+                    qty: s.qty + Number(editForm.adjustQty) 
+                } : s));
+                setEditItem(null);
+                showAlert('สำเร็จ', 'บันทึกข้อมูลสินค้าเรียบร้อยแล้ว', 'success');
+            } else {
+                showAlert('ผิดพลาด', 'ไม่สามารถบันทึกข้อมูลได้', 'error');
+            }
+        } catch (err) {
+            console.error('Failed to save edit:', err);
+            showAlert('ผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึก', 'error');
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    // ── Soft Delete ──
+    const softDelete = async (item) => {
+        setDeleteLoading(true);
+        try {
+            const res = await fetch(`${API_BASE}/stock/${item.id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            if (res.ok) {
+                setDeleteConfirm(null);
+                setRefreshTrigger(prev => prev + 1);
+                showAlert('สำเร็จ', 'ลบสินค้าเรียบร้อยแล้ว', 'success');
+            } else {
+                showAlert('ผิดพลาด', 'ไม่สามารถลบสินค้าได้', 'error');
+            }
+        } catch (err) {
+            console.error('Failed to soft delete:', err);
+            showAlert('ผิดพลาด', 'เกิดข้อผิดพลาดในการลบสินค้า', 'error');
+        } finally {
+            setDeleteLoading(false);
         }
     };
 
@@ -248,14 +400,14 @@ export default function Stock() {
                                             {detail.logs.map((log, i) => (
                                                 <div key={i} style={{ padding: '12px 16px', borderBottom: i < detail.logs.length - 1 ? '1px solid #e5e7eb' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                                        {log.type === 'IN' ? (
+                                                        {['IN', 'ADJ_IN'].includes(log.type) ? (
                                                             <ArrowDownCircle size={20} style={{ color: '#059669' }} />
                                                         ) : (
                                                             <ArrowUpCircle size={20} style={{ color: '#f59e0b' }} />
                                                         )}
                                                         <div>
                                                             <div style={{ fontWeight: 600, fontSize: 13 }}>
-                                                                {log.type === 'IN' ? '📥 รับเข้า' : log.refType === 'oem_direct' ? '🚚 OEM ส่งตรง' : '📤 เบิกจ่าย'}
+                                                                {log.type === 'IN' ? '📥 รับเข้า' : log.type === 'ADJ_IN' ? '📈 ปรับเพิ่ม' : log.type === 'ADJ_OUT' ? '📉 ปรับลด' : log.refType === 'oem_direct' ? '🚚 OEM ส่งตรง' : '📤 เบิกจ่าย'}
                                                                 {log.ref && (
                                                                     <span style={{ marginLeft: 8, background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
                                                                         {log.ref}
@@ -266,8 +418,8 @@ export default function Stock() {
                                                         </div>
                                                     </div>
                                                     <div style={{ textAlign: 'right' }}>
-                                                        <div style={{ fontWeight: 800, fontSize: 16, color: log.type === 'IN' ? '#059669' : '#ef4444' }}>
-                                                            {log.type === 'IN' ? '+' : '-'}{log.qty?.toLocaleString()}
+                                                        <div style={{ fontWeight: 800, fontSize: 16, color: ['IN', 'ADJ_IN'].includes(log.type) ? '#059669' : '#ef4444' }}>
+                                                            {['IN', 'ADJ_IN'].includes(log.type) ? '+' : '-'}{log.qty?.toLocaleString()}
                                                         </div>
                                                         <div style={{ fontSize: 11, color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 4 }}>
                                                             <Clock size={10} /> {fmtDate(log.date)}
@@ -302,7 +454,7 @@ export default function Stock() {
                                     Batch: {selectedLog.ref}
                                 </span>
                                 <span className={`badge ${getLogTypeClass(selectedLog.type)}`}>
-                                    {selectedLog.type === 'IN' ? '📥 รับเข้า' : selectedLog.refType === 'oem_direct' ? '🚚 OEM ส่งตรง' : '📤 เบิกจ่าย'}
+                                    {selectedLog.type === 'IN' ? '📥 รับเข้า' : selectedLog.type === 'ADJ_IN' ? '📈 ปรับเพิ่ม' : selectedLog.type === 'ADJ_OUT' ? '📉 ปรับลด' : selectedLog.refType === 'oem_direct' ? '🚚 OEM ส่งตรง' : '📤 เบิกจ่าย'}
                                 </span>
                             </div>
                         </div>
@@ -428,46 +580,175 @@ export default function Stock() {
             {(activeTab === 'stock_dashboard' && hasSubPermission('stock_dashboard')) && (
                 <div className="subpage-content" key="stock_dashboard">
                     {hasSectionPermission('stock_dashboard_stats') && (
-                        <div className="dashboard-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                            <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <div style={{ background: '#eff6ff', padding: '16px', borderRadius: '50%', color: '#3b82f6' }}>
-                                    <Package size={28} />
-                                </div>
-                                <div>
-                                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>จำนวนสินค้าทั้งหมด</div>
-                                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>{stockItems.length.toLocaleString()}</div>
-                                </div>
-                            </div>
-                            
-                            <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '50%', color: '#22c55e' }}>
-                                    <TrendingUp size={28} />
-                                </div>
-                                <div>
-                                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>ยอดรวมสินค้าคงคลัง (ชิ้น)</div>
-                                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#166534' }}>{stockItems.reduce((sum, item) => sum + (item.qty || 0), 0).toLocaleString()}</div>
-                                </div>
-                            </div>
+                        <div className="dashboard-comprehensive" style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '24px' }}>
+                            {dashboardLoading ? (
+                                <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>กำลังโหลดข้อมูล Dashboard...</div>
+                            ) : !dashboardData ? (
+                                <div style={{ padding: '40px', textAlign: 'center', color: '#ef4444' }}>ไม่สามารถดึงข้อมูล Dashboard ได้</div>
+                            ) : (
+                                <>
+                                    {/* 1. KPI Cards */}
+                                    <div className="dashboard-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                                        <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                            <div style={{ background: '#eff6ff', padding: '16px', borderRadius: '50%', color: '#3b82f6' }}>
+                                                <Package size={28} />
+                                            </div>
+                                            <div>
+                                                <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>จำนวนรายการทั้งหมด</div>
+                                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#0f172a' }}>{dashboardData.kpi?.totalItems?.toLocaleString() || 0}</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                            <div style={{ background: '#f0fdf4', padding: '16px', borderRadius: '50%', color: '#22c55e' }}>
+                                                <TrendingUp size={28} />
+                                            </div>
+                                            <div>
+                                                <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>ยอดรวมสินค้าคงคลัง (ชิ้น/กก.)</div>
+                                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#166534' }}>{dashboardData.kpi?.totalQty?.toLocaleString() || 0}</div>
+                                            </div>
+                                        </div>
 
-                            <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '50%', color: '#f59e0b' }}>
-                                    <AlertTriangle size={28} />
-                                </div>
-                                <div>
-                                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>สินค้าเหลือน้อย</div>
-                                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#b45309' }}>{stockItems.filter(i => i.status === 'สินค้าเหลือน้อย').length.toLocaleString()}</div>
-                                </div>
-                            </div>
+                                        <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                            <div style={{ background: '#fffbeb', padding: '16px', borderRadius: '50%', color: '#f59e0b' }}>
+                                                <AlertTriangle size={28} />
+                                            </div>
+                                            <div>
+                                                <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>สินค้าเหลือน้อย (Low Stock)</div>
+                                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#b45309' }}>{dashboardData.kpi?.lowStockCount?.toLocaleString() || 0}</div>
+                                            </div>
+                                        </div>
 
-                            <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                <div style={{ background: '#fef2f2', padding: '16px', borderRadius: '50%', color: '#ef4444' }}>
-                                    <XCircle size={28} />
-                                </div>
-                                <div>
-                                    <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>สินค้าหมดสต็อก</div>
-                                    <div style={{ fontSize: '28px', fontWeight: 800, color: '#991b1b' }}>{stockItems.filter(i => i.status === 'สินค้าหมด' || i.qty === 0).length.toLocaleString()}</div>
-                                </div>
-                            </div>
+                                        <div className="stat-card" style={{ background: '#fff', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                            <div style={{ background: '#fef2f2', padding: '16px', borderRadius: '50%', color: '#ef4444' }}>
+                                                <XCircle size={28} />
+                                            </div>
+                                            <div>
+                                                <div style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>สินค้าหมดสต็อก</div>
+                                                <div style={{ fontSize: '28px', fontWeight: 800, color: '#991b1b' }}>{dashboardData.kpi?.outOfStockCount?.toLocaleString() || 0}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. Charts Row */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                                        <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', minWidth: 0 }}>
+                                            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', marginBottom: '16px' }}>สัดส่วนประเภทสินค้า</h3>
+                                            <div style={{ height: '280px', width: '100%' }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={dashboardData.categoryDistribution || []}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            innerRadius={70}
+                                                            outerRadius={100}
+                                                            paddingAngle={5}
+                                                            dataKey="value"
+                                                        >
+                                                            {(dashboardData.categoryDistribution || []).map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'][index % 4]} />
+                                                            ))}
+                                                        </Pie>
+                                                        <Tooltip formatter={(value, name, props) => [`${value} รายการ`, props.payload.name]} />
+                                                        <Legend verticalAlign="bottom" height={36} />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', minWidth: 0 }}>
+                                            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', marginBottom: '16px' }}>Top 5 สินค้าคงเหลือสูงสุด</h3>
+                                            <div style={{ height: '280px', width: '100%' }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={dashboardData.topItems || []} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
+                                                        <XAxis type="number" hide />
+                                                        <YAxis dataKey="ProductName" type="category" width={180} tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                                                        <Tooltip cursor={{fill: '#f1f5f9'}} formatter={(value) => [`${value.toLocaleString()}`, 'ยอดคงเหลือ']} />
+                                                        <Bar dataKey="Quantity" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={24}>
+                                                            {(dashboardData.topItems || []).map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe'][index % 5]} />
+                                                            ))}
+                                                        </Bar>
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. Tables Row */}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                                        <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', minWidth: 0 }}>
+                                            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#b45309', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <AlertTriangle size={18} /> แจ้งเตือนจุดสั่งซื้อ (Low Stock)
+                                            </h3>
+                                            <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                                                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                    <thead>
+                                                        <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                                                            <th style={{ padding: '12px 8px', textAlign: 'left', color: '#64748b', fontSize: '13px' }}>ชื่อสินค้า</th>
+                                                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#64748b', fontSize: '13px' }}>คงเหลือ</th>
+                                                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#64748b', fontSize: '13px' }}>จุดสั่งซื้อ</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {(!dashboardData.lowStockItems || dashboardData.lowStockItems.length === 0) ? (
+                                                            <tr><td colSpan="3" style={{padding: '24px', textAlign: 'center', color: '#94a3b8'}}>ไม่มีรายการที่ต้องสั่งซื้อด่วน</td></tr>
+                                                        ) : dashboardData.lowStockItems.map(item => (
+                                                            <tr key={item.ItemID} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                <td style={{ padding: '12px 8px', fontSize: '14px' }}>
+                                                                    <div style={{fontWeight: 600, color: '#1e293b'}}>{item.ItemID}</div>
+                                                                    <div style={{fontSize: '12px', color: '#64748b'}}>{item.ProductName}</div>
+                                                                </td>
+                                                                <td style={{ padding: '12px 8px', textAlign: 'right', color: '#ef4444', fontWeight: 700 }}>{item.Quantity}</td>
+                                                                <td style={{ padding: '12px 8px', textAlign: 'right', color: '#94a3b8' }}>{item.MinStock}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ background: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', minWidth: 0 }}>
+                                            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Clock size={18} /> ความเคลื่อนไหวล่าสุด
+                                            </h3>
+                                            <div className="table-responsive" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                                                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                    <thead>
+                                                        <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                                                            <th style={{ padding: '12px 8px', textAlign: 'left', color: '#64748b', fontSize: '13px' }}>ประเภท</th>
+                                                            <th style={{ padding: '12px 8px', textAlign: 'left', color: '#64748b', fontSize: '13px' }}>รายการ</th>
+                                                            <th style={{ padding: '12px 8px', textAlign: 'right', color: '#64748b', fontSize: '13px' }}>จำนวน</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {(!dashboardData.recentMovements || dashboardData.recentMovements.length === 0) ? (
+                                                            <tr><td colSpan="3" style={{padding: '24px', textAlign: 'center', color: '#94a3b8'}}>ไม่มีประวัติล่าสุด</td></tr>
+                                                        ) : dashboardData.recentMovements.map(log => (
+                                                            <tr key={log.LogID} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                <td style={{ padding: '12px 8px' }}>
+                                                                    <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 600, background: log.Type === 'IN' ? '#dcfce7' : '#fee2e2', color: log.Type === 'IN' ? '#166534' : '#991b1b' }}>
+                                                                        {log.Type === 'IN' ? 'รับเข้า' : 'เบิกออก'}
+                                                                    </span>
+                                                                </td>
+                                                                <td style={{ padding: '12px 8px', fontSize: '14px' }}>
+                                                                    <div style={{fontWeight: 500, color: '#1e293b'}}>{log.ItemID}</div>
+                                                                    <div style={{fontSize: '12px', color: '#64748b', maxWidth: '150px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'}} title={log.ProductName}>{log.ProductName}</div>
+                                                                </td>
+                                                                <td style={{ padding: '12px 8px', textAlign: 'right', fontWeight: 700, color: log.Type === 'IN' ? '#166534' : '#991b1b' }}>
+                                                                    {log.Type === 'IN' ? '+' : '-'}{log.Quantity}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
                 </div>
@@ -502,6 +783,39 @@ export default function Stock() {
                         </div>
                     )}
 
+                    {hasSectionPermission('stock_data_search') && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                            <div className="sub-tabs-container" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 5, flex: 1 }}>
+                                {['สินค้าสำเร็จรูป', 'วัตถุดิบ', 'บรรจุภัณฑ์', 'วัสดุสิ้นเปลือง'].map(cat => (
+                                    <button 
+                                        key={cat} 
+                                        className={`sub-tab-btn ${activeCategory === cat ? 'active' : ''}`}
+                                        onClick={() => { setActiveCategory(cat); setStockPagination(p => ({...p, page: 1})); }}
+                                        style={{
+                                            padding: '8px 16px', borderRadius: 20, border: '1px solid #e5e7eb',
+                                            background: activeCategory === cat ? '#eff6ff' : '#fff',
+                                            color: activeCategory === cat ? '#1d4ed8' : '#6b7280',
+                                            fontWeight: activeCategory === cat ? 700 : 500,
+                                            cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {cat === 'สินค้าสำเร็จรูป' ? '🟢 สินค้าสำเร็จรูป (FG)' : 
+                                         cat === 'วัตถุดิบ' ? '🟡 วัตถุดิบ (RM)' : 
+                                         cat === 'บรรจุภัณฑ์' ? '🔵 บรรจุภัณฑ์ (PM)' : '🟤 วัสดุสิ้นเปลือง'}
+                                    </button>
+                                ))}
+                            </div>
+                            {canCreate('stock_data') && (
+                                <button 
+                                    onClick={() => setShowAddModal(true)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 8, background: '#059669', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
+                                >
+                                    <Plus size={18} /> เพิ่มสินค้า
+                                </button>
+                            )}
+                        </div>
+                    )}
+
                     {hasSectionPermission('stock_data_table') && (
                         <div className="table-card card">
                             {loading ? (
@@ -522,7 +836,7 @@ export default function Stock() {
                                             <th>ยอดคงเหลือ</th>
                                             <th>หน่วย</th>
                                             <th>สถานะ</th>
-                                            <th>จัดการ</th>
+                                            <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -541,10 +855,30 @@ export default function Stock() {
                                                     </span>
                                                 </td>
                                                 <td>
-                                                    <button className="btn-sm" onClick={() => openDetail(item)}
-                                                        style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                        <Eye size={14} /> ดูรายละเอียด
-                                                    </button>
+                                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                                                        <button onClick={() => openDetail(item)} title="ดูรายละเอียด"
+                                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4, borderRadius: 6, transition: 'color 0.2s' }}
+                                                            onMouseEnter={e => e.currentTarget.style.color = '#2563eb'}
+                                                            onMouseLeave={e => e.currentTarget.style.color = '#6b7280'}>
+                                                            <Eye size={15} />
+                                                        </button>
+                                                        {canUpdate('stock_data') && (
+                                                            <button onClick={() => openEdit(item)} title="แก้ไข"
+                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4, borderRadius: 6, transition: 'color 0.2s' }}
+                                                                onMouseEnter={e => e.currentTarget.style.color = '#2563eb'}
+                                                                onMouseLeave={e => e.currentTarget.style.color = '#6b7280'}>
+                                                                <Edit3 size={15} />
+                                                            </button>
+                                                        )}
+                                                        {canDelete('stock_data') && (
+                                                            <button onClick={() => setDeleteConfirm(item)} title="ลบสินค้า"
+                                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4, borderRadius: 6, transition: 'color 0.2s' }}
+                                                                onMouseEnter={e => e.currentTarget.style.color = '#dc2626'}
+                                                                onMouseLeave={e => e.currentTarget.style.color = '#6b7280'}>
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -638,13 +972,13 @@ export default function Stock() {
                                                 <td>{log.date}</td>
                                                 <td>
                                                     <span className={`badge ${getLogTypeClass(log.type)}`}>
-                                                        {log.type === 'IN' ? '📥 รับเข้า' : log.refType === 'oem_direct' ? '🚚 OEM ส่งตรง' : '📤 เบิกจ่าย'}
+                                                        {log.type === 'IN' ? '📥 รับเข้า' : log.type === 'ADJ_IN' ? '📈 ปรับเพิ่ม' : log.type === 'ADJ_OUT' ? '📉 ปรับลด' : log.refType === 'oem_direct' ? '🚚 OEM ส่งตรง' : '📤 เบิกจ่าย'}
                                                     </span>
                                                 </td>
                                                 <td className="text-bold">{log.item}</td>
                                                 <td>
-                                                    <span className={log.type === 'IN' ? 'text-success' : 'text-danger'} style={{ fontWeight: 700 }}>
-                                                        {log.type === 'IN' ? '+' : '-'}{log.qty?.toLocaleString()}
+                                                    <span className={['IN', 'ADJ_IN'].includes(log.type) ? 'text-success' : 'text-danger'} style={{ fontWeight: 700 }}>
+                                                        {['IN', 'ADJ_IN'].includes(log.type) ? '+' : '-'}{log.qty?.toLocaleString()}
                                                     </span>
                                                 </td>
                                                 <td>
@@ -698,6 +1032,257 @@ export default function Stock() {
             {/* ── Detail Modal ── */}
             {renderDetailModal()}
             {renderLogDetailModal()}
+
+            {/* ── Add Modal ── */}
+            {showAddModal && (
+                <div className="rnd-modal-overlay" onClick={() => setShowAddModal(false)}>
+                    <div className="rnd-modal" style={{ maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="rnd-modal-header">
+                            <div>
+                                <h2>➕ เพิ่มรายการสินค้าใหม่</h2>
+                            </div>
+                            <button className="rnd-modal-close" onClick={() => setShowAddModal(false)}>
+                                <XCircle size={22} />
+                            </button>
+                        </div>
+                        <div className="rnd-modal-body">
+                            <div className="form-group" style={{ marginBottom: 15 }}>
+                                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>ชื่อสินค้า <span style={{ color: '#ef4444' }}>*</span></label>
+                                <input
+                                    type="text"
+                                    value={addForm.name}
+                                    onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+                                    placeholder="ระบุชื่อสินค้า..."
+                                />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15, marginBottom: 15 }}>
+                                <div className="form-group">
+                                    <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>หมวดหมู่</label>
+                                    <select
+                                        value={addForm.category}
+                                        onChange={e => setAddForm(p => ({ ...p, category: e.target.value }))}
+                                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, background: '#fff' }}
+                                    >
+                                        <option value="สินค้าสำเร็จรูป">สินค้าสำเร็จรูป (FG)</option>
+                                        <option value="วัตถุดิบ">วัตถุดิบ (RM)</option>
+                                        <option value="บรรจุภัณฑ์">บรรจุภัณฑ์ (PM)</option>
+                                        <option value="วัสดุสิ้นเปลือง">วัสดุสิ้นเปลือง</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>หน่วยนับ</label>
+                                    <input
+                                        type="text"
+                                        value={addForm.unit}
+                                        onChange={e => setAddForm(p => ({ ...p, unit: e.target.value }))}
+                                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+                                <div className="form-group">
+                                    <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>จำนวนเริ่มต้น (ยกยอดมา)</label>
+                                    <input
+                                        type="number"
+                                        value={addForm.initialQty === 0 ? '' : addForm.initialQty}
+                                        onChange={e => setAddForm(p => ({ ...p, initialQty: e.target.value }))}
+                                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+                                        placeholder="0"
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
+                                <button
+                                    onClick={() => setShowAddModal(false)}
+                                    style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    onClick={saveNewItem}
+                                    disabled={addSaving}
+                                    style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', fontSize: 14, opacity: addSaving ? 0.7 : 1 }}
+                                >
+                                    {addSaving ? 'กำลังบันทึก...' : '💾 บันทึกสินค้าใหม่'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Edit Modal ── */}
+            {editItem && (
+                <div className="rnd-modal-overlay" onClick={() => setEditItem(null)}>
+                    <div className="rnd-modal" style={{ maxWidth: 550 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="rnd-modal-header">
+                            <div>
+                                <h2>✏️ แก้ไขข้อมูลสินค้า</h2>
+                                <div className="rnd-modal-meta">
+                                    <span style={{ color: '#059669', fontWeight: 700 }}>{editItem.id}</span>
+                                </div>
+                            </div>
+                            <button className="rnd-modal-close" onClick={() => setEditItem(null)}>
+                                <XCircle size={22} />
+                            </button>
+                        </div>
+                        <div className="rnd-modal-body">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>ชื่อสินค้า</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.name}
+                                        onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+                                        style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, outline: 'none', transition: 'border 0.2s' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>หมวดหมู่</label>
+                                    <select
+                                        value={editForm.category}
+                                        onChange={(e) => setEditForm(f => ({ ...f, category: e.target.value }))}
+                                        style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, outline: 'none', background: '#fff' }}
+                                    >
+                                        <option value="สินค้าสำเร็จรูป">สินค้าสำเร็จรูป (FG)</option>
+                                        <option value="วัตถุดิบ">วัตถุดิบ (RM)</option>
+                                        <option value="บรรจุภัณฑ์">บรรจุภัณฑ์ (PM)</option>
+                                        <option value="วัสดุสิ้นเปลือง">วัสดุสิ้นเปลือง</option>
+                                    </select>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>จำนวนปัจจุบัน</label>
+                                        <div style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, background: '#f3f4f6', color: '#374151', fontWeight: 700 }}>
+                                            {editItem.qty?.toLocaleString()} <span style={{ fontWeight: 400, color: '#6b7280' }}>{editItem.unit}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>หน่วย</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.unit}
+                                            onChange={(e) => setEditForm(f => ({ ...f, unit: e.target.value }))}
+                                            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, outline: 'none' }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* ปุ่มเปิดช่องปรับปรุงจำนวน */}
+                                {!showAdjust ? (
+                                    <button
+                                        onClick={() => setShowAdjust(true)}
+                                        style={{ width: '100%', padding: '10px 16px', borderRadius: 8, border: '1px dashed #93c5fd', background: '#eff6ff', color: '#2563eb', fontWeight: 600, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.2s' }}
+                                        onMouseEnter={e => { e.currentTarget.style.background = '#dbeafe'; e.currentTarget.style.borderColor = '#3b82f6'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.borderColor = '#93c5fd'; }}
+                                    >
+                                        ➕ ปรับปรุงจำนวนสินค้า
+                                    </button>
+                                ) : (
+                                    <div style={{ background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0', padding: 16 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                            <label style={{ fontWeight: 700, fontSize: 13, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 6 }}>📦 ปรับปรุงจำนวนสินค้า</label>
+                                            <button onClick={() => { setShowAdjust(false); setEditForm(f => ({ ...f, adjustQty: 0, adjustReason: '' })); }}
+                                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 12, fontWeight: 600 }}
+                                                onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                                                onMouseLeave={e => e.currentTarget.style.color = '#9ca3af'}
+                                            >✕ ยกเลิก</button>
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 12, color: '#2563eb' }}>จำนวนที่ปรับ (+/-)</label>
+                                                <input
+                                                    type="number"
+                                                    value={editForm.adjustQty}
+                                                    onChange={(e) => setEditForm(f => ({ ...f, adjustQty: e.target.value }))}
+                                                    placeholder="เช่น 10 หรือ -5"
+                                                    style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #bfdbfe', fontSize: 14, outline: 'none', background: '#fff', color: '#1d4ed8', fontWeight: 600 }}
+                                                />
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                                <div style={{ padding: '10px 14px', fontSize: 14, color: '#374151', fontWeight: 600 }}>
+                                                    ผลลัพธ์: <span style={{ color: '#059669', fontSize: 16 }}>{(editItem.qty + Number(editForm.adjustQty || 0)).toLocaleString()}</span> {editForm.unit}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 12, color: '#b45309' }}>สาเหตุ / ที่มาของสินค้า <span style={{color: '#ef4444'}}>*</span></label>
+                                            <input
+                                                type="text"
+                                                value={editForm.adjustReason}
+                                                onChange={(e) => setEditForm(f => ({ ...f, adjustReason: e.target.value }))}
+                                                placeholder="ระบุที่มา เช่น รับคืนจากลูกค้า, นับสต็อกใหม่, สินค้าทดสอบ ฯลฯ"
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #fcd34d', fontSize: 14, outline: 'none', background: '#fffbeb' }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
+                                <button
+                                    onClick={() => setEditItem(null)}
+                                    style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    onClick={saveEdit}
+                                    disabled={editSaving}
+                                    style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontSize: 14, opacity: editSaving ? 0.7 : 1 }}
+                                >
+                                    {editSaving ? 'กำลังบันทึก...' : '💾 บันทึก'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Delete Confirm Dialog ── */}
+            {deleteConfirm && (
+                <div className="rnd-modal-overlay" onClick={() => setDeleteConfirm(null)}>
+                    <div className="rnd-modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="rnd-modal-header">
+                            <div>
+                                <h2>⚠️ ยืนยันการลบสินค้า</h2>
+                            </div>
+                            <button className="rnd-modal-close" onClick={() => setDeleteConfirm(null)}>
+                                <XCircle size={22} />
+                            </button>
+                        </div>
+                        <div className="rnd-modal-body">
+                            <div style={{ textAlign: 'center', padding: '10px 0 20px' }}>
+                                <div style={{ fontSize: 48, marginBottom: 12 }}>🗑️</div>
+                                <p style={{ fontSize: 15, color: '#374151', fontWeight: 600, marginBottom: 6 }}>
+                                    ต้องการลบสินค้า "{deleteConfirm.name}" ใช่หรือไม่?
+                                </p>
+                                <p style={{ fontSize: 13, color: '#6b7280' }}>
+                                    รหัส: {deleteConfirm.id} — สินค้าจะถูกนำออกจากรายการ (กู้คืนได้ภายหลัง)
+                                </p>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                                <button
+                                    onClick={() => setDeleteConfirm(null)}
+                                    style={{ padding: '10px 24px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 600, cursor: 'pointer', fontSize: 14 }}
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    onClick={() => softDelete(deleteConfirm)}
+                                    disabled={deleteLoading}
+                                    style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#dc2626', color: '#fff', fontWeight: 600, cursor: deleteLoading ? 'not-allowed' : 'pointer', fontSize: 14, opacity: deleteLoading ? 0.7 : 1 }}
+                                >
+                                    {deleteLoading ? 'กำลังลบ...' : '🗑️ ลบสินค้า'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

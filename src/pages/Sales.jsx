@@ -83,7 +83,7 @@ const InlineStatusDropdown = ({ value, onChange, options, badgeClassFn, fallback
 
 export default function Sales() {
     const { showAlert, showConfirm, showLoading, hideLoading } = useAlert();
-    const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
+    const { hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate, canUpdate, canDelete } = useAuth();
     const visibleSubPages = getVisibleSubPages('sales');
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'sales_dashboard';
@@ -911,7 +911,12 @@ export default function Sales() {
                         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                             <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>ใบเสนอราคาล่าสุด</span>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Quotations</span>
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
+                                    setEditingQuotationId(null);
+                                    setShowQuotationForm(true);
+                                }}>
+                                    <Plus size={16} /> สร้างใบเสนอราคา
+                                </button>
                             </div>
                             <div style={{ padding: '0' }}>
                                 <table className="data-table" style={{ minWidth: 'auto' }}>
@@ -1011,13 +1016,15 @@ export default function Sales() {
                                         setAppliedQuotationSearch(quotationSearch);
                                     }}>ค้นหา</button>
                                 </div>
-                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
-                                    setEditingQuotationId(null);
-                                    setIsViewOnly(false);
-                                    setShowQuotationForm(true);
-                                }}>
-                                    <Plus size={16} /> สร้างใบเสนอราคา
-                                </button>
+                                {canCreate('sales_quotation') && (
+                                    <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
+                                        setEditingQuotationId(null);
+                                        setIsViewOnly(false);
+                                        setShowQuotationForm(true);
+                                    }}>
+                                        <Plus size={16} /> สร้างใบเสนอราคา
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -1078,25 +1085,29 @@ export default function Sales() {
                                                                 <Clock size={16} />
                                                             </button>
                                                         )}
-                                                        <button 
-                                                            className="btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700"
-                                                            title="แก้ไข"
-                                                            onClick={() => {
-                                                                setEditingQuotationId(q.QuotationID || q.id);
-                                                                setIsViewOnly(false);
-                                                                setIsHistoryView(false);
-                                                                setShowQuotationForm(true);
-                                                            }}
-                                                        >
-                                                            <Edit size={16} />
-                                                        </button>
-                                                        <button 
-                                                            className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700"
-                                                            title="ลบ"
-                                                            onClick={() => handleDeleteQuotation(q.QuotationID || q.id)}
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        {canUpdate('sales_quotation') && (
+                                                            <button 
+                                                                className="btn-icon text-purple-600 hover:bg-purple-50 hover:text-purple-700"
+                                                                title="แก้ไข"
+                                                                onClick={() => {
+                                                                    setEditingQuotationId(q.QuotationID || q.id);
+                                                                    setIsViewOnly(false);
+                                                                    setIsHistoryView(false);
+                                                                    setShowQuotationForm(true);
+                                                                }}
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
+                                                        )}
+                                                        {canDelete('sales_quotation') && (
+                                                            <button 
+                                                                className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                title="ลบ"
+                                                                onClick={() => handleDeleteQuotation(q.QuotationID || q.id)}
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1184,12 +1195,14 @@ export default function Sales() {
                                         setAppliedTaxInvoiceSearch(taxInvoiceSearch);
                                     }}>ค้นหา</button>
                                 </div>
-                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
-                                    setEditingTaxInvoiceId(null);
-                                    setShowTaxInvoiceForm(true);
-                                }}>
-                                    <Plus size={16} /> สร้างใบแจ้งหนี้/ใบส่งสินค้า
-                                </button>
+                                {canCreate('sales_tax_invoice') && (
+                                    <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
+                                        setEditingTaxInvoiceId(null);
+                                        setShowTaxInvoiceForm(true);
+                                    }}>
+                                        <Plus size={16} /> สร้างใบแจ้งหนี้/ใบส่งสินค้า
+                                    </button>
+                                )}
                             </div>
                         )}
                         {hasSectionPermission('sales_tax_invoice_table') && (
@@ -1249,23 +1262,27 @@ export default function Sales() {
                                                                     <Clock size={15} />
                                                                 </button>
                                                             )}
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEditingTaxInvoiceId(q.TaxInvoiceID);
-                                                                    setShowTaxInvoiceForm(true);
-                                                                }}
-                                                                className="doc-action-btn"
-                                                                title="แก้ไข"
-                                                            >
-                                                                <Edit size={15} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(q.TaxInvoiceID, 'TaxInvoice')}
-                                                                className="doc-action-btn doc-action-btn-danger"
-                                                                title="ลบ"
-                                                            >
-                                                                <Trash2 size={15} />
-                                                            </button>
+                                                            {canUpdate('sales_tax_invoice') && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setEditingTaxInvoiceId(q.TaxInvoiceID);
+                                                                        setShowTaxInvoiceForm(true);
+                                                                    }}
+                                                                    className="doc-action-btn"
+                                                                    title="แก้ไข"
+                                                                >
+                                                                    <Edit size={15} />
+                                                                </button>
+                                                            )}
+                                                            {canDelete('sales_tax_invoice') && (
+                                                                <button
+                                                                    onClick={() => handleDelete(q.TaxInvoiceID, 'TaxInvoice')}
+                                                                    className="doc-action-btn doc-action-btn-danger"
+                                                                    title="ลบ"
+                                                                >
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1353,12 +1370,14 @@ export default function Sales() {
                                         setAppliedDeliveryOrderSearch(deliveryOrderSearch);
                                     }}>ค้นหา</button>
                                 </div>
-                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
-                                    setEditingDeliveryOrderId(null);
-                                    setShowDeliveryOrderForm(true);
-                                }}>
-                                    <Plus size={16} /> สร้างใบส่งสินค้า
-                                </button>
+                                {canCreate('sales_delivery_order') && (
+                                    <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
+                                        setEditingDeliveryOrderId(null);
+                                        setShowDeliveryOrderForm(true);
+                                    }}>
+                                        <Plus size={16} /> สร้างใบส่งสินค้า
+                                    </button>
+                                )}
                             </div>
                         )}
                         {hasSectionPermission('sales_delivery_order_table') && (
@@ -1420,23 +1439,27 @@ export default function Sales() {
                                                                     <Clock size={15} />
                                                                 </button>
                                                             )}
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEditingDeliveryOrderId(q.DeliveryOrderID);
-                                                                    setShowDeliveryOrderForm(true);
-                                                                }}
-                                                                className="doc-action-btn"
-                                                                title="แก้ไข"
-                                                            >
-                                                                <Edit size={15} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(q.DeliveryOrderID, 'DeliveryOrder')}
-                                                                className="doc-action-btn doc-action-btn-danger"
-                                                                title="ลบ"
-                                                            >
-                                                                <Trash2 size={15} />
-                                                            </button>
+                                                            {canUpdate('sales_delivery_order') && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setEditingDeliveryOrderId(q.DeliveryOrderID);
+                                                                        setShowDeliveryOrderForm(true);
+                                                                    }}
+                                                                    className="doc-action-btn"
+                                                                    title="แก้ไข"
+                                                                >
+                                                                    <Edit size={15} />
+                                                                </button>
+                                                            )}
+                                                            {canDelete('sales_delivery_order') && (
+                                                                <button
+                                                                    onClick={() => handleDelete(q.DeliveryOrderID, 'DeliveryOrder')}
+                                                                    className="doc-action-btn doc-action-btn-danger"
+                                                                    title="ลบ"
+                                                                >
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1521,12 +1544,14 @@ export default function Sales() {
                                     setAppliedReceiptSearch(receiptSearch);
                                 }}>ค้นหา</button>
                             </div>
-                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
-                                setEditDocId(null);
-                                setShowReceiptForm(true);
-                            }}>
-                                <Plus size={16} /> สร้างใบเสร็จรับเงิน
-                            </button>
+                            {canCreate('sales_receipt') && (
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
+                                    setEditDocId(null);
+                                    setShowReceiptForm(true);
+                                }}>
+                                    <Plus size={16} /> สร้างใบเสร็จรับเงิน
+                                </button>
+                            )}
                         </div>
 
                         <div className="table-card card">
@@ -1584,23 +1609,27 @@ export default function Sales() {
                                                                     <Clock size={15} />
                                                                 </button>
                                                             )}
-                                                            <button
-                                                                onClick={() => {
-                                                                    setEditDocId(q.ReceiptID);
-                                                                    setShowReceiptForm(true);
-                                                                }}
-                                                                className="doc-action-btn"
-                                                                title="แก้ไข"
-                                                            >
-                                                                <Edit size={15} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(q.ReceiptID, 'Receipt')}
-                                                                className="doc-action-btn doc-action-btn-danger"
-                                                                title="ลบ"
-                                                            >
-                                                                <Trash2 size={15} />
-                                                            </button>
+                                                            {canUpdate('sales_receipt') && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setEditDocId(q.ReceiptID);
+                                                                        setShowReceiptForm(true);
+                                                                    }}
+                                                                    className="doc-action-btn"
+                                                                    title="แก้ไข"
+                                                                >
+                                                                    <Edit size={15} />
+                                                                </button>
+                                                            )}
+                                                            {canDelete('sales_receipt') && (
+                                                                <button
+                                                                    onClick={() => handleDelete(q.ReceiptID, 'Receipt')}
+                                                                    className="doc-action-btn doc-action-btn-danger"
+                                                                    title="ลบ"
+                                                                >
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1681,9 +1710,11 @@ export default function Sales() {
                                     </div>
                                     <button className="search-btn">ค้นหา</button>
                                 </div>
-                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setShowSOForm(true)}>
-                                    <Plus size={16} /> สร้าง Sales Order
-                                </button>
+                                {canCreate('sales_orders') && (
+                                    <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => setShowSOForm(true)}>
+                                        <Plus size={16} /> สร้าง Sales Order
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -1738,12 +1769,16 @@ export default function Sales() {
                                                                 <button className="btn-icon text-blue-600 hover:bg-blue-50 hover:text-blue-700" title="ดูรายละเอียด" onClick={() => setPreviewSOId(o.SalesOrderID)}>
                                                                     <Eye size={16} />
                                                                 </button>
-                                                                <button className="btn-icon text-amber-500 hover:bg-amber-50 hover:text-amber-600" title="แก้ไข" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(false); setShowSOForm(true); }}>
-                                                                    <Edit size={16} />
-                                                                </button>
-                                                                <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" title="ลบ" onClick={() => handleDeleteSO(o.SalesOrderID)}>
-                                                                    <Trash2 size={16} />
-                                                                </button>
+                                                                {canUpdate('sales_orders') && (
+                                                                    <button className="btn-icon text-amber-500 hover:bg-amber-50 hover:text-amber-600" title="แก้ไข" onClick={() => { setEditingSOId(o.SalesOrderID); setIsSOViewOnly(false); setShowSOForm(true); }}>
+                                                                        <Edit size={16} />
+                                                                    </button>
+                                                                )}
+                                                                {canDelete('sales_orders') && (
+                                                                    <button className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700" title="ลบ" onClick={() => handleDeleteSO(o.SalesOrderID)}>
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                )}
                                                             </>
                                                         ) : (
                                                             <>
@@ -1822,9 +1857,11 @@ export default function Sales() {
                                     setAppliedBillingSearch(billingSearch);
                                 }}>ค้นหา</button>
                             </div>
-                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setEditingBillingId(null); setShowBillingForm(true); }}>
-                                <Plus size={16} /> สร้างบิล/เอกสาร
-                            </button>
+                            {canCreate('sales_billing_invoice') && (
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setEditingBillingId(null); setShowBillingForm(true); }}>
+                                    <Plus size={16} /> สร้างบิล/เอกสาร
+                                </button>
+                            )}
                         </div>
 
                         <div className="table-card card">
@@ -1877,20 +1914,24 @@ export default function Sales() {
                                                             <Clock size={16} />
                                                         </button>
                                                     )}
-                                                    <button 
-                                                        className="btn-icon text-amber-500 hover:bg-amber-50 hover:text-amber-600"
-                                                        title="แก้ไข"
-                                                        onClick={() => { setEditingBillingId(b.BillingInvoiceID); setShowBillingForm(true); }}
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button 
-                                                        className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700"
-                                                        title="ลบ"
-                                                        onClick={() => handleDeleteBilling(b.BillingInvoiceID)}
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                                    {canUpdate('sales_billing_invoice') && (
+                                                        <button 
+                                                            className="btn-icon text-amber-500 hover:bg-amber-50 hover:text-amber-600"
+                                                            title="แก้ไข"
+                                                            onClick={() => { setEditingBillingId(b.BillingInvoiceID); setShowBillingForm(true); }}
+                                                        >
+                                                            <Edit size={16} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete('sales_billing_invoice') && (
+                                                        <button 
+                                                            className="btn-icon text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                            title="ลบ"
+                                                            onClick={() => handleDeleteBilling(b.BillingInvoiceID)}
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -1965,9 +2006,11 @@ export default function Sales() {
                                     setAppliedPoaSearch(poaSearch);
                                 }}>ค้นหา</button>
                             </div>
-                            <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setEditingPOAId(null); setShowPOAForm(true); }}>
-                                <Plus size={16} /> สร้างเอกสารขึ้นทะเบียน
-                            </button>
+                            {canCreate('sales_poa') && (
+                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setEditingPOAId(null); setShowPOAForm(true); }}>
+                                    <Plus size={16} /> สร้างเอกสารขึ้นทะเบียน
+                                </button>
+                            )}
                         </div>
                         <div className="table-card card">
                             <div className="table-responsive">
@@ -2058,7 +2101,7 @@ export default function Sales() {
             )}
 
             {/* ── Tab: หนังสือแต่งตั้งผู้แทนนิติบุคคล ── */}
-            {(activeTab === 'sales_corp_rep' && hasSubPermission('sales_corp_rep')) && (
+            {(activeTab === 'sales_corp_rep' && hasSubPermission('sales_poa')) && (
                 <div className="subpage-content" key="sales_corp_rep">
                     <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                         <div>

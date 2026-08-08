@@ -1,0 +1,130 @@
+/* Product Master specific styles */
+.pm-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.pm-summary-card {
+    background: #fff;
+    border: 1px solid var(--border-light, #e2e8f0);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pm-summary-card .pm-card-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.3px;
+}
+
+.pm-summary-card .pm-card-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text, #1e293b);
+}
+
+.pm-type-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.pm-type-tab {
+    padding: 7px 16px;
+    border-radius: 8px;
+    border: 1.5px solid #e2e8f0;
+    background: #fff;
+    color: var(--text-secondary, #64748b);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.pm-type-tab:hover {
+    border-color: var(--primary, #4f46e5);
+    color: var(--primary, #4f46e5);
+}
+
+.pm-type-tab.active {
+    background: var(--primary, #4f46e5);
+    color: #fff;
+    border-color: var(--primary, #4f46e5);
+}
+
+.pm-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.pm-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pm-form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.pm-form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.pm-form-group input,
+.pm-form-group select,
+.pm-form-group textarea {
+    height: 38px;
+    padding: 0 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: #1e293b;
+    background: #fff;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.pm-form-group textarea {
+    height: auto;
+    padding: 8px 12px;
+    resize: vertical;
+    min-height: 80px;
+}
+
+.pm-form-group input:focus,
+.pm-form-group select:focus,
+.pm-form-group textarea:focus {
+    border-color: var(--primary, #4f46e5);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.08);
+}
+
+.pm-badge-type {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .pm-form-grid {
+        grid-template-columns: 1fr;
+    }
+    .pm-summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

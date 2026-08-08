@@ -119,17 +119,17 @@ const SYSTEM_MENU_IDS = ['settings'];
 // Layout Component
 // =============================================================================
 export default function Layout() {
-    const { currentUser, logout, getVisiblePages, getVisibleSubPages } = useAuth();
+    const { currentUser, logout, getVisiblePages, getVisibleSubPages, permissions } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+
+    // ── Data & Menu Visibility ──
+    const visiblePages = getVisiblePages();
 
     // ── Sidebar state ──
     const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [expandedGroups, setExpandedGroups] = useState({});
-
-    // ── Pages ที่ user มีสิทธิ์เห็น ──
-    const visiblePages = getVisiblePages();
 
     // ── Auto-expand group ที่ตรงกับ URL ปัจจุบัน ──
     useEffect(() => {

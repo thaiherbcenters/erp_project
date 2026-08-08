@@ -12,7 +12,7 @@ import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 
 export default function Customer() {
-    const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
+    const { hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate, canUpdate, canDelete } = useAuth();
     const { showAlert, showConfirm } = useAlert();
     const visibleSubPages = getVisibleSubPages('customer');
     const [searchParams] = useSearchParams();
@@ -338,7 +338,9 @@ export default function Customer() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            <button className="btn-primary" onClick={openCreate}>+ เพิ่มลูกค้าใหม่</button>
+                            {canCreate('customer_list') && (
+                                <button className="btn-primary" onClick={openCreate}>+ เพิ่มลูกค้าใหม่</button>
+                            )}
                         </div>
                     )}
 
@@ -372,8 +374,12 @@ export default function Customer() {
                                             <td style={{ textAlign: 'center' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '0' }}>
                                                     <button className="doc-action-btn" style={{ margin: 0 }} title="ดูรายละเอียด" onClick={() => openView(c)}><Eye size={15} /></button>
-                                                    <button className="doc-action-btn" style={{ margin: 0 }} title="แก้ไข" onClick={() => openEdit(c)}><Edit2 size={15} /></button>
-                                                    <button className="doc-action-btn doc-action-btn-danger" style={{ margin: 0 }} title="ลบ" onClick={() => handleDelete(c)}><Trash2 size={15} /></button>
+                                                    {canUpdate('customer_list') && (
+                                                        <button className="doc-action-btn" style={{ margin: 0 }} title="แก้ไข" onClick={() => openEdit(c)}><Edit2 size={15} /></button>
+                                                    )}
+                                                    {canDelete('customer_list') && (
+                                                        <button className="doc-action-btn doc-action-btn-danger" style={{ margin: 0 }} title="ลบ" onClick={() => handleDelete(c)}><Trash2 size={15} /></button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

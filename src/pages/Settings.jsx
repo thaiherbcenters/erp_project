@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { useSearchParams } from 'react-router-dom';
 import {
     Settings as SettingsIcon, Users, Building2, Wrench,
@@ -119,7 +120,7 @@ export default function Settings() {
 // =============================================================================
 // Users Tab
 // =============================================================================
-function UsersTab({ showToast }) {
+function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); 
     const [users, setUsers] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [roles, setRoles] = useState([]);
@@ -241,9 +242,9 @@ function UsersTab({ showToast }) {
                     <Search size={16} style={{ color: '#94a3b8' }} />
                     <input placeholder="ค้นหาชื่อ, username, แผนก..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-                <button className="settings-add-btn" onClick={() => setModal({ type: 'create' })}>
+                {canCreate('settings') && (<button className="settings-add-btn" onClick={() => setModal({ type: 'create' })}>
                     <UserPlus size={16} /> เพิ่มผู้ใช้ใหม่
-                </button>
+                </button>)}
             </div>
 
             <div className="settings-table-wrap">
@@ -339,7 +340,7 @@ function UsersTab({ showToast }) {
 // =============================================================================
 // Departments Tab
 // =============================================================================
-function DepartmentsTab({ showToast }) {
+function DepartmentsTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); 
     const [departments, setDepartments] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
@@ -439,9 +440,9 @@ function DepartmentsTab({ showToast }) {
                     <Search size={16} style={{ color: '#94a3b8' }} />
                     <input placeholder="ค้นหารหัสหรือชื่อแผนก..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-                <button className="settings-add-btn" onClick={() => setModal({ type: 'create' })}>
+                {canCreate('settings') && (<button className="settings-add-btn" onClick={() => setModal({ type: 'create' })}>
                     <Plus size={16} /> เพิ่มแผนกใหม่
-                </button>
+                </button>)}
             </div>
 
             <div className="settings-table-wrap">
@@ -523,7 +524,7 @@ function GeneralTab() {
 // =============================================================================
 // Roles Tab
 // =============================================================================
-function RolesTab({ showToast }) {
+function RolesTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); 
     const [roles, setRoles] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [search, setSearch] = useState('');
@@ -610,9 +611,9 @@ function RolesTab({ showToast }) {
                     <Search size={16} style={{ color: '#94a3b8' }} />
                     <input placeholder="ค้นหาตำแหน่ง..." value={search} onChange={e => setSearch(e.target.value)} />
                 </div>
-                <button className="settings-add-btn" onClick={() => setModal({ type: 'create' })}>
+                {canCreate('settings') && (<button className="settings-add-btn" onClick={() => setModal({ type: 'create' })}>
                     <Plus size={16} /> เพิ่มตำแหน่งใหม่
-                </button>
+                </button>)}
             </div>
 
             <div className="settings-table-wrap">
@@ -1048,9 +1049,9 @@ function AuditLogTab() {
                 <span style={{ color: '#94a3b8', alignSelf: 'center' }}>ถึง</span>
                 <CustomDatePicker className="settings-filter-date" value={filters.to}
                     onChange={e => setFilters({ ...filters, to: e.target.value })} />
-                <button className="settings-add-btn" onClick={handleFilter} style={{ padding: '8px 16px' }}>
+                {canCreate('settings') && (<button className="settings-add-btn" onClick={handleFilter} style={{ padding: '8px 16px' }}>
                     <Search size={14} /> ค้นหา
-                </button>
+                </button>)}
             </div>
 
             {/* Summary */}

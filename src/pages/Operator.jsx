@@ -34,7 +34,7 @@ const STEP_ICONS = {
 };
 
 export default function Operator() {
-    const { user, getVisibleSubPages, hasSectionPermission } = useAuth();
+    const { user, getVisibleSubPages, hasSectionPermission, canUpdate } = useAuth();
     const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
     const { showAlert, showConfirm } = useAlert();
     const { jobs } = usePlanner();
@@ -335,9 +335,11 @@ export default function Operator() {
                         {isQcStep && !hasQcRequest(task) && (
                             <div className="op-modal-next-action" style={{ background: '#fef3c7', borderColor: '#fde68a' }}>
                                 <span>ขั้นตอนนี้ต้องส่งให้ QC ตรวจ</span>
-                                <button className="op-btn op-btn-qc" onClick={() => sendQcRequest(task, task.currentStep)}>
-                                    <Send size={14} /> ส่งคำขอ QC
-                                </button>
+                                {canUpdate('operator_dashboard') && (
+                                    <button className="op-btn op-btn-qc" onClick={() => sendQcRequest(task, task.currentStep)}>
+                                        <Send size={14} /> ส่งคำขอ QC
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -345,9 +347,11 @@ export default function Operator() {
                         {!isLastStep && !isQcStep && task.currentStep !== 'packaging' && task.status !== 'เสร็จสิ้น' && (
                             <div className="op-modal-next-action">
                                 <span>ขั้นตอนถัดไป: <strong>{nextStep?.label}</strong></span>
-                                <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
-                                    <ChevronRight size={14} /> ไปขั้นตอนถัดไป
-                                </button>
+                                {canUpdate('operator_dashboard') && (
+                                    <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
+                                        <ChevronRight size={14} /> ไปขั้นตอนถัดไป
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -361,7 +365,7 @@ export default function Operator() {
                         {/* ==================================================== */}
                         {/* UPDATE PRODUCTION LOGS SECTION */}
                         {/* ==================================================== */}
-                        {task.status !== 'เสร็จสิ้น' && (
+                        {task.status !== 'เสร็จสิ้น' && canUpdate('operator_dashboard') && (
                             <div className="op-log-section">
                                 <h4 style={{ margin: '24px 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: '#374151' }}>
                                     <Plus size={16} /> บันทึกยอดผลิต/เสีย (อัปเดตรายกะ)

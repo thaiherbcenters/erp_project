@@ -266,6 +266,61 @@ export function AuthProvider({ children }) {
         });
     };
 
+    /**
+     * เปลี่ยนสิทธิ์ CRUD (สร้าง/ดู/แก้ไข/ลบ) ระดับหน้าย่อย
+     */
+    const updateCrudPermission = (userId, pageId, action, enabled) => {
+        setPermissions((prev) => {
+            const userPerms = prev[userId] || [];
+            let newPerms = [...userPerms];
+            
+            let targetIds = [pageId];
+            
+            // ลองหาว่าเป็น top-level page หรือไม่
+            const page = ALL_PAGES.find((p) => p.id === pageId);
+            if (page) {
+                targetIds = [pageId, ...getPageChildIds(page)];
+            } else {
+                // ลองหาว่าเป็น sub-page หรือไม่
+                let foundSub = null;
+                for (const p of ALL_PAGES) {
+                    foundSub = p.subPages?.find(s => s.id === pageId);
+                    if (foundSub) break;
+                }
+                if (foundSub) {
+                    targetIds = [pageId, ...getSubPageChildIds(foundSub)];
+                }
+            }
+
+            // อัปเดตสิทธิ์ทุกอันใน targetIds ที่ถูกเปิดใช้งานไว้ (มีใน newPerms) หรือเพิ่มใหม่ถ้ายังไม่มี
+            targetIds.forEach(id => {
+                const permIndex = newPerms.findIndex(p => p.page_id === id);
+                if (permIndex >= 0) {
+                    newPerms[permIndex] = {
+                        ...newPerms[permIndex],
+                        [`can_${action}`]: enabled
+                    };
+                } else if (enabled) {
+                    // ถ้ายังไม่มีสิทธิ์หน้านี้ แต่ถูกสั่งให้เปิด CRUD (เช่นติ๊ก Read ทั้งๆ ที่ยังไม่เปิดสิทธิ์หน้า)
+                    // ให้เพิ่มสิทธิ์หน้านี้เข้าไปเลย
+                    newPerms.push({
+                        page_id: id,
+                        data_scope: 'all',
+                        can_create: action === 'create',
+                        can_read: action === 'read' || true, // default read to true if granting any permission
+                        can_update: action === 'update',
+                        can_delete: action === 'delete'
+                    });
+                }
+            });
+
+            // บันทึกลง DB ทันที
+            savePermissionsToAPI(userId, newPerms);
+
+            return { ...prev, [userId]: newPerms };
+        });
+    };
+
     // =================================================================
     // Permission Checks — ตรวจสอบสิทธิ์ของ user ปัจจุบัน
     // =================================================================
@@ -293,6 +348,21 @@ export function AuthProvider({ children }) {
         const userPerms = permissions[currentUser.id] || [];
         return userPerms.some(p => p.page_id === sectionId);
     };
+
+    /** ตรวจสิทธิ์ CRUD */
+    const _checkCrud = (pageId, action) => {
+        if (!currentUser) return false;
+        if (currentUser.role === 'admin') return true;
+        const userPerms = permissions[currentUser.id] || [];
+        const perm = userPerms.find(p => p.page_id === pageId);
+        if (!perm) return false;
+        return perm[`can_${action}`] !== false; // default to true if undefined
+    };
+
+    const canCreate = (pageId) => _checkCrud(pageId, 'create');
+    const canRead = (pageId) => _checkCrud(pageId, 'read');
+    const canUpdate = (pageId) => _checkCrud(pageId, 'update');
+    const canDelete = (pageId) => _checkCrud(pageId, 'delete');
 
     // =================================================================
     // Visible Pages — ดึงหน้าที่ user ปัจจุบันมีสิทธิ์เห็น
@@ -367,11 +437,16 @@ export function AuthProvider({ children }) {
                 updatePermissions,
                 updateSubPermission,
                 updateSectionPermission,
+                updateCrudPermission,
 
                 // Permission Checks (สำหรับ ProtectedRoute + pages)
                 hasPermission,
                 hasSubPermission,
                 hasSectionPermission,
+                canCreate,
+                canRead,
+                canUpdate,
+                canDelete,
 
                 // Visible Pages (สำหรับ Layout sidebar)
                 getVisibleSubPages,

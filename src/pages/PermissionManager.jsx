@@ -74,7 +74,7 @@ function ScopeChip({ value, onChange, small }) {
 }
 
 export default function PermissionManager({ isEmbed = false }) {
-    const { updatePermissions, updateSubPermission, updateSectionPermission, getUserPermissions, loadUserPermissions } = useAuth();
+    const { updatePermissions, updateSubPermission, updateSectionPermission, updateCrudPermission, getUserPermissions, loadUserPermissions } = useAuth();
     const { showAlert, showConfirm } = useAlert();
 
     // ── State ──
@@ -215,8 +215,14 @@ export default function PermissionManager({ isEmbed = false }) {
     };
 
     const handleSectionToggle = (pageId, subId, sectionId) => {
-        const isEnabled = userPerms.some((p) => p.page_id === sectionId);
-        updateSectionPermission(activeUserId, pageId, subId, sectionId, !isEnabled);
+        if (!activeUser) return;
+        const isEnabled = getUserPermissions(activeUser.id).some((p) => p.page_id === sectionId);
+        updateSectionPermission(activeUser.id, pageId, subId, sectionId, !isEnabled);
+    };
+
+    const handleCrudToggle = (pageId, action, currentValue) => {
+        if (!activeUser) return;
+        updateCrudPermission(activeUser.id, pageId, action, !currentValue);
     };
 
     // For Data Scope select
@@ -366,8 +372,12 @@ export default function PermissionManager({ isEmbed = false }) {
                                         <th style={{ width: '40px' }}></th>
                                         <th>ชื่อหน้า / หัวข้อ</th>
                                         <th style={{ width: '120px', textAlign: 'center' }}>ขอบเขตข้อมูล</th>
-                                        <th style={{ width: '100px', textAlign: 'center' }}>หน้าย่อย</th>
-                                        <th style={{ width: '100px', textAlign: 'center' }}>สิทธิ์</th>
+                                        <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>สร้าง</th>
+                                        <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>ดู</th>
+                                        <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>แก้ไข</th>
+                                        <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>ลบ</th>
+                                        <th style={{ width: '90px', textAlign: 'center' }}>หน้าย่อย</th>
+                                        <th style={{ width: '90px', textAlign: 'center' }}>สิทธิ์</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -403,6 +413,34 @@ export default function PermissionManager({ isEmbed = false }) {
                                                             />
                                                         ) : (
                                                             <span style={{ color: 'var(--text-muted, #9ca3af)', fontSize: '12px' }}>—</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        {isPageEnabled ? (
+                                                            <input type="checkbox" checked={currPerm?.can_create !== false} onChange={() => handleCrudToggle(page.id, 'create', currPerm?.can_create !== false)} />
+                                                        ) : (
+                                                            <span style={{ color: '#d1d5db' }}>-</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        {isPageEnabled ? (
+                                                            <input type="checkbox" checked={currPerm?.can_read !== false} onChange={() => handleCrudToggle(page.id, 'read', currPerm?.can_read !== false)} />
+                                                        ) : (
+                                                            <span style={{ color: '#d1d5db' }}>-</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        {isPageEnabled ? (
+                                                            <input type="checkbox" checked={currPerm?.can_update !== false} onChange={() => handleCrudToggle(page.id, 'update', currPerm?.can_update !== false)} />
+                                                        ) : (
+                                                            <span style={{ color: '#d1d5db' }}>-</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        {isPageEnabled ? (
+                                                            <input type="checkbox" checked={currPerm?.can_delete !== false} onChange={() => handleCrudToggle(page.id, 'delete', currPerm?.can_delete !== false)} />
+                                                        ) : (
+                                                            <span style={{ color: '#d1d5db' }}>-</span>
                                                         )}
                                                     </td>
                                                     <td className="perm-td-count">
@@ -459,6 +497,34 @@ export default function PermissionManager({ isEmbed = false }) {
                                                                         <span style={{ color: 'var(--text-muted, #9ca3af)', fontSize: '11px' }}>—</span>
                                                                     )}
                                                                 </td>
+                                                                <td style={{ textAlign: 'center' }}>
+                                                                    {isSubEnabled ? (
+                                                                        <input type="checkbox" checked={currSubPerm?.can_create !== false} onChange={() => handleCrudToggle(sub.id, 'create', currSubPerm?.can_create !== false)} />
+                                                                    ) : (
+                                                                        <span style={{ color: '#d1d5db' }}>-</span>
+                                                                    )}
+                                                                </td>
+                                                                <td style={{ textAlign: 'center' }}>
+                                                                    {isSubEnabled ? (
+                                                                        <input type="checkbox" checked={currSubPerm?.can_read !== false} onChange={() => handleCrudToggle(sub.id, 'read', currSubPerm?.can_read !== false)} />
+                                                                    ) : (
+                                                                        <span style={{ color: '#d1d5db' }}>-</span>
+                                                                    )}
+                                                                </td>
+                                                                <td style={{ textAlign: 'center' }}>
+                                                                    {isSubEnabled ? (
+                                                                        <input type="checkbox" checked={currSubPerm?.can_update !== false} onChange={() => handleCrudToggle(sub.id, 'update', currSubPerm?.can_update !== false)} />
+                                                                    ) : (
+                                                                        <span style={{ color: '#d1d5db' }}>-</span>
+                                                                    )}
+                                                                </td>
+                                                                <td style={{ textAlign: 'center' }}>
+                                                                    {isSubEnabled ? (
+                                                                        <input type="checkbox" checked={currSubPerm?.can_delete !== false} onChange={() => handleCrudToggle(sub.id, 'delete', currSubPerm?.can_delete !== false)} />
+                                                                    ) : (
+                                                                        <span style={{ color: '#d1d5db' }}>-</span>
+                                                                    )}
+                                                                </td>
                                                                 <td className="perm-td-count">
                                                                     {hasSections && (
                                                                         <span className={`perm-count-badge perm-count-sm ${isSubEnabled ? 'badge-active' : ''}`}>
@@ -487,6 +553,10 @@ export default function PermissionManager({ isEmbed = false }) {
                                                                         <td className="perm-td-name perm-indent-2">
                                                                             <span className="perm-sec-label">{sec.name}</span>
                                                                         </td>
+                                                                        <td></td>
+                                                                        <td></td>
+                                                                        <td></td>
+                                                                        <td></td>
                                                                         <td></td>
                                                                         <td></td>
                                                                         <td className="perm-td-toggle">

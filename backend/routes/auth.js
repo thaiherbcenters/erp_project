@@ -44,10 +44,10 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'ผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง' });
         }
 
-        // Fetch permissions with data_scope
+        // Fetch permissions with data_scope + CRUD flags
         const permResult = await pool.request()
              .input('user_id', user.user_id)
-             .query('SELECT page_id, data_scope FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+             .query('SELECT page_id, data_scope, can_create, can_read, can_update, can_delete FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
 
         const userData = {
             id: user.user_id,
@@ -55,8 +55,7 @@ router.post('/login', async (req, res) => {
             name: user.display_name,
             role: user.role,
             avatar: user.avatar,
-            department: user.department || '',
-            permissions: permResult.recordset.map(p => ({ page_id: p.page_id, data_scope: p.data_scope || 'all' }))
+            departmentId: user.department_id
         };
 
         const token = jwt.sign(
@@ -64,6 +63,16 @@ router.post('/login', async (req, res) => {
             process.env.JWT_SECRET || 'THAIHERB_SECRET_KEY_2026_ERP',
             { expiresIn: '10h' }
         );
+
+        // เราจะส่ง permissions กลับไปให้ frontend ใน response แบบปกติ (ไม่ใช่ใน token)
+        userData.permissions = permResult.recordset.map(p => ({
+            page_id: p.page_id, 
+            data_scope: p.data_scope || 'all',
+            can_create: p.can_create ?? true,
+            can_read: p.can_read ?? true,
+            can_update: p.can_update ?? true,
+            can_delete: p.can_delete ?? true
+        }));
 
         // Log การ Login สำเร็จ
         await logAction(req, 'LOGIN', 'auth', user.user_id, `${username} เข้าสู่ระบบสำเร็จ`);
