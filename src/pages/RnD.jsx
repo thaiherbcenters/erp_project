@@ -361,11 +361,11 @@ export default function RnD() {
                                         <td><span className={`badge ${getStatusColor(formula.status)}`}>{formula.status}</span></td>
                                         <td style={{ textAlign: 'center' }}>
                                             <button className="btn-sm" onClick={() => { setSelectedFormula(formula); if(formula.unitSize) setSimUnitSize(formula.unitSize); }} title="ดูรายละเอียด"><Eye size={14} /></button>
+                                            {canCreate('rnd_formulas') && (
+                                                <button className="btn-sm" onClick={() => handleCopyFormula(formula)} title="คัดลอกสูตร"><Copy size={14} /></button>
+                                            )}
                                             {canUpdate('rnd_formulas') && (
-                                                <>
-                                                    <button className="btn-sm" onClick={() => handleCopyFormula(formula)} title="คัดลอกสูตร"><Copy size={14} /></button>
-                                                    <button className="btn-sm" onClick={() => openEditFormula(formula)} title="แก้ไข"><Edit size={14} /></button>
-                                                </>
+                                                <button className="btn-sm" onClick={() => openEditFormula(formula)} title="แก้ไข"><Edit size={14} /></button>
                                             )}
                                             {canDelete('rnd_formulas') && (
                                                 <button className="btn-sm" onClick={() => handleDeleteFormula(formula.id, formula.name)} title="ลบ" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>

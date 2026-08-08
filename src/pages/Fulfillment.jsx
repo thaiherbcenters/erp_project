@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight, Printer, Phone } from 'lucide-react';
+import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 
 import API_BASE from '../config';
@@ -53,6 +54,55 @@ export default function Fulfillment() {
             console.error('Failed to update status:', err);
         } finally {
             setUpdatingId(null);
+        }
+    };
+
+    const [shipForm, setShipForm] = useState({ courier: '', trackingNo: '', slipFile: null, slipPreview: null });
+    const [submittingShip, setSubmittingShip] = useState(false);
+
+    const handleSlipChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setShipForm(prev => ({ 
+                ...prev, 
+                slipFile: file,
+                slipPreview: URL.createObjectURL(file)
+            }));
+        }
+    };
+
+    const submitShipment = async (id) => {
+        if (!shipForm.courier) {
+            alert('กรุณาระบุบริษัทขนส่ง');
+            return;
+        }
+        setSubmittingShip(true);
+        try {
+            const formData = new FormData();
+            formData.append('courier', shipForm.courier);
+            formData.append('trackingNo', shipForm.trackingNo);
+            if (shipForm.slipFile) {
+                formData.append('slipImage', shipForm.slipFile);
+            }
+            formData.append('shippedBy', 'system'); // In real app, from user context
+
+            const res = await fetch(`${API_BASE}/shipping/${id}/ship`, {
+                method: 'PATCH',
+                body: formData
+            });
+
+            if (res.ok) {
+                setShipForm({ courier: '', trackingNo: '', slipFile: null, slipPreview: null });
+                setSelectedOrder(null);
+                fetchData();
+            } else {
+                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูลการจัดส่ง');
+            }
+        } catch (err) {
+            console.error('Failed to submit shipment:', err);
+            alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+        } finally {
+            setSubmittingShip(false);
         }
     };
 
@@ -449,6 +499,110 @@ export default function Fulfillment() {
                             </div>
                         </div>
 
+                        {/* ข้อมูลการจัดส่ง (ฟอร์มบันทึก หรือ แสดงข้อมูล) */}
+                        <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e5e7eb', padding: 16, marginBottom: 16 }}>
+                            <h4 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <Truck size={16} style={{ color: '#3b82f6' }} /> ข้อมูลการจัดส่ง
+                            </h4>
+                            
+                            {o.Status === 'รอจัดส่ง' ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', margin: '0 0 6px 4px' }}>
+                                                🏢 บริษัทขนส่ง <span style={{color: '#ef4444'}}>*</span>
+                                            </label>
+                                            <CustomSelect 
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1.5px solid #cbd5e1', fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', height: 42, outline: 'none', transition: 'all 0.2s', background: '#fff' }}
+                                                value={shipForm.courier} 
+                                                onChange={e => setShipForm({...shipForm, courier: e.target.value})}
+                                            >
+                                                <option value="" disabled>-- เลือกบริษัทขนส่ง --</option>
+                                                <option value="Kerry Express">Kerry Express</option>
+                                                <option value="Flash Express">Flash Express</option>
+                                                <option value="J&T Express">J&T Express</option>
+                                                <option value="ไปรษณีย์ไทย (EMS)">ไปรษณีย์ไทย (EMS)</option>
+                                                <option value="ไปรษณีย์ไทย (ลงทะเบียน)">ไปรษณีย์ไทย (ลงทะเบียน)</option>
+                                                <option value="ขนส่งเอกชนอื่นๆ">ขนส่งเอกชนอื่นๆ</option>
+                                                <option value="จัดส่งโดยบริษัท">จัดส่งโดยบริษัท</option>
+                                            </CustomSelect>
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', margin: '0 0 6px 4px' }}>
+                                                🔢 หมายเลขพัสดุ (Tracking No.) <span style={{color: '#ef4444'}}>*</span>
+                                            </label>
+                                            <input 
+                                                type="text" 
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1.5px solid #cbd5e1', fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box', height: 42, outline: 'none', transition: 'all 0.2s', background: '#fff' }}
+                                                placeholder="เช่น TH0123456789"
+                                                value={shipForm.trackingNo} 
+                                                onChange={e => setShipForm({...shipForm, trackingNo: e.target.value})}
+                                                onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
+                                                onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', margin: '0 0 6px 4px' }}>
+                                            🧾 หลักฐานการจัดส่ง (Slip / ใบเสร็จ) <span style={{color: '#ef4444'}}>*</span>
+                                        </label>
+                                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                                            <label style={{ cursor: 'pointer', background: '#f8fafc', padding: '10px 16px', borderRadius: 8, border: '1.5px dashed #cbd5e1', fontSize: 13, fontWeight: 600, color: '#475569', display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'all 0.2s' }}
+                                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.color = '#2563eb'; e.currentTarget.style.background = '#eff6ff'; }}
+                                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.background = '#f8fafc'; }}>
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                                อัปโหลดรูป
+                                                <input 
+                                                    type="file" 
+                                                    style={{ display: 'none' }}
+                                                    accept="image/*"
+                                                    onChange={handleSlipChange}
+                                                />
+                                            </label>
+                                            
+                                            <label style={{ cursor: 'pointer', background: '#fff1f2', padding: '10px 16px', borderRadius: 8, border: '1.5px dashed #fecdd3', fontSize: 13, fontWeight: 600, color: '#e11d48', display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'all 0.2s' }}
+                                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#e11d48'; e.currentTarget.style.color = '#be123c'; e.currentTarget.style.background = '#ffe4e6'; }}
+                                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#fecdd3'; e.currentTarget.style.color = '#e11d48'; e.currentTarget.style.background = '#fff1f2'; }}>
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                                                ถ่ายรูป
+                                                <input 
+                                                    type="file" 
+                                                    style={{ display: 'none' }}
+                                                    accept="image/*"
+                                                    capture="environment"
+                                                    onChange={handleSlipChange}
+                                                />
+                                            </label>
+
+                                            <span style={{ fontSize: 13, color: shipForm.slipFile ? '#059669' : '#9ca3af', fontWeight: shipForm.slipFile ? 600 : 400, width: '100%' }}>
+                                                {shipForm.slipFile ? `✅ เลือกไฟล์แล้ว: ${shipForm.slipFile.name}` : 'ยังไม่ได้เลือกไฟล์ / ถ่ายรูป'}
+                                            </span>
+                                        </div>
+                                        {shipForm.slipPreview && (
+                                            <div style={{ marginTop: 12, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', display: 'inline-block', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                                <img src={shipForm.slipPreview} alt="Slip Preview" style={{ maxHeight: 180, display: 'block' }} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: o.SlipImage ? '1fr 1fr' : '1fr', gap: 16 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                                        <div><span style={{ color: '#6b7280' }}>ขนส่ง:</span> <strong style={{ color: '#0d9488' }}>{o.Courier || '-'}</strong></div>
+                                        <div><span style={{ color: '#6b7280' }}>Tracking No:</span> <strong>{o.TrackingNo || '-'}</strong></div>
+                                    </div>
+                                    {o.SlipImage && (
+                                        <div>
+                                            <span style={{ color: '#6b7280', fontSize: 12, display: 'block', marginBottom: 4 }}>หลักฐานการจัดส่ง:</span>
+                                            <a href={`http://localhost:5000${o.SlipImage}`} target="_blank" rel="noopener noreferrer">
+                                                <img src={`http://localhost:5000${o.SlipImage}`} alt="Shipping Slip" style={{ maxHeight: 100, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                         {/* Quick Actions */}
                         <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'space-between', alignItems: 'center' }}>
                             <button 
@@ -460,9 +614,19 @@ export default function Fulfillment() {
                             </button>
                             <div style={{ display: 'flex', gap: 8 }}>
                                 {o.Status === 'รอจัดส่ง' && (
-                                    <button className="btn-primary" style={{ background: '#0d9488', borderColor: '#0d9488', display: 'flex', alignItems: 'center', gap: 6 }}
-                                        onClick={() => { updateStatus(o.ShipmentID, 'กำลังจัดส่ง'); close(); }}>
-                                        <Truck size={16} /> เริ่มจัดส่ง
+                                    <button 
+                                        className="btn-primary" 
+                                        style={{ 
+                                            background: (!shipForm.courier || !shipForm.trackingNo || !shipForm.slipFile) ? '#cbd5e1' : '#0d9488', 
+                                            borderColor: (!shipForm.courier || !shipForm.trackingNo || !shipForm.slipFile) ? '#cbd5e1' : '#0d9488', 
+                                            cursor: (!shipForm.courier || !shipForm.trackingNo || !shipForm.slipFile) ? 'not-allowed' : 'pointer',
+                                            display: 'flex', 
+                                            alignItems: 'center', 
+                                            gap: 6 
+                                        }}
+                                        onClick={() => submitShipment(o.ShipmentID)}
+                                        disabled={submittingShip || !shipForm.courier || !shipForm.trackingNo || !shipForm.slipFile}>
+                                        <Truck size={16} /> {submittingShip ? 'กำลังบันทึก...' : 'บันทึกและเริ่มจัดส่ง'}
                                     </button>
                                 )}
                                 {o.Status === 'กำลังจัดส่ง' && (

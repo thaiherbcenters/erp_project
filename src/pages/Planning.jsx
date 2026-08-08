@@ -122,12 +122,7 @@ export default function Planning() {
             const json = await res.json();
             if (json.success) {
                 setAllSalesOrders(json.data || []);
-                const pending = json.data.filter(so => {
-                    if (so.Status !== 'ส่ง Planner แล้ว') return false;
-                    // กรองออกถ้ามีการสร้าง JO จาก SO นี้ไปแล้ว
-                    const hasJob = jobs.some(j => j.notes && j.notes.includes(`SO: ${so.SalesOrderNo}`));
-                    return !hasJob;
-                });
+                const pending = json.data.filter(so => so.Status === 'ส่ง Planner แล้ว');
                 setPendingSalesOrders(pending);
             }
         } catch (err) {
@@ -229,10 +224,28 @@ export default function Planning() {
         setCreatingItemIdx(-1);
 
         if (res.success) {
-            setSOPlanData(prev => ({
-                ...prev,
-                items: prev.items.map((it, idx) => idx === itemIdx ? { ...it, created: true } : it)
-            }));
+            setSOPlanData(prev => {
+                const newItems = prev.items.map((it, idx) => idx === itemIdx ? { ...it, created: true } : it);
+                
+                // Check if ALL items are now planned
+                const allCreated = newItems.every(it => it.created);
+                if (allCreated) {
+                    // Automatically mark SO as 'วางแผนแล้ว'
+                    const token = localStorage.getItem('token');
+                    fetch(`${API_BASE}/sales-orders/${prev.id}/status`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                        },
+                        body: JSON.stringify({ status: 'วางแผนแล้ว' })
+                    }).then(() => {
+                        fetchPendingSalesOrders(false);
+                    }).catch(err => console.error('Failed to update SO status:', err));
+                }
+                
+                return { ...prev, items: newItems };
+            });
             showAlert('สำเร็จ', `สร้างใบสั่งผลิต "${item.ItemName}" จำนวน ${Number(item.Qty).toLocaleString()} ${formula.unit} (สเกล ${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก) สำเร็จ!`, 'success');
         } else {
             showAlert('เกิดข้อผิดพลาด', res.message, 'error');
@@ -1084,7 +1097,7 @@ export default function Planning() {
             formula.ingredients.forEach(ing => {
                 const key = ing.materialId;
                 // OEM scaling: use actual qty vs formula batch size
-                const isOEM = job.notes && job.notes.includes('MTO');
+                const isOEM = (job.notes && (job.notes.includes('MTO') || job.notes.includes('OEM'))) || (job.productionType && job.productionType.includes('OEM'));
                 const scaleFactor = isOEM ? (job.totalQty / formula.batchSize) : job.batchQty;
                 const requiredQty = ing.qty * scaleFactor;
                 if (materialRequirements[key]) {
@@ -1268,7 +1281,7 @@ export default function Planning() {
                         {/* วัตถุดิบที่ต้องใช้สำหรับ Job นี้ */}
                         {formula && (() => {
                             // OEM scaling: if totalQty differs from formula batchSize, scale ingredients proportionally
-                            const isOEM = job.notes && job.notes.includes('MTO');
+                            const isOEM = (job.notes && (job.notes.includes('MTO') || job.notes.includes('OEM'))) || (job.productionType && job.productionType.includes('OEM'));
                             const scaleFactor = isOEM ? (job.totalQty / formula.batchSize) : job.batchQty;
                             const scaleLabel = isOEM 
                                 ? `สเกลตามจำนวนสั่ง ${job.totalQty.toLocaleString()} ${job.unit} (${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก)`

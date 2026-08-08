@@ -541,7 +541,7 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req, re
 // ─────────────────────────────────────────────────────────────────────────────
 // 4.5 PATCH /:id/status  — อัปเดตสถานะ SO อย่างเดียว (มีระบบป้องกันถ้าออก Job ผลิตแล้ว)
 // ─────────────────────────────────────────────────────────────────────────────
-router.patch('/:id/status', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
+router.patch('/:id/status', authorizeRoles('admin', 'executive', 'sales', 'planner'), async (req, res) => {
     const { status } = req.body;
     if (!status) {
         return res.status(400).json({ success: false, message: 'Status is required' });

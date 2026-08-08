@@ -15,6 +15,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
 import { usePlanner } from '../context/PlannerContext';
+import { useRnD } from '../context/RnDContext';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import {
@@ -38,6 +39,7 @@ export default function Operator() {
     const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
     const { showAlert, showConfirm } = useAlert();
     const { jobs } = usePlanner();
+    const { formulas: MOCK_FORMULAS } = useRnD();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('operator');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
@@ -311,6 +313,51 @@ export default function Operator() {
                                 </span>
                             </div>
                         </div>
+
+                        {/* วัตถุดิบที่ต้องใช้สำหรับงานนี้ */}
+                        {(() => {
+                            const formula = MOCK_FORMULAS.find(f => f.name === task.formulaName || f.id === task.formulaName);
+                            if (!formula) return null;
+
+                            const scaleFactor = task.expectedQty / formula.batchSize;
+                            const isStandard = task.expectedQty === formula.batchSize;
+                            const scaleLabel = isStandard
+                                ? `สูตรมาตรฐาน (1 Batch = ${formula.batchSize.toLocaleString()} ${formula.unit})`
+                                : `สเกลตามยอดผลิต ${task.expectedQty.toLocaleString()} ${formula.unit} (${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก)`;
+
+                            return (
+                                <div className="rnd-modal-section" style={{ marginTop: 24, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                    <h4 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <Package size={16} /> วัตถุดิบที่ต้องเตรียม ({scaleLabel})
+                                    </h4>
+                                    <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+                                        <table className="data-table rnd-ingredients-table" style={{ background: '#fff', margin: 0, border: 'none' }}>
+                                            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                                                <tr>
+                                                    <th>วัตถุดิบ</th>
+                                                    <th>ต่อ 1 Batch ({formula.batchSize.toLocaleString()} {formula.unit})</th>
+                                                    <th>จำนวนที่ต้องใช้จริง</th>
+                                                    <th>หน่วย</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {formula.ingredients.map((ing, idx) => {
+                                                    const cleanName = ing.name ? ing.name.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim() : '-';
+                                                    return (
+                                                    <tr key={idx}>
+                                                        <td>{cleanName}</td>
+                                                        <td style={{ color: 'var(--text-muted)' }}>{ing.qty}</td>
+                                                        <td style={{ fontWeight: 700, color: !isStandard ? '#0369a1' : 'var(--text)' }}>{(ing.qty * scaleFactor).toFixed(2)}</td>
+                                                        <td>{ing.unit}</td>
+                                                    </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* FULL STEPPER */}
                         <div className="op-modal-stepper-section">
