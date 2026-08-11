@@ -1,0 +1,316 @@
+﻿diff --git a/src/pages/RnD.jsx b/src/pages/RnD.jsx
+index 73389a3..bba222e 100644
+--- a/src/pages/RnD.jsx
++++ b/src/pages/RnD.jsx
+@@ -9,20 +9,21 @@
+  * =============================================================================
+  */
+ 
+-import { useState } from 'react';
++import React, { useState, Fragment } from 'react';
+ import { useLocation } from 'react-router-dom';
+ import { useAuth } from '../context/AuthContext';
+ import {
+     FlaskConical, Lightbulb, Clock, CheckCircle2,
+     TrendingUp, Plus, Search, Eye, XCircle,
+     Beaker, ListChecks, Package, FileText, AlertTriangle,
+-    Edit, Trash2, ArrowRight, DollarSign, Shield, Copy
++    Edit, Trash2, ArrowRight, DollarSign, Shield, Copy, ChevronDown, ChevronRight
+ } from 'lucide-react';
+ import { useRnD } from '../context/RnDContext';
+ import { useAlert } from '../components/CustomAlert';
+ import { TipTapCell } from '../components/TipTapCell';
+ import CustomDatePicker from '../components/CustomDatePicker';
+ import CustomSelect from '../components/CustomSelect';
++import API_BASE from '../config';
+ import './PageCommon.css';
+ import './RnD.css';
+ 
+@@ -34,6 +35,7 @@ export default function RnD() {
+     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
+ 
+     const [searchTerm, setSearchTerm] = useState('');
++    const [selectedProjectForView, setSelectedProjectForView] = useState(null);
+     const [selectedFormula, setSelectedFormula] = useState(null);
+     const [formulaFilter, setFormulaFilter] = useState('α╕ùα╕▒α╣ëα╕çα╕½α╕íα╕ö');
+ 
+@@ -42,6 +44,7 @@ export default function RnD() {
+     const [showEditFormula, setShowEditFormula] = useState(false);
+     const [showCreateProject, setShowCreateProject] = useState(false);
+     const [showCreateExperiment, setShowCreateExperiment] = useState(false);
++    const [isPromoting, setIsPromoting] = useState(false);
+ 
+     // Forms
+     const emptyFormulaForm = {
+@@ -69,6 +72,16 @@ export default function RnD() {
+     const draftFormulas = formulas.filter(f => f.status === 'α╕úα╣êα╕▓α╕ç' || f.status === 'α╕ùα╕öα╕¬α╕¡α╕Ü').length;
+     const activeProjects = projects.filter(p => p.status === 'α╕üα╕│α╕Ñα╕▒α╕çα╕öα╕│α╣Çα╕Öα╕┤α╕Öα╕üα╕▓α╕ú').length;
+ 
++    const getCategoryStyle = (category) => {
++        if (!category) return { background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
++        const cat = category.toLowerCase();
++        if (cat.includes('α╕óα╕▓α╕öα╕í')) return { background: '#e0f2fe', color: '#0369a1', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
++        if (cat.includes('α╕óα╕▓α╕½α╕íα╣êα╕¡α╕ç')) return { background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
++        if (cat.includes('α╕óα╕▓α╕Öα╣ëα╕│') || cat.includes('α╕Öα╣ëα╕│α╕íα╕▒α╕Ö')) return { background: '#fce7f3', color: '#be185d', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
++        if (cat.includes('α╕Ñα╕╣α╕üα╕¢α╕úα╕░α╕äα╕Ü')) return { background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
++        return { background: '#e0e7ff', color: '#4338ca', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
++    };
++
+     const getStatusColor = (status) => {
+         switch (status) {
+             case 'α╕¡α╕Öα╕╕α╕íα╕▒α╕òα╕┤': return 'badge-success';
+@@ -133,7 +146,11 @@ export default function RnD() {
+         if (hasEmptyName) return showAlert('α╣Çα╕üα╕┤α╕öα╕éα╣ëα╕¡α╕£α╕┤α╕öα╕₧α╕Ñα╕▓α╕ö', 'α╕üα╕úα╕╕α╕ôα╕▓α╕úα╕░α╕Üα╕╕α╕èα╕╖α╣êα╕¡α╕ºα╕▒α╕òα╕ûα╕╕α╕öα╕┤α╕Üα╣âα╕½α╣ëα╕äα╕úα╕Üα╕ùα╕╕α╕üα╕úα╕▓α╕óα╕üα╕▓α╕ú α╕½α╕úα╕╖α╕¡α╕Ñα╕Üα╕úα╕▓α╕óα╕üα╕▓α╕úα╕ùα╕╡α╣êα╣äα╕íα╣êα╣äα╕öα╣ëα╣âα╕èα╣ëα╕¡α╕¡α╕ü', 'error');
+         
+         setSaving(true);
+-        const payload = { ...formulaForm, createdBy: user?.name || user?.username || 'R&D Staff' };
++        const payload = { 
++            ...formulaForm, 
++            status: isPromoting ? 'α╕¡α╕Öα╕╕α╕íα╕▒α╕òα╕┤' : 'α╕úα╣êα╕▓α╕ç',
++            createdBy: (isPromoting && formulaForm._researcher) ? formulaForm._researcher : (user?.displayName || user?.name || user?.username || 'R&D Staff') 
++        };
+         const res = await createFormula(payload);
+         setSaving(false);
+         if (res.success) { showAlert('α╕¬α╕│α╣Çα╕úα╣çα╕ê', 'α╕¬α╕úα╣ëα╕▓α╕çα╕¬α╕╣α╕òα╕úα╕¬α╕│α╣Çα╕úα╣çα╕ê!', 'success'); setShowCreateFormula(false); setFormulaForm(emptyFormulaForm); }
+@@ -353,7 +370,7 @@ export default function RnD() {
+                                                 </span>
+                                             </div>
+                                         </td>
+-                                        <td><span className="badge badge-info">{formula.category || '-'}</span></td>
++                                        <td><span style={getCategoryStyle(formula.category)}>{formula.category || '-'}</span></td>
+                                         <td><span className="badge badge-neutral">{formula.version}</span></td>
+                                         <td>{formula.batchSize?.toLocaleString()} {formula.unit}</td>
+                                         <td>{formula.ingredients?.length} α╕úα╕▓α╕óα╕üα╕▓α╕ú</td>
+@@ -370,7 +387,7 @@ export default function RnD() {
+                                             {canDelete('rnd_formulas') && (
+                                                 <button className="btn-sm" onClick={() => handleDeleteFormula(formula.id, formula.name)} title="α╕Ñα╕Ü" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
+                                             )}
+-                                            {formula.status === 'α╕úα╣êα╕▓α╕ç' && (
++                                            {formula.status === 'α╕úα╣êα╕▓α╕ç' && (!formula.description || !formula.description.includes('α╕₧α╕▒α╕Æα╕Öα╕▓α╕íα╕▓α╕êα╕▓α╕üα╕üα╕▓α╕úα╕ùα╕öα╕Ñα╕¡α╕ç')) && (
+                                                 <button className="btn-sm" style={{ color: '#f59e0b' }} onClick={() => handleStatusChange(formula, 'α╕úα╕¡α╕ùα╕öα╕¬α╕¡α╕Ü')} title="α╕¬α╣êα╕çα╣âα╕½α╣ë QC α╕ùα╕öα╕¬α╕¡α╕Ü"><ArrowRight size={14} /></button>
+                                             )}
+                                             {formula.status === 'α╕ùα╕öα╕¬α╕¡α╕Üα╕£α╣êα╕▓α╕Ö' && (
+@@ -393,6 +410,130 @@ export default function RnD() {
+     // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+     // 3. α╣éα╕äα╕úα╕çα╕üα╕▓α╕úα╕ºα╕┤α╕êα╕▒α╕ó (Research Projects)
+     // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
++    const handlePrintSafetyCert = async (exp) => {
++        try {
++            showAlert('α╕úα╕¡α╕¬α╕▒α╕üα╕äα╕úα╕╣α╣ê', 'α╕üα╕│α╕Ñα╕▒α╕çα╕¬α╕úα╣ëα╕▓α╕çα╣Çα╕¡α╕üα╕¬α╕▓α╕ú PDF...', 'info');
++            const printResponse = await fetch(`${API_BASE}/rnd/experiments/${exp.id}/print`, {
++                method: 'GET'
++            });
++
++            if (printResponse.ok) {
++                const blob = await printResponse.blob();
++                const url = window.URL.createObjectURL(blob);
++                window.open(url, '_blank');
++                showAlert('α╕¬α╕│α╣Çα╕úα╣çα╕ê', 'α╣Çα╕¢α╕┤α╕öα╣Çα╕¡α╕üα╕¬α╕▓α╕ú PDF α╣üα╕Ñα╣ëα╕º', 'success');
++            } else {
++                showAlert('α╣Çα╕üα╕┤α╕öα╕éα╣ëα╕¡α╕£α╕┤α╕öα╕₧α╕Ñα╕▓α╕ö', 'α╣äα╕íα╣êα╕¬α╕▓α╕íα╕▓α╕úα╕ûα╕¬α╕úα╣ëα╕▓α╕çα╣Çα╕¡α╕üα╕¬α╕▓α╕ú PDF α╣äα╕öα╣ë', 'error');
++            }
++        } catch (error) {
++            console.error('Error printing certificate:', error);
++            showAlert('α╣Çα╕üα╕┤α╕öα╕éα╣ëα╕¡α╕£α╕┤α╕öα╕₧α╕Ñα╕▓α╕ö', 'α╣äα╕íα╣êα╕¬α╕▓α╕íα╕▓α╕úα╕ûα╣Çα╕èα╕╖α╣êα╕¡α╕íα╕òα╣êα╕¡α╕üα╕▒α╕Üα╕úα╕░α╕Üα╕Üα╣äα╕öα╣ë', 'error');
++        }
++    };
++
++    const renderProjectDetailsModal = () => {
++        if (!selectedProjectForView) return null;
++        
++        const project = selectedProjectForView;
++        const projectExps = experiments.filter(e => e.projectCode === project.code);
++
++        return (
++            <div className="rnd-modal-overlay" onClick={() => setSelectedProjectForView(null)}>
++                <div className="rnd-modal" style={{ width: 1000, maxWidth: '95%' }} onClick={(e) => e.stopPropagation()}>
++                    <div className="rnd-modal-header">
++                        <h3><Beaker size={18} style={{ color: '#4f46e5', marginRight: 8 }}/> α╕£α╕Ñα╕üα╕▓α╕úα╕ùα╕öα╕Ñα╕¡α╕ç: α╣éα╕äα╕úα╕çα╕üα╕▓α╕ú {project.code} ({project.name})</h3>
++                        <button className="doc-action-btn" onClick={() => setSelectedProjectForView(null)}><XCircle size={20} /></button>
++                    </div>
++                    <div className="rnd-modal-body" style={{ background: '#f8fafc', padding: 20 }}>
++                        
++                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
++                            <h4 style={{ margin: 0, color: '#1e293b' }}>α╕úα╕▓α╕óα╕üα╕▓α╕úα╕ùα╕öα╕Ñα╕¡α╕çα╕ùα╕▒α╣ëα╕çα╕½α╕íα╕ö ({projectExps.length})</h4>
++                            <button className="btn-primary btn-sm" onClick={() => { setSelectedProjectForView(null); setShowCreateExperiment(true); }}>
++                                <Beaker size={14} style={{ marginRight: 4 }}/> α╕Üα╕▒α╕Öα╕ùα╕╢α╕üα╕£α╕Ñα╕ùα╕öα╕Ñα╕¡α╕çα╣âα╕½α╕íα╣ê
++                            </button>
++                        </div>
++                        
++                        {projectExps.length > 0 ? (
++                            <table className="data-table" style={{ background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: 8 }}>
++                                <thead style={{ background: '#f1f5f9' }}>
++                                    <tr>
++                                        <th style={{ padding: '12px' }}>α╕úα╕½α╕▒α╕¬</th>
++                                        <th style={{ padding: '12px' }}>α╕èα╕╖α╣êα╕¡α╕üα╕▓α╕úα╕ùα╕öα╕Ñα╕¡α╕ç</th>
++                                        <th style={{ padding: '12px' }}>α╕¡α╣ëα╕▓α╕çα╕¡α╕┤α╕çα╕¬α╕╣α╕òα╕ú</th>
++                                        <th style={{ padding: '12px' }}>α╕¬α╕╣α╕òα╕ú/α╕¬α╕▒α╕öα╕¬α╣êα╕ºα╕Öα╕ùα╕╡α╣êα╕ùα╕öα╕Ñα╕¡α╕ç</th>
++                                        <th style={{ padding: '12px' }}>α╕ºα╕▒α╕Öα╕ùα╕╡α╣ê</th>
++                                        <th style={{ padding: '12px' }}>α╕£α╕Ñα╕Ñα╕▒α╕₧α╕ÿα╣î</th>
++                                        <th style={{ padding: '12px' }}>α╕½α╕íα╕▓α╕óα╣Çα╕½α╕òα╕╕</th>
++                                        <th style={{ padding: '12px', textAlign: 'right' }}>α╕êα╕▒α╕öα╕üα╕▓α╕ú</th>
++                                    </tr>
++                                </thead>
++                                <tbody>
++                                    {projectExps.map(exp => (
++                                        <tr key={exp.id}>
++                                            <td className="text-bold" style={{ padding: '12px' }}>{exp.code}</td>
++                                            <td style={{ padding: '12px' }}>{exp.name}</td>
++                                            <td style={{ padding: '12px' }}>{exp.formulaRef ? <span className="badge badge-info">{exp.formulaRef}</span> : '-'}</td>
++                                            <td style={{ padding: '12px' }}>
++                                                <div style={{ maxWidth: 250, fontSize: 12 }}>
++                                                    {(() => {
++                                                        try {
++                                                            const arr = JSON.parse(exp.trialRecipe);
++                                                            if (Array.isArray(arr)) {
++                                                                return <ul style={{ margin: 0, paddingLeft: 16 }}>{arr.map((item, i) => <li key={i}>{item.name}: {item.qty} {item.unit}</li>)}</ul>;
++                                                            }
++                                                        } catch(e) {}
++                                                        return exp.trialRecipe || '-';
++                                                    })()}
++                                                </div>
++                                            </td>
++                                            <td style={{ padding: '12px' }}>{exp.date}</td>
++                                            <td style={{ padding: '12px' }}><span className={`badge ${getResultColor(exp.result)}`}>{exp.result}</span></td>
++                                            <td style={{ padding: '12px' }}>{exp.note}</td>
++                                            <td style={{ padding: '12px', textAlign: 'right' }}>
++                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, flexWrap: 'wrap' }}>
++                                                    {(exp.result === 'α╕úα╕¡α╕£α╕Ñ' || exp.result === 'α╕úα╕¡α╕¢α╕úα╕░α╣Çα╕íα╕┤α╕Ö') && (
++                                                        <button className="doc-action-btn" style={{ color: '#6b7280' }} title="α╣üα╕üα╣ëα╣äα╕é" onClick={() => { setSelectedProjectForView(null); handleEditExperiment(exp); }}>
++                                                            <Edit size={16} />
++                                                        </button>
++                                                    )}
++                                                    
++                                                    {exp.result === 'α╕úα╕¡α╕£α╕Ñ' && (
++                                                        <button className="doc-action-btn" style={{ color: '#3b82f6' }} title="α╕¬α╣êα╕çα╣âα╕½α╣ëα╣Çα╕áα╕¬α╕▒α╕èα╕üα╕ú" onClick={() => { setSelectedProjectForView(null); handleUpdateExperimentStatus(exp, 'α╕úα╕¡α╕¢α╕úα╕░α╣Çα╕íα╕┤α╕Ö'); }} disabled={saving}>
++                                                            <Send size={16} />
++                                                        </button>
++                                                    )}
++
++                                                    {exp.result === 'α╕£α╣êα╕▓α╕Ö' && (
++                                                        <>
++                                                            <button className="doc-action-btn" style={{ color: '#10b981' }} title="α╕₧α╕┤α╕íα╕₧α╣îα╣âα╕Üα╕úα╕▒α╕Üα╕úα╕¡α╕çα╕äα╕ºα╕▓α╕íα╕¢α╕Ñα╕¡α╕öα╕áα╕▒α╕ó" onClick={() => handlePrintSafetyCert(exp)}>
++                                                                <FileText size={16} />
++                                                            </button>
++                                                            
++                                                            {canUpdate('rnd_projects') && !formulas.some(f => (f.description && f.description.includes(exp.code || exp.id)) || f.name === exp.name + ' (α╕êα╕▓α╕üα╕£α╕Ñα╕ùα╕öα╕Ñα╕¡α╕ç)') && (
++                                                                <button className="doc-action-btn" style={{ color: '#8b5cf6' }} title="α╕éα╕╢α╣ëα╕Öα╕¬α╕╣α╕òα╕úα╕½α╕Ñα╕▒α╕ü" onClick={() => { setSelectedProjectForView(null); handlePromoteToFormula(exp); }}>
++                                                                    <ArrowRight size={16} />
++                                                                </button>
++                                                            )}
++                                                        </>
++                                                    )}
++                                                </div>
++                                            </td>
++                                        </tr>
++                                    ))}
++                                </tbody>
++                            </table>
++                        ) : (
++                            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
++                                <FlaskConical size={48} style={{ margin: '0 auto 16px auto', opacity: 0.5 }} />
++                                <div>α╕óα╕▒α╕çα╣äα╕íα╣êα╕íα╕╡α╕£α╕Ñα╕üα╕▓α╕úα╕ùα╕öα╕Ñα╕¡α╕çα╣âα╕Öα╣éα╕äα╕úα╕çα╕üα╕▓α╕úα╕Öα╕╡α╣ë</div>
++                            </div>
++                        )}
++                    </div>
++                </div>
++            </div>
++        );
++    };
++
+     const renderProjects = () => {
+         const filtered = projects.filter(p =>
+             p.name.includes(searchTerm) || p.code.includes(searchTerm) || p.category.toLowerCase().includes(searchTerm.toLowerCase())
+@@ -414,7 +555,6 @@ export default function RnD() {
+                         )}
+                     </div>
+                     <div style={{ display: 'flex', gap: 8 }}>
+-                        <button className="btn-secondary" onClick={() => setShowCreateExperiment(true)}><Beaker size={16} /> α╕Üα╕▒α╕Öα╕ùα╕╢α╕üα╕£α╕Ñα╕ùα╕öα╕Ñα╕¡α╕ç</button>
+                         {canCreate('rnd_projects') && (
+                             <button className="btn-primary" onClick={() => setShowCreateProject(true)}><Plus size={16} /> α╕¬α╕úα╣ëα╕▓α╕çα╣éα╕äα╕úα╕çα╕üα╕▓α╕úα╣âα╕½α╕íα╣ê</button>
+                         )}
+@@ -428,7 +568,7 @@ export default function RnD() {
+                                 <tr>
+                                     <th>α╕úα╕½α╕▒α╕¬</th><th>α╕èα╕╖α╣êα╕¡α╣éα╕äα╕úα╕çα╕üα╕▓α╕ú</th><th>α╕½α╕íα╕ºα╕öα╕½α╕íα╕╣α╣ê</th><th>α╕Öα╕▒α╕üα╕ºα╕┤α╕êα╕▒α╕ó</th>
+                                     <th>α╣Çα╕úα╕┤α╣êα╕íα╕òα╣ëα╕Ö</th><th>α╣Çα╕¢α╣ëα╕▓α╕½α╕íα╕▓α╕ó</th><th>α╣Çα╕ƒα╕¬</th><th>Progress</th>
+-                                    <th>α╕¬α╕╣α╕òα╕úα╕¡α╣ëα╕▓α╕çα╕¡α╕┤α╕ç</th><th>α╕¬α╕ûα╕▓α╕Öα╕░</th>
++                                    <th>α╕¬α╕╣α╕òα╕úα╕¡α╣ëα╕▓α╕çα╕¡α╕┤α╕ç</th><th>α╕¬α╕ûα╕▓α╕Öα╕░</th><th style={{ textAlign: 'right' }}>α╕êα╕▒α╕öα╕üα╕▓α╕ú</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+@@ -436,7 +576,7 @@ export default function RnD() {
+                                     <tr key={project.id}>
+                                         <td className="text-bold">{project.code}</td>
+                                         <td>{project.name}</td>
+-                                        <td><span className="badge badge-info">{project.category}</span></td>
++                                        <td><span style={getCategoryStyle(project.category)}>{project.category}</span></td>
+                                         <td>{project.researcher}</td>
+                                         <td>{project.startDate}</td>
+                                         <td>{project.targetDate}</td>
+@@ -458,34 +598,27 @@ export default function RnD() {
+                                             ) : <span style={{ color: 'var(--text-muted)' }}>ΓÇö</span>}
+                                         </td>
+                                         <td><span className={`badge ${getStatusColor(project.status)}`}>{project.status}</span></td>
++                                        <td style={{ textAlign: 'right' }}>
++                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
++                                                <button className="doc-action-btn" style={{ color: '#4f46e5' }} title="α╕öα╕╣α╕£α╕Ñα╕üα╕▓α╕úα╕ùα╕öα╕Ñα╕¡α╕ç" onClick={() => setSelectedProjectForView(project)}>
++                                                    <Eye size={16} />
++                                                </button>
++                                                <button className="doc-action-btn" style={{ color: '#10b981' }} title="α╕Üα╕▒α╕Öα╕ùα╕╢α╕üα╕£α╕Ñα╕ùα╕öα╕Ñα╕¡α╕ç" onClick={() => setShowCreateExperiment(true)}>
++                                                    <Beaker size={16} />
++                                                </button>
++                                                {canDelete('rnd_projects') && (
++                                                    <button className="doc-action-btn doc-action-btn-danger" style={{ color: '#ef4444' }} title="α╕Ñα╕Ü" onClick={() => handleDeleteProject(project.code)}>
++                                                        <Trash2 size={16} />
++                                                    </button>
++                                                )}
++                                            </div>
++                                        </td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     </div>
+                 )}
+-
+-                {/* α╕òα╕▓α╕úα╕▓α╕çα╕£α╕Ñα╕ùα╕öα╕Ñα╕¡α╕ç */}
+-                <div className="card table-card" style={{ marginTop: 16 }}>
+-                    <h3 className="card-title"><Beaker size={16} style={{ color: '#7b7bf5' }} /> α╕£α╕Ñα╕üα╕▓α╕úα╕ùα╕öα╕Ñα╕¡α╕çα╕ùα╕▒α╣ëα╕çα╕½α╕íα╕ö ({experiments.length})</h3>
+-                    <table className="data-table">
+-                        <thead>
+-                            <tr><th>α╕úα╕½α╕▒α╕¬</th><th>α╣éα╕äα╕úα╕çα╕üα╕▓α╕ú</th><th>α╕èα╕╖α╣êα╕¡α╕üα╕▓α╕úα╕ùα╕öα╕Ñα╕¡α╕ç</th><th>α╕ºα╕▒α╕Öα╕ùα╕╡α╣ê</th><th>α╕£α╕Ñα╕Ñα╕▒α╕₧α╕ÿα╣î</th><th>α╕½α╕íα╕▓α╕óα╣Çα╕½α╕òα╕╕</th></tr>
+-                        </thead>
+-                        <tbody>
+-                            {experiments.map(exp => (
+-                                <tr key={exp.id}>
+-                                    <td className="text-bold">{exp.code}</td>
+-                                    <td>{exp.projectCode}</td>
+-                                    <td>{exp.name}</td>
+-                                    <td>{exp.date}</td>
+-                                    <td><span className={`badge ${getResultColor(exp.result)}`}>{exp.result}</span></td>
+-                                    <td>{exp.note}</td>
+-                                </tr>
+-                            ))}
+-                        </tbody>
+-                    </table>
+-                </div>
+             </div>
+         );
+     };
+@@ -1040,7 +1173,7 @@ export default function RnD() {
+                                                 </span>
+                                             </div>
+                                         </td>
+-                                        <td><span className="badge badge-info">{formula.category}</span></td>
++                                        <td><span style={getCategoryStyle(formula.category)}>{formula.category}</span></td>
+                                         <td>{formula.qcApprovedBy || '-'}</td>
+                                         <td>{formula.qcApprovedDate || '-'}</td>
+                                         <td><span className={`badge ${getStatusColor(formula.status)}`}>{formula.status}</span></td>
+@@ -1102,6 +1235,7 @@ export default function RnD() {
+             {renderFormulaFormModal()}
+             {renderCreateProjectModal()}
+             {renderCreateExperimentModal()}
++            {renderProjectDetailsModal()}
+         </div>
+     );
+ }

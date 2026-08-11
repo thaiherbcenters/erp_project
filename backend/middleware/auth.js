@@ -2,17 +2,22 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const authMiddleware = (req, res, next) => {
-    // Check for token in Authorization header
+    // Check for token in Authorization header or query parameter (for PDF downloads)
     const authHeader = req.header('Authorization');
+    let token = null;
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    } else if (req.query.token) {
+        token = req.query.token;
+    }
+    
+    if (!token) {
         return res.status(401).json({ 
             success: false, 
             message: 'การเข้าถึงถูกปฏิเสธ: ไม่พบ Token ยืนยันตัวตน' 
         });
     }
-
-    const token = authHeader.split(' ')[1];
 
     try {
         const secret = process.env.JWT_SECRET || 'THAIHERB_SECRET_KEY_2026_ERP';

@@ -77,7 +77,6 @@ const loginLimiter = rateLimit({
 
 app.use('/api/auth', loginLimiter, authRoutes);
 
-// Apply auth middleware to all subsequent API routes
 app.use(authMiddleware);
 
 app.use('/api/users', userRoutes);
@@ -103,6 +102,7 @@ app.use('/api/stock', stockRoutes);
 app.use('/api/legal-documents', legalDocumentRoutes);
 app.use('/api/contract-mfg-documents', contractMfgRoutes);
 app.use('/api/print', printRoutes);
+app.use('/api/print-experiment', require('./routes/print-experiment'));
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/quotations', quotationRoutes);
 app.use('/api/billing-invoices', billingInvoiceRoutes);

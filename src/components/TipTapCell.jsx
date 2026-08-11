@@ -147,7 +147,7 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                 className="tiptap-cell-editor" 
             />
             {!editor.getText() && placeholder && !readOnly && (
-                <div style={{ position: 'absolute', top: '8px', left: '12px', color: '#9ca3af', pointerEvents: 'none', fontSize: '13px' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', color: '#9ca3af', pointerEvents: 'none', fontSize: '14px' }}>
                     {placeholder}
                 </div>
             )}

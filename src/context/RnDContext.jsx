@@ -154,11 +154,37 @@ export function RnDProvider({ children }) {
         } catch (err) { return { success: false, message: 'Server error' }; }
     }, [fetchProjects]);
 
+    const deleteProject = useCallback(async (code) => {
+        try {
+            const res = await fetch(`${API_BASE}/rnd/projects/${code}`, { method: 'DELETE', headers: getAuthHeaders(false) });
+            if (res.ok) { fetchProjects(); return { success: true }; }
+            return { success: false, message: 'Failed' };
+        } catch (err) { return { success: false, message: 'Server error' }; }
+    }, [fetchProjects]);
+
     const createExperiment = useCallback(async (data) => {
         try {
             const res = await fetch(`${API_BASE}/rnd/experiments`, {
                 method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(data),
             });
+            if (res.ok) { fetchExperiments(); return { success: true }; }
+            return { success: false, message: 'Failed' };
+        } catch (err) { return { success: false, message: 'Server error' }; }
+    }, [fetchExperiments]);
+
+    const updateExperiment = useCallback(async (code, data) => {
+        try {
+            const res = await fetch(`${API_BASE}/rnd/experiments/${code}`, {
+                method: 'PUT', headers: getAuthHeaders(), body: JSON.stringify(data),
+            });
+            if (res.ok) { fetchExperiments(); return { success: true }; }
+            return { success: false, message: 'Failed' };
+        } catch (err) { return { success: false, message: 'Server error' }; }
+    }, [fetchExperiments]);
+
+    const deleteExperiment = useCallback(async (code) => {
+        try {
+            const res = await fetch(`${API_BASE}/rnd/experiments/${code}`, { method: 'DELETE', headers: getAuthHeaders(false) });
             if (res.ok) { fetchExperiments(); return { success: true }; }
             return { success: false, message: 'Failed' };
         } catch (err) { return { success: false, message: 'Server error' }; }
@@ -198,7 +224,7 @@ export function RnDProvider({ children }) {
         fetchFormulas, fetchMaterials, fetchProjects, fetchExperiments, fetchAll,
         createFormula, updateFormula, updateFormulaStatus, deleteFormula,
         createMaterial, updateMaterial, deleteMaterial,
-        createProject, createExperiment,
+        createProject, deleteProject, createExperiment, updateExperiment, deleteExperiment,
         fetchFormulaTests, submitFormulaTest, pharmApprove,
     };
 

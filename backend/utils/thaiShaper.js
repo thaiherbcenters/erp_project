@@ -6,7 +6,8 @@
  */
 
 function drawThaiText(pdfPage, text, x, y, size, font, color, italic = false) {
-    if (!text) return;
+    if (text === null || text === undefined) return;
+    text = String(text);
     
     let currentX = x;
     const startY = y;
@@ -102,7 +103,8 @@ function drawThaiText(pdfPage, text, x, y, size, font, color, italic = false) {
 }
 
 function wrapThaiText(text, maxWidth, size, font) {
-    if (!text) return [];
+    if (text === null || text === undefined) return [];
+    text = String(text);
     
     // Split explicitly by newline first
     const lines = text.split(/\r?\n/);
@@ -154,7 +156,8 @@ function wrapThaiText(text, maxWidth, size, font) {
 }
 
 function parseHTMLToParagraphs(html) {
-    if (!html) return [{ align: 'left', chunks: [] }];
+    if (html === null || html === undefined) return [{ align: 'left', chunks: [] }];
+    html = String(html);
 
     // Match paragraph blocks or similar block elements
     const pRegex = /<p([^>]*)>(.*?)<\/p>/gi;

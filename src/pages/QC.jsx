@@ -14,15 +14,14 @@ import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
 import { useRnD } from '../context/RnDContext';
 import API_BASE from '../config';
-import { Search } from 'lucide-react';
+import { Search, Plus, FileText } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 import './QC.css';
 
 export default function QC() {
-    const { canCreate, canUpdate, canDelete } = useAuth();
-    const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
+    const { currentUser, canCreate, canUpdate, canDelete, hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
     const { qcRequests, submitQcResult, getPendingQcRequests } = useProduction();
     const { showAlert } = useAlert();
     const visibleSubPages = getVisibleSubPages('qc');
@@ -42,7 +41,7 @@ export default function QC() {
     const [formulaTests, setFormulaTests] = useState([]);
     const [showTestForm, setShowTestForm] = useState(false);
     const [testFormData, setTestFormData] = useState({
-        formulaId: '', testedBy: '', pH: '', viscosity: '', color: '', smell: '', stability: '', microbial: '', overallResult: '', notes: ''
+        formulaId: '', testedBy: currentUser?.name || currentUser?.username || '', pH: '', viscosity: '', color: '', smell: '', stability: '', microbial: '', overallResult: '', notes: ''
     });
     const [testSaving, setTestSaving] = useState(false);
 
@@ -61,9 +60,19 @@ export default function QC() {
         if (res.success) {
             showAlert('สำเร็จ', 'บันทึกผลทดสอบสำเร็จ!', 'success');
             setShowTestForm(false);
-            setTestFormData({ formulaId: '', testedBy: '', pH: '', viscosity: '', color: '', smell: '', stability: '', microbial: '', overallResult: '', notes: '' });
+            setTestFormData({ formulaId: '', testedBy: currentUser?.name || currentUser?.username || '', pH: '', viscosity: '', color: '', smell: '', stability: '', microbial: '', overallResult: '', notes: '' });
             loadFormulaTests();
         } else showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกได้ กรุณาลองใหม่', 'error');
+    };
+
+    const handlePrintQcReport = async (test) => {
+        try {
+            const token = localStorage.getItem('erp_token');
+            window.open(`${API_BASE}/rnd/formula-tests/${test.id}/print?token=${token}`, '_blank');
+        } catch (error) {
+            console.error('Print error:', error);
+            showAlert('ข้อผิดพลาด', 'เกิดปัญหาในการสร้างเอกสาร', 'error');
+        }
     };
 
     const [incomings, setIncomings] = useState([]);
@@ -435,7 +444,7 @@ export default function QC() {
             case 'qc_inprocess': return 'ตรวจสอบระหว่างผลิต (In-Process QC)';
             case 'qc_final': return 'ตรวจสอบขั้นสุดท้าย (Final QC)';
             case 'qc_defect': return 'แจ้งปัญหาและของเสีย (NCR)';
-            case 'qc_formula_lab': return '🧪 QC/Lab ทดสอบสูตร';
+            case 'qc_formula_lab': return 'QC/Lab ทดสอบสูตร';
             case 'qc_reports': return 'รายงานและการวิเคราะห์คุณภาพ';
             default: return 'ตรวจสอบคุณภาพ (QC)';
         }
@@ -649,21 +658,79 @@ export default function QC() {
 
                     {/* สูตรรอทดสอบ */}
                     {pendingFormulas.length > 0 && (
-                        <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #f59e0b' }}>
-                            <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: '#92400e' }}>⏳ สูตรรอทดสอบ ({pendingFormulas.length})</h3>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ 
+                            background: 'linear-gradient(to right, #fffbeb, #fef3c7)', 
+                            border: '1px solid #fde68a', 
+                            borderRadius: '12px', 
+                            padding: '20px', 
+                            marginBottom: '24px',
+                            boxShadow: '0 4px 6px -1px rgba(245, 158, 11, 0.1)'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', background: '#f59e0b', color: '#fff', borderRadius: '50%', fontWeight: 'bold', fontSize: '20px', boxShadow: '0 2px 4px rgba(245, 158, 11, 0.3)' }}>!</div>
+                                <div>
+                                    <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#92400e' }}>
+                                        สูตรที่ต้องเร่งทดสอบ ({pendingFormulas.length} รายการ)
+                                    </h3>
+                                    <div style={{ fontSize: '13px', color: '#b45309', marginTop: '2px' }}>
+                                        โปรดบันทึกผลการทดสอบสำหรับรายการด้านล่าง
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
                                 {pendingFormulas.map(f => (
-                                    <button key={f.id} className="btn-sm" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}
-                                        onClick={() => { setTestFormData({ ...testFormData, formulaId: f.id }); setShowTestForm(true); }}>
-                                        🧪 {f.id} — {f.name}
-                                    </button>
+                                    <div key={f.id} style={{ 
+                                        background: '#ffffff', 
+                                        border: '1px solid #fcd34d', 
+                                        borderRadius: '8px', 
+                                        padding: '16px',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '16px',
+                                        transition: 'all 0.2s',
+                                        cursor: 'pointer',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.2)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'; e.currentTarget.style.transform = 'none'; }}
+                                    onClick={() => { setTestFormData({ ...testFormData, formulaId: f.id, testedBy: testFormData.testedBy || currentUser?.name || currentUser?.username || '' }); setShowTestForm(true); }}>
+                                        <div>
+                                            <div style={{ fontSize: '13px', fontWeight: 700, color: '#d97706', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></span>
+                                                {f.id}
+                                            </div>
+                                            <div style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', lineHeight: '1.4' }}>{f.name}</div>
+                                            <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px' }}>เวอร์ชั่น: {f.version} • หมวดหมู่: {f.category || 'ทั่วไป'}</div>
+                                        </div>
+                                        <button style={{ 
+                                            width: '100%', 
+                                            padding: '10px 0', 
+                                            background: '#f59e0b', 
+                                            color: '#fff', 
+                                            border: 'none', 
+                                            borderRadius: '6px', 
+                                            fontWeight: 700,
+                                            fontSize: '14px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'background 0.2s'
+                                        }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#d97706'}
+                                        onMouseLeave={e => e.currentTarget.style.background = '#f59e0b'}>
+                                            บันทึกผลทดสอบ
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
                         </div>
                     )}
 
                     <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                        <button className="btn-primary" onClick={() => setShowTestForm(true)}>➕ บันทึกผลทดสอบสูตร</button>
+                        <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setTestFormData({ ...testFormData, testedBy: testFormData.testedBy || currentUser?.name || currentUser?.username || '' }); setShowTestForm(true); }}><Plus size={16} /> บันทึกผลทดสอบสูตร</button>
                     </div>
 
                     {/* ใบทดสอบสูตร Modal */}
@@ -671,7 +738,7 @@ export default function QC() {
                         <div className="rnd-modal-overlay" onClick={() => setShowTestForm(false)}>
                             <div className="rnd-modal" style={{ maxWidth: 650 }} onClick={e => e.stopPropagation()}>
                                 <div className="rnd-modal-header">
-                                    <h2>📋 ใบทดสอบสูตร (Formula Test Report)</h2>
+                                    <h2>ใบทดสอบสูตร (Formula Test Report)</h2>
                                     <button className="rnd-modal-close" onClick={() => setShowTestForm(false)}>✕</button>
                                 </div>
                                 <div className="rnd-modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
@@ -685,6 +752,60 @@ export default function QC() {
                                                 ))}
                                             </CustomSelect>
                                         </div>
+                                        {testFormData.formulaId && (() => {
+                                            const f = formulas.find(formula => formula.id === testFormData.formulaId);
+                                            if (!f) return null;
+                                            return (
+                                                <div style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '8px' }}>
+                                                    <h4 style={{ margin: '0 0 12px 0', color: '#334155', fontSize: '15px' }}>รายละเอียดสูตร: {f.name} (v{f.version})</h4>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px', fontSize: '13px' }}>
+                                                        <div><span style={{ color: '#64748b' }}>ขนาดต่อ Batch:</span> <strong style={{ color: '#0f172a' }}>{f.batchSize?.toLocaleString()} {f.unit}</strong></div>
+                                                        <div><span style={{ color: '#64748b' }}>ปริมาณบรรจุต่อชิ้น:</span> <strong style={{ color: '#0f172a' }}>{f.unitSize || '-'}</strong></div>
+                                                        <div><span style={{ color: '#64748b' }}>อายุการเก็บ:</span> <strong style={{ color: '#0f172a' }}>{f.shelfLife || '-'}</strong></div>
+                                                    </div>
+                                                    
+                                                    {f.ingredients?.length > 0 && (
+                                                        <div style={{ marginBottom: '16px' }}>
+                                                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>วัตถุดิบ ({f.ingredients.length} รายการ)</div>
+                                                            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                                                                <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                                                                    <thead style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
+                                                                        <tr>
+                                                                            <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>ชื่อวัตถุดิบ</th>
+                                                                            <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '1px solid #e2e8f0' }}>ปริมาณ</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {f.ingredients.map((ing, idx) => (
+                                                                            <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                                <td style={{ padding: '6px 8px' }} dangerouslySetInnerHTML={{ __html: ing.name || ing.materialId }} />
+                                                                                <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500 }}>{ing.qty} {ing.unit}</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {(() => {
+                                                        const validInstructions = f.instructions?.filter(s => s.trim() !== '') || [];
+                                                        return (
+                                                            <div>
+                                                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>วิธีการผลิต</div>
+                                                                {validInstructions.length > 0 ? (
+                                                                    <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#334155' }}>
+                                                                        {validInstructions.map((step, idx) => <li key={idx} style={{ marginBottom: '4px' }}>{step}</li>)}
+                                                                    </ol>
+                                                                ) : (
+                                                                    <div style={{ fontSize: '13px', color: '#64748b' }}>-</div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            );
+                                        })()}
                                         <div className="rnd-modal-info-item">
                                             <label>ผู้ทดสอบ</label>
                                             <input type="text" style={fmtInput} value={testFormData.testedBy} onChange={e => setTestFormData({ ...testFormData, testedBy: e.target.value })} placeholder="ชื่อผู้ทดสอบ" />
@@ -737,12 +858,12 @@ export default function QC() {
 
                     {/* ตารางผลทดสอบที่ผ่านมา */}
                     <div className="card table-card">
-                        <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>📊 ประวัติผลทดสอบสูตร ({formulaTests.length})</h3>
+                        <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>ประวัติผลทดสอบสูตร ({formulaTests.length})</h3>
                         <table className="data-table">
                             <thead>
                                 <tr>
                                     <th>สูตร</th><th>ชื่อสูตร</th><th>วันที่</th><th>ผู้ทดสอบ</th>
-                                    <th>pH</th><th>สี</th><th>กลิ่น</th><th>Microbial</th><th>ผลรวม</th>
+                                    <th>pH</th><th>สี</th><th>กลิ่น</th><th>Microbial</th><th>ผลรวม</th><th>เอกสาร</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -757,10 +878,15 @@ export default function QC() {
                                         <td>{t.smell}</td>
                                         <td>{t.microbial}</td>
                                         <td><span className={`badge ${t.overallResult === 'ผ่าน' ? 'badge-success' : 'badge-danger'}`}>{t.overallResult}</span></td>
+                                        <td>
+                                            <button className="btn-sm btn-secondary" onClick={() => handlePrintQcReport(t)} title="พิมพ์ใบรายงานผล" style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <FileText size={14} />
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                                 {formulaTests.length === 0 && (
-                                    <tr><td colSpan="9" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ยังไม่มีผลทดสอบ</td></tr>
+                                    <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ยังไม่มีผลทดสอบ</td></tr>
                                 )}
                             </tbody>
                         </table>

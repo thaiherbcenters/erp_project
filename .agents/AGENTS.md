@@ -34,3 +34,7 @@ When rendering text fields in PDFs, respect the frontend configuration and imple
 
 ## UI Permission Wrapping
 When creating new pages, features, or action buttons (Create/Edit/Delete), ALWAYS wrap them with the canCreate(page_id), canUpdate(page_id), and canDelete(page_id) permission checks imported from useAuth(). Double-check that the string ID passed matches the EXACT page_id defined in src/data/mockData.js to prevent missing buttons for users with valid permissions.
+
+## No Native Alerts
+When displaying error messages, success notifications, or generic alerts in the frontend, **NEVER** use the native browser `alert()` function.
+Instead, **ALWAYS** use the internal custom alert component by importing `useAlert` from `../components/CustomAlert` and calling `showAlert('Title', 'Message', 'type')` (where type is 'success', 'error', 'warning', or 'info').

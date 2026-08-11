@@ -9,20 +9,21 @@
  * =============================================================================
  */
 
-import { useState } from 'react';
+import React, { useState, Fragment } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     FlaskConical, Lightbulb, Clock, CheckCircle2,
     TrendingUp, Plus, Search, Eye, XCircle,
     Beaker, ListChecks, Package, FileText, AlertTriangle,
-    Edit, Trash2, ArrowRight, DollarSign, Shield, Copy
+    Edit, Trash2, ArrowRight, DollarSign, Shield, Copy, ChevronDown, ChevronRight, Send, ClipboardCheck
 } from 'lucide-react';
 import { useRnD } from '../context/RnDContext';
 import { useAlert } from '../components/CustomAlert';
 import { TipTapCell } from '../components/TipTapCell';
 import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
+import API_BASE from '../config';
 import './PageCommon.css';
 import './RnD.css';
 
@@ -34,7 +35,9 @@ export default function RnD() {
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedProjectForView, setSelectedProjectForView] = useState(null);
     const [selectedFormula, setSelectedFormula] = useState(null);
+    const [selectedExperimentForPharm, setSelectedExperimentForPharm] = useState(null);
     const [formulaFilter, setFormulaFilter] = useState('ทั้งหมด');
 
     // Modals
@@ -42,6 +45,7 @@ export default function RnD() {
     const [showEditFormula, setShowEditFormula] = useState(false);
     const [showCreateProject, setShowCreateProject] = useState(false);
     const [showCreateExperiment, setShowCreateExperiment] = useState(false);
+    const [isPromoting, setIsPromoting] = useState(false);
 
     // Forms
     const emptyFormulaForm = {
@@ -50,7 +54,7 @@ export default function RnD() {
     };
     const [formulaForm, setFormulaForm] = useState(emptyFormulaForm);
     const [projectForm, setProjectForm] = useState({ name: '', category: '', researcher: '', startDate: '', targetDate: '', formulaRef: '' });
-    const [experimentForm, setExperimentForm] = useState({ projectCode: '', name: '', date: '', result: 'รอผล', note: '' });
+    const [experimentForm, setExperimentForm] = useState({ projectCode: '', name: '', date: '', result: 'รอผล', note: '', formulaRef: '' });
     const [saving, setSaving] = useState(false);
 
     // Simulator State
@@ -60,7 +64,7 @@ export default function RnD() {
     const {
         formulas, materials, projects, experiments, loading,
         createFormula, updateFormula, updateFormulaStatus, deleteFormula,
-        createProject, createExperiment, pharmApprove,
+        createProject, deleteProject, createExperiment, updateExperiment, deleteExperiment, pharmApprove,
     } = useRnD();
 
     // ── Stats ──
@@ -68,6 +72,16 @@ export default function RnD() {
     const approvedFormulas = formulas.filter(f => f.status === 'อนุมัติ').length;
     const draftFormulas = formulas.filter(f => f.status === 'ร่าง' || f.status === 'ทดสอบ').length;
     const activeProjects = projects.filter(p => p.status === 'กำลังดำเนินการ').length;
+
+    const getCategoryStyle = (category) => {
+        if (!category) return { background: '#f1f5f9', color: '#475569', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
+        const cat = category.toLowerCase();
+        if (cat.includes('ยาดม')) return { background: '#e0f2fe', color: '#0369a1', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
+        if (cat.includes('ยาหม่อง')) return { background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
+        if (cat.includes('ยาน้ำ') || cat.includes('น้ำมัน')) return { background: '#fce7f3', color: '#be185d', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
+        if (cat.includes('ลูกประคบ')) return { background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
+        return { background: '#e0e7ff', color: '#4338ca', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '500', display: 'inline-block' };
+    };
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -104,7 +118,13 @@ export default function RnD() {
 
     // ── Formula Form Helpers ──
     const addIngredient = () => setFormulaForm(p => ({ ...p, ingredients: [...p.ingredients, { materialId: '', name: '', qty: 0, unit: '', type: 'active', engName: '', latinName: '', partUsed: '' }] }));
-    const removeIngredient = (idx) => setFormulaForm(p => ({ ...p, ingredients: p.ingredients.filter((_, i) => i !== idx) }));
+    const removeIngredient = (idx) => {
+        setFormulaForm(p => {
+            const newIngs = p.ingredients.filter((_, i) => i !== idx);
+            const newBatchSize = newIngs.reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+            return { ...p, ingredients: newIngs, batchSize: newBatchSize };
+        });
+    };
     const updateIngredient = (idx, field, value) => {
         setFormulaForm(p => {
             const ings = [...p.ingredients];
@@ -113,7 +133,8 @@ export default function RnD() {
                 const mat = materials.find(m => m.id === value);
                 if (mat) { ings[idx].name = mat.name; ings[idx].unit = mat.unit; }
             }
-            return { ...p, ingredients: ings };
+            const newBatchSize = ings.reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+            return { ...p, ingredients: ings, batchSize: newBatchSize };
         });
     };
     const addInstruction = () => setFormulaForm(p => ({ ...p, instructions: [...p.instructions, ''] }));
@@ -133,7 +154,11 @@ export default function RnD() {
         if (hasEmptyName) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อวัตถุดิบให้ครบทุกรายการ หรือลบรายการที่ไม่ได้ใช้ออก', 'error');
         
         setSaving(true);
-        const payload = { ...formulaForm, createdBy: user?.name || user?.username || 'R&D Staff' };
+        const payload = { 
+            ...formulaForm, 
+            status: isPromoting ? 'อนุมัติ' : 'ร่าง',
+            createdBy: (isPromoting && formulaForm._researcher) ? formulaForm._researcher : (user?.displayName || user?.name || user?.username || 'R&D Staff') 
+        };
         const res = await createFormula(payload);
         setSaving(false);
         if (res.success) { showAlert('สำเร็จ', 'สร้างสูตรสำเร็จ!', 'success'); setShowCreateFormula(false); setFormulaForm(emptyFormulaForm); }
@@ -205,13 +230,110 @@ export default function RnD() {
         else showAlert('เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการสร้างโครงการ', 'error');
     };
 
-    const handleCreateExperiment = async () => {
-        if (!experimentForm.projectCode || !experimentForm.name) return alert('กรุณากรอกข้อมูลให้ครบ');
+    const handleDeleteProject = async (code) => {
+        const ok = await showConfirm('ยืนยันการลบ', `ยืนยันการลบโครงการ ${code} หรือไม่?`, 'warning');
+        if (!ok) return;
+        const res = await deleteProject(code);
+        if (res.success) showAlert('สำเร็จ', 'ลบโครงการสำเร็จ!', 'success');
+        else showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถลบโครงการได้', 'error');
+    };
+
+    const handleEditExperiment = (exp, isViewOnly = false) => {
+        let parsedIngredients = [];
+        try {
+            const arr = JSON.parse(exp.trialRecipe);
+            if (Array.isArray(arr)) parsedIngredients = arr;
+        } catch(e) {}
+
+        setExperimentForm({
+            code: exp.code,
+            projectCode: exp.projectCode,
+            name: exp.name,
+            date: exp.date || '',
+            result: exp.result || 'รอผล',
+            note: exp.note || '',
+            formulaRef: exp.formulaRef || '',
+            ingredients: parsedIngredients,
+            isViewOnly: isViewOnly
+        });
+
+        setShowCreateExperiment(true);
+    };
+
+    const handleUpdateExperimentStatus = async (exp, newResult) => {
+        const ok = await showConfirm('ยืนยันการเปลี่ยนสถานะ', `ต้องการเปลี่ยนสถานะผลการทดลองเป็น "${newResult}" หรือไม่?`, 'warning');
+        if (!ok) return;
         setSaving(true);
-        const res = await createExperiment(experimentForm);
+        const res = await updateExperiment(exp.code, { ...exp, result: newResult });
         setSaving(false);
-        if (res.success) { alert('บันทึกผลทดลองสำเร็จ!'); setShowCreateExperiment(false); setExperimentForm({ projectCode: '', name: '', date: '', result: 'รอผล', note: '' }); }
-        else alert('เกิดข้อผิดพลาด');
+        if (res.success) showAlert('สำเร็จ', 'อัพเดทสถานะสำเร็จ!', 'success');
+        else showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถอัพเดทสถานะได้', 'error');
+    };
+
+    const handlePromoteToFormula = (exp) => {
+        setIsPromoting(true);
+        let ingredients = [];
+        try { ingredients = JSON.parse(exp.trialRecipe); } catch(e) {}
+        const validIngredients = Array.isArray(ingredients) ? ingredients : [{ materialId: '', name: '', qty: 0, unit: '', type: 'active', engName: '', latinName: '', partUsed: '' }];
+        const initialBatchSize = validIngredients.reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+
+        setFormulaForm({
+            ...emptyFormulaForm,
+            name: `${exp.name} (จากผลทดลอง)`,
+            description: `อ้างอิงจากผลทดลอง: ${exp.code || exp.id}`,
+            ingredients: validIngredients,
+            batchSize: initialBatchSize
+        });
+        setShowCreateFormula(true);
+    };
+
+    const handleSaveExperiment = async () => {
+        if (!experimentForm.projectCode || !experimentForm.name) return showAlert('เกิดข้อผิดพลาด', 'กรุณากรอกข้อมูลให้ครบ', 'error');
+        
+        // Ensure ingredients are serialized as trialRecipe for the backend
+        const dataToSave = { ...experimentForm, trialRecipe: JSON.stringify(experimentForm.ingredients || []) };
+        
+        setSaving(true);
+        const res = experimentForm.code ? await updateExperiment(experimentForm.code, dataToSave) : await createExperiment(dataToSave);
+        setSaving(false);
+        if (res.success) { showAlert('สำเร็จ', 'บันทึกผลทดลองสำเร็จ!', 'success'); setShowCreateExperiment(false); setExperimentForm({ code: '', projectCode: '', name: '', date: '', result: 'รอผล', note: '', formulaRef: '', ingredients: [] }); }
+        else showAlert('เกิดข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกผล', 'error');
+    };
+
+    const handleExpFormulaRefChange = (e) => {
+        const ref = e.target.value;
+        const formula = formulas.find(f => f.code === ref || f.id === ref);
+        let ings = [];
+        if (formula && formula.ingredients) {
+            ings = JSON.parse(JSON.stringify(formula.ingredients));
+        }
+        setExperimentForm({ ...experimentForm, formulaRef: ref, ingredients: ings });
+    };
+
+    const updateExpIngredient = (idx, field, value) => {
+        const newIngs = [...(experimentForm.ingredients || [])];
+        newIngs[idx] = { ...newIngs[idx], [field]: value };
+        if (field === 'materialId' && value) {
+            const m = materials.find(x => String(x.id) === String(value));
+            if (m) {
+                newIngs[idx].name = m.name;
+                newIngs[idx].unit = m.unit;
+            }
+        }
+        setExperimentForm({ ...experimentForm, ingredients: newIngs });
+    };
+
+    const addExpIngredient = () => {
+        setExperimentForm({
+            ...experimentForm,
+            ingredients: [...(experimentForm.ingredients || []), { materialId: '', name: '', qty: 0, unit: '', type: 'active' }]
+        });
+    };
+
+    const removeExpIngredient = (idx) => {
+        const newIngs = [...(experimentForm.ingredients || [])];
+        newIngs.splice(idx, 1);
+        setExperimentForm({ ...experimentForm, ingredients: newIngs });
     };
 
     // ══════════════════════════════════════════════════════════════════
@@ -337,7 +459,7 @@ export default function RnD() {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>รหัสสูตร</th><th>ชื่อผลิตภัณฑ์</th><th>หมวดหมู่</th><th>เวอร์ชัน</th>
+                                    <th>รหัสสูตร</th><th>ชื่อผลิตภัณฑ์</th><th>ที่มาของสูตร</th><th>หมวดหมู่</th><th>เวอร์ชัน</th>
                                     <th>Batch Size</th><th>วัตถุดิบ</th><th>ต้นทุน/Batch</th><th>สถานะ</th><th>จัดการ</th>
                                 </tr>
                             </thead>
@@ -346,14 +468,25 @@ export default function RnD() {
                                     <tr key={formula.id}>
                                         <td className="text-bold">{formula.id}</td>
                                         <td>
-                                            {formula.name}
+                                            {formula.name.replace(' (จากผลทดลอง)', '')}
                                             <div style={{ marginTop: 4 }}>
                                                 <span className={`badge ${formula.formulaType === 'สูตร อย.' ? 'badge-primary' : 'badge-neutral'}`} style={{ fontSize: 10 }}>
                                                     {formula.formulaType || 'สูตรทั่วไป'}
                                                 </span>
                                             </div>
                                         </td>
-                                        <td><span className="badge badge-info">{formula.category || '-'}</span></td>
+                                        <td>
+                                            {(formula.description?.includes('อ้างอิงจากผลทดลอง') || formula.name.includes('(จากผลทดลอง)')) ? (
+                                                <span className="badge" style={{ background: '#fef3c7', color: '#d97706', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                    <FlaskConical size={12} /> ผลทดลอง
+                                                </span>
+                                            ) : (
+                                                <span className="badge badge-neutral" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                    <Edit size={12} /> สร้างโดยตรง
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td><span style={getCategoryStyle(formula.category)}>{formula.category || '-'}</span></td>
                                         <td><span className="badge badge-neutral">{formula.version}</span></td>
                                         <td>{formula.batchSize?.toLocaleString()} {formula.unit}</td>
                                         <td>{formula.ingredients?.length} รายการ</td>
@@ -370,7 +503,7 @@ export default function RnD() {
                                             {canDelete('rnd_formulas') && (
                                                 <button className="btn-sm" onClick={() => handleDeleteFormula(formula.id, formula.name)} title="ลบ" style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
                                             )}
-                                            {formula.status === 'ร่าง' && (
+                                            {formula.status === 'ร่าง' && (!formula.description || !formula.description.includes('พัฒนามาจากการทดลอง')) && (
                                                 <button className="btn-sm" style={{ color: '#f59e0b' }} onClick={() => handleStatusChange(formula, 'รอทดสอบ')} title="ส่งให้ QC ทดสอบ"><ArrowRight size={14} /></button>
                                             )}
                                             {formula.status === 'ทดสอบผ่าน' && (
@@ -393,6 +526,127 @@ export default function RnD() {
     // ══════════════════════════════════════════════════════════════════
     // 3. โครงการวิจัย (Research Projects)
     // ══════════════════════════════════════════════════════════════════
+    const handlePrintSafetyCert = async (exp) => {
+        try {
+            const token = localStorage.getItem('erp_token');
+            window.open(`${API_BASE}/rnd/experiments/${exp.id}/print?token=${token}`, '_blank');
+        } catch (error) {
+            console.error('Error printing certificate:', error);
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับระบบได้', 'error');
+        }
+    };
+
+    const renderProjectDetailsModal = () => {
+        if (!selectedProjectForView) return null;
+        
+        const project = selectedProjectForView;
+        const projectExps = experiments.filter(e => e.projectCode === project.code).sort((a, b) => b.id - a.id);
+
+        return (
+            <div className="rnd-modal-overlay" onClick={() => setSelectedProjectForView(null)}>
+                <div className="rnd-modal" style={{ width: 1000, maxWidth: '95%' }} onClick={(e) => e.stopPropagation()}>
+                    <div className="rnd-modal-header">
+                        <h3><Beaker size={18} style={{ color: '#4f46e5', marginRight: 8 }}/> ผลการทดลอง: โครงการ {project.code} ({project.name})</h3>
+                        <button className="doc-action-btn" onClick={() => setSelectedProjectForView(null)}><XCircle size={20} /></button>
+                    </div>
+                    <div className="rnd-modal-body" style={{ background: '#f8fafc', padding: 20 }}>
+                        
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h4 style={{ margin: 0, color: '#1e293b' }}>รายการทดลองทั้งหมด ({projectExps.length})</h4>
+                            <button className="btn-primary btn-sm" onClick={() => { setSelectedProjectForView(null); setShowCreateExperiment(true); }}>
+                                <Beaker size={14} style={{ marginRight: 4 }}/> บันทึกผลทดลองใหม่
+                            </button>
+                        </div>
+                        
+                        {projectExps.length > 0 ? (
+                            <table className="data-table" style={{ background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderRadius: 8 }}>
+                                <thead style={{ background: '#f1f5f9' }}>
+                                    <tr>
+                                        <th style={{ padding: '12px' }}>รหัส</th>
+                                        <th style={{ padding: '12px' }}>ชื่อการทดลอง</th>
+                                        <th style={{ padding: '12px' }}>อ้างอิงสูตร</th>
+                                        <th style={{ padding: '12px' }}>สูตร/สัดส่วนที่ทดลอง</th>
+                                        <th style={{ padding: '12px' }}>วันที่</th>
+                                        <th style={{ padding: '12px' }}>ผลลัพธ์</th>
+                                        <th style={{ padding: '12px' }}>หมายเหตุ</th>
+                                        <th style={{ padding: '12px', textAlign: 'right' }}>จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {projectExps.map(exp => (
+                                        <tr key={exp.id}>
+                                            <td className="text-bold" style={{ padding: '12px' }}>{exp.code}</td>
+                                            <td style={{ padding: '12px' }}>{exp.name}</td>
+                                            <td style={{ padding: '12px' }}>{exp.formulaRef ? <span className="badge badge-info">{exp.formulaRef}</span> : '-'}</td>
+                                            <td style={{ padding: '12px' }}>
+                                                <div style={{ maxWidth: 250, fontSize: 12 }}>
+                                                    {(() => {
+                                                        try {
+                                                            const arr = JSON.parse(exp.trialRecipe);
+                                                            if (Array.isArray(arr)) {
+                                                                return <ul style={{ margin: 0, paddingLeft: 16 }}>{arr.map((item, i) => <li key={i}>{item.name ? item.name.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : ''}: {item.qty} {item.unit}</li>)}</ul>;
+                                                            }
+                                                        } catch(e) {}
+                                                        return typeof exp.trialRecipe === 'string' ? exp.trialRecipe.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '-';
+                                                    })()}
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '12px' }}>{exp.date}</td>
+                                            <td style={{ padding: '12px' }}><span className={`badge ${getResultColor(exp.result)}`}>{exp.result}</span></td>
+                                            <td style={{ padding: '12px' }}>{exp.note}</td>
+                                            <td style={{ padding: '12px', textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4, flexWrap: 'wrap' }}>
+                                                    {exp.result === 'รอผล' && (
+                                                        <button className="doc-action-btn" style={{ color: '#6b7280' }} title="แก้ไข" onClick={() => { handleEditExperiment(exp); }}>
+                                                            <Edit size={16} />
+                                                        </button>
+                                                    )}
+                                                    
+                                                    {exp.result === 'รอประเมิน' && (
+                                                        <button className="doc-action-btn" style={{ color: '#3b82f6' }} title="ดูรายละเอียด" onClick={() => { setSelectedExperimentForPharm(exp); }}>
+                                                            <Eye size={16} />
+                                                        </button>
+                                                    )}
+                                                    
+                                                    {exp.result === 'รอผล' && (
+                                                        <button className="doc-action-btn" style={{ color: '#3b82f6' }} title="ส่งให้เภสัชกร" onClick={() => { setSelectedProjectForView(null); handleUpdateExperimentStatus(exp, 'รอประเมิน'); }} disabled={saving}>
+                                                            <Send size={16} />
+                                                        </button>
+                                                    )}
+
+                                                    {(exp.result === 'ผ่าน' || exp.result === 'ไม่ผ่าน') && (
+                                                        <button className="doc-action-btn" style={{ color: exp.result === 'ผ่าน' ? '#10b981' : '#ef4444' }} title="พรีวิวใบประเมิน (PDF)" onClick={() => handlePrintSafetyCert(exp)}>
+                                                            <FileText size={16} />
+                                                        </button>
+                                                    )}
+                                                    
+                                                    {exp.result === 'ผ่าน' && (
+                                                        <>
+                                                            {canUpdate('rnd_projects') && !formulas.some(f => (f.description && f.description.includes(exp.code || exp.id)) || f.name === exp.name + ' (จากผลทดลอง)') && (
+                                                                <button className="doc-action-btn" style={{ color: '#8b5cf6' }} title="ขึ้นสูตรหลัก" onClick={() => { setSelectedProjectForView(null); handlePromoteToFormula(exp); }}>
+                                                                    <ArrowRight size={16} />
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+                                <FlaskConical size={48} style={{ margin: '0 auto 16px auto', opacity: 0.5 }} />
+                                <div>ยังไม่มีผลการทดลองในโครงการนี้</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderProjects = () => {
         const filtered = projects.filter(p =>
             p.name.includes(searchTerm) || p.code.includes(searchTerm) || p.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -414,7 +668,6 @@ export default function RnD() {
                         )}
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn-secondary" onClick={() => setShowCreateExperiment(true)}><Beaker size={16} /> บันทึกผลทดลอง</button>
                         {canCreate('rnd_projects') && (
                             <button className="btn-primary" onClick={() => setShowCreateProject(true)}><Plus size={16} /> สร้างโครงการใหม่</button>
                         )}
@@ -428,7 +681,7 @@ export default function RnD() {
                                 <tr>
                                     <th>รหัส</th><th>ชื่อโครงการ</th><th>หมวดหมู่</th><th>นักวิจัย</th>
                                     <th>เริ่มต้น</th><th>เป้าหมาย</th><th>เฟส</th><th>Progress</th>
-                                    <th>สูตรอ้างอิง</th><th>สถานะ</th>
+                                    <th>สูตรอ้างอิง</th><th>สถานะ</th><th style={{ textAlign: 'right' }}>จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -436,7 +689,7 @@ export default function RnD() {
                                     <tr key={project.id}>
                                         <td className="text-bold">{project.code}</td>
                                         <td>{project.name}</td>
-                                        <td><span className="badge badge-info">{project.category}</span></td>
+                                        <td><span style={getCategoryStyle(project.category)}>{project.category}</span></td>
                                         <td>{project.researcher}</td>
                                         <td>{project.startDate}</td>
                                         <td>{project.targetDate}</td>
@@ -458,34 +711,27 @@ export default function RnD() {
                                             ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
                                         </td>
                                         <td><span className={`badge ${getStatusColor(project.status)}`}>{project.status}</span></td>
+                                        <td style={{ textAlign: 'right' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
+                                                <button className="doc-action-btn" style={{ color: '#4f46e5' }} title="ดูผลการทดลอง" onClick={() => setSelectedProjectForView(project)}>
+                                                    <Eye size={16} />
+                                                </button>
+                                                <button className="doc-action-btn" style={{ color: '#10b981' }} title="บันทึกผลทดลอง" onClick={() => setShowCreateExperiment(true)}>
+                                                    <Beaker size={16} />
+                                                </button>
+                                                {canDelete('rnd_projects') && (
+                                                    <button className="doc-action-btn doc-action-btn-danger" style={{ color: '#ef4444' }} title="ลบ" onClick={() => handleDeleteProject(project.code)}>
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
                 )}
-
-                {/* ตารางผลทดลอง */}
-                <div className="card table-card" style={{ marginTop: 16 }}>
-                    <h3 className="card-title"><Beaker size={16} style={{ color: '#7b7bf5' }} /> ผลการทดลองทั้งหมด ({experiments.length})</h3>
-                    <table className="data-table">
-                        <thead>
-                            <tr><th>รหัส</th><th>โครงการ</th><th>ชื่อการทดลอง</th><th>วันที่</th><th>ผลลัพธ์</th><th>หมายเหตุ</th></tr>
-                        </thead>
-                        <tbody>
-                            {experiments.map(exp => (
-                                <tr key={exp.id}>
-                                    <td className="text-bold">{exp.code}</td>
-                                    <td>{exp.projectCode}</td>
-                                    <td>{exp.name}</td>
-                                    <td>{exp.date}</td>
-                                    <td><span className={`badge ${getResultColor(exp.result)}`}>{exp.result}</span></td>
-                                    <td>{exp.note}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
             </div>
         );
     };
@@ -630,14 +876,7 @@ export default function RnD() {
                             </div>
                         )}
 
-                        {/* Workflow buttons */}
-                        <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
-                            {f.status === 'ร่าง' && <button className="btn-sm" style={{ background: '#fef3c7', color: '#92400e' }} onClick={() => { handleStatusChange(f, 'รอทดสอบ'); setSelectedFormula(null); }}>🧪 ส่งให้ QC ทดสอบ</button>}
-                            {f.status === 'ทดสอบผ่าน' && <button className="btn-sm" style={{ background: '#ede9fe', color: '#5b21b6' }} onClick={() => { handleStatusChange(f, 'รอเภสัชกร'); setSelectedFormula(null); }}>🏥 ส่งให้เภสัชกร</button>}
-                            {f.status === 'รอเภสัชกร' && <button className="btn-sm" style={{ background: '#d1fae5', color: '#065f46' }} onClick={async () => { const res = await pharmApprove(f.id, 'เภสัชกร', true); if (res.success) { showAlert('สำเร็จ', 'อนุมัติสำเร็จ!', 'success'); setSelectedFormula(null); } }}>✅ เภสัชกรอนุมัติ</button>}
-                            {f.status === 'รอเภสัชกร' && <button className="btn-sm" style={{ background: '#fee2e2', color: '#991b1b' }} onClick={async () => { const res = await pharmApprove(f.id, 'เภสัชกร', false); if (res.success) { showAlert('แจ้งเตือน', 'ไม่อนุมัติ', 'warning'); setSelectedFormula(null); } }}>❌ เภสัชกรไม่อนุมัติ</button>}
-                            {(f.status === 'ทดสอบไม่ผ่าน' || f.status === 'เภสัชกรไม่อนุมัติ') && <button className="btn-sm" style={{ background: '#fef3c7', color: '#92400e' }} onClick={() => { handleStatusChange(f, 'ร่าง'); setSelectedFormula(null); }}>↩️ กลับไปแก้ไข</button>}
-                        </div>
+
 
                         {/* Official Status Tracking Timeline */}
                         <div style={{ marginTop: 24, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
@@ -646,7 +885,11 @@ export default function RnD() {
                             </div>
                             <div style={{ padding: 16 }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                    {(() => {
+                                        const isFromExp = f.description?.includes('อ้างอิงจากผลทดลอง') || f.name.includes('(จากผลทดลอง)');
+                                        return (
+                                            <>
+                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                                         <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#d1fae5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><CheckCircle2 size={14} /></div>
                                         <div style={{ flex: 1 }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -657,30 +900,41 @@ export default function RnD() {
                                         </div>
                                     </div>
                                     
-                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                                        {['ทดสอบผ่าน', 'รอเภสัชกร', 'อนุมัติ', 'เภสัชกรไม่อนุมัติ', 'ทดสอบไม่ผ่าน'].includes(f.status) ? (
-                                            <>
-                                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: f.status === 'ทดสอบไม่ผ่าน' ? '#fee2e2' : '#d1fae5', color: f.status === 'ทดสอบไม่ผ่าน' ? '#ef4444' : '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    {f.status === 'ทดสอบไม่ผ่าน' ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
-                                                </div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>ตรวจสอบคุณภาพ (QC) - {f.status === 'ทดสอบไม่ผ่าน' ? 'ไม่ผ่าน' : 'ผ่าน'}</div>
-                                                        <div style={{ color: '#94a3b8', fontSize: 12 }}>{f.createdDate || '-'}</div>
+                                    {!isFromExp && (
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                            {['ทดสอบผ่าน', 'รอเภสัชกร', 'อนุมัติ', 'เภสัชกรไม่อนุมัติ', 'ทดสอบไม่ผ่าน'].includes(f.status) ? (
+                                                <>
+                                                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: f.status === 'ทดสอบไม่ผ่าน' ? '#fee2e2' : '#d1fae5', color: f.status === 'ทดสอบไม่ผ่าน' ? '#ef4444' : '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                        {f.status === 'ทดสอบไม่ผ่าน' ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
                                                     </div>
-                                                    <div style={{ color: '#64748b', fontSize: 12 }}>ตรวจสอบโดย: ฝ่ายตรวจสอบคุณภาพ (QC)</div>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#f1f5f9', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Clock size={14} /></div>
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 600, color: '#64748b', fontSize: 13 }}>ตรวจสอบคุณภาพ (QC)</div>
-                                                    <div style={{ color: '#94a3b8', fontSize: 12 }}>รอดำเนินการ</div>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>ตรวจสอบคุณภาพ (QC) - {f.status === 'ทดสอบไม่ผ่าน' ? 'ไม่ผ่าน' : 'ผ่าน'}</div>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                <div style={{ color: '#94a3b8', fontSize: 12 }}>{f.qcApprovedDate || f.createdDate || '-'}</div>
+                                                                <button 
+                                                                    style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }} 
+                                                                    onClick={() => window.open(`${API_BASE}/rnd/formulas/${f.id}/latest-qc-print?token=${localStorage.getItem('erp_token')}`, '_blank')} 
+                                                                    title="ดูเอกสารรายงานผลทดสอบ QC"
+                                                                >
+                                                                    <FileText size={16} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ color: '#64748b', fontSize: 12 }}>ตรวจสอบโดย: ฝ่ายตรวจสอบคุณภาพ (QC)</div>
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#f1f5f9', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Clock size={14} /></div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 600, color: '#64748b', fontSize: 13 }}>ตรวจสอบคุณภาพ (QC)</div>
+                                                        <div style={{ color: '#94a3b8', fontSize: 12 }}>รอดำเนินการ</div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                                         {['อนุมัติ', 'เภสัชกรไม่อนุมัติ'].includes(f.status) ? (
@@ -689,11 +943,20 @@ export default function RnD() {
                                                     {f.status === 'เภสัชกรไม่อนุมัติ' ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
                                                 </div>
                                                 <div style={{ flex: 1 }}>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                         <div style={{ fontWeight: 600, color: '#1e293b', fontSize: 13 }}>อนุมัติสูตรตำรับ (Pharmacist) - {f.status === 'เภสัชกรไม่อนุมัติ' ? 'ไม่อนุมัติ' : 'อนุมัติ'}</div>
-                                                        <div style={{ color: '#94a3b8', fontSize: 12 }}>{f.approvedDate || '-'}</div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                            <div style={{ color: '#94a3b8', fontSize: 12 }}>{f.pharmApprovedDate || f.approvedDate || '-'}</div>
+                                                            <button 
+                                                                style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center' }} 
+                                                                onClick={() => window.open(`${API_BASE}/rnd/formulas/${f.id}/pharm-print?token=${localStorage.getItem('erp_token')}`, '_blank')} 
+                                                                title="ดูใบอนุมัติสูตรตำรับ"
+                                                            >
+                                                                <FileText size={16} />
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div style={{ color: '#64748b', fontSize: 12 }}>อนุมัติโดย: {f.approvedBy || 'เภสัชกร'}</div>
+                                                    <div style={{ color: '#64748b', fontSize: 12 }}>อนุมัติโดย: {f.pharmApprovedBy || f.approvedBy || 'เภสัชกร'}</div>
                                                 </div>
                                             </>
                                         ) : (
@@ -706,8 +969,22 @@ export default function RnD() {
                                             </>
                                         )}
                                     </div>
+                                            </>
+                                        );
+                                    })()}
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Workflow buttons */}
+                        <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end', borderTop: '1px solid #e2e8f0', paddingTop: 16 }}>
+                            {f.status === 'ร่าง' && <button style={{ padding: '10px 20px', fontSize: '15px', fontWeight: 600, border: 'none', borderRadius: '8px', cursor: 'pointer', background: '#fef3c7', color: '#92400e', transition: 'all 0.2s' }} onClick={() => { handleStatusChange(f, 'รอทดสอบ'); setSelectedFormula(null); }}>🧪 ส่งให้ QC ทดสอบ</button>}
+                            {f.status === 'ทดสอบผ่าน' && <button style={{ padding: '10px 20px', fontSize: '15px', fontWeight: 600, border: 'none', borderRadius: '8px', cursor: 'pointer', background: '#ede9fe', color: '#5b21b6', transition: 'all 0.2s' }} onClick={() => { handleStatusChange(f, 'รอเภสัชกร'); setSelectedFormula(null); }}>🏥 ส่งให้เภสัชกร</button>}
+                            
+                            {f.status === 'รอเภสัชกร' && <button style={{ padding: '12px 24px', fontSize: '16px', fontWeight: 700, border: 'none', borderRadius: '8px', cursor: 'pointer', background: '#fee2e2', color: '#991b1b', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8 }} onClick={async () => { const res = await pharmApprove(f.id, 'เภสัชกร', false); if (res.success) { showAlert('แจ้งเตือน', 'ไม่อนุมัติ', 'warning'); setSelectedFormula(null); } }}><XCircle size={20} /> ไม่อนุมัติ</button>}
+                            {f.status === 'รอเภสัชกร' && <button style={{ padding: '12px 32px', fontSize: '16px', fontWeight: 700, border: 'none', borderRadius: '8px', cursor: 'pointer', background: '#10b981', color: '#fff', transition: 'all 0.2s', boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', gap: 8 }} onClick={async () => { const res = await pharmApprove(f.id, 'เภสัชกร', true); if (res.success) { showAlert('สำเร็จ', 'อนุมัติสำเร็จ!', 'success'); setSelectedFormula(null); } }}><CheckCircle2 size={20} /> อนุมัติสูตร</button>}
+                            
+                            {(f.status === 'ทดสอบไม่ผ่าน' || f.status === 'เภสัชกรไม่อนุมัติ') && <button style={{ padding: '10px 20px', fontSize: '15px', fontWeight: 600, border: 'none', borderRadius: '8px', cursor: 'pointer', background: '#fef3c7', color: '#92400e', transition: 'all 0.2s' }} onClick={() => { handleStatusChange(f, 'ร่าง'); setSelectedFormula(null); }}>↩️ กลับไปแก้ไข</button>}
                         </div>
                     </div>
                 </div>
@@ -724,10 +1001,10 @@ export default function RnD() {
 
         return (
             <div className="rnd-modal-overlay" onClick={() => { setShowCreateFormula(false); setShowEditFormula(false); }}>
-                <div className="rnd-modal" style={{ maxWidth: 760 }} onClick={(e) => e.stopPropagation()}>
+                <div className="rnd-modal" style={{ maxWidth: 1200, width: '95%' }} onClick={(e) => e.stopPropagation()}>
                     <div className="rnd-modal-header">
                         <div>
-                            <h2>{isEdit ? '✏️ แก้ไขสูตร' : '➕ สร้างสูตรใหม่'}</h2>
+                            <h2>{isEdit ? 'แก้ไขสูตร' : 'ขึ้นสูตร'}</h2>
                             <div className="rnd-modal-meta"><span className="badge badge-primary">{isEdit ? formulaForm.id : 'New Formula'}</span></div>
                         </div>
                         <button className="rnd-modal-close" onClick={() => { setShowCreateFormula(false); setShowEditFormula(false); }}><XCircle size={22} /></button>
@@ -795,74 +1072,86 @@ export default function RnD() {
                         <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                             <Beaker size={16} style={{ color: '#1e88e5' }} /> วัตถุดิบ ({formulaForm.ingredients.length} รายการ)
                         </h4>
-                        {formulaForm.ingredients.map((ing, idx) => (
-                            <div key={idx} style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: 12, marginBottom: 12 }}>
-                                
-                                {/* แถวที่ 1: ชนิด, วัตถุดิบ, จำนวน, หน่วย, ลบ */}
-                                <div style={{ display: 'flex', gap: 12, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <CustomSelect style={{ ...inputStyle, width: '160px' }} value={ing.type} onChange={e => updateIngredient(idx, 'type', e.target.value)}>
-                                        <option value="active">สารสำคัญ (Active)</option>
-                                        <option value="extract">สารสกัด (Extract)</option>
-                                        <option value="inactive">สารช่วย (Inactive)</option>
-                                    </CustomSelect>
-                                    
-                                    <CustomSelect style={{ ...inputStyle, flex: 1, minWidth: '200px' }} value={ing.materialId} onChange={e => updateIngredient(idx, 'materialId', e.target.value)}>
-                                        <option value="">-- เลือกวัตถุดิบระบบ (ถ้ามี) --</option>
-                                        {materials.map(m => <option key={m.id} value={m.id}>{m.id} — {m.name} ({m.unit})</option>)}
-                                    </CustomSelect>
-
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <input type="number" style={{ ...inputStyle, width: '100px' }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateIngredient(idx, 'qty', parseFloat(e.target.value) || 0)} />
-                                        <CustomSelect style={{ ...inputStyle, width: '100px' }} value={ing.unit} onChange={e => updateIngredient(idx, 'unit', e.target.value)}>
-                                            <option value="">-- หน่วย --</option>
-                                            <option>กรัม</option>
-                                            <option>กิโลกรัม</option>
-                                            <option>มิลลิลิตร</option>
-                                            <option>ลิตร</option>
-                                            <option>ชิ้น</option>
-                                        </CustomSelect>
-                                    </div>
-
-                                    <button onClick={() => removeIngredient(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '4px' }} title="ลบรายการ"><Trash2 size={18} /></button>
-                                </div>
-
-                                {/* แถวที่ 2: ชื่อวัตถุดิบ (ถ้าไม่เลือกจากระบบ) */}
-                                {!ing.materialId && (
-                                    <div style={{ marginBottom: 8, background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '4px' }}>
-                                        <TipTapCell 
-                                            value={ing.name || ''} 
-                                            onChange={val => updateIngredient(idx, 'name', val)}
-                                            placeholder="ชื่อวัตถุดิบ (พิมพ์เองเนื่องจากไม่ได้เลือกจากระบบ)"
-                                        />
-                                    </div>
-                                )}
-
-                                {/* แถวที่ 3: ข้อมูลเพิ่มเติมสำหรับสูตร อย. */}
-                                <div style={{ display: 'flex', gap: 8, alignItems: 'stretch', flexWrap: 'wrap' }}>
-                                    <div style={{ flex: 1, minWidth: '150px', background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '4px' }}>
-                                        <TipTapCell 
-                                            value={ing.engName || ''} 
-                                            onChange={val => updateIngredient(idx, 'engName', val)}
-                                            placeholder="ชื่ออังกฤษ (ถ้ามี)"
-                                        />
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: '150px', background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '4px' }}>
-                                        <TipTapCell 
-                                            value={ing.latinName || ''} 
-                                            onChange={val => updateIngredient(idx, 'latinName', val)}
-                                            placeholder="ชื่อวิทยาศาสตร์/ละติน"
-                                        />
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: '150px', background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '4px' }}>
-                                        <TipTapCell 
-                                            value={ing.partUsed || ''} 
-                                            onChange={val => updateIngredient(idx, 'partUsed', val)}
-                                            placeholder="ส่วนที่ใช้"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
+                        <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+                            <table className="data-table" style={{ width: '100%', minWidth: 1100 }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: 40, textAlign: 'center' }}>#</th>
+                                        <th style={{ width: 120 }}>ชนิด</th>
+                                        <th style={{ minWidth: 220 }}>วัตถุดิบ (อ้างอิงระบบ)</th>
+                                        <th style={{ minWidth: 150 }}>ชื่อ (พิมพ์เอง)</th>
+                                        <th style={{ minWidth: 120 }}>อังกฤษ</th>
+                                        <th style={{ minWidth: 150 }}>วิทยาศาสตร์/ละติน</th>
+                                        <th style={{ width: 100 }}>ส่วนที่ใช้</th>
+                                        <th style={{ width: 90 }}>ปริมาณ</th>
+                                        <th style={{ width: 100 }}>หน่วย</th>
+                                        <th style={{ width: 50, textAlign: 'center' }}>ลบ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {formulaForm.ingredients.map((ing, idx) => (
+                                        <tr key={idx} style={{ verticalAlign: 'middle' }}>
+                                            <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                                            <td style={{ padding: '8px 4px' }}>
+                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.type} onChange={e => updateIngredient(idx, 'type', e.target.value)}>
+                                                    <option value="active">Active</option>
+                                                    <option value="extract">Extract</option>
+                                                    <option value="inactive">Inactive</option>
+                                                </CustomSelect>
+                                            </td>
+                                            <td style={{ padding: '8px 4px' }}>
+                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', minWidth: 200, padding: '6px 8px' }} value={ing.materialId} onChange={e => updateIngredient(idx, 'materialId', e.target.value)}>
+                                                    <option value="">-- เลือก (ถ้ามี) --</option>
+                                                    {materials.map(m => <option key={m.id} value={m.id}>{m.id} — {m.name}</option>)}
+                                                </CustomSelect>
+                                            </td>
+                                            {!ing.materialId ? (
+                                                <>
+                                                    <td style={{ padding: '8px 4px' }}>
+                                                        <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
+                                                            <TipTapCell value={ing.name || ''} onChange={val => updateIngredient(idx, 'name', val)} placeholder="ชื่อวัตถุดิบ" />
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '8px 4px' }}>
+                                                        <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
+                                                            <TipTapCell value={ing.engName || ''} onChange={val => updateIngredient(idx, 'engName', val)} placeholder="อังกฤษ" />
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '8px 4px' }}>
+                                                        <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
+                                                            <TipTapCell value={ing.latinName || ''} onChange={val => updateIngredient(idx, 'latinName', val)} placeholder="วิทย์" />
+                                                        </div>
+                                                    </td>
+                                                    <td style={{ padding: '8px 4px' }}>
+                                                        <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
+                                                            <TipTapCell value={ing.partUsed || ''} onChange={val => updateIngredient(idx, 'partUsed', val)} placeholder="ส่วนที่ใช้" />
+                                                        </div>
+                                                    </td>
+                                                </>
+                                            ) : (
+                                                <td colSpan="4" style={{ padding: '8px 4px', verticalAlign: 'middle', textAlign: 'center' }}>
+                                                    <div style={{ color: '#9ca3af', fontSize: 13 }}>- อ้างอิงจากระบบ -</div>
+                                                </td>
+                                            )}
+                                            <td style={{ padding: '8px 4px' }}>
+                                                <input type="number" style={{ ...inputStyle, width: '100%', padding: '6px 8px', minHeight: '38px', boxSizing: 'border-box' }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateIngredient(idx, 'qty', parseFloat(e.target.value) || 0)} />
+                                            </td>
+                                            <td style={{ padding: '8px 4px' }}>
+                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.unit} onChange={e => updateIngredient(idx, 'unit', e.target.value)}>
+                                                    <option value="">- หน่วย -</option>
+                                                    <option>กรัม</option><option>กิโลกรัม</option><option>มิลลิลิตร</option><option>ลิตร</option><option>ชิ้น</option>
+                                                </CustomSelect>
+                                            </td>
+                                            <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                                                <button className="btn-sm" onClick={() => removeIngredient(idx)} style={{ background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer', color: '#ef4444', padding: '6px', borderRadius: 4, marginTop: 2 }} title="ลบรายการ">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                         <button className="btn-sm" onClick={addIngredient} style={{ marginBottom: 20 }}><Plus size={14} /> เพิ่มวัตถุดิบ</button>
 
                         {/* วิธีการผลิต */}
@@ -950,44 +1239,164 @@ export default function RnD() {
     const renderCreateExperimentModal = () => {
         if (!showCreateExperiment) return null;
         return (
-            <div className="rnd-modal-overlay" onClick={() => setShowCreateExperiment(false)}>
-                <div className="rnd-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+            <div className="rnd-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setShowCreateExperiment(false)}>
+                <div className="rnd-modal" style={{ maxWidth: 1200, width: '95%' }} onClick={e => e.stopPropagation()}>
                     <div className="rnd-modal-header">
-                        <h2>🧪 บันทึกผลการทดลอง</h2>
+                        <h2>{experimentForm.isViewOnly ? '🔍 รายละเอียดผลการทดลอง' : '🧪 บันทึกผลการทดลอง'}</h2>
                         <button className="rnd-modal-close" onClick={() => setShowCreateExperiment(false)}><XCircle size={22} /></button>
                     </div>
                     <div className="rnd-modal-body">
                         <div className="rnd-modal-info-grid">
                             <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                 <label>โครงการ <span style={{ color: '#ef4444' }}>*</span></label>
-                                <CustomSelect style={inputStyle} value={experimentForm.projectCode} onChange={e => setExperimentForm({ ...experimentForm, projectCode: e.target.value })}>
+                                <CustomSelect style={inputStyle} value={experimentForm.projectCode} onChange={e => setExperimentForm({ ...experimentForm, projectCode: e.target.value })} disabled={experimentForm.isViewOnly}>
                                     <option value="">-- เลือกโครงการ --</option>
                                     {projects.map(p => <option key={p.code} value={p.code}>{p.code} — {p.name}</option>)}
                                 </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                 <label>ชื่อการทดลอง <span style={{ color: '#ef4444' }}>*</span></label>
-                                <input type="text" style={inputStyle} value={experimentForm.name} onChange={e => setExperimentForm({ ...experimentForm, name: e.target.value })} placeholder="เช่น ทดสอบค่า pH ครั้งที่ 2" />
+                                <input type="text" style={inputStyle} value={experimentForm.name} onChange={e => setExperimentForm({ ...experimentForm, name: e.target.value })} placeholder="เช่น ทดสอบค่า pH ครั้งที่ 2" disabled={experimentForm.isViewOnly} />
+                            </div>
+                            <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
+                                <label>สูตรอ้างอิง</label>
+                                <CustomSelect style={inputStyle} value={experimentForm.formulaRef} onChange={handleExpFormulaRefChange} disabled={experimentForm.isViewOnly}>
+                                    <option value="">-- เลือกสูตรอ้างอิง (ถ้ามี) --</option>
+                                    {formulas.map(f => <option key={f.code || f.id} value={f.code || f.id}>{f.code || f.id} — {f.name}</option>)}
+                                </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>วันที่ทดลอง</label>
-                                <CustomDatePicker style={inputStyle} value={experimentForm.date} onChange={e => setExperimentForm({ ...experimentForm, date: e.target.value })} />
+                                <CustomDatePicker style={inputStyle} value={experimentForm.date} onChange={e => setExperimentForm({ ...experimentForm, date: e.target.value })} disabled={experimentForm.isViewOnly} />
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ผลลัพธ์</label>
-                                <CustomSelect style={inputStyle} value={experimentForm.result} onChange={e => setExperimentForm({ ...experimentForm, result: e.target.value })}>
-                                    <option value="รอผล">รอผล</option><option value="ผ่าน">ผ่าน</option><option value="ไม่ผ่าน">ไม่ผ่าน</option>
+                                <CustomSelect 
+                                    style={{ ...inputStyle, backgroundColor: experimentForm.isViewOnly ? '#f3f4f6' : '#fff', cursor: experimentForm.isViewOnly ? 'not-allowed' : 'pointer', color: '#6b7280' }} 
+                                    value={experimentForm.result || 'รอผล'} 
+                                    onChange={e => setExperimentForm({ ...experimentForm, result: e.target.value })}
+                                    disabled={true}
+                                >
+                                    <option value="รอผล">รอผล</option>
+                                    {experimentForm.isViewOnly && <option value="รอประเมิน">รอประเมิน</option>}
+                                    {experimentForm.isViewOnly && <option value="ผ่าน">ผ่าน</option>}
+                                    {experimentForm.isViewOnly && <option value="ไม่ผ่าน">ไม่ผ่าน</option>}
                                 </CustomSelect>
                             </div>
                             <div className="rnd-modal-info-item" style={{ gridColumn: '1 / -1' }}>
                                 <label>หมายเหตุ</label>
-                                <textarea rows={3} style={{ ...inputStyle, resize: 'vertical' }} value={experimentForm.note} onChange={e => setExperimentForm({ ...experimentForm, note: e.target.value })} placeholder="รายละเอียดผลทดลอง..." />
+                                <textarea rows={3} style={{ ...inputStyle, resize: 'vertical' }} value={experimentForm.note} onChange={e => setExperimentForm({ ...experimentForm, note: e.target.value })} placeholder="รายละเอียดผลทดลอง..." disabled={experimentForm.isViewOnly} />
+                            </div>
+
+                            {/* วัตถุดิบ (สัดส่วนที่ปรับแก้ในการทดลอง) */}
+                            <div style={{ gridColumn: '1 / -1', marginTop: 16 }}>
+                                <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <Beaker size={16} style={{ color: '#1e88e5' }} /> ส่วนผสมที่ปรับปรุงในการทดลอง ({experimentForm.ingredients?.length || 0} รายการ)
+                                </h4>
+                                {experimentForm.ingredients && (
+                                    <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+                                        <table className="data-table" style={{ width: '100%', minWidth: 1100 }}>
+                                            <thead>
+                                                <tr>
+                                                    <th style={{ width: 40, textAlign: 'center' }}>#</th>
+                                                    <th style={{ width: 120 }}>ชนิด</th>
+                                                    <th style={{ minWidth: 220 }}>วัตถุดิบ (อ้างอิงระบบ)</th>
+                                                    <th style={{ minWidth: 150 }}>ชื่อ (พิมพ์เอง)</th>
+                                                    <th style={{ minWidth: 120 }}>อังกฤษ</th>
+                                                    <th style={{ minWidth: 150 }}>วิทยาศาสตร์/ละติน</th>
+                                                    <th style={{ width: 100 }}>ส่วนที่ใช้</th>
+                                                    <th style={{ width: 90 }}>ปริมาณ</th>
+                                                    <th style={{ width: 100 }}>หน่วย</th>
+                                                    {!experimentForm.isViewOnly && <th style={{ width: 50, textAlign: 'center' }}>ลบ</th>}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {experimentForm.ingredients.map((ing, idx) => (
+                                                    <tr key={idx} style={{ verticalAlign: 'middle' }}>
+                                                        <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                                                        <td style={{ padding: '8px 4px' }}>
+                                                            <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.type} onChange={e => updateExpIngredient(idx, 'type', e.target.value)} disabled={experimentForm.isViewOnly}>
+                                                                <option value="active">Active</option>
+                                                                <option value="extract">Extract</option>
+                                                                <option value="inactive">Inactive</option>
+                                                            </CustomSelect>
+                                                        </td>
+                                                        <td style={{ padding: '8px 4px' }}>
+                                                            <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', minWidth: 200, padding: '6px 8px' }} value={ing.materialId} onChange={e => updateExpIngredient(idx, 'materialId', e.target.value)} disabled={experimentForm.isViewOnly}>
+                                                                <option value="">-- เลือก (ถ้ามี) --</option>
+                                                                {materials.map(m => <option key={m.id} value={m.id}>{m.id} — {m.name}</option>)}
+                                                            </CustomSelect>
+                                                        </td>
+                                                        {!ing.materialId ? (
+                                                            <>
+                                                                <td style={{ padding: '8px 4px' }}>
+                                                                    <div style={{ background: experimentForm.isViewOnly ? '#f3f4f6' : '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
+                                                                        <TipTapCell value={ing.name || ''} onChange={val => updateExpIngredient(idx, 'name', val)} placeholder="ชื่อวัตถุดิบ" readOnly={experimentForm.isViewOnly} />
+                                                                    </div>
+                                                                </td>
+                                                                <td style={{ padding: '8px 4px' }}>
+                                                                    <div style={{ background: experimentForm.isViewOnly ? '#f3f4f6' : '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
+                                                                        <TipTapCell value={ing.engName || ''} onChange={val => updateExpIngredient(idx, 'engName', val)} placeholder="อังกฤษ" readOnly={experimentForm.isViewOnly} />
+                                                                    </div>
+                                                                </td>
+                                                                <td style={{ padding: '8px 4px' }}>
+                                                                    <div style={{ background: experimentForm.isViewOnly ? '#f3f4f6' : '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
+                                                                        <TipTapCell value={ing.latinName || ''} onChange={val => updateExpIngredient(idx, 'latinName', val)} placeholder="วิทย์" readOnly={experimentForm.isViewOnly} />
+                                                                    </div>
+                                                                </td>
+                                                                <td style={{ padding: '8px 4px' }}>
+                                                                    <div style={{ background: experimentForm.isViewOnly ? '#f3f4f6' : '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
+                                                                        <TipTapCell value={ing.partUsed || ''} onChange={val => updateExpIngredient(idx, 'partUsed', val)} placeholder="ส่วนที่ใช้" readOnly={experimentForm.isViewOnly} />
+                                                                    </div>
+                                                                </td>
+                                                            </>
+                                                        ) : (
+                                                            <td colSpan="4" style={{ padding: '8px 4px', verticalAlign: 'middle', textAlign: 'center' }}>
+                                                                <div style={{ color: '#9ca3af', fontSize: 13 }}>- อ้างอิงจากระบบ -</div>
+                                                            </td>
+                                                        )}
+                                                        <td style={{ padding: '8px 4px' }}>
+                                                            <input type="number" style={{ ...inputStyle, width: '100%', padding: '6px 8px', minHeight: '38px', boxSizing: 'border-box' }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateExpIngredient(idx, 'qty', parseFloat(e.target.value) || 0)} disabled={experimentForm.isViewOnly} />
+                                                        </td>
+                                                        <td style={{ padding: '8px 4px' }}>
+                                                            <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.unit} onChange={e => updateExpIngredient(idx, 'unit', e.target.value)} disabled={experimentForm.isViewOnly}>
+                                                                <option value="">- หน่วย -</option>
+                                                                <option>กรัม</option><option>กิโลกรัม</option><option>มิลลิลิตร</option><option>ลิตร</option><option>ชิ้น</option>
+                                                            </CustomSelect>
+                                                        </td>
+                                                        {!experimentForm.isViewOnly && (
+                                                            <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                                                                <button className="btn-sm" onClick={() => removeExpIngredient(idx)} style={{ background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer', color: '#ef4444', padding: '6px', borderRadius: 4, marginTop: 2 }} title="ลบรายการ">
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </td>
+                                                        )}
+                                                    </tr>
+                                                ))}
+                                                {experimentForm.ingredients.length === 0 && (
+                                                    <tr><td colSpan={experimentForm.isViewOnly ? "9" : "10"} style={{ textAlign: 'center', padding: 20, color: '#6b7280' }}>ยังไม่มีวัตถุดิบ</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                                {!experimentForm.isViewOnly && (
+                                    <button className="btn-sm" style={{ color: '#3b82f6', background: '#eff6ff', border: '1px solid #bfdbfe' }} onClick={addExpIngredient}>
+                                        <Plus size={16} /> เพิ่มวัตถุดิบ
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
                     <div className="rnd-modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '16px 24px', borderTop: '1px solid #e5e7eb' }}>
-                        <button className="btn-secondary" onClick={() => setShowCreateExperiment(false)}>ยกเลิก</button>
-                        <button className="btn-primary" onClick={handleCreateExperiment} disabled={saving}>{saving ? 'กำลังบันทึก...' : '✅ บันทึกผลทดลอง'}</button>
+                        {experimentForm.isViewOnly ? (
+                            <button className="btn-secondary" onClick={() => setShowCreateExperiment(false)}>ปิดหน้าต่าง</button>
+                        ) : (
+                            <>
+                                <button className="btn-secondary" onClick={() => setShowCreateExperiment(false)}>ยกเลิก</button>
+                                <button className="btn-primary" onClick={handleSaveExperiment} disabled={saving}>{saving ? 'กำลังบันทึก...' : '✅ บันทึกผลทดลอง'}</button>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1000,62 +1409,289 @@ export default function RnD() {
     const renderPharmacist = () => {
         const pharmFormulas = formulas.filter(f => ['รอเภสัชกร', 'เภสัชกรไม่อนุมัติ', 'อนุมัติ'].includes(f.status));
         const pendingFormulas = formulas.filter(f => f.status === 'รอเภสัชกร');
+        const pharmExperiments = [...experiments]
+            .filter(e => ['รอประเมิน', 'ผ่าน', 'ไม่ผ่าน'].includes(e.result))
+            .sort((a, b) => b.id - a.id);
         
         return (
             <div className="rnd-pharmacist">
 
                 {pendingFormulas.length > 0 && (
-                    <div className="card" style={{ marginBottom: 16, borderLeft: '4px solid #7c3aed' }}>
-                        <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700, color: '#5b21b6' }}>⚠️ รอเภสัชกรอนุมัติ ({pendingFormulas.length} รายการ)</h3>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ 
+                        background: 'linear-gradient(to right, #faf5ff, #f3e8ff)', 
+                        border: '1px solid #e9d5ff', 
+                        borderRadius: '12px', 
+                        padding: '20px', 
+                        marginBottom: '24px',
+                        boxShadow: '0 4px 6px -1px rgba(168, 85, 247, 0.1)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', background: '#a855f7', color: '#fff', borderRadius: '50%', fontWeight: 'bold', fontSize: '20px', boxShadow: '0 2px 4px rgba(168, 85, 247, 0.3)' }}>!</div>
+                            <div>
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#6b21a8' }}>
+                                    รอเภสัชกรตรวจสอบและอนุมัติ ({pendingFormulas.length} รายการ)
+                                </h3>
+                                <div style={{ fontSize: '13px', color: '#7e22ce', marginTop: '2px' }}>
+                                    โปรดตรวจสอบความถูกต้องของสูตรตามกฎหมายและอนุมัติการผลิต
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
                             {pendingFormulas.map(f => (
-                                <button key={f.id} className="btn-sm" style={{ background: '#ede9fe', color: '#5b21b6', border: '1px solid #c4b5fd' }}
-                                    onClick={() => { setSelectedFormula(f); if(f.unitSize) setSimUnitSize(f.unitSize); }}>
-                                    🏥 {f.id} — {f.name}
-                                </button>
+                                <div key={f.id} style={{ 
+                                    background: '#ffffff', 
+                                    border: '1px solid #d8b4fe', 
+                                    borderRadius: '8px', 
+                                    padding: '16px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '16px',
+                                    transition: 'all 0.2s',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                                }}
+                                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 12px rgba(168, 85, 247, 0.2)'; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)'; e.currentTarget.style.transform = 'none'; }}
+                                onClick={() => { setSelectedFormula(f); if(f.unitSize) setSimUnitSize(f.unitSize); }}>
+                                    <div>
+                                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#9333ea', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#a855f7' }}></span>
+                                            {f.id}
+                                        </div>
+                                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#1e293b', lineHeight: '1.4' }}>{f.name}</div>
+                                        <div style={{ fontSize: '13px', color: '#64748b', marginTop: '6px' }}>เวอร์ชั่น: {f.version} • หมวดหมู่: {f.category || 'ทั่วไป'}</div>
+                                    </div>
+                                    <button style={{ 
+                                        width: '100%', 
+                                        padding: '10px 0', 
+                                        background: '#a855f7', 
+                                        color: '#fff', 
+                                        border: 'none', 
+                                        borderRadius: '6px', 
+                                        fontWeight: 600, 
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        transition: 'background 0.2s'
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#9333ea'}
+                                    onMouseLeave={e => e.currentTarget.style.background = '#a855f7'}
+                                    >
+                                        <Beaker size={16} /> ตรวจสอบสูตร
+                                    </button>
+                                </div>
                             ))}
                         </div>
                     </div>
                 )}
 
                 {hasSectionPermission('rnd_pharmacist_approve') && (
-                    <div className="card table-card">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>รหัสสูตร</th><th>ชื่อผลิตภัณฑ์</th><th>หมวดหมู่</th>
-                                    <th>ผู้ทดสอบ (QC)</th><th>วันที่ QC ผ่าน</th>
-                                    <th>สถานะ</th><th>จัดการ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {pharmFormulas.map(formula => (
-                                    <tr key={formula.id}>
-                                        <td className="text-bold">{formula.id}</td>
-                                        <td>
-                                            {formula.name}
-                                            <div style={{ marginTop: 4 }}>
-                                                <span className={`badge ${formula.formulaType === 'สูตร อย.' ? 'badge-primary' : 'badge-neutral'}`} style={{ fontSize: 10 }}>
-                                                    {formula.formulaType || 'สูตรทั่วไป'}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td><span className="badge badge-info">{formula.category}</span></td>
-                                        <td>{formula.qcApprovedBy || '-'}</td>
-                                        <td>{formula.qcApprovedDate || '-'}</td>
-                                        <td><span className={`badge ${getStatusColor(formula.status)}`}>{formula.status}</span></td>
-                                        <td>
-                                            <button className="btn-sm" onClick={() => { setSelectedFormula(formula); if(formula.unitSize) setSimUnitSize(formula.unitSize); }} title="ดูรายละเอียดและอนุมัติ"><Eye size={14} /> ตรวจสอบ</button>
-                                        </td>
+                    <>
+                        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Beaker size={18} style={{ color: '#6366f1' }}/> สูตรหลัก (Formulas)
+                        </h3>
+                        <div className="card table-card" style={{ marginBottom: 24 }}>
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>รหัสสูตร</th><th>ชื่อผลิตภัณฑ์</th><th>หมวดหมู่</th>
+                                        <th>ผู้ทดสอบ (QC)</th><th>วันที่ QC ผ่าน</th>
+                                        <th>สถานะ</th><th>จัดการ</th>
                                     </tr>
-                                ))}
-                                {pharmFormulas.length === 0 && (
-                                    <tr><td colSpan="7" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีรายการที่รอการตรวจสอบจากเภสัชกร</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    {pharmFormulas.map(formula => (
+                                        <tr key={formula.id}>
+                                            <td className="text-bold">{formula.id}</td>
+                                            <td>
+                                                {formula.name}
+                                                <div style={{ marginTop: 4 }}>
+                                                    <span className={`badge ${formula.formulaType === 'สูตร อย.' ? 'badge-primary' : 'badge-neutral'}`} style={{ fontSize: 10 }}>
+                                                        {formula.formulaType || 'สูตรทั่วไป'}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td><span style={getCategoryStyle(formula.category)}>{formula.category}</span></td>
+                                            <td>{formula.qcApprovedBy || '-'}</td>
+                                            <td>{formula.qcApprovedDate || '-'}</td>
+                                            <td><span className={`badge ${getStatusColor(formula.status)}`}>{formula.status}</span></td>
+                                            <td>
+                                                {formula.status === 'รอเภสัชกร' ? (
+                                                    <button 
+                                                        className="btn-sm" 
+                                                        style={{ background: '#a855f7', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 2px 4px rgba(168, 85, 247, 0.3)' }}
+                                                        onClick={() => { setSelectedFormula(formula); if(formula.unitSize) setSimUnitSize(formula.unitSize); }} 
+                                                        title="ดูรายละเอียดและอนุมัติ"
+                                                    >
+                                                        <ClipboardCheck size={14} /> ตรวจสอบ
+                                                    </button>
+                                                ) : (
+                                                    <button 
+                                                        className="btn-sm" 
+                                                        style={{ background: '#f8fafc', color: '#475569', border: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                        onClick={() => { setSelectedFormula(formula); if(formula.unitSize) setSimUnitSize(formula.unitSize); }} 
+                                                        title="ดูรายละเอียดสูตร"
+                                                    >
+                                                        <Eye size={14} /> ดูรายละเอียด
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {pharmFormulas.length === 0 && (
+                                        <tr><td colSpan="7" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีรายการที่รอการตรวจสอบจากเภสัชกร</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <ClipboardCheck size={18} style={{ color: '#10b981' }}/> ผลการทดลอง (Experiments) ที่ส่งให้เภสัชกรประเมิน
+                        </h3>
+                        <div className="card table-card">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>รหัสการทดลอง</th>
+                                        <th>ชื่อการทดลอง</th>
+                                        <th>อ้างอิงสูตร</th>
+                                        <th>วันที่ทดลอง</th>
+                                        <th>ผลประเมิน</th>
+                                        <th style={{ textAlign: 'right' }}>จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {pharmExperiments.map(exp => (
+                                        <tr key={exp.id}>
+                                            <td className="text-bold">{exp.code}</td>
+                                            <td>{exp.name}</td>
+                                            <td>{exp.formulaRef ? <span className="badge badge-info">{exp.formulaRef}</span> : '-'}</td>
+                                            <td>{exp.date || '-'}</td>
+                                            <td><span className={`badge ${getResultColor(exp.result)}`}>{exp.result}</span></td>
+                                            <td style={{ textAlign: 'right' }}>
+                                                {exp.result === 'รอประเมิน' ? (
+                                                    <button className="btn-sm" onClick={() => setSelectedExperimentForPharm(exp)} title="ตรวจสอบข้อมูลผลการทดลอง"><Eye size={14} /> ตรวจสอบ</button>
+                                                ) : (
+                                                    <button className="btn-sm btn-secondary" onClick={() => handlePrintSafetyCert(exp)} title="เปิดดูใบประเมิน (PDF)"><FileText size={14} /> พรีวิว</button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {pharmExperiments.length === 0 && (
+                                        <tr><td colSpan="6" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีผลการทดลองที่รอประเมิน</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
                 )}
+            </div>
+        );
+    };
+
+    // ══════════════════════════════════════════════════════════════════
+    // Pharmacist Experiment Preview Modal
+    // ══════════════════════════════════════════════════════════════════
+    const renderExperimentPharmModal = () => {
+        if (!selectedExperimentForPharm) return null;
+        const exp = selectedExperimentForPharm;
+
+        // Ensure we parse trialRecipe if it's a string
+        let recipeItems = [];
+        if (typeof exp.trialRecipe === 'string') {
+            try { recipeItems = JSON.parse(exp.trialRecipe); } catch(e) { console.error('Failed to parse trialRecipe', e); }
+        } else if (Array.isArray(exp.trialRecipe)) {
+            recipeItems = exp.trialRecipe;
+        }
+
+        return (
+            <div className="rnd-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setSelectedExperimentForPharm(null)}>
+                <div className="rnd-modal" style={{ width: 800, maxWidth: '95%' }} onClick={(e) => e.stopPropagation()}>
+                    <div className="rnd-modal-header">
+                        <div>
+                            <h2>{exp.name}</h2>
+                            <div className="rnd-modal-meta">
+                                <span className="badge badge-info">{exp.code}</span>
+                                <span className={`badge ${getResultColor(exp.result)}`}>{exp.result}</span>
+                                {exp.formulaRef && <span className="badge badge-neutral">อ้างอิง: {exp.formulaRef}</span>}
+                            </div>
+                        </div>
+                        <button className="rnd-modal-close" onClick={() => setSelectedExperimentForPharm(null)}><XCircle size={22} /></button>
+                    </div>
+
+                    <div className="rnd-modal-body">
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                            <div className="info-box" style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 4 }}>ผู้ทดสอบ</label>
+                                <div style={{ fontWeight: 600, color: '#334155' }}>{exp.tester || '-'}</div>
+                            </div>
+                            <div className="info-box" style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                                <label style={{ display: 'block', fontSize: 12, color: '#64748b', marginBottom: 4 }}>วันที่ทดลอง</label>
+                                <div style={{ fontWeight: 600, color: '#334155' }}>{exp.date || '-'}</div>
+                            </div>
+                        </div>
+
+                        <h4 style={{ margin: '0 0 12px', color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>ส่วนผสม (Trial Recipe)</h4>
+                        {recipeItems.length > 0 ? (
+                            <div className="card table-card" style={{ marginBottom: 24, boxShadow: 'none', border: '1px solid #e2e8f0' }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr style={{ background: '#f8fafc' }}>
+                                            <th>ชนิด/ประเภท</th>
+                                            <th>ชื่อสาร / วัตถุดิบ</th>
+                                            <th>รายละเอียดเพิ่มเติม</th>
+                                            <th style={{ textAlign: 'right' }}>ปริมาณ</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {recipeItems.map((item, idx) => {
+                                            const itemName = item.name ? String(item.name).replace(/<[^>]+>/g, ' ') : '';
+                                            return (
+                                                <tr key={item.id || idx}>
+                                                    <td>{item.type || '-'}</td>
+                                                    <td>{item.materialCode ? `${item.materialCode} - ${itemName}` : itemName}</td>
+                                                    <td>{item.description ? String(item.description).replace(/<[^>]+>/g, ' ') : '-'}</td>
+                                                    <td style={{ textAlign: 'right' }}>{item.qty || 0} {item.unit || 'g'}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <p style={{ color: '#94a3b8', fontStyle: 'italic', marginBottom: 24 }}>ไม่มีข้อมูลส่วนผสม</p>
+                        )}
+
+                        <h4 style={{ margin: '0 0 12px', color: '#1e293b', borderBottom: '1px solid #e2e8f0', paddingBottom: 8 }}>รายละเอียดผลการทดลอง</h4>
+                        <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, color: '#334155', minHeight: 60, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+                            {exp.note || '-'}
+                        </div>
+                    </div>
+
+                    <div className="rnd-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 24px', borderTop: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn-secondary" onClick={() => setSelectedExperimentForPharm(null)}>ปิด</button>
+                            <button className="btn-primary" style={{ background: '#3b82f6', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => handlePrintSafetyCert(exp)}>
+                                <FileText size={16} /> ใบประเมิน (PDF)
+                            </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            {currentTab === 'rnd_pharmacist' && exp.result === 'รอประเมิน' && (
+                                <>
+                                    <button className="btn-primary" style={{ background: '#10b981', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { handleUpdateExperimentStatus(exp, 'ผ่าน'); setSelectedExperimentForPharm(null); }}>
+                                        <CheckCircle2 size={16} /> ประเมินผ่าน
+                                    </button>
+                                    <button className="btn-primary" style={{ background: '#ef4444', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { handleUpdateExperimentStatus(exp, 'ไม่ผ่าน'); setSelectedExperimentForPharm(null); }}>
+                                        <XCircle size={16} /> ประเมินไม่ผ่าน
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     };
@@ -1099,9 +1735,11 @@ export default function RnD() {
             {currentTab === 'rnd_projects' && renderProjects()}
             {currentTab === 'rnd_pharmacist' && renderPharmacist()}
             {renderFormulaModal()}
+            {renderExperimentPharmModal()}
             {renderFormulaFormModal()}
             {renderCreateProjectModal()}
             {renderCreateExperimentModal()}
+            {renderProjectDetailsModal()}
         </div>
     );
 }
