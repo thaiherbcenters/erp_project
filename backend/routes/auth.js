@@ -45,9 +45,20 @@ router.post('/login', async (req, res) => {
         }
 
         // Fetch permissions with data_scope + CRUD flags
-        const permResult = await pool.request()
-             .input('user_id', user.user_id)
-             .query('SELECT page_id, data_scope, can_create, can_read, can_update, can_delete FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+        let permResult;
+        let hasCrudColumns = true;
+        try {
+            permResult = await pool.request()
+                 .input('user_id', user.user_id)
+                 .query('SELECT page_id, data_scope, can_create, can_read, can_update, can_delete FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+        } catch (dbErr) {
+            // Fallback for older database schema (if migration hasn't been run on production)
+            console.log('Falling back to old permissions query (CRUD columns missing)');
+            hasCrudColumns = false;
+            permResult = await pool.request()
+                 .input('user_id', user.user_id)
+                 .query('SELECT page_id, data_scope FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+        }
 
         const userData = {
             id: user.user_id,
@@ -68,10 +79,10 @@ router.post('/login', async (req, res) => {
         userData.permissions = permResult.recordset.map(p => ({
             page_id: p.page_id, 
             data_scope: p.data_scope || 'all',
-            can_create: p.can_create ?? true,
-            can_read: p.can_read ?? true,
-            can_update: p.can_update ?? true,
-            can_delete: p.can_delete ?? true
+            can_create: hasCrudColumns ? (p.can_create ?? true) : true,
+            can_read: hasCrudColumns ? (p.can_read ?? true) : true,
+            can_update: hasCrudColumns ? (p.can_update ?? true) : true,
+            can_delete: hasCrudColumns ? (p.can_delete ?? true) : true
         }));
 
         // Log การ Login สำเร็จ
@@ -85,7 +96,7 @@ router.post('/login', async (req, res) => {
 
     } catch (err) {
         console.error('Login error:', err);
-        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' });
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ', error: err.stack });
     }
 });
 

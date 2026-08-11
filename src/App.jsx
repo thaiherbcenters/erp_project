@@ -63,11 +63,8 @@ function App() {
   return (
     <AlertProvider>
     <AuthProvider>
-      <ProductionProvider>
-        <PlannerProvider>
-          <RnDProvider>
-          <BrowserRouter>
-            <Suspense fallback={
+      <BrowserRouter>
+        <Suspense fallback={
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '1.2rem', color: '#666' }}>
                 <div className="spinner-border text-primary me-2" role="status"></div> กำลังโหลด...
               </div>
@@ -79,7 +76,13 @@ function App() {
               {/* ── หน้าที่ต้องล็อกอิน (มี Layout ครอบ) ── */}
               <Route element={
                 <ProtectedRoute pageId={null}>
-                  <Layout />
+                  <ProductionProvider>
+                    <PlannerProvider>
+                      <RnDProvider>
+                        <Layout />
+                      </RnDProvider>
+                    </PlannerProvider>
+                  </ProductionProvider>
                 </ProtectedRoute>
               }>
                 {/* เมนูหลัก */}
@@ -145,9 +148,6 @@ function App() {
             </Routes>
             </Suspense>
           </BrowserRouter>
-          </RnDProvider>
-        </PlannerProvider>
-      </ProductionProvider>
     </AuthProvider>
     </AlertProvider>
   );
