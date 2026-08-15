@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
-const { generateSequence, getDatePrefix } = require('../utils/sequence');
+const { generateSequence, getDatePrefix, getShortDatePrefix } = require('../utils/sequence');
 const { authorizeRoles } = require('../middleware/authorize');
+const { autoDeductStock, autoReceiveWIP } = require('../utils/stockDeduction');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -25,8 +26,10 @@ router.get('/tasks', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT * FROM Production_Tasks 
-            ORDER BY StartTime DESC, CreatedAt DESC
+            SELECT pt.*, p.Unit as JobUnit 
+            FROM Production_Tasks pt
+            LEFT JOIN Planner p ON pt.JobOrderID = p.PlannerID
+            ORDER BY pt.StartTime DESC, pt.CreatedAt DESC
         `);
 
         // Format data to match frontend expectations
@@ -56,7 +59,8 @@ router.get('/tasks', async (req, res) => {
                 operator: row.WorkerID,
                 startTime: row.StartTime ? new Date(row.StartTime).toISOString().slice(0, 16).replace('T', ' ') : null,
                 endTime: row.EndTime ? new Date(row.EndTime).toISOString().slice(0, 16).replace('T', ' ') : null,
-                createdAt: row.CreatedAt
+                createdAt: row.CreatedAt,
+                jobUnit: row.JobUnit
             };
         });
 
@@ -64,6 +68,45 @@ router.get('/tasks', async (req, res) => {
     } catch (err) {
         console.error('Error fetching production tasks:', err);
         res.status(500).json({ message: 'Error fetching production tasks' });
+    }
+});
+
+// Create an ad-hoc WIP production task
+router.post('/tasks/wip', authorizeRoles('admin', 'executive', 'planner', 'operator'), async (req, res) => {
+    try {
+        const { formulaName, expectedQty, unit, tankNo } = req.body;
+        const pool = await poolPromise;
+        
+        // Generate IDs
+        const datePrefix = getDatePrefix();
+        const joId = await generateSequence(pool, 'Job_Orders', 'JobOrderID', `JO-${datePrefix}-`, 3);
+        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `PT-${datePrefix}-`, 3);
+        const batchNo = `B${datePrefix.replace(/-/g, '')}-WIP`;
+
+        await pool.request()
+            .input('TaskID', sql.VarChar, taskId)
+            .input('JobOrderID', sql.VarChar, joId)
+            .input('BatchNo', sql.VarChar, batchNo)
+            .input('FormulaName', sql.NVarChar, formulaName)
+            .input('Line', sql.VarChar, tankNo || 'WIP Line')
+            .input('ExpectedQty', sql.Float, expectedQty)
+            .input('JobUnit', sql.NVarChar, unit || 'กรัม')
+            .input('CurrentStep', sql.VarChar, 'wait')
+            .input('Status', sql.NVarChar, 'รอเริ่มงาน')
+            .query(`
+                INSERT INTO Production_Tasks (
+                    TaskID, JobOrderID, BatchNo, FormulaName, Line, 
+                    ExpectedQty, JobUnit, CurrentStep, Status, CreatedAt
+                ) VALUES (
+                    @TaskID, @JobOrderID, @BatchNo, @FormulaName, @Line,
+                    @ExpectedQty, @JobUnit, @CurrentStep, @Status, GETDATE()
+                )
+            `);
+            
+        res.status(201).json({ message: 'สร้างใบสั่งผลิต WIP สำเร็จ', taskId });
+    } catch (err) {
+        console.error('Error creating WIP task:', err);
+        res.status(500).json({ message: 'Error creating WIP task' });
     }
 });
 
@@ -102,6 +145,44 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
 
         if (result.rowsAffected[0] === 0) {
             return res.status(404).json({ message: 'Task not found' });
+        }
+
+        // --- Integration: Deduct WIP Stock when advancing to 'production_1' ---
+        if (currentStep === 'production_1' && req.body.usedWip && req.body.usedWip.id) {
+            try {
+                const { id, requiredQty, name } = req.body.usedWip;
+                
+                // Deduct from Stock_Items
+                await pool.request()
+                    .input('WipID', sql.VarChar, id)
+                    .input('DeductQty', sql.Float, requiredQty)
+                    .query(`
+                        UPDATE Stock_Items 
+                        SET Quantity = Quantity - @DeductQty,
+                            UpdatedAt = GETDATE()
+                        WHERE ItemID = @WipID
+                    `);
+                    
+                // Add Stock_Logs
+                const logId = await generateSequence(pool, 'Stock_Logs', 'LogID', 'LOG-', 6);
+                await pool.request()
+                    .input('LogID', sql.VarChar, logId)
+                    .input('ItemID', sql.VarChar, id)
+                    .input('ProductName', sql.NVarChar, name)
+                    .input('Type', sql.VarChar, 'out')
+                    .input('Quantity', sql.Float, requiredQty)
+                    .input('RefNo', sql.VarChar, taskId)
+                    .input('RefType', sql.VarChar, 'production')
+                    .input('Notes', sql.NVarChar, `เบิกใช้ในกระบวนการผลิตงาน ${taskId}`)
+                    .input('CreatedBy', sql.NVarChar, req.user ? req.user.username : 'system')
+                    .query(`
+                        INSERT INTO Stock_Logs (LogID, ItemID, ProductName, Type, Quantity, RefNo, RefType, Notes, CreatedBy, CreatedAt)
+                        VALUES (@LogID, @ItemID, @ProductName, @Type, @Quantity, @RefNo, @RefType, @Notes, @CreatedBy, GETDATE())
+                    `);
+            } catch (err) {
+                console.error('Error deducting WIP stock:', err);
+                // We don't fail the advance step if stock deduction fails, but log it
+            }
         }
 
         // --- Integration: Auto-create Packaging Task if entering 'packaging' step ---
@@ -169,7 +250,11 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
         }
         // -----------------------------------------------------------------------------
 
-        // -----------------------------------------------------------------------------
+        // --- WIP Lot Auto Receive ---
+        if (status === 'เสร็จสิ้น') {
+            const reqUser = req.user?.username || req.user?.name || req.user?.displayName || 'operator';
+            autoReceiveWIP(taskId, reqUser).catch(e => console.error("Auto receive WIP error:", e));
+        }
 
         res.json(result.recordset[0]);
     } catch (err) {
@@ -206,6 +291,13 @@ router.put('/tasks/:id/start', authorizeRoles('admin', 'executive', 'planner', '
         if (result.rowsAffected[0] === 0) {
             return res.status(404).json({ message: 'Task not found' });
         }
+        
+        // Auto deduct stock on start
+        if (currentStep && currentStep !== 'เตรียมความพร้อม') {
+            const reqUser = req.user?.username || req.user?.name || req.user?.displayName || 'operator';
+            autoDeductStock(taskId, reqUser).catch(e => console.error("Auto deduct error:", e));
+        }
+
         res.json(result.recordset[0]);
     } catch (err) {
         console.error('Error starting task:', err);

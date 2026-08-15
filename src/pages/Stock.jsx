@@ -11,6 +11,7 @@ import { Eye, Edit3, Trash2, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCi
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
+import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 
 export default function Stock() {
@@ -382,6 +383,46 @@ export default function Stock() {
                                                             </tr>
                                                         );
                                                     })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                
+                                {/* WIP Lots (ถ้าเป็นสินค้ากึ่งสำเร็จรูป) */}
+                                {detail.wipLots && detail.wipLots.length > 0 && (
+                                    <div style={{ marginBottom: 20 }}>
+                                        <h4 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <Package size={16} style={{ color: '#f97316' }} /> ล็อตการผลิตกึ่งสำเร็จรูป (WIP Lots)
+                                        </h4>
+                                        <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e5e7eb', overflowX: 'auto' }}>
+                                            <table className="modern-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>หมายเลขล็อต (Lot No)</th>
+                                                        <th>วันที่ผลิต</th>
+                                                        <th>วันหมดอายุ</th>
+                                                        <th style={{ textAlign: 'right' }}>จำนวนเหลือ (หน่วย)</th>
+                                                        <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {detail.wipLots.map((wip, i) => (
+                                                        <tr key={i}>
+                                                            <td style={{ fontWeight: 600, color: '#4338ca' }}>{wip.LotNo}</td>
+                                                            <td>{fmtDate(wip.ProductionDate).split(' ')[0]}</td>
+                                                            <td>{wip.ExpiryDate ? fmtDate(wip.ExpiryDate).split(' ')[0] : '-'}</td>
+                                                            <td style={{ textAlign: 'right', fontWeight: 700, color: wip.RemainingQty > 0 ? '#059669' : '#dc2626' }}>
+                                                                {wip.RemainingQty?.toLocaleString()} {wip.Unit}
+                                                            </td>
+                                                            <td style={{ textAlign: 'center' }}>
+                                                                <span className="badge" style={{ background: wip.Status === 'พร้อมใช้' ? '#dcfce7' : '#f3f4f6', color: wip.Status === 'พร้อมใช้' ? '#166534' : '#4b5563' }}>
+                                                                    {wip.Status}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -786,7 +827,7 @@ export default function Stock() {
                     {hasSectionPermission('stock_data_search') && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                             <div className="sub-tabs-container" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 5, flex: 1 }}>
-                                {['สินค้าสำเร็จรูป', 'วัตถุดิบ', 'บรรจุภัณฑ์', 'วัสดุสิ้นเปลือง'].map(cat => (
+                                {['สินค้าสำเร็จรูป', 'สินค้ากึ่งสำเร็จรูป', 'วัตถุดิบ', 'บรรจุภัณฑ์', 'วัสดุสิ้นเปลือง'].map(cat => (
                                     <button 
                                         key={cat} 
                                         className={`sub-tab-btn ${activeCategory === cat ? 'active' : ''}`}
@@ -800,6 +841,7 @@ export default function Stock() {
                                         }}
                                     >
                                         {cat === 'สินค้าสำเร็จรูป' ? '🟢 สินค้าสำเร็จรูป (FG)' : 
+                                         cat === 'สินค้ากึ่งสำเร็จรูป' ? '🟠 สินค้ากึ่งสำเร็จรูป (WIP)' : 
                                          cat === 'วัตถุดิบ' ? '🟡 วัตถุดิบ (RM)' : 
                                          cat === 'บรรจุภัณฑ์' ? '🔵 บรรจุภัณฑ์ (PM)' : '🟤 วัสดุสิ้นเปลือง'}
                                     </button>
@@ -1060,25 +1102,40 @@ export default function Stock() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15, marginBottom: 15 }}>
                                 <div className="form-group">
                                     <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>หมวดหมู่</label>
-                                    <select
+                                    <CustomSelect
+                                        usePortal={true}
                                         value={addForm.category}
                                         onChange={e => setAddForm(p => ({ ...p, category: e.target.value }))}
                                         style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, background: '#fff' }}
                                     >
                                         <option value="สินค้าสำเร็จรูป">สินค้าสำเร็จรูป (FG)</option>
+                                        <option value="สินค้ากึ่งสำเร็จรูป">สินค้ากึ่งสำเร็จรูป (WIP)</option>
                                         <option value="วัตถุดิบ">วัตถุดิบ (RM)</option>
                                         <option value="บรรจุภัณฑ์">บรรจุภัณฑ์ (PM)</option>
                                         <option value="วัสดุสิ้นเปลือง">วัสดุสิ้นเปลือง</option>
-                                    </select>
+                                    </CustomSelect>
                                 </div>
                                 <div className="form-group">
                                     <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>หน่วยนับ</label>
-                                    <input
-                                        type="text"
+                                    <CustomSelect
+                                        usePortal={true}
                                         value={addForm.unit}
                                         onChange={e => setAddForm(p => ({ ...p, unit: e.target.value }))}
-                                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
-                                    />
+                                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, background: '#fff' }}
+                                    >
+                                        <option value="">- เลือกหน่วย -</option>
+                                        <option value="ชิ้น">ชิ้น</option>
+                                        <option value="ขวด">ขวด</option>
+                                        <option value="กระปุก">กระปุก</option>
+                                        <option value="หลอด">หลอด</option>
+                                        <option value="กล่อง">กล่อง</option>
+                                        <option value="กิโลกรัม">กิโลกรัม (kg)</option>
+                                        <option value="กรัม">กรัม (g)</option>
+                                        <option value="ลิตร">ลิตร (L)</option>
+                                        <option value="มิลลิลิตร">มิลลิลิตร (ml)</option>
+                                        <option value="ดวง">ดวง</option>
+                                        <option value="ม้วน">ม้วน</option>
+                                    </CustomSelect>
                                 </div>
                             </div>
 
@@ -1143,16 +1200,18 @@ export default function Stock() {
                                 </div>
                                 <div>
                                     <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>หมวดหมู่</label>
-                                    <select
+                                    <CustomSelect
+                                        usePortal={true}
                                         value={editForm.category}
                                         onChange={(e) => setEditForm(f => ({ ...f, category: e.target.value }))}
                                         style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, outline: 'none', background: '#fff' }}
                                     >
                                         <option value="สินค้าสำเร็จรูป">สินค้าสำเร็จรูป (FG)</option>
+                                        <option value="สินค้ากึ่งสำเร็จรูป">สินค้ากึ่งสำเร็จรูป (WIP)</option>
                                         <option value="วัตถุดิบ">วัตถุดิบ (RM)</option>
                                         <option value="บรรจุภัณฑ์">บรรจุภัณฑ์ (PM)</option>
                                         <option value="วัสดุสิ้นเปลือง">วัสดุสิ้นเปลือง</option>
-                                    </select>
+                                    </CustomSelect>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                                     <div>
@@ -1163,12 +1222,25 @@ export default function Stock() {
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>หน่วย</label>
-                                        <input
-                                            type="text"
+                                        <CustomSelect
+                                            usePortal={true}
                                             value={editForm.unit}
                                             onChange={(e) => setEditForm(f => ({ ...f, unit: e.target.value }))}
-                                            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, outline: 'none' }}
-                                        />
+                                            style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, outline: 'none', background: '#fff' }}
+                                        >
+                                            <option value="">- เลือกหน่วย -</option>
+                                            <option value="ชิ้น">ชิ้น</option>
+                                            <option value="ขวด">ขวด</option>
+                                            <option value="กระปุก">กระปุก</option>
+                                            <option value="หลอด">หลอด</option>
+                                            <option value="กล่อง">กล่อง</option>
+                                            <option value="กิโลกรัม">กิโลกรัม (kg)</option>
+                                            <option value="กรัม">กรัม (g)</option>
+                                            <option value="ลิตร">ลิตร (L)</option>
+                                            <option value="มิลลิลิตร">มิลลิลิตร (ml)</option>
+                                            <option value="ดวง">ดวง</option>
+                                            <option value="ม้วน">ม้วน</option>
+                                        </CustomSelect>
                                     </div>
                                 </div>
 

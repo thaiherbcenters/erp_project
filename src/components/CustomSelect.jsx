@@ -5,6 +5,7 @@ const CustomSelect = ({ value, onChange, name, className, style = {}, children, 
     const [isOpen, setIsOpen] = useState(false);
     const [portalStyle, setPortalStyle] = useState({});
     const containerRef = useRef(null);
+    const portalRef = useRef(null);
 
     // Extract options from children (<option> tags)
     // If a child is an array or fragment, Children.toArray flattens it
@@ -42,7 +43,14 @@ const CustomSelect = ({ value, onChange, name, className, style = {}, children, 
             document.addEventListener('mousedown', handleClickOutside);
             
             // Optional: Close on scroll when using portal to prevent floating
-            const handleScroll = () => usePortal && setIsOpen(false);
+            const handleScroll = (e) => {
+                if (usePortal) {
+                    if (portalRef.current && (portalRef.current === e.target || portalRef.current.contains(e.target))) {
+                        return;
+                    }
+                    setIsOpen(false);
+                }
+            };
             if (usePortal) window.addEventListener('scroll', handleScroll, true);
             
             return () => {
@@ -106,7 +114,9 @@ const CustomSelect = ({ value, onChange, name, className, style = {}, children, 
             </div>
 
             {isOpen && (usePortal ? createPortal(
-                <div style={{
+                <div 
+                    ref={portalRef}
+                    style={{
                     position: 'fixed',
                     top: portalStyle.top,
                     bottom: portalStyle.bottom,

@@ -263,7 +263,7 @@ router.post('/:id/release', authorizeRoles('admin', 'executive', 'planner'), asy
                     .input('ProcessName', sql.NVarChar, 'เตรียมวัตถุดิบ + ผสม')
                     .input('BatchNo', sql.VarChar, batchNo)
                     .input('Line', sql.VarChar, job.AssignedLine || 'Line A')
-                    .input('ExpectedQty', sql.Int, job.BatchSize)
+                    .input('ExpectedQty', sql.Int, Math.ceil((job.TotalQty || 0) / (job.BatchQty || 1)))
                     .input('ProducedQty', sql.Int, 0)
                     .input('DefectQty', sql.Int, 0)
                     .input('Status', sql.NVarChar, 'รอเริ่มงาน')

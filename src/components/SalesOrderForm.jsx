@@ -9,40 +9,39 @@ import ContractSelectorModal from './ContractSelectorModal';
 import QuotationSelectorModal from './QuotationSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import '../pages/PageCommon.css';
-
 const PRODUCT_CATALOG = {
-    "ยาดมสมุนไพร": { price: 79, promo: { newQty: 40, newPrice: 25, oldQty: 50, oldPrice: 20 } },
-    "ยาดมสมุนไพร จัมโบ้": { price: 490, promo: { newQty: 5, newPrice: 200 } },
-    "ยาหม่อง": { price: 59, promo: { newQty: 35, newPrice: 1000/35, oldQty: 40, oldPrice: 25 } },
-    "ยาน้ำมัน ขนาด 10 มล.": { price: 129, promo: { newQty: 20, newPrice: 50, oldQty: 17, oldPrice: 59 } },
-    "ยาน้ำมัน ขนาด 5 มล.": { price: 69, promo: { newQty: 25, newPrice: 40 } },
-    "ยาน้ำมันสมุนไพร สูตรเย็น": { price: 199, promo: { newQty: 14, newPrice: 71 } },
-    "ยาน้ำมันสมุนไพร สูตรร้อน": { price: 199, promo: { newQty: 14, newPrice: 71 } },
-    "ยาสเปรย์ผสมกระดูกไก่ดำ": { price: 199, promo: { newQty: 14, newPrice: 71 } },
-    "แคปซูลขมิ้นชัน": { price: 129 },
-    "แคปซูลฟ้าทะลายโจร": { price: 159 },
-    "แคปซูลขิง": { price: 129 },
-    "แคปซูลมะขามแขก": { price: 129 },
-    "แคปซูลรางจืด": { price: 129 },
-    "แคปซูลมะระขี้นก": { price: 129 },
-    "แคปซูลตรีผลา": { price: 129 },
-    "แคปซูลเพชรสังฆาต": { price: 129 },
-    "แคปซูลประสะเจตพังคี": { price: 129 },
-    "แคปซูลสหัศธารา": { price: 129 },
-    "แคปซูลประสะมะแว้ง": { price: 129 },
-    "แคปซูลปราบชมพูทวีป": { price: 129 },
-    "ลูกประคบ": { price: 159 },
-    "ชาอัสสัม กล่อง": { price: '' },
-    "ชาอัสสัม ซอง": { price: 95 },
-    "ชากัญชาโสมขาว": { price: 95 },
-    "ชากัญชา": { price: 95 },
-    "น้ำผึ้ง": { price: '' },
-    "เทียนหอม Aromatic กลิ่น Rose": { price: 290 },
-    "เทียนหอม Aromatic กลิ่น Morning": { price: 290 },
-    "เทียนหอม Aromatic กลิ่น Thai": { price: 290 },
-    "น้ำมันหอมระเหย กลิ่น Rose": { price: 490 },
-    "น้ำมันหอมระเหย กลิ่น Morning": { price: 490 },
-    "น้ำมันหอมระเหย กลิ่น Thai": { price: 490 }
+    "ยาดมสมุนไพร": { price: 79, promo: { newQty: 40, newPrice: 25, oldQty: 50, oldPrice: 20 }, unit: 'ขวด' },
+    "ยาดมสมุนไพร จัมโบ้": { price: 490, promo: { newQty: 5, newPrice: 200 }, unit: 'ขวด' },
+    "ยาหม่อง": { price: 59, promo: { newQty: 35, newPrice: 1000/35, oldQty: 40, oldPrice: 25 }, unit: 'ขวด' },
+    "ยาน้ำมัน ขนาด 10 มล.": { price: 129, promo: { newQty: 20, newPrice: 50, oldQty: 17, oldPrice: 59 }, unit: 'ขวด' },
+    "ยาน้ำมัน ขนาด 5 มล.": { price: 69, promo: { newQty: 25, newPrice: 40 }, unit: 'ขวด' },
+    "ยาน้ำมันสมุนไพร สูตรเย็น": { price: 199, promo: { newQty: 14, newPrice: 71 }, unit: 'ขวด' },
+    "ยาน้ำมันสมุนไพร สูตรร้อน": { price: 199, promo: { newQty: 14, newPrice: 71 }, unit: 'ขวด' },
+    "ยาสเปรย์ผสมกระดูกไก่ดำ": { price: 199, promo: { newQty: 14, newPrice: 71 }, unit: 'ขวด' },
+    "แคปซูลขมิ้นชัน": { price: 129, unit: 'กระปุก' },
+    "แคปซูลฟ้าทะลายโจร": { price: 159, unit: 'กระปุก' },
+    "แคปซูลขิง": { price: 129, unit: 'กระปุก' },
+    "แคปซูลมะขามแขก": { price: 129, unit: 'กระปุก' },
+    "แคปซูลรางจืด": { price: 129, unit: 'กระปุก' },
+    "แคปซูลมะระขี้นก": { price: 129, unit: 'กระปุก' },
+    "แคปซูลตรีผลา": { price: 129, unit: 'กระปุก' },
+    "แคปซูลเพชรสังฆาต": { price: 129, unit: 'กระปุก' },
+    "แคปซูลประสะเจตพังคี": { price: 129, unit: 'กระปุก' },
+    "แคปซูลสหัศธารา": { price: 129, unit: 'กระปุก' },
+    "แคปซูลประสะมะแว้ง": { price: 129, unit: 'กระปุก' },
+    "แคปซูลปราบชมพูทวีป": { price: 129, unit: 'กระปุก' },
+    "ลูกประคบ": { price: 159, unit: 'ลูก' },
+    "ชาอัสสัม กล่อง": { price: '', unit: 'กล่อง' },
+    "ชาอัสสัม ซอง": { price: 95, unit: 'ซอง' },
+    "ชากัญชาโสมขาว": { price: 95, unit: 'ซอง' },
+    "ชากัญชา": { price: 95, unit: 'ซอง' },
+    "น้ำผึ้ง": { price: '', unit: 'ขวด' },
+    "เทียนหอม Aromatic กลิ่น Rose": { price: 290, unit: 'ชิ้น' },
+    "เทียนหอม Aromatic กลิ่น Morning": { price: 290, unit: 'ชิ้น' },
+    "เทียนหอม Aromatic กลิ่น Thai": { price: 290, unit: 'ชิ้น' },
+    "น้ำมันหอมระเหย กลิ่น Rose": { price: 490, unit: 'ขวด' },
+    "น้ำมันหอมระเหย กลิ่น Morning": { price: 490, unit: 'ขวด' },
+    "น้ำมันหอมระเหย กลิ่น Thai": { price: 490, unit: 'ขวด' }
 };
 
 const soStyles = `
@@ -681,6 +680,9 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                             if (PRODUCT_CATALOG[value].price !== '') {
                                 newItem.price = PRODUCT_CATALOG[value].price;
                             }
+                        }
+                        if (PRODUCT_CATALOG[value].unit) {
+                            newItem.unit = PRODUCT_CATALOG[value].unit;
                         }
                     } else {
                         newItem.basePromoName = value;
@@ -1440,7 +1442,8 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = item.unit === unit || (!item.unit && unit === 'ชิ้น') ? '#f1f5f9' : 'white'}
                                                         >
                                                             <div
-                                                                onClick={() => {
+                                                                onMouseDown={(e) => {
+                                                                    e.preventDefault();
                                                                     handleItemChange(item.id, 'unit', unit);
                                                                     handleItemChange(item.id, 'showUnitDropdown', false);
                                                                 }}

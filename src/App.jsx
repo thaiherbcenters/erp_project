@@ -53,6 +53,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const PermissionManager = lazy(() => import('./pages/PermissionManager'));
 const Planning = lazy(() => import('./pages/Planning'));
 const Operator = lazy(() => import('./pages/Operator'));
+const OperatorWIP = lazy(() => import('./pages/OperatorWIP'));
 const RnD = lazy(() => import('./pages/RnD'));
 const Packaging = lazy(() => import('./pages/Packaging'));
 const Fulfillment = lazy(() => import('./pages/Fulfillment'));
@@ -115,6 +116,9 @@ function App() {
                 } />
                 <Route path="/operator" element={
                   <ProtectedRoute pageId="operator"><Operator /></ProtectedRoute>
+                } />
+                <Route path="/operator/wip" element={
+                  <ProtectedRoute pageId="operator_wip"><OperatorWIP /></ProtectedRoute>
                 } />
                 <Route path="/rnd" element={
                   <ProtectedRoute pageId="rnd"><RnD /></ProtectedRoute>

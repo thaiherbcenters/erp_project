@@ -23,14 +23,27 @@
     margin: 12px 0;
     position: relative;
     overflow-x: auto;
-    padding-bottom: 4px;
+    padding-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.op-stepper::-webkit-scrollbar {
+    height: 6px;
+}
+.op-stepper::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.op-stepper::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .op-step-wrapper {
     display: flex;
     align-items: flex-start;
     flex: 1;
-    min-width: 0;
+    min-width: 80px;
     position: relative;
 }
 
@@ -137,6 +150,7 @@
     max-width: 90px;
     line-height: 1.2;
     white-space: pre-line;
+    word-break: break-word;
 }
 
 .op-step-now {

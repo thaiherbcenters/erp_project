@@ -62,7 +62,7 @@ export default function RnD() {
     const [simUnitSize, setSimUnitSize] = useState(5);
 
     const {
-        formulas, materials, projects, experiments, loading,
+        formulas, materials, pmMaterials = [], projects, experiments, loading,
         createFormula, updateFormula, updateFormulaStatus, deleteFormula,
         createProject, deleteProject, createExperiment, updateExperiment, deleteExperiment, pharmApprove,
     } = useRnD();
@@ -121,7 +121,7 @@ export default function RnD() {
     const removeIngredient = (idx) => {
         setFormulaForm(p => {
             const newIngs = p.ingredients.filter((_, i) => i !== idx);
-            const newBatchSize = newIngs.reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+            const newBatchSize = newIngs.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
             return { ...p, ingredients: newIngs, batchSize: newBatchSize };
         });
     };
@@ -130,10 +130,10 @@ export default function RnD() {
             const ings = [...p.ingredients];
             ings[idx] = { ...ings[idx], [field]: value };
             if (field === 'materialId') {
-                const mat = materials.find(m => m.id === value);
+                const mat = materials.find(m => m.id === value) || pmMaterials.find(m => m.id === value);
                 if (mat) { ings[idx].name = mat.name; ings[idx].unit = mat.unit; }
             }
-            const newBatchSize = ings.reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+            const newBatchSize = ings.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
             return { ...p, ingredients: ings, batchSize: newBatchSize };
         });
     };
@@ -150,8 +150,8 @@ export default function RnD() {
     // ── Handlers ──
     const handleCreateFormula = async () => {
         if (!formulaForm.name) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อสูตร', 'error');
-        const hasEmptyName = formulaForm.ingredients.some(ing => !ing.name || ing.name.trim() === '');
-        if (hasEmptyName) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อวัตถุดิบให้ครบทุกรายการ หรือลบรายการที่ไม่ได้ใช้ออก', 'error');
+        const hasEmptyName = formulaForm.ingredients.some(ing => (!ing.name || ing.name.trim() === '<p></p>' || ing.name.trim() === '') && !ing.materialId);
+        if (hasEmptyName) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อ หรือเลือกรายการอ้างอิงให้ครบถ้วน หรือลบรายการที่ไม่ได้ใช้ออก', 'error');
         
         setSaving(true);
         const payload = { 
@@ -167,8 +167,8 @@ export default function RnD() {
 
     const handleEditFormula = async () => {
         if (!formulaForm.name) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อสูตร', 'error');
-        const hasEmptyName = formulaForm.ingredients.some(ing => !ing.name || ing.name.trim() === '<p></p>' || ing.name.trim() === '');
-        if (hasEmptyName) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อวัตถุดิบให้ครบทุกรายการ หรือลบรายการที่ไม่ได้ใช้ออก', 'error');
+        const hasEmptyName = formulaForm.ingredients.some(ing => (!ing.name || ing.name.trim() === '<p></p>' || ing.name.trim() === '') && !ing.materialId);
+        if (hasEmptyName) return showAlert('เกิดข้อผิดพลาด', 'กรุณาระบุชื่อ หรือเลือกรายการอ้างอิงให้ครบถ้วน หรือลบรายการที่ไม่ได้ใช้ออก', 'error');
         
         setSaving(true);
         const res = await updateFormula(formulaForm.id, formulaForm);
@@ -275,7 +275,7 @@ export default function RnD() {
         let ingredients = [];
         try { ingredients = JSON.parse(exp.trialRecipe); } catch(e) {}
         const validIngredients = Array.isArray(ingredients) ? ingredients : [{ materialId: '', name: '', qty: 0, unit: '', type: 'active', engName: '', latinName: '', partUsed: '' }];
-        const initialBatchSize = validIngredients.reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+        const initialBatchSize = validIngredients.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
 
         setFormulaForm({
             ...emptyFormulaForm,
@@ -314,7 +314,7 @@ export default function RnD() {
         const newIngs = [...(experimentForm.ingredients || [])];
         newIngs[idx] = { ...newIngs[idx], [field]: value };
         if (field === 'materialId' && value) {
-            const m = materials.find(x => String(x.id) === String(value));
+            const m = materials.find(x => String(x.id) === String(value)) || pmMaterials.find(x => String(x.id) === String(value));
             if (m) {
                 newIngs[idx].name = m.name;
                 newIngs[idx].unit = m.unit;
@@ -764,7 +764,7 @@ export default function RnD() {
                         <div className="rnd-modal-info-grid">
                             <div className="rnd-modal-info-item">
                                 <label>ขนาดต่อ Batch</label>
-                                <span>{f.batchSize?.toLocaleString()} {f.unit}</span>
+                                <span>{(f.ingredients?.filter(i => i.type !== 'packaging').reduce((s, i) => s + (parseFloat(i.qty) || 0), 0) || f.batchSize || 0).toLocaleString()} {f.unit}</span>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ปริมาณบรรจุต่อชิ้น</label>
@@ -791,7 +791,7 @@ export default function RnD() {
                                 ฿{batchCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </div>
                             <div style={{ fontSize: 12, color: '#6b7280' }}>
-                                ต่อหน่วย: ฿{f.batchSize ? (batchCost / f.batchSize).toFixed(2) : '—'} / {f.unit}
+                                ต่อหน่วย: ฿{f.batchSize ? (batchCost / (f.ingredients?.filter(i => i.type !== 'packaging').reduce((s, i) => s + (parseFloat(i.qty) || 0), 0) || f.batchSize || 1)).toFixed(2) : '—'} / {f.unit}
                             </div>
                         </div>
 
@@ -832,21 +832,21 @@ export default function RnD() {
                         </div>
 
                         <div className="rnd-modal-section">
-                            <h4><Beaker size={16} /> วัตถุดิบที่ใช้ ({f.ingredients?.length} รายการ)</h4>
+                            <h4><Beaker size={16} /> วัตถุดิบที่ใช้ ({f.ingredients?.filter(i => i.type !== 'packaging').length || 0} รายการ)</h4>
                             <table className="data-table rnd-ingredients-table">
                                 <thead>
                                     <tr><th>#</th><th>รหัส</th><th>ชื่อวัตถุดิบ</th><th>ปริมาณมาตรฐาน</th><th>หน่วย</th><th>ปริมาณที่ต้องใช้ (จำลอง)</th><th>ต้นทุน (จำลอง)</th></tr>
                                 </thead>
                                 <tbody>
-                                    {f.ingredients?.map((ing, idx) => {
+                                    {f.ingredients?.filter(i => i.type !== 'packaging').map((ing, idx) => {
                                         const mat = materials.find(m => m.id === ing.materialId);
+                                        const ingName = ing.name || mat?.name || '';
                                         const cost = mat ? mat.costPerUnit * ing.qty : 0;
                                         
                                         // Calc Scale
-                                        const targetYieldGrams = simTargetUnits * simUnitSize;
-                                        let baseYieldGrams = f.batchSize || 1;
+                                        let baseYieldGrams = f.ingredients?.filter(i => i.type !== 'packaging').reduce((s, i) => s + (parseFloat(i.qty) || 0), 0) || f.batchSize || 1;
                                         if (f.unit === 'kg' || f.unit === 'L') baseYieldGrams *= 1000;
-                                        
+                                        const targetYieldGrams = simTargetUnits * simUnitSize;
                                         const scaleFactor = targetYieldGrams / baseYieldGrams;
                                         const scaledQty = ing.qty * scaleFactor;
                                         const scaledCost = cost * scaleFactor;
@@ -855,7 +855,7 @@ export default function RnD() {
                                             <tr key={idx}>
                                                 <td>{idx + 1}</td>
                                                 <td className="text-bold">{ing.materialId}</td>
-                                                <td dangerouslySetInnerHTML={{ __html: ing.name || '' }} />
+                                                <td dangerouslySetInnerHTML={{ __html: ingName }} />
                                                 <td style={{ color: '#6b7280' }}>{ing.qty} {ing.unit}</td>
                                                 <td>{ing.unit}</td>
                                                 <td style={{ fontWeight: 700, color: '#1e40af', background: '#eff6ff' }}>{scaledQty.toLocaleString(undefined, { maximumFractionDigits: 4 })} {ing.unit}</td>
@@ -866,6 +866,34 @@ export default function RnD() {
                                 </tbody>
                             </table>
                         </div>
+
+                        {f.ingredients?.some(i => i.type === 'packaging') && (
+                            <div className="rnd-modal-section">
+                                <h4><Package size={16} style={{ color: '#f59e0b' }} /> บรรจุภัณฑ์ ({f.ingredients?.filter(i => i.type === 'packaging').length} รายการ)</h4>
+                                <table className="data-table rnd-ingredients-table">
+                                    <thead>
+                                        <tr><th>#</th><th>รหัส</th><th>ชื่อบรรจุภัณฑ์</th><th>ปริมาณที่ต้องใช้ (จำลอง)</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        {f.ingredients?.filter(i => i.type === 'packaging').map((ing, idx) => {
+                                            const pm = pmMaterials.find(m => m.id === ing.materialId);
+                                            const pmName = ing.name || pm?.name || '';
+                                            // Per user instruction: Packaging quantity is exactly the target units. No formula calculation needed.
+                                            const scaledQty = simTargetUnits;
+
+                                            return (
+                                                <tr key={idx}>
+                                                    <td>{idx + 1}</td>
+                                                    <td className="text-bold">{ing.materialId}</td>
+                                                    <td dangerouslySetInnerHTML={{ __html: pmName }} />
+                                                    <td style={{ fontWeight: 700, color: '#1e40af', background: '#eff6ff' }}>{scaledQty.toLocaleString()} {ing.unit || 'ชิ้น'}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
 
                         {f.instructions?.length > 0 && (
                             <div className="rnd-modal-section">
@@ -1070,7 +1098,7 @@ export default function RnD() {
 
                         {/* วัตถุดิบ */}
                         <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Beaker size={16} style={{ color: '#1e88e5' }} /> วัตถุดิบ ({formulaForm.ingredients.length} รายการ)
+                            <Beaker size={16} style={{ color: '#1e88e5' }} /> วัตถุดิบ ({formulaForm.ingredients.filter(i => i.type !== 'packaging').length} รายการ)
                         </h4>
                         <div style={{ overflowX: 'auto', marginBottom: 16 }}>
                             <table className="data-table" style={{ width: '100%', minWidth: 1100 }}>
@@ -1089,42 +1117,42 @@ export default function RnD() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {formulaForm.ingredients.map((ing, idx) => (
-                                        <tr key={idx} style={{ verticalAlign: 'middle' }}>
-                                            <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                                    {formulaForm.ingredients.map((ing, originalIdx) => ({ing, originalIdx})).filter(({ing}) => ing.type !== 'packaging').map(({ing, originalIdx}, displayIdx) => (
+                                        <tr key={originalIdx} style={{ verticalAlign: 'middle' }}>
+                                            <td style={{ textAlign: 'center' }}>{displayIdx + 1}</td>
                                             <td style={{ padding: '8px 4px' }}>
-                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.type} onChange={e => updateIngredient(idx, 'type', e.target.value)}>
+                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.type} onChange={e => updateIngredient(originalIdx, 'type', e.target.value)}>
                                                     <option value="active">Active</option>
                                                     <option value="extract">Extract</option>
                                                     <option value="inactive">Inactive</option>
                                                 </CustomSelect>
                                             </td>
                                             <td style={{ padding: '8px 4px' }}>
-                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', minWidth: 200, padding: '6px 8px' }} value={ing.materialId} onChange={e => updateIngredient(idx, 'materialId', e.target.value)}>
+                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', minWidth: 200, padding: '6px 8px' }} value={ing.materialId} onChange={e => updateIngredient(originalIdx, 'materialId', e.target.value)}>
                                                     <option value="">-- เลือก (ถ้ามี) --</option>
-                                                    {materials.map(m => <option key={m.id} value={m.id}>{m.id} — {m.name}</option>)}
+                                                    {materials.filter(m => m.category !== 'Packaging').map(m => <option key={m.id} value={m.id}>{m.id} — {m.name}</option>)}
                                                 </CustomSelect>
                                             </td>
                                             {!ing.materialId ? (
                                                 <>
                                                     <td style={{ padding: '8px 4px' }}>
                                                         <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
-                                                            <TipTapCell value={ing.name || ''} onChange={val => updateIngredient(idx, 'name', val)} placeholder="ชื่อวัตถุดิบ" />
+                                                            <TipTapCell value={ing.name || ''} onChange={val => updateIngredient(originalIdx, 'name', val)} placeholder="ชื่อวัตถุดิบ" />
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: '8px 4px' }}>
                                                         <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
-                                                            <TipTapCell value={ing.engName || ''} onChange={val => updateIngredient(idx, 'engName', val)} placeholder="อังกฤษ" />
+                                                            <TipTapCell value={ing.engName || ''} onChange={val => updateIngredient(originalIdx, 'engName', val)} placeholder="อังกฤษ" />
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: '8px 4px' }}>
                                                         <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
-                                                            <TipTapCell value={ing.latinName || ''} onChange={val => updateIngredient(idx, 'latinName', val)} placeholder="วิทย์" />
+                                                            <TipTapCell value={ing.latinName || ''} onChange={val => updateIngredient(originalIdx, 'latinName', val)} placeholder="วิทย์" />
                                                         </div>
                                                     </td>
                                                     <td style={{ padding: '8px 4px' }}>
                                                         <div style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '4px', minHeight: '38px', padding: '6px 8px', display: 'flex', fontSize: 14 }}>
-                                                            <TipTapCell value={ing.partUsed || ''} onChange={val => updateIngredient(idx, 'partUsed', val)} placeholder="ส่วนที่ใช้" />
+                                                            <TipTapCell value={ing.partUsed || ''} onChange={val => updateIngredient(originalIdx, 'partUsed', val)} placeholder="ส่วนที่ใช้" />
                                                         </div>
                                                     </td>
                                                 </>
@@ -1134,16 +1162,16 @@ export default function RnD() {
                                                 </td>
                                             )}
                                             <td style={{ padding: '8px 4px' }}>
-                                                <input type="number" style={{ ...inputStyle, width: '100%', padding: '6px 8px', minHeight: '38px', boxSizing: 'border-box' }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateIngredient(idx, 'qty', parseFloat(e.target.value) || 0)} />
+                                                <input type="number" style={{ ...inputStyle, width: '100%', padding: '6px 8px', minHeight: '38px', boxSizing: 'border-box' }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateIngredient(originalIdx, 'qty', parseFloat(e.target.value) || 0)} />
                                             </td>
                                             <td style={{ padding: '8px 4px' }}>
-                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.unit} onChange={e => updateIngredient(idx, 'unit', e.target.value)}>
+                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.unit} onChange={e => updateIngredient(originalIdx, 'unit', e.target.value)}>
                                                     <option value="">- หน่วย -</option>
                                                     <option>กรัม</option><option>กิโลกรัม</option><option>มิลลิลิตร</option><option>ลิตร</option><option>ชิ้น</option>
                                                 </CustomSelect>
                                             </td>
                                             <td style={{ textAlign: 'center', padding: '8px 4px' }}>
-                                                <button className="btn-sm" onClick={() => removeIngredient(idx)} style={{ background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer', color: '#ef4444', padding: '6px', borderRadius: 4, marginTop: 2 }} title="ลบรายการ">
+                                                <button className="btn-sm" onClick={() => removeIngredient(originalIdx)} style={{ background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer', color: '#ef4444', padding: '6px', borderRadius: 4, marginTop: 2 }} title="ลบรายการ">
                                                     <Trash2 size={16} />
                                                 </button>
                                             </td>
@@ -1153,6 +1181,46 @@ export default function RnD() {
                             </table>
                         </div>
                         <button className="btn-sm" onClick={addIngredient} style={{ marginBottom: 20 }}><Plus size={14} /> เพิ่มวัตถุดิบ</button>
+
+                        {/* บรรจุภัณฑ์ */}
+                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, paddingTop: 16, borderTop: '1px dashed #e2e8f0' }}>
+                            <Package size={16} style={{ color: '#f59e0b' }} /> บรรจุภัณฑ์ ({formulaForm.ingredients.filter(i => i.type === 'packaging').length} รายการ)
+                        </h4>
+                        <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+                            <table className="data-table" style={{ width: '100%', minWidth: 800 }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ width: 40, textAlign: 'center' }}>#</th>
+                                        <th style={{ minWidth: 220 }}>บรรจุภัณฑ์ (อ้างอิงระบบ)</th>
+                                        <th style={{ width: 50, textAlign: 'center' }}>ลบ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {formulaForm.ingredients.map((ing, originalIdx) => ({ing, originalIdx})).filter(({ing}) => ing.type === 'packaging').map(({ing, originalIdx}, displayIdx) => (
+                                        <tr key={originalIdx} style={{ verticalAlign: 'middle' }}>
+                                            <td style={{ textAlign: 'center' }}>{displayIdx + 1}</td>
+                                            <td style={{ padding: '8px 4px' }}>
+                                                <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', minWidth: 200, padding: '6px 8px' }} value={ing.materialId} onChange={e => updateIngredient(originalIdx, 'materialId', e.target.value)}>
+                                                    <option value="">-- เลือก (ถ้ามี) --</option>
+                                                    {pmMaterials.map(m => <option key={m.id} value={m.id}>{m.id} — {m.name}</option>)}
+                                                </CustomSelect>
+                                            </td>
+                                            <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                                                <button className="btn-sm" onClick={() => removeIngredient(originalIdx)} style={{ background: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer', color: '#ef4444', padding: '6px', borderRadius: 4, marginTop: 2 }} title="ลบรายการ">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button className="btn-sm" onClick={() => setFormulaForm({
+                            ...formulaForm,
+                            ingredients: [...formulaForm.ingredients, { type: 'packaging', materialId: '', name: '', engName: '', latinName: '', partUsed: '', qty: 1, unit: 'ชิ้น' }]
+                        })} style={{ marginBottom: 24, background: '#fffbeb', color: '#d97706', border: '1px solid #fde68a' }}>
+                            <Plus size={14} /> เพิ่มบรรจุภัณฑ์
+                        </button>
 
                         {/* วิธีการผลิต */}
                         <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>

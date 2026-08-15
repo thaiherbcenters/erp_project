@@ -65,6 +65,7 @@ const contractMfgRoutes = require('./routes/contractMfg');
 const contractRoutes = require('./routes/contracts');
 const printRoutes = require('./routes/print');
 const templateRoutes = require('./routes/templates');
+const reportsRoutes = require('./routes/reports');
 
 // ── Rate Limiting สำหรับ Login (ป้องกัน brute force) ──
 const loginLimiter = rateLimit({
@@ -98,6 +99,7 @@ app.use('/api/production', productionRoutes);
 app.use('/api/planner', plannerRoutes);
 app.use('/api/rnd', rndRoutes);
 app.use('/api/packaging', packagingRoutes);
+app.use('/api/reports', reportsRoutes);
 app.use('/api/stock', stockRoutes);
 app.use('/api/legal-documents', legalDocumentRoutes);
 app.use('/api/contract-mfg-documents', contractMfgRoutes);

@@ -213,11 +213,15 @@ export default function Layout() {
                         {subPages.map((sub) => (
                             <NavLink
                                 key={sub.id}
-                                to={`${page.path}?tab=${sub.id}`}
+                                to={sub.path || `${page.path}?tab=${sub.id}`}
                                 className={() => {
                                     const currentTab = new URLSearchParams(location.search).get('tab')
                                         || getVisibleSubPages(page.id)[0]?.id;
-                                    return `sub-nav-item ${isActive && currentTab === sub.id ? 'active' : ''}`;
+                                    // If sub has an explicit path, match exactly. Otherwise, it's a tab so we must be exactly on the parent page path.
+                                    const isActiveRoute = sub.path 
+                                        ? location.pathname === sub.path 
+                                        : (location.pathname === page.path && currentTab === sub.id);
+                                    return `sub-nav-item ${isActiveRoute ? 'active' : ''}`;
                                 }}
                             >
                                 <span className="nav-label">{sub.name}</span>

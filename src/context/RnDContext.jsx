@@ -6,6 +6,7 @@ const RnDContext = createContext();
 export function RnDProvider({ children }) {
     const [formulas, setFormulas] = useState([]);
     const [materials, setMaterials] = useState([]);
+    const [pmMaterials, setPmMaterials] = useState([]);
     const [projects, setProjects] = useState([]);
     const [experiments, setExperiments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -53,11 +54,31 @@ export function RnDProvider({ children }) {
         }
     }, []);
 
+    const fetchPmMaterials = useCallback(async () => {
+        try {
+            const res = await fetch(`${API_BASE}/stock?category=บรรจุภัณฑ์&limit=1000`, {
+                headers: getAuthHeaders(false)
+            });
+            if (res.ok) {
+                const json = await res.json();
+                const pm = (json.data || []).map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    category: 'Packaging',
+                    unit: item.unit
+                }));
+                setPmMaterials(pm);
+            }
+        } catch (err) {
+            console.error('Failed to fetch PM materials:', err);
+        }
+    }, []);
+
     const fetchAll = useCallback(async (showLoading = false) => {
         if (showLoading) setLoading(true);
-        await Promise.all([fetchFormulas(), fetchMaterials(), fetchProjects(), fetchExperiments()]);
+        await Promise.all([fetchFormulas(), fetchMaterials(), fetchPmMaterials(), fetchProjects(), fetchExperiments()]);
         setLoading(false);
-    }, [fetchFormulas, fetchMaterials, fetchProjects, fetchExperiments]);
+    }, [fetchFormulas, fetchMaterials, fetchPmMaterials, fetchProjects, fetchExperiments]);
 
     useEffect(() => {
         fetchAll(true); // ครั้งแรกแสดง loading
@@ -220,7 +241,7 @@ export function RnDProvider({ children }) {
     }, [fetchFormulas]);
 
     const value = {
-        formulas, materials, projects, experiments, loading,
+        formulas, materials, pmMaterials, projects, experiments, loading,
         fetchFormulas, fetchMaterials, fetchProjects, fetchExperiments, fetchAll,
         createFormula, updateFormula, updateFormulaStatus, deleteFormula,
         createMaterial, updateMaterial, deleteMaterial,

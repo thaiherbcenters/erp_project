@@ -322,25 +322,57 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                                         VALUES (@ShipmentID, @ShipBatchNo, @ShipJobOrderID, @ShipProdTaskID, @ShipProductName, @ShipQty, @ShipCustomerName, @ShipCustomerPO, N'รอจัดส่ง', 'oem', @ShipPriority, @ShipDueDate, @ShipNotes, @ShipAddress, @ShipPhone)`);
                             console.log(`🚚 Shipping created: ${shipId} for OEM Batch ${batchNo} (Address: ${shipAddress ? 'Yes' : 'N/A'})`);
                         } else {
-                            // MTS → เข้าคลังจริง
+                            // MTS or WIP → เข้าคลัง
+                            let isWIP = batchNo.includes('-WIP');
+                            let finalProductName = productName;
                             let itemId = '';
-                            const existingCheck = await pool.request()
-                                .input('ProductName', sql.NVarChar, productName)
-                                .query('SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName');
-                            if (existingCheck.recordset.length > 0) {
-                                itemId = existingCheck.recordset[0].ItemID;
-                                await pool.request()
-                                    .input('ItemID', sql.VarChar, itemId)
-                                    .input('Qty', sql.Int, goodQty)
-                                    .query('UPDATE Stock_Items SET Quantity = Quantity + @Qty, UpdatedAt = GETDATE() WHERE ItemID = @ItemID');
-                            } else {
+                            let category = 'สินค้าสำเร็จรูป';
+                            let unit = 'ชิ้น';
+
+                            if (isWIP) {
+                                // For WIP, create a UNIQUE stock item row for Lot tracking
+                                try {
+                                    const pt = await pool.request().input('b', sql.VarChar, batchNo).query('SELECT Line, JobUnit FROM Production_Tasks WHERE BatchNo = @b');
+                                    const tankNo = pt.recordset[0]?.Line || 'WIP Line';
+                                    unit = pt.recordset[0]?.JobUnit || 'กรัม';
+                                    finalProductName = `${productName} [Lot: ${batchNo}] [${tankNo !== 'WIP Line' ? tankNo : 'ไม่ระบุถัง'}]`;
+                                    category = 'สินค้ากึ่งสำเร็จรูป';
+                                } catch (e) {
+                                    console.error('Error fetching WIP task details:', e);
+                                    finalProductName = `${productName} [Lot: ${batchNo}]`;
+                                    category = 'สินค้ากึ่งสำเร็จรูป';
+                                    unit = 'กรัม';
+                                }
+
                                 itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK-${getDatePrefix()}`, 3);
                                 await pool.request()
                                     .input('ItemID', sql.VarChar, itemId)
-                                    .input('ProductName', sql.NVarChar, productName)
+                                    .input('ProductName', sql.NVarChar, finalProductName)
                                     .input('Qty', sql.Int, goodQty)
+                                    .input('Unit', sql.NVarChar, unit)
+                                    .input('Category', sql.NVarChar, category)
                                     .query(`INSERT INTO Stock_Items (ItemID, ProductName, Quantity, Unit, Category)
-                                            VALUES (@ItemID, @ProductName, @Qty, N'ชิ้น', N'สินค้าสำเร็จรูป')`);
+                                            VALUES (@ItemID, @ProductName, @Qty, @Unit, @Category)`);
+                            } else {
+                                // Regular MTS: Merge into generic Stock_Items row
+                                const existingCheck = await pool.request()
+                                    .input('ProductName', sql.NVarChar, productName)
+                                    .query('SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName');
+                                if (existingCheck.recordset.length > 0) {
+                                    itemId = existingCheck.recordset[0].ItemID;
+                                    await pool.request()
+                                        .input('ItemID', sql.VarChar, itemId)
+                                        .input('Qty', sql.Int, goodQty)
+                                        .query('UPDATE Stock_Items SET Quantity = Quantity + @Qty, UpdatedAt = GETDATE() WHERE ItemID = @ItemID');
+                                } else {
+                                    itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK-${getDatePrefix()}`, 3);
+                                    await pool.request()
+                                        .input('ItemID', sql.VarChar, itemId)
+                                        .input('ProductName', sql.NVarChar, productName)
+                                        .input('Qty', sql.Int, goodQty)
+                                        .query(`INSERT INTO Stock_Items (ItemID, ProductName, Quantity, Unit, Category)
+                                                VALUES (@ItemID, @ProductName, @Qty, N'ชิ้น', N'สินค้าสำเร็จรูป')`);
+                                }
                             }
                             // Log it
                             await pool.request()
@@ -349,12 +381,12 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                                 .input('Quantity', sql.Int, goodQty)
                                 .input('RefNo', sql.VarChar, batchNo)
                                 .input('RefType', sql.VarChar, 'production')
-                                .input('ProductName', sql.NVarChar, productName)
+                                .input('ProductName', sql.NVarChar, finalProductName)
                                 .input('Notes', sql.NVarChar, `รับจากการผลิต Batch: ${batchNo}`)
                                 .input('CreatedBy', sql.VarChar, 'system')
                                 .query(`INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
                                         VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)`);
-                            console.log(`📦 MTS: Batch ${batchNo} → Stock (${goodQty} ชิ้น)`);
+                            console.log(`📦 MTS/WIP: Batch ${batchNo} → Stock (${goodQty} ${unit})`);
                         }
                     }
                 }

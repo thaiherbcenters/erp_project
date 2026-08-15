@@ -22,7 +22,7 @@ import {
     CheckSquare, Play, CheckCircle, Search,
     Clock, Package, AlertTriangle, Activity, ClipboardList,
     Timer, TrendingUp, Repeat, ShieldCheck, Warehouse,
-    SearchCheck, ChevronRight, Eye, XCircle, Send, Plus, Save,
+    SearchCheck, ChevronRight, ChevronLeft, ArrowLeft, Eye, XCircle, Send, Plus, Save,
     Calendar, Tag, Star
 } from 'lucide-react';
 import { PRODUCTION_STEPS } from '../data/productionMockData';
@@ -34,12 +34,128 @@ const STEP_ICONS = {
     Play, SearchCheck, Repeat, CheckCircle, Package, ShieldCheck, Warehouse
 };
 
+const WipChecklist = ({ task, targetWeight, onComplete }) => {
+    const [wipData, setWipData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [checklist, setChecklist] = useState({ raw: false, pkg: false });
+
+    // Mock computation
+    const getRequiredWip = (formulaName, targetWt, expectedQty) => {
+        let name = `น้ำ${formulaName}กึ่งสำเร็จรูป`;
+        if (formulaName === 'ยาหม่อง' || formulaName.includes('ยาหม่อง')) {
+            name = 'น้ำยาหม่องกึ่งสำเร็จรูป';
+        }
+        return { name, requiredQty: parseFloat((targetWt || (expectedQty * 50)).toFixed(4)), unit: 'กรัม' };
+    };
+
+    useEffect(() => {
+        const fetchWip = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/stock?category=${encodeURIComponent('สินค้ากึ่งสำเร็จรูป')}&limit=100`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const required = getRequiredWip(task.formulaName, targetWeight, task.expectedQty);
+                    
+                    // Match any WIP that starts with the required name to support Lot/Tank suffixes
+                    const matchingWips = (data.data || []).filter(item => item.name && item.name.startsWith(required.name));
+                    const totalWipQty = matchingWips.reduce((sum, item) => sum + (item.qty || 0), 0);
+                    
+                    setWipData({
+                        ...required,
+                        id: matchingWips.length > 0 ? matchingWips[0].id : null,
+                        currentQty: totalWipQty,
+                        lots: matchingWips
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchWip();
+    }, [task]);
+
+    if (loading) return <div style={{ padding: 12, color: '#64748b' }}>กำลังโหลดข้อมูลสต๊อก WIP...</div>;
+
+    const isEnough = wipData && wipData.currentQty >= wipData.requiredQty;
+
+    return (
+        <div className="op-modal-next-action" style={{ background: '#f8fafc', borderColor: '#e2e8f0', flexDirection: 'column', alignItems: 'stretch', gap: 16, marginBottom: 24, padding: '20px' }}>
+            <h4 style={{ margin: 0, fontSize: 15, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Warehouse size={18} color="#0369a1"/> ตรวจสอบความพร้อมของสินค้ากึ่งสำเร็จรูป (WIP)
+            </h4>
+            
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', padding: '16px', borderRadius: 8, border: isEnough ? '1px solid #bbf7d0' : '1px solid #fecaca', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: isEnough ? '#dcfce7' : '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isEnough ? '#16a34a' : '#dc2626' }}>
+                        {isEnough ? <CheckCircle size={24} /> : <span style={{fontSize: 24, fontWeight: 'bold'}}>!</span>}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 700, color: '#1e293b' }}>{wipData?.name}</span>
+                        <div style={{ display: 'flex', gap: 24, fontSize: 13, color: '#64748b' }}>
+                            <span>ต้องการใช้: <strong style={{color: '#334155'}}>{wipData?.requiredQty.toLocaleString()}</strong> {wipData?.unit}</span>
+                            <span>มีในสต๊อก: <strong style={{color: '#334155'}}>{wipData?.currentQty.toLocaleString()}</strong> {wipData?.unit}</span>
+                        </div>
+                    </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                    {isEnough ? (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#dcfce7', color: '#16a34a', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700 }}>
+                            <CheckCircle size={14} /> พร้อมผลิต
+                        </div>
+                    ) : (
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fee2e2', color: '#dc2626', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 700 }}>
+                            ขาดอีก {(wipData.requiredQty - wipData.currentQty).toLocaleString()} {wipData?.unit}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {!isEnough && (
+                <div className="alert alert-warning" style={{ margin: 0, fontSize: 13, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12, borderLeft: '4px solid #f59e0b', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <span style={{ fontSize: 16 }}>⚠️</span>
+                        <div>
+                            <strong style={{ display: 'block', marginBottom: 4, color: '#b45309' }}>ระบบพักงานชั่วคราว</strong>
+                            <span style={{ color: '#d97706' }}>สต๊อกสินค้ากึ่งสำเร็จรูปไม่เพียงพอ กรุณาเปิดบิลสั่งผลิต WIP สำหรับงานนี้ก่อน</span>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={() => window.location.href = `/operator/wip?formula=${encodeURIComponent(task.formulaName)}&qty=${wipData.requiredQty - wipData.currentQty}`}
+                        style={{ 
+                            background: '#fff', color: '#b45309', border: '1px solid #fcd34d', 
+                            padding: '6px 12px', borderRadius: 4, fontSize: 13, fontWeight: 600, 
+                            cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 
+                        }}
+                    >
+                        👉 ไปสร้างใบสั่งผลิต WIP
+                    </button>
+                </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                <button 
+                    className="op-btn op-btn-start" 
+                    disabled={!isEnough}
+                    style={{ opacity: isEnough ? 1 : 0.5, padding: '10px 24px', fontSize: 15 }}
+                    onClick={() => onComplete({ usedWip: wipData })}
+                >
+                    <Play size={16} /> เริ่มดำเนินการผลิต
+                </button>
+            </div>
+        </div>
+    );
+};
+
 export default function Operator() {
     const { user, getVisibleSubPages, hasSectionPermission, canUpdate } = useAuth();
     const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
     const { showAlert, showConfirm } = useAlert();
     const { jobs } = usePlanner();
-    const { formulas: MOCK_FORMULAS } = useRnD();
+    const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS, pmMaterials } = useRnD();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('operator');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
@@ -54,6 +170,7 @@ export default function Operator() {
     // ── Production Qty Modal (ถามยอดผลิตก่อนกดผ่านขั้นตอน) ──
     const [qtyModal, setQtyModal] = useState({ open: false, taskId: null, taskName: '', expectedQty: 0, currentProduced: 0 });
     const [qtyForm, setQtyForm] = useState({ producedQty: '', defectQty: '0', notes: '' });
+    const [checklist, setChecklist] = useState({ wip: null, raw: false, pkg: false });
 
     useEffect(() => {
         if (selectedTask) {
@@ -97,6 +214,8 @@ export default function Operator() {
     const totalProduced = tasks.reduce((sum, t) => sum + t.producedQty, 0);
     const totalDefect = tasks.reduce((sum, t) => sum + t.defectQty, 0);
 
+
+
     // ── Check if task is waiting for QC result ──
     const isWaitingForQc = (task) => {
         if (task.currentStep !== 'qc_inprocess' && task.currentStep !== 'qc_final') return false;
@@ -110,7 +229,7 @@ export default function Operator() {
     };
 
     // ── Handle advancing to next step (with QC auto-send) ──
-    const handleAdvanceStep = (taskId) => {
+    const handleAdvanceStep = (taskId, extraPayload = {}) => {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
@@ -135,14 +254,14 @@ export default function Operator() {
 
         // If next step is QC, advance AND auto-send QC request
         if (nextStep.key === 'qc_inprocess' || nextStep.key === 'qc_final') {
-            advanceTaskStep(taskId);
+            advanceTaskStep(taskId, extraPayload);
             // Send QC request after advancing
             setTimeout(() => {
                 const updatedTask = { ...task, currentStep: nextStep.key };
                 sendQcRequest(updatedTask, nextStep.key);
             }, 100);
         } else {
-            advanceTaskStep(taskId);
+            advanceTaskStep(taskId, extraPayload);
         }
     };
 
@@ -265,7 +384,7 @@ export default function Operator() {
     // ══════════════════════════════════════════════════════════════════
     // Task Detail Modal
     // ══════════════════════════════════════════════════════════════════
-    const renderTaskModal = () => {
+    const renderWorkstation = () => {
         if (!selectedTask) return null;
         // Get fresh task data from context
         const task = tasks.find(t => t.id === selectedTask.id) || selectedTask;
@@ -276,100 +395,81 @@ export default function Operator() {
         const waitingQc = isWaitingForQc(task);
         const qcReqForTask = qcRequests.filter(r => r.taskId === task.id);
 
-        return (
-            <div className="rnd-modal-overlay" onClick={() => setSelectedTask(null)}>
-                <div className="rnd-modal" style={{ maxWidth: 800 }} onClick={(e) => e.stopPropagation()}>
-                    <div className="rnd-modal-header">
-                        <div>
-                            <h2>{task.batchNo} — {task.formulaName}</h2>
-                            <div className="rnd-modal-meta">
-                                <span className="op-jo-ref">{task.jobOrderId}</span>
-                                <span className={`op-status-badge ${getStatusBadge(task.status)}`}>{task.status}</span>
-                                <span className="badge badge-neutral">{task.line}</span>
-                            </div>
-                        </div>
-                        <button className="rnd-modal-close" onClick={() => setSelectedTask(null)}><XCircle size={22} /></button>
-                    </div>
+        const formula = MOCK_FORMULAS.find(f => f.name === task.formulaName || f.id === task.formulaName);
+        let targetWeight = task.expectedQty;
+        const isPieceUnit = ['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(task.jobUnit);
+        if (formula && isPieceUnit && formula.unitSize && formula.unitSize > 0) {
+            targetWeight = task.expectedQty * formula.unitSize;
+        }
+        
+        const scaleFactor = formula ? targetWeight / formula.batchSize : 1;
+        const isStandard = formula ? targetWeight === formula.batchSize : true;
+        const scaleLabel = formula ? (isStandard
+            ? `สูตรมาตรฐาน (1 Batch = ${formula.batchSize.toLocaleString()} ${formula.unit})`
+            : `สเกลตามยอดผลิต ${task.expectedQty.toLocaleString()} ${task.jobUnit || 'หน่วย'} (${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก)`) : '';
 
-                    <div className="rnd-modal-body">
-                        <div className="rnd-modal-info-grid">
+        const rawMaterials = formula ? formula.ingredients.filter(i => i.type !== 'packaging') : [];
+        const packagingItems = formula ? formula.ingredients.filter(i => i.type === 'packaging') : [];
+        
+        const totalRmScaled = rawMaterials.reduce((sum, ing) => sum + (ing.qty * scaleFactor), 0);
+
+        return (
+            <div className="op-workstation-container" style={{ background: '#fff', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden', marginTop: 16 }}>
+                <div className="op-workstation-header" style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', padding: '20px 24px', borderBottom: '1px solid #e2e8f0' }}>
+                    <button className="op-btn" onClick={() => setSelectedTask(null)} style={{ marginRight: 24, padding: '8px 16px', borderRadius: 8, background: '#f97316', color: 'white', border: 'none', boxShadow: '0 2px 4px rgba(249,115,22,0.2)' }}>
+                        <ArrowLeft size={18} /> กลับหน้ารวม
+                    </button>
+                    <div>
+                        <h2 style={{ margin: '0 0 8px 0', fontSize: 24, color: '#0f172a', fontWeight: 800 }}>{task.batchNo} — {task.formulaName}</h2>
+                        <div className="op-workstation-meta" style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
+                            <span className="op-jo-ref" style={{ background: '#e0e7ff', color: '#4338ca', padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>{task.jobOrderId}</span>
+                            <span className={`op-status-badge ${getStatusBadge(task.status)}`}>{task.status}</span>
+                            <span className="badge badge-neutral">Line: {task.line}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="op-workstation-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 0 }}>
+                    {/* LEFT PANEL */}
+                    <div className="op-ws-left" style={{ padding: 24, borderRight: '1px solid #e2e8f0', background: '#fcfcfd' }}>
+                        
+                        <div className="rnd-modal-info-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 32 }}>
                             <div className="rnd-modal-info-item">
                                 <label>กระบวนการ</label>
                                 <span>{task.process}</span>
                             </div>
-                            <div className="rnd-modal-info-item">
-                                <label>ผลิตได้ / เป้าหมาย</label>
-                                <span>{task.producedQty} / {task.expectedQty}</span>
+                            <div className="rnd-modal-info-item" style={{ padding: '16px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                                <label style={{ color: '#0369a1', marginBottom: 8 }}>ผลิตได้ / เป้าหมาย (Batch)</label>
+                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                                    <span style={{ fontSize: 36, fontWeight: 800, color: '#0284c7', lineHeight: 1 }}>{task.producedQty}</span>
+                                    <span style={{ fontSize: 20, fontWeight: 600, color: '#64748b' }}>/ {task.expectedQty}</span>
+                                </div>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ของเสีย</label>
-                                <span style={{ color: task.defectQty > 0 ? '#ef4444' : undefined }}>{task.defectQty}</span>
+                                <span style={{ color: task.defectQty > 0 ? '#ef4444' : undefined, fontSize: 18 }}>{task.defectQty}</span>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ขั้นตอนปัจจุบัน</label>
-                                <span style={{ color: waitingQc ? '#f59e0b' : '#7b7bf5', fontWeight: 700 }}>
+                                <span style={{ color: waitingQc ? '#f59e0b' : '#7b7bf5', fontWeight: 700, fontSize: 16 }}>
                                     {PRODUCTION_STEPS.find(s => s.key === task.currentStep)?.label}
                                     {waitingQc && ' (รอ QC)'}
                                 </span>
                             </div>
                         </div>
 
-                        {/* วัตถุดิบที่ต้องใช้สำหรับงานนี้ */}
-                        {(() => {
-                            const formula = MOCK_FORMULAS.find(f => f.name === task.formulaName || f.id === task.formulaName);
-                            if (!formula) return null;
-
-                            const scaleFactor = task.expectedQty / formula.batchSize;
-                            const isStandard = task.expectedQty === formula.batchSize;
-                            const scaleLabel = isStandard
-                                ? `สูตรมาตรฐาน (1 Batch = ${formula.batchSize.toLocaleString()} ${formula.unit})`
-                                : `สเกลตามยอดผลิต ${task.expectedQty.toLocaleString()} ${formula.unit} (${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก)`;
-
-                            return (
-                                <div className="rnd-modal-section" style={{ marginTop: 24, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                                    <h4 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <Package size={16} /> วัตถุดิบที่ต้องเตรียม ({scaleLabel})
-                                    </h4>
-                                    <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
-                                        <table className="data-table rnd-ingredients-table" style={{ background: '#fff', margin: 0, border: 'none' }}>
-                                            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-                                                <tr>
-                                                    <th>วัตถุดิบ</th>
-                                                    <th>ต่อ 1 Batch ({formula.batchSize.toLocaleString()} {formula.unit})</th>
-                                                    <th>จำนวนที่ต้องใช้จริง</th>
-                                                    <th>หน่วย</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {formula.ingredients.map((ing, idx) => {
-                                                    const cleanName = ing.name ? ing.name.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim() : '-';
-                                                    return (
-                                                    <tr key={idx}>
-                                                        <td>{cleanName}</td>
-                                                        <td style={{ color: 'var(--text-muted)' }}>{ing.qty}</td>
-                                                        <td style={{ fontWeight: 700, color: !isStandard ? '#0369a1' : 'var(--text)' }}>{(ing.qty * scaleFactor).toFixed(2)}</td>
-                                                        <td>{ing.unit}</td>
-                                                    </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
                         {/* FULL STEPPER */}
-                        <div className="op-modal-stepper-section">
-                            <h4 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <Activity size={16} /> ขั้นตอนการผลิต
+                        <div className="op-modal-stepper-section" style={{ marginBottom: 32 }}>
+                            <h4 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
+                                <Activity size={18} /> ความคืบหน้าของงาน
                             </h4>
                             <WorkflowStepper task={task} compact={false} />
                         </div>
 
+                        {/* --- ACTION BLOCKS --- */}
                         {/* QC Waiting State */}
                         {waitingQc && (
-                            <div className="op-qc-waiting-banner">
+                            <div className="op-qc-waiting-banner" style={{ marginBottom: 24 }}>
                                 <SearchCheck size={20} />
                                 <div>
                                     <strong>📋 ส่งคำขอ QC แล้ว — รอเจ้าหน้าที่ QC ตรวจ</strong>
@@ -378,10 +478,10 @@ export default function Operator() {
                             </div>
                         )}
 
-                        {/* QC Send Button (if at QC step but hasn't sent yet) */}
+                        {/* QC Send Button */}
                         {isQcStep && !hasQcRequest(task) && (
-                            <div className="op-modal-next-action" style={{ background: '#fef3c7', borderColor: '#fde68a' }}>
-                                <span>ขั้นตอนนี้ต้องส่งให้ QC ตรวจ</span>
+                            <div className="op-modal-next-action" style={{ background: '#fef3c7', borderColor: '#fde68a', marginBottom: 24 }}>
+                                <span>ขั้นตอนนี้ต้องส่งให้ QC ตรวจก่อนดำเนินการต่อ</span>
                                 {canUpdate('operator_dashboard') && (
                                     <button className="op-btn op-btn-qc" onClick={() => sendQcRequest(task, task.currentStep)}>
                                         <Send size={14} /> ส่งคำขอ QC
@@ -390,13 +490,39 @@ export default function Operator() {
                             </div>
                         )}
 
-                        {/* Normal Next Step (non-QC) */}
-                        {!isLastStep && !isQcStep && task.currentStep !== 'packaging' && task.status !== 'เสร็จสิ้น' && (
-                            <div className="op-modal-next-action">
-                                <span>ขั้นตอนถัดไป: <strong>{nextStep?.label}</strong></span>
+                        {/* Pending State - Just Start Button */}
+                        {task.currentStep === 'pending' && (
+                            <div className="op-modal-next-action" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                                <div>
+                                    <h4 style={{ margin: 0, fontSize: 15, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <Play size={18} /> ยืนยันเริ่มปฏิบัติงาน
+                                    </h4>
+                                    <span style={{ fontSize: 13, color: '#15803d' }}>กดปุ่มเพื่อเปลี่ยนสถานะเป็นกำลังดำเนินการ และเข้าสู่ขั้นตอนที่ 1</span>
+                                </div>
                                 {canUpdate('operator_dashboard') && (
-                                    <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
-                                        <ChevronRight size={14} /> ไปขั้นตอนถัดไป
+                                    <button className="op-btn op-btn-start" style={{ background: '#22c55e', borderColor: '#16a34a' }} onClick={() => handleAdvanceStep(task.id)}>
+                                        เริ่มงาน
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Checklist for Step: Prepare */}
+                        {task.currentStep === 'prepare' && !waitingQc && (
+                            <WipChecklist 
+                                task={task} 
+                                targetWeight={totalRmScaled > 0 ? totalRmScaled : targetWeight}
+                                onComplete={(extra) => handleAdvanceStep(task.id, extra)} 
+                            />
+                        )}
+
+                        {/* Normal Next Step (non-QC) */}
+                        {!isLastStep && !isQcStep && task.currentStep !== 'packaging' && task.currentStep !== 'pending' && task.currentStep !== 'prepare' && task.status !== 'เสร็จสิ้น' && !waitingQc && (
+                            <div className="op-modal-next-action" style={{ marginBottom: 24 }}>
+                                <span style={{ fontSize: 15 }}>ขั้นตอนถัดไป: <strong>{nextStep?.label}</strong></span>
+                                {canUpdate('operator_dashboard') && (
+                                    <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)} style={{ padding: '10px 20px', fontSize: 15 }}>
+                                        <ChevronRight size={16} /> ไปขั้นตอนถัดไป
                                     </button>
                                 )}
                             </div>
@@ -404,102 +530,16 @@ export default function Operator() {
 
                         {/* Packaging Wait State */}
                         {task.currentStep === 'packaging' && (
-                            <div className="op-modal-next-action" style={{ background: '#f5f3ff', borderColor: '#ddd6fe' }}>
+                            <div className="op-modal-next-action" style={{ background: '#f5f3ff', borderColor: '#ddd6fe', marginBottom: 24 }}>
                                 <span style={{ color: '#8b5cf6', fontWeight: 700 }}>📦 ข้อมูลถูกส่งไปฝ่ายบรรจุภัณฑ์แล้ว กรุณารอ...</span>
                             </div>
                         )}
 
-                        {/* ==================================================== */}
-                        {/* UPDATE PRODUCTION LOGS SECTION */}
-                        {/* ==================================================== */}
-                        {task.status !== 'เสร็จสิ้น' && canUpdate('operator_dashboard') && (
-                            <div className="op-log-section">
-                                <h4 style={{ margin: '24px 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: '#374151' }}>
-                                    <Plus size={16} /> บันทึกยอดผลิต/เสีย (อัปเดตรายกะ)
-                                </h4>
-                                <div className="op-log-form">
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label>ยอดดี (เพิ่ม)</label>
-                                        <input 
-                                            type="number" 
-                                            min="0" 
-                                            style={{ width: '100%', padding: '6px' }}
-                                            value={logForm.producedQty}
-                                            onChange={(e) => setLogForm({...logForm, producedQty: e.target.value})}
-                                            placeholder="จำนวนชิ้น"
-                                            disabled={isSubmittingLog}
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ color: '#ef4444' }}>ของเสีย (เพิ่ม)</label>
-                                        <input 
-                                            type="number" 
-                                            min="0" 
-                                            style={{ width: '100%', padding: '6px', borderColor: '#fca5a5' }}
-                                            value={logForm.defectQty}
-                                            onChange={(e) => setLogForm({...logForm, defectQty: e.target.value})}
-                                            placeholder="จำนวนชิ้น"
-                                            disabled={isSubmittingLog}
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ marginBottom: 0, flex: 2 }}>
-                                        <label>หมายเหตุ</label>
-                                        <input 
-                                            type="text" 
-                                            style={{ width: '100%', padding: '6px' }}
-                                            value={logForm.notes}
-                                            onChange={(e) => setLogForm({...logForm, notes: e.target.value})}
-                                            placeholder="ระบุหมายเหตุถ้ามี"
-                                            disabled={isSubmittingLog}
-                                        />
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                                        <button 
-                                            className="op-btn" 
-                                            style={{ height: '36px', background: 'var(--primary)', color: 'white', padding: '0 12px', borderRadius: 4, fontWeight: 600 }}
-                                            onClick={handleAddLog}
-                                            disabled={isSubmittingLog || (!logForm.producedQty && !logForm.defectQty)}
-                                        >
-                                            {isSubmittingLog ? 'รอ...' : <><Save size={14} /> บันทึก</>}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* LIST LOG HISTORY */}
-                        {selectedTaskLogs.length > 0 && (
-                            <div className="op-qc-history" style={{ marginTop: 24, background: '#f8fafc' }}>
-                                <h4 style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 700 }}>📅 ประวัติการลงยอดผลิต</h4>
-                                <table style={{ width: '100%', fontSize: 13, textAlign: 'left', borderCollapse: 'collapse' }}>
-                                    <thead>
-                                        <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b' }}>
-                                            <th style={{ padding: '4px 0' }}>เวลา</th>
-                                            <th>โดย</th>
-                                            <th>ยอดดี (+)</th>
-                                            <th>เสีย (+)</th>
-                                            <th>หมายเหตุ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {selectedTaskLogs.map(log => (
-                                            <tr key={log.LogID} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                <td style={{ padding: '6px 0', color: '#475569' }}>{new Date(log.LogDate).toLocaleString('th-TH')}</td>
-                                                <td>{log.OperatorID}</td>
-                                                <td style={{ color: '#059669', fontWeight: 600 }}>+{log.ProducedQty}</td>
-                                                <td style={{ color: log.DefectQty > 0 ? '#ef4444' : '#94a3b8' }}>{log.DefectQty > 0 ? `+${log.DefectQty}` : '-'}</td>
-                                                <td style={{ color: '#475569' }}>{log.Notes || '-'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
 
                         {/* QC History for this task */}
                         {qcReqForTask.length > 0 && (
                             <div className="op-qc-history">
-                                <h4 style={{ margin: '16px 0 8px', fontSize: 13, fontWeight: 700 }}>📋 ประวัติ QC ของงานนี้</h4>
+                                <h4 style={{ margin: '16px 0 12px', fontSize: 14, fontWeight: 700, color: '#334155' }}>📋 ประวัติ QC ของงานนี้</h4>
                                 {qcReqForTask.map(r => (
                                     <div key={r.id} className={`op-qc-history-item ${r.status === 'ผ่าน' ? 'passed' : r.status === 'ไม่ผ่าน' ? 'failed' : 'pending'}`}>
                                         <div className="op-qc-history-top">
@@ -516,6 +556,101 @@ export default function Operator() {
                                 ))}
                             </div>
                         )}
+                    </div>
+
+                    {/* RIGHT PANEL */}
+                    <div className="op-ws-right" style={{ padding: 24 }}>
+                        
+
+
+                        {/* Ingredients Table */}
+                        {formula && (
+                            <div className="rnd-modal-section" style={{ padding: 20, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 24 }}>
+                                <h4 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: '#334155' }}>
+                                    <Package size={18} /> วัตถุดิบที่ต้องเตรียม <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>({scaleLabel})</span>
+                                </h4>
+                                <div style={{ maxHeight: 250, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+                                    <table className="data-table rnd-ingredients-table" style={{ background: '#fff', margin: 0, border: 'none' }}>
+                                        <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                                            <tr>
+                                                <th>วัตถุดิบ</th>
+                                                <th>ต่อ 1 Batch</th>
+                                                <th>ที่ต้องใช้จริง</th>
+                                                <th>หน่วย</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rawMaterials.map((ing, idx) => {
+                                                const pmMatch = pmMaterials?.find(m => String(m.id) === String(ing.materialId));
+                                                const rawMatch = MOCK_RAW_MATERIALS?.find(m => String(m.id) === String(ing.materialId));
+                                                const foundName = ing.name || (pmMatch ? pmMatch.name : (rawMatch ? rawMatch.name : null));
+                                                const cleanName = foundName ? foundName.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim() : '-';
+                                                return (
+                                                <tr key={idx}>
+                                                    <td>{cleanName}</td>
+                                                    <td style={{ color: 'var(--text-muted)' }}>{ing.qty}</td>
+                                                    <td style={{ fontWeight: 700, color: !isStandard ? '#0369a1' : 'var(--text)' }}>{(ing.qty * scaleFactor).toFixed(4)}</td>
+                                                    <td>{ing.unit}</td>
+                                                </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                {/* Packaging Table */}
+                                {packagingItems.length > 0 && (
+                                    <div style={{ marginTop: 20 }}>
+                                        <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#475569' }}>📦 บรรจุภัณฑ์ที่ต้องใช้</h4>
+                                        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+                                            <table className="data-table" style={{ background: '#fff', margin: 0, border: 'none', fontSize: 13 }}>
+                                                <thead>
+                                                    <tr>
+                                                        <th>บรรจุภัณฑ์</th>
+                                                        <th>จำนวนที่ต้องใช้จริง</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {(() => {
+                                                        const maxPkgQty = Math.max(...packagingItems.map(p => parseFloat(p.qty) || 1));
+                                                        let inferredBatchYield = 1;
+                                                        if (maxPkgQty > 50) {
+                                                            inferredBatchYield = maxPkgQty;
+                                                        } else if (formula.unitSize && formula.batchSize) {
+                                                            inferredBatchYield = formula.batchSize / formula.unitSize;
+                                                        }
+                                                        
+                                                        let targetUnits = task.expectedQty;
+                                                        if (!isPieceUnit && formula.unitSize && formula.unitSize > 0) {
+                                                            targetUnits = Math.ceil(task.expectedQty / formula.unitSize);
+                                                        }
+
+                                                        return packagingItems.map((ing, idx) => {
+                                                            const pmMatch = pmMaterials?.find(m => String(m.id) === String(ing.materialId));
+                                                            const rawMatch = MOCK_RAW_MATERIALS?.find(m => String(m.id) === String(ing.materialId));
+                                                            const foundName = ing.name || (pmMatch ? pmMatch.name : (rawMatch ? rawMatch.name : null));
+                                                            const cleanName = foundName ? foundName.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim() : '-';
+                                                            
+                                                            const baseQty = parseFloat(ing.qty) || 1;
+                                                            const pkgRatio = baseQty / inferredBatchYield;
+                                                            const scaledQty = Math.ceil(targetUnits * pkgRatio);
+
+                                                            return (
+                                                            <tr key={idx}>
+                                                                <td>{cleanName}</td>
+                                                                <td style={{ fontWeight: 700, color: '#1e40af' }}>{scaledQty.toLocaleString()} {ing.unit || 'ชิ้น'}</td>
+                                                            </tr>
+                                                            );
+                                                        });
+                                                    })()}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                     </div>
                 </div>
             </div>
@@ -594,7 +729,13 @@ export default function Operator() {
                                                 key={group.jobOrderId} 
                                                 className={`op-jo-group-card ${hasQcWaiting ? 'op-jo-group-qc' : ''}`}
                                                 style={{ cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'translateY(-2px)' } }}
-                                                onClick={() => setExpandedJobOrder(group.jobOrderId)}
+                                                onClick={() => {
+                                                    if (group.tasks.length === 1) {
+                                                        setSelectedTask(group.tasks[0]);
+                                                    } else {
+                                                        setExpandedJobOrder(group.jobOrderId);
+                                                    }
+                                                }}
                                             >
                                                 <div className="op-jo-group-header">
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -709,24 +850,20 @@ export default function Operator() {
                                                     return null;
                                                 })()}
 
-                                                <div className="op-active-actions">
-                                                    {waitingQc ? (
-                                                        <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
-                                                    ) : isQcStep ? (
-                                                        <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
-                                                    ) : task.currentStep === 'packaging' ? (
-                                                        <span className="op-waiting-label" style={{ color: '#8b5cf6', background: '#f5f3ff' }}>📦 รอแผนกบรรจุภัณฑ์...</span>
-                                                    ) : task.currentStep === 'pending' ? (
-                                                        <button className="op-btn op-btn-start" style={{ background: '#10b981', color: 'white', borderColor: '#059669' }} onClick={() => startTask(task.id)}>
-                                                            <Play size={14} /> เริ่มดำเนินการ
-                                                        </button>
-                                                    ) : !isLastStep && !isQcStep ? (
-                                                        <button className="op-btn op-btn-start" onClick={() => handleAdvanceStep(task.id)}>
-                                                            <ChevronRight size={14} /> ขั้นตอนถัดไป
-                                                        </button>
-                                                    ) : null}
-                                                    <button className="op-btn op-btn-detail" onClick={() => setSelectedTask(task)}>
-                                                        <Eye size={14} /> รายละเอียด
+                                                <div className="op-active-actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div style={{ fontSize: 13, color: '#64748b' }}>
+                                                        {waitingQc ? (
+                                                            <span className="op-waiting-label">⏳ รอเจ้าหน้าที่ QC ตรวจ...</span>
+                                                        ) : isQcStep ? (
+                                                            <span className="op-waiting-label">⏳ ขั้นตอน QC</span>
+                                                        ) : task.currentStep === 'packaging' ? (
+                                                            <span className="op-waiting-label" style={{ color: '#8b5cf6', background: '#f5f3ff' }}>📦 รอแผนกบรรจุภัณฑ์...</span>
+                                                        ) : (
+                                                            <span>กรุณากดเข้าพื้นที่ทำงานเพื่อดำเนินการต่อ</span>
+                                                        )}
+                                                    </div>
+                                                    <button className="op-btn op-btn-start" style={{ background: '#3b82f6', color: 'white', borderColor: '#2563eb', padding: '6px 12px' }} onClick={() => setSelectedTask(task)}>
+                                                        เข้าสู่พื้นที่ทำงาน <ChevronRight size={14} style={{ marginLeft: 4 }} />
                                                     </button>
                                                 </div>
                                             </div>
@@ -947,9 +1084,8 @@ export default function Operator() {
                 <h1>{getPageTitle()}</h1>
                 <p>{getPageDesc()}</p>
             </div>
-            {currentTab === 'operator_dashboard' && renderDashboard()}
+            {currentTab === 'operator_dashboard' && (!selectedTask ? renderDashboard() : renderWorkstation())}
             {currentTab === 'operator_history' && renderHistory()}
-            {renderTaskModal()}
 
             {/* ── Production Qty Modal ── */}
             {qtyModal.open && (

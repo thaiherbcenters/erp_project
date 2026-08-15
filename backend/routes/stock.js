@@ -283,6 +283,11 @@ router.get('/:id/detail', async (req, res) => {
             productionTasks = prodRes.recordset;
         }
 
+        // 4. Get WIP Lots if applicable
+        const wipLotsRes = await pool.request()
+            .input('ItemID', sql.VarChar, itemId)
+            .query('SELECT * FROM WIP_Lots WHERE ItemID = @ItemID ORDER BY CreatedAt DESC');
+
         res.json({
             item: {
                 id: item.ItemID,
@@ -306,6 +311,7 @@ router.get('/:id/detail', async (req, res) => {
                 createdBy: l.CreatedBy,
                 date: l.CreatedAt
             })),
+            wipLots: wipLotsRes.recordset,
             productionTasks: productionTasks.map(t => ({
                 taskId: t.TaskID,
                 jobOrderId: t.JobOrderID,
@@ -531,6 +537,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res)
             // Generate ItemID based on category
             let prefix = 'STK';
             if (category === 'สินค้าสำเร็จรูป') prefix = 'FG';
+            else if (category === 'สินค้ากึ่งสำเร็จรูป') prefix = 'WIP';
             else if (category === 'วัตถุดิบ') prefix = 'RM';
             else if (category === 'บรรจุภัณฑ์') prefix = 'PM';
             else if (category === 'วัสดุสิ้นเปลือง') prefix = 'SP';
@@ -574,6 +581,20 @@ router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res)
     } catch (err) {
         console.error('Error adding stock item:', err);
         res.status(500).json({ message: 'Error adding stock item' });
+    }
+});
+
+// ==========================================
+// WIP LOTS MODULE
+// ==========================================
+router.get('/wip-lots', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query('SELECT * FROM WIP_Lots ORDER BY CreatedAt DESC');
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching WIP lots:', err);
+        res.status(500).json({ message: 'Error fetching WIP lots' });
     }
 });
 

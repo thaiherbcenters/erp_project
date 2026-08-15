@@ -160,7 +160,7 @@ export function ProductionProvider({ children }) {
     }, [tasks, fetchTasks]);
 
     // ── Advance task to next step ──
-    const advanceTaskStep = useCallback(async (taskId) => {
+    const advanceTaskStep = useCallback(async (taskId, extraPayload = {}) => {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
@@ -175,7 +175,8 @@ export function ProductionProvider({ children }) {
             currentStep: nextStep.key,
             stepTimes: { ...task.stepTimes, [nextStep.key]: now },
             status: isFinished ? 'เสร็จสิ้น' : 'กำลังทำ',
-            endTime: isFinished ? now : null
+            endTime: isFinished ? now : null,
+            ...extraPayload
         };
 
         try {
@@ -276,9 +277,9 @@ export function ProductionProvider({ children }) {
         const now = new Date().toISOString();
         const payload = {
             status: 'กำลังทำ',
-            currentStep: 'production_1',
+            currentStep: 'prepare',
             startTime: now,
-            stepTimes: { ...task.stepTimes, production_1: now }
+            stepTimes: { ...task.stepTimes, prepare: now }
         };
 
         try {

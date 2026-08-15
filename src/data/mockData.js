@@ -253,7 +253,13 @@ export const ALL_PAGES = [
       {
         id: 'reports_list', name: 'รายการรายงาน',
         sections: [
-          { id: 'reports_list_cards', name: 'การ์ดรายงาน' },
+          { id: 'reports_list_cards', name: 'รายการการ์ดรายงาน' },
+        ],
+      },
+      {
+        id: 'reports_traceability', name: 'สอบกลับล็อตผลิต (Traceability)',
+        sections: [
+          { id: 'reports_trace_search', name: 'ช่องค้นหาล็อต/Batch' },
         ],
       },
     ],
@@ -435,6 +441,12 @@ export const ALL_PAGES = [
         sections: [
           { id: 'operator_dashboard_tasks', name: 'งานที่ต้องรับผิดชอบ' },
           { id: 'operator_dashboard_status', name: 'อัปเดตสถานะการผลิต' },
+        ],
+      },
+      {
+        id: 'operator_wip', name: 'การทำ WIP', path: '/operator/wip',
+        sections: [
+          { id: 'operator_wip_create', name: 'สร้างใบสั่งผลิต WIP' }
         ],
       },
       {

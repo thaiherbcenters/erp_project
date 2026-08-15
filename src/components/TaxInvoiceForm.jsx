@@ -2868,7 +2868,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                                 <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
                                     ยอดรวม<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>TOTAL</span>
                                 </td>
-                                <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderTop: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', fontSize: '10pt' }}>
+                                <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderTop: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', fontSize: '10pt' }}>
                                     <span style={{ fontWeight: 'normal' }}>{subTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                 </td>
                             </tr>

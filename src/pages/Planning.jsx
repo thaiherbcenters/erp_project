@@ -40,7 +40,7 @@ export default function Planning() {
     const visibleSubPages = getVisibleSubPages('planning');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
     const { jobs, loading, releaseJobOrder, createJob } = usePlanner();
-    const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS } = useRnD();
+    const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS, pmMaterials } = useRnD();
     const { qcRequests } = useProduction();
     const { showAlert, showConfirm } = useAlert();
     const { signatures: dbSignatures } = useSignatures();
@@ -193,7 +193,11 @@ export default function Planning() {
 
         const bSize = formula.batchSize > 0 ? formula.batchSize : 1;
         // OEM: ผลิตพอดีจำนวนสั่ง (ไม่ปัดขึ้นเป็น batch)
-        const scaleFactor = item.Qty / bSize;
+        let effectiveTotalBase = item.Qty;
+        if (['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(item.Unit || 'ชิ้น') && !['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(formula.unit)) {
+            effectiveTotalBase = item.Qty * (formula.unitSize || 1);
+        }
+        const scaleFactor = effectiveTotalBase / bSize;
 
         setCreatingItemIdx(itemIdx);
         const userNotes = item.notes ? item.notes.trim() : '';
@@ -203,9 +207,9 @@ export default function Planning() {
             formulaId: formula.id,
             formulaName: formula.name,
             batchQty: 1,
-            batchSize: item.Qty, // ผลิตพอดีจำนวนสั่ง
+            batchSize: effectiveTotalBase, // Store effective base amount for reference
             totalQty: item.Qty,
-            unit: formula.unit,
+            unit: item.Unit || 'ชิ้น',
             priority: item.priority,
             planDate: item.planDate || new Date().toISOString().split('T')[0],
             dueDate: soPlanData.deliveryDate ? new Date(soPlanData.deliveryDate).toISOString().split('T')[0] : '',
@@ -1282,41 +1286,108 @@ export default function Planning() {
                         {formula && (() => {
                             // OEM scaling: if totalQty differs from formula batchSize, scale ingredients proportionally
                             const isOEM = (job.notes && (job.notes.includes('MTO') || job.notes.includes('OEM'))) || (job.productionType && job.productionType.includes('OEM'));
-                            const scaleFactor = isOEM ? (job.totalQty / formula.batchSize) : job.batchQty;
+                            
+                            let effectiveTotalBase = job.totalQty;
+                            if (['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(job.unit) && !['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(formula.unit)) {
+                                effectiveTotalBase = job.totalQty * (formula.unitSize || 1);
+                            }
+                            
+                            const scaleFactor = isOEM ? (effectiveTotalBase / formula.batchSize) : job.batchQty;
                             const scaleLabel = isOEM 
                                 ? `สเกลตามจำนวนสั่ง ${job.totalQty.toLocaleString()} ${job.unit} (${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก)`
                                 : `คำนวณจากสูตร × ${job.batchQty} batch`;
+                            
+                            const rawMaterials = formula.ingredients.filter(i => i.type !== 'packaging');
+                            const packagingItems = formula.ingredients.filter(i => i.type === 'packaging');
+
+                            let targetUnits = job.batchQty;
+                            if (job.totalQty && formula.unitSize) {
+                                if (['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(job.unit)) {
+                                    targetUnits = job.totalQty;
+                                } else {
+                                    targetUnits = Math.ceil(job.totalQty / formula.unitSize);
+                                }
+                            }
 
                             return (
-                                <div className="rnd-modal-section">
-                                    <h4><Package size={16} /> วัตถุดิบที่ต้องใช้ ({scaleLabel})</h4>
-                                    <table className="data-table rnd-ingredients-table">
-                                        <thead>
-                                            <tr>
-                                                <th>วัตถุดิบ</th>
-                                                <th>ต่อ 1 Batch ({formula.batchSize.toLocaleString()} {formula.unit})</th>
-                                                <th>จำนวนที่ต้องใช้จริง</th>
-                                                <th>หน่วย</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {formula.ingredients.map((ing, idx) => {
-                                                // Strip HTML tags from ingredient name (some DB entries contain <p> wrappers)
-                                                const cleanName = ing.name
-                                                    ? ing.name.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim()
-                                                    : '-';
-                                                return (
-                                                <tr key={idx}>
-                                                    <td>{cleanName}</td>
-                                                    <td style={{ color: 'var(--text-muted)' }}>{ing.qty}</td>
-                                                    <td style={{ fontWeight: 700, color: isOEM ? '#0369a1' : 'var(--text)' }}>{(ing.qty * scaleFactor).toFixed(2)}</td>
-                                                    <td>{ing.unit}</td>
+                                <>
+                                    <div className="rnd-modal-section">
+                                        <h4><Beaker size={16} /> วัตถุดิบที่ต้องใช้ ({scaleLabel})</h4>
+                                        <table className="data-table rnd-ingredients-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>วัตถุดิบ</th>
+                                                    <th>ต่อ 1 Batch ({formula.batchSize.toLocaleString()} {formula.unit})</th>
+                                                    <th>จำนวนที่ต้องใช้จริง</th>
+                                                    <th>หน่วย</th>
                                                 </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody>
+                                                {rawMaterials.map((ing, idx) => {
+                                                    const cleanName = ing.name
+                                                        ? ing.name.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim()
+                                                        : '-';
+                                                    return (
+                                                    <tr key={idx}>
+                                                        <td>{cleanName}</td>
+                                                        <td style={{ color: 'var(--text-muted)' }}>{ing.qty}</td>
+                                                        <td style={{ fontWeight: 700, color: isOEM ? '#0369a1' : 'var(--text)' }}>{(ing.qty * scaleFactor).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td>
+                                                        <td>{ing.unit}</td>
+                                                    </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    {packagingItems.length > 0 && (
+                                        <div className="rnd-modal-section">
+                                            <h4><Package size={16} style={{ color: '#f59e0b' }} /> บรรจุภัณฑ์ที่ต้องใช้ (เป้าหมาย: {targetUnits.toLocaleString()} ชิ้น)</h4>
+                                            <table className="data-table rnd-ingredients-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>บรรจุภัณฑ์ (อ้างอิงระบบ)</th>
+                                                        <th>ชื่อบรรจุภัณฑ์</th>
+                                                        <th>จำนวนที่ต้องใช้จริง</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {(() => {
+                                                        const maxPkgQty = Math.max(...packagingItems.map(p => parseFloat(p.qty) || 1));
+                                                        let inferredBatchYield = 1;
+                                                        if (maxPkgQty > 50) {
+                                                            inferredBatchYield = maxPkgQty;
+                                                        } else if (formula.unitSize && formula.batchSize) {
+                                                            inferredBatchYield = formula.batchSize / formula.unitSize;
+                                                        }
+
+                                                        return packagingItems.map((ing, idx) => {
+                                                            const pmMatch = pmMaterials?.find(m => String(m.id) === String(ing.materialId));
+                                                            const rawMatch = MOCK_RAW_MATERIALS?.find(m => String(m.id) === String(ing.materialId));
+                                                            const foundName = ing.name || (pmMatch ? pmMatch.name : (rawMatch ? rawMatch.name : null));
+                                                            
+                                                            const cleanName = foundName
+                                                                ? foundName.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim()
+                                                                : '-';
+                                                            
+                                                            const baseQty = parseFloat(ing.qty) || 1;
+                                                            const pkgRatio = baseQty / inferredBatchYield;
+                                                            const scaledQty = Math.ceil(targetUnits * pkgRatio);
+
+                                                            return (
+                                                            <tr key={idx}>
+                                                                <td className="text-bold">{ing.materialId}</td>
+                                                                <td>{cleanName}</td>
+                                                                <td style={{ fontWeight: 700, color: '#1e40af', background: '#eff6ff' }}>{scaledQty.toLocaleString()} {ing.unit || 'ชิ้น'}</td>
+                                                            </tr>
+                                                            );
+                                                        });
+                                                    })()}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </>
                             );
                         })()}
                     </div>

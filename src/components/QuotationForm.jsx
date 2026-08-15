@@ -699,6 +699,8 @@ const PRODUCT_IMAGES = {
 const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม', 'กระปุก', 'ขวด', 'ถุง', 'ซอง', 'หลอด', 'กล่อง', 'แผง', 'ขวด(โหล)', 'โหล'];
 
 export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHistory, hideControls }) {
+    // ★★★ UNIT FIX VERSION 2 - 2026-08-14 14:52 ★★★
+    console.log('★★★ QuotationForm LOADED - UNIT FIX v2 - timestamp:', Date.now(), '★★★');
     const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
@@ -1332,9 +1334,14 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                 amount: i.isPromo ? 1000 * (Number(i.promoMultiplier) || 1) : (Number(i.qty) || 0) * (Number(i.price) || 0),
                 isPromo: i.isPromo,
                 promoMultiplier: Number(i.promoMultiplier) || 1,
-                imageURL: i.image || i.imageURL
+                imageURL: i.image || i.imageURL,
+                unit: i.unit || 'ชิ้น'
             }))
         };
+
+        // === DEBUG: ตรวจสอบว่าโค้ดใหม่ทำงาน ===
+        console.log('🔥 [UNIT-FIX-v2] items state:', items.map(i => ({ name: i.name, unit: i.unit })));
+        console.log('🔥 [UNIT-FIX-v2] payload.items:', JSON.stringify(payload.items, null, 2));
 
         try {
             const url = editId ? `${API_BASE}/quotations/${editId}` : `${API_BASE}/quotations`;
@@ -1977,8 +1984,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                                                 >
                                                                     <div
                                                                         onClick={() => {
-                                                                            handleItemChange(item.id, 'unit', unit);
-                                                                            handleItemChange(item.id, 'showUnitDropdown', false);
+                                                                            setItems(prev => prev.map(i => i.id === item.id ? { ...i, unit: unit, showUnitDropdown: false } : i));
                                                                         }}
                                                                         style={{ padding: '8px 12px', fontSize: '13px', color: '#334155', fontWeight: item.unit === unit || (!item.unit && unit === 'ชิ้น') ? 'bold' : 'normal', flex: 1 }}
                                                                     >

@@ -11,6 +11,7 @@ const quotationItemSchema = z.object({
     isPromo: z.boolean().optional().default(false),
     promoMultiplier: z.number().int().optional().default(1),
     imageURL: z.string().nullable().optional(),
+    unit: z.string().nullable().optional(),
 });
 
 const createQuotationSchema = z.object({

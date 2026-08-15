@@ -230,6 +230,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
 
         const quotationId = headerResult.recordset[0].QuotationID;
 
+        console.log("=== POST ITEMS ===", JSON.stringify(items, null, 2));
+
         // 2. Insert Items
         if (items && items.length > 0) {
             for (let i = 0; i < items.length; i++) {
@@ -244,10 +246,11 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
                 itemReq.input('isPromo', sql.Bit, item.isPromo ? 1 : 0);
                 itemReq.input('promoMultiplier', sql.Int, item.promoMultiplier || 1);
                 itemReq.input('imageURL', sql.NVarChar(sql.MAX), item.imageURL);
+                itemReq.input('unit', sql.NVarChar, item.unit || 'ชิ้น');
 
                 await itemReq.query(`
-                    INSERT INTO QuotationItem (QuotationID, ItemOrder, ItemName, Qty, Price, Amount, IsPromo, PromoMultiplier, ImageURL)
-                    VALUES (@qid, @order, @name, @qty, @price, @amount, @isPromo, @promoMultiplier, @imageURL)
+                    INSERT INTO QuotationItem (QuotationID, ItemOrder, ItemName, Qty, Price, Amount, IsPromo, PromoMultiplier, ImageURL, Unit)
+                    VALUES (@qid, @order, @name, @qty, @price, @amount, @isPromo, @promoMultiplier, @imageURL, @unit)
                 `);
             }
         }
@@ -399,8 +402,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSch
         backupItemsReq.input('historyId', sql.Int, historyId);
         backupItemsReq.input('id', sql.Int, qid);
         await backupItemsReq.query(`
-            INSERT INTO QuotationItemHistory (HistoryID, ItemOrder, ItemName, Qty, Price, Amount, IsPromo, PromoMultiplier, ImageURL)
-            SELECT @historyId, ItemOrder, ItemName, Qty, Price, Amount, IsPromo, PromoMultiplier, ImageURL
+            INSERT INTO QuotationItemHistory (HistoryID, ItemOrder, ItemName, Qty, Price, Amount, IsPromo, PromoMultiplier, ImageURL, Unit)
+            SELECT @historyId, ItemOrder, ItemName, Qty, Price, Amount, IsPromo, PromoMultiplier, ImageURL, Unit
             FROM QuotationItem
             WHERE QuotationID = @id
         `);
@@ -443,10 +446,11 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createQuotationSch
                 itemReq.input('isPromo', sql.Bit, item.isPromo ? 1 : 0);
                 itemReq.input('promoMultiplier', sql.Int, item.promoMultiplier || 1);
                 itemReq.input('imageURL', sql.NVarChar(sql.MAX), item.imageURL);
+                itemReq.input('unit', sql.NVarChar, item.unit || 'ชิ้น');
 
                 await itemReq.query(`
-                    INSERT INTO QuotationItem (QuotationID, ItemOrder, ItemName, Qty, Price, Amount, IsPromo, PromoMultiplier, ImageURL)
-                    VALUES (@qid, @order, @name, @qty, @price, @amount, @isPromo, @promoMultiplier, @imageURL)
+                    INSERT INTO QuotationItem (QuotationID, ItemOrder, ItemName, Qty, Price, Amount, IsPromo, PromoMultiplier, ImageURL, Unit)
+                    VALUES (@qid, @order, @name, @qty, @price, @amount, @isPromo, @promoMultiplier, @imageURL, @unit)
                 `);
             }
         }
