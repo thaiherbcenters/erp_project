@@ -15,7 +15,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
 import { Search, Loader, Package, GitMerge, FileText } from 'lucide-react';
-import api from '../utils/api';
+
 import './PageCommon.css';
 
 export default function Reports() {
