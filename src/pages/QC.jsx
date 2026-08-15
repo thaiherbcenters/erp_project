@@ -20,6 +20,26 @@ import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 import './QC.css';
 
+// --- Unit Conversion Helpers ---
+const convertToBase = (qty, unit) => {
+    if (!qty || isNaN(qty)) return 0;
+    const val = parseFloat(qty);
+    const u = (unit || '').toLowerCase().trim();
+    if (['กิโลกรัม', 'kg', 'kgs', 'กก.', 'ลิตร', 'l', 'liter', 'liters'].includes(u)) return val * 1000;
+    if (['มิลลิกรัม', 'mg', 'มก.'].includes(u)) return val * 0.001;
+    return val;
+};
+
+const formatDynamicBatchSize = (ingredients) => {
+    if (!ingredients || !ingredients.length) return "0 กรัม";
+    const totalBase = ingredients.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + convertToBase(ing.qty, ing.unit), 0);
+    
+    if (totalBase >= 1000) {
+        return (totalBase / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' กิโลกรัม';
+    }
+    return totalBase.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' กรัม';
+};
+
 export default function QC() {
     const { currentUser, canCreate, canUpdate, canDelete, hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
     const { qcRequests, submitQcResult, getPendingQcRequests } = useProduction();
@@ -759,34 +779,38 @@ export default function QC() {
                                                 <div style={{ gridColumn: '1 / -1', background: '#f8fafc', padding: '16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '8px' }}>
                                                     <h4 style={{ margin: '0 0 12px 0', color: '#334155', fontSize: '15px' }}>รายละเอียดสูตร: {f.name} (v{f.version})</h4>
                                                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '16px', fontSize: '13px' }}>
-                                                        <div><span style={{ color: '#64748b' }}>ขนาดต่อ Batch:</span> <strong style={{ color: '#0f172a' }}>{f.batchSize?.toLocaleString()} {f.unit}</strong></div>
+                                                        <div><span style={{ color: '#64748b' }}>ขนาดต่อ Batch:</span> <strong style={{ color: '#0f172a' }}>{f.ingredients?.length ? formatDynamicBatchSize(f.ingredients) : `${f.batchSize?.toLocaleString(undefined, { maximumFractionDigits: 1 })} กิโลกรัม`}</strong></div>
                                                         <div><span style={{ color: '#64748b' }}>ปริมาณบรรจุต่อชิ้น:</span> <strong style={{ color: '#0f172a' }}>{f.unitSize || '-'}</strong></div>
                                                         <div><span style={{ color: '#64748b' }}>อายุการเก็บ:</span> <strong style={{ color: '#0f172a' }}>{f.shelfLife || '-'}</strong></div>
                                                     </div>
                                                     
-                                                    {f.ingredients?.length > 0 && (
-                                                        <div style={{ marginBottom: '16px' }}>
-                                                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>วัตถุดิบ ({f.ingredients.length} รายการ)</div>
-                                                            <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
-                                                                <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
-                                                                    <thead style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
-                                                                        <tr>
-                                                                            <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>ชื่อวัตถุดิบ</th>
-                                                                            <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '1px solid #e2e8f0' }}>ปริมาณ</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {f.ingredients.map((ing, idx) => (
-                                                                            <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                                                                                <td style={{ padding: '6px 8px' }} dangerouslySetInnerHTML={{ __html: ing.name || ing.materialId }} />
-                                                                                <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500 }}>{ing.qty} {ing.unit}</td>
+                                                    {(() => {
+                                                        const activeIngredients = f.ingredients?.filter(ing => ing.type !== 'packaging') || [];
+                                                        if (activeIngredients.length === 0) return null;
+                                                        return (
+                                                            <div style={{ marginBottom: '16px' }}>
+                                                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#475569', marginBottom: '8px' }}>วัตถุดิบ ({activeIngredients.length} รายการ)</div>
+                                                                <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '6px' }}>
+                                                                    <table style={{ width: '100%', fontSize: '12px', borderCollapse: 'collapse' }}>
+                                                                        <thead style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
+                                                                            <tr>
+                                                                                <th style={{ padding: '6px 8px', textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>ชื่อวัตถุดิบ</th>
+                                                                                <th style={{ padding: '6px 8px', textAlign: 'right', borderBottom: '1px solid #e2e8f0' }}>ปริมาณ</th>
                                                                             </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {activeIngredients.map((ing, idx) => (
+                                                                                <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                                                    <td style={{ padding: '6px 8px' }} dangerouslySetInnerHTML={{ __html: ing.name || ing.materialId }} />
+                                                                                    <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500 }}>{ing.qty} {ing.unit}</td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    )}
+                                                        );
+                                                    })()}
 
                                                     {(() => {
                                                         const validInstructions = f.instructions?.filter(s => s.trim() !== '') || [];

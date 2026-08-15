@@ -10,7 +10,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
@@ -26,6 +26,7 @@ import {
     Calendar, Tag, Star
 } from 'lucide-react';
 import { PRODUCTION_STEPS } from '../data/productionMockData';
+import { getDynamicBatchSizeValue, convertToBase } from '../utils/formatters';
 import './PageCommon.css';
 import './Operator.css';
 
@@ -124,7 +125,7 @@ const WipChecklist = ({ task, targetWeight, onComplete }) => {
                         </div>
                     </div>
                     <button 
-                        onClick={() => window.location.href = `/operator/wip?formula=${encodeURIComponent(task.formulaName)}&qty=${wipData.requiredQty - wipData.currentQty}`}
+                        onClick={() => window.location.href = `/operator/wip?formula=${encodeURIComponent(task.formulaName)}&wipQty=${wipData.requiredQty}&wipUnit=${encodeURIComponent(wipData.unit || 'กรัม')}&taskQty=${task.expectedQty}&taskUnit=${encodeURIComponent(task.jobUnit || task.unit || 'ชิ้น')}&jobOrderId=${encodeURIComponent(task.jobOrderId || '')}`}
                         style={{ 
                             background: '#fff', color: '#b45309', border: '1px solid #fcd34d', 
                             padding: '6px 12px', borderRadius: 4, fontSize: 13, fontWeight: 600, 
@@ -152,7 +153,8 @@ const WipChecklist = ({ task, targetWeight, onComplete }) => {
 
 export default function Operator() {
     const { user, getVisibleSubPages, hasSectionPermission, canUpdate } = useAuth();
-    const { tasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
+    const { tasks: allTasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
+    const tasks = useMemo(() => allTasks.filter(t => t.line !== 'WIP Line'), [allTasks]);
     const { showAlert, showConfirm } = useAlert();
     const { jobs } = usePlanner();
     const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS, pmMaterials } = useRnD();
@@ -396,17 +398,24 @@ export default function Operator() {
         const qcReqForTask = qcRequests.filter(r => r.taskId === task.id);
 
         const formula = MOCK_FORMULAS.find(f => f.name === task.formulaName || f.id === task.formulaName);
+        
         let targetWeight = task.expectedQty;
-        const isPieceUnit = ['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(task.jobUnit);
+        const rawUnit = task.jobUnit || task.unit || 'หน่วย';
+        const activeUnit = String(rawUnit).replace(/,/g, '').trim();
+        const isPieceUnit = ['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(activeUnit);
         if (formula && isPieceUnit && formula.unitSize && formula.unitSize > 0) {
             targetWeight = task.expectedQty * formula.unitSize;
+        } else if (!isPieceUnit && activeUnit) {
+            targetWeight = convertToBase(task.expectedQty, activeUnit);
         }
         
-        const scaleFactor = formula ? targetWeight / formula.batchSize : 1;
-        const isStandard = formula ? targetWeight === formula.batchSize : true;
+        const actualFormulaBase = formula ? (getDynamicBatchSizeValue(formula.ingredients) || convertToBase(formula.batchSize, formula.unit) || 1) : 1;
+        const scaleFactor = formula ? targetWeight / actualFormulaBase : 1;
+        
+        const isStandard = formula ? Math.abs(targetWeight - actualFormulaBase) < 0.1 : true;
         const scaleLabel = formula ? (isStandard
-            ? `สูตรมาตรฐาน (1 Batch = ${formula.batchSize.toLocaleString()} ${formula.unit})`
-            : `สเกลตามยอดผลิต ${task.expectedQty.toLocaleString()} ${task.jobUnit || 'หน่วย'} (${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก)`) : '';
+            ? `คำนวณจากสูตร`
+            : `สเกลตามยอดผลิตเป้าหมาย ${task.expectedQty.toLocaleString()} ${activeUnit} (${(scaleFactor * 100).toFixed(4)}% ของสูตรหลัก)`) : '';
 
         const rawMaterials = formula ? formula.ingredients.filter(i => i.type !== 'packaging') : [];
         const packagingItems = formula ? formula.ingredients.filter(i => i.type === 'packaging') : [];
@@ -420,7 +429,7 @@ export default function Operator() {
                         <ArrowLeft size={18} /> กลับหน้ารวม
                     </button>
                     <div>
-                        <h2 style={{ margin: '0 0 8px 0', fontSize: 24, color: '#0f172a', fontWeight: 800 }}>{task.batchNo} — {task.formulaName}</h2>
+                        <h2 style={{ margin: '0 0 6px 0', fontSize: 20, color: '#0f172a', fontWeight: 800 }}>{task.batchNo} — {task.formulaName}</h2>
                         <div className="op-workstation-meta" style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
                             <span className="op-jo-ref" style={{ background: '#e0e7ff', color: '#4338ca', padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>{task.jobOrderId}</span>
                             <span className={`op-status-badge ${getStatusBadge(task.status)}`}>{task.status}</span>
@@ -429,29 +438,29 @@ export default function Operator() {
                     </div>
                 </div>
 
-                <div className="op-workstation-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 0 }}>
+                <div className="op-workstation-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 1fr)', gap: 0 }}>
                     {/* LEFT PANEL */}
-                    <div className="op-ws-left" style={{ padding: 24, borderRight: '1px solid #e2e8f0', background: '#fcfcfd' }}>
+                    <div className="op-ws-left" style={{ padding: '20px 24px', borderRight: '1px solid #e2e8f0', background: '#fcfcfd', minWidth: 0 }}>
                         
-                        <div className="rnd-modal-info-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 32 }}>
+                        <div className="rnd-modal-info-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 24, gap: '16px' }}>
                             <div className="rnd-modal-info-item">
                                 <label>กระบวนการ</label>
                                 <span>{task.process}</span>
                             </div>
-                            <div className="rnd-modal-info-item" style={{ padding: '16px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
-                                <label style={{ color: '#0369a1', marginBottom: 8 }}>ผลิตได้ / เป้าหมาย (Batch)</label>
+                            <div className="rnd-modal-info-item" style={{ padding: '12px 14px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                                <label style={{ color: '#0369a1', marginBottom: 4 }}>ผลิตได้ / เป้าหมาย (Batch)</label>
                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                    <span style={{ fontSize: 36, fontWeight: 800, color: '#0284c7', lineHeight: 1 }}>{task.producedQty}</span>
-                                    <span style={{ fontSize: 20, fontWeight: 600, color: '#64748b' }}>/ {task.expectedQty}</span>
+                                    <span style={{ fontSize: 30, fontWeight: 800, color: '#0284c7', lineHeight: 1 }}>{task.producedQty}</span>
+                                    <span style={{ fontSize: 18, fontWeight: 600, color: '#64748b' }}>/ {task.expectedQty}</span>
                                 </div>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ของเสีย</label>
-                                <span style={{ color: task.defectQty > 0 ? '#ef4444' : undefined, fontSize: 18 }}>{task.defectQty}</span>
+                                <span style={{ color: task.defectQty > 0 ? '#ef4444' : undefined, fontSize: 16 }}>{task.defectQty}</span>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ขั้นตอนปัจจุบัน</label>
-                                <span style={{ color: waitingQc ? '#f59e0b' : '#7b7bf5', fontWeight: 700, fontSize: 16 }}>
+                                <span style={{ color: waitingQc ? '#f59e0b' : '#7b7bf5', fontWeight: 700, fontSize: 14 }}>
                                     {PRODUCTION_STEPS.find(s => s.key === task.currentStep)?.label}
                                     {waitingQc && ' (รอ QC)'}
                                 </span>
@@ -459,8 +468,8 @@ export default function Operator() {
                         </div>
 
                         {/* FULL STEPPER */}
-                        <div className="op-modal-stepper-section" style={{ marginBottom: 32 }}>
-                            <h4 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
+                        <div className="op-modal-stepper-section" style={{ marginBottom: 24 }}>
+                            <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, color: '#334155' }}>
                                 <Activity size={18} /> ความคืบหน้าของงาน
                             </h4>
                             <WorkflowStepper task={task} compact={false} />
@@ -559,18 +568,19 @@ export default function Operator() {
                     </div>
 
                     {/* RIGHT PANEL */}
-                    <div className="op-ws-right" style={{ padding: 24 }}>
+                    <div className="op-ws-right" style={{ padding: '20px 24px', minWidth: 0 }}>
                         
 
 
                         {/* Ingredients Table */}
                         {formula && (
-                            <div className="rnd-modal-section" style={{ padding: 20, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 24 }}>
-                                <h4 style={{ margin: '0 0 16px', fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: '#334155' }}>
-                                    <Package size={18} /> วัตถุดิบที่ต้องเตรียม <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>({scaleLabel})</span>
+                            <div className="rnd-modal-section" style={{ padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 20 }}>
+                                <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, color: '#334155', flexWrap: 'wrap' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}><Package size={16} /> วัตถุดิบที่ต้องเตรียม</span> 
+                                    <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>({scaleLabel})</span>
                                 </h4>
-                                <div style={{ maxHeight: 250, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
-                                    <table className="data-table rnd-ingredients-table" style={{ background: '#fff', margin: 0, border: 'none' }}>
+                                <div style={{ maxHeight: 250, overflowX: 'auto', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+                                    <table className="data-table rnd-ingredients-table" style={{ background: '#fff', margin: 0, border: 'none', minWidth: '400px' }}>
                                         <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                                             <tr>
                                                 <th>วัตถุดิบ</th>
@@ -603,7 +613,7 @@ export default function Operator() {
                                     <div style={{ marginTop: 20 }}>
                                         <h4 style={{ margin: '0 0 12px', fontSize: 14, fontWeight: 700, color: '#475569' }}>📦 บรรจุภัณฑ์ที่ต้องใช้</h4>
                                         <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
-                                            <table className="data-table" style={{ background: '#fff', margin: 0, border: 'none', fontSize: 13 }}>
+                                            <table className="data-table" style={{ background: '#fff', margin: 0, border: 'none', fontSize: 13, minWidth: '350px' }}>
                                                 <thead>
                                                     <tr>
                                                         <th>บรรจุภัณฑ์</th>
@@ -612,17 +622,11 @@ export default function Operator() {
                                                 </thead>
                                                 <tbody>
                                                     {(() => {
-                                                        const maxPkgQty = Math.max(...packagingItems.map(p => parseFloat(p.qty) || 1));
-                                                        let inferredBatchYield = 1;
-                                                        if (maxPkgQty > 50) {
-                                                            inferredBatchYield = maxPkgQty;
-                                                        } else if (formula.unitSize && formula.batchSize) {
-                                                            inferredBatchYield = formula.batchSize / formula.unitSize;
-                                                        }
-                                                        
                                                         let targetUnits = task.expectedQty;
                                                         if (!isPieceUnit && formula.unitSize && formula.unitSize > 0) {
-                                                            targetUnits = Math.ceil(task.expectedQty / formula.unitSize);
+                                                            let expectedGrams = task.expectedQty;
+                                                            if (activeUnit === 'กิโลกรัม' || activeUnit === 'ลิตร') expectedGrams *= 1000;
+                                                            targetUnits = Math.ceil(expectedGrams / formula.unitSize);
                                                         }
 
                                                         return packagingItems.map((ing, idx) => {
@@ -632,8 +636,7 @@ export default function Operator() {
                                                             const cleanName = foundName ? foundName.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').trim() : '-';
                                                             
                                                             const baseQty = parseFloat(ing.qty) || 1;
-                                                            const pkgRatio = baseQty / inferredBatchYield;
-                                                            const scaledQty = Math.ceil(targetUnits * pkgRatio);
+                                                            const scaledQty = Math.ceil(targetUnits * baseQty);
 
                                                             return (
                                                             <tr key={idx}>

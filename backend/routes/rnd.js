@@ -130,8 +130,8 @@ router.post('/formulas', authorizeRoles('admin', 'executive', 'rnd'), async (req
         const pool = await poolPromise;
 
         // Generate ID
-        const countRes = await pool.request().query("SELECT COUNT(*) as cnt FROM RnD_Formulas");
-        const newNum = countRes.recordset[0].cnt + 1;
+        const countRes = await pool.request().query("SELECT MAX(CAST(REPLACE(FormulaID, 'FM-', '') AS INT)) as maxId FROM RnD_Formulas WHERE FormulaID LIKE 'FM-[0-9]%'");
+        const newNum = (countRes.recordset[0].maxId || 0) + 1;
         const newId = `FM-${newNum.toString().padStart(3, '0')}`;
 
         const transaction = new sql.Transaction(pool);
@@ -186,7 +186,7 @@ router.post('/formulas', authorizeRoles('admin', 'executive', 'rnd'), async (req
         }
     } catch (err) {
         console.error('Error creating formula:', err);
-        res.status(500).json({ message: 'Error creating formula' });
+        res.status(500).json({ message: 'Error creating formula: ' + err.message });
     }
 });
 
@@ -381,20 +381,18 @@ router.post('/materials', authorizeRoles('admin', 'executive', 'rnd'), async (re
     try {
         const { name, unit, stock, minStock, costPerUnit, category } = req.body;
         const pool = await poolPromise;
-        const countRes = await pool.request().query("SELECT COUNT(*) as cnt FROM RnD_RawMaterials");
-        const newNum = countRes.recordset[0].cnt + 1;
+        const countRes = await pool.request().query("SELECT MAX(CAST(REPLACE(MaterialID, 'RM-', '') AS INT)) as maxId FROM RnD_RawMaterials WHERE MaterialID LIKE 'RM-[0-9]%'");
+        const newNum = (countRes.recordset[0].maxId || 0) + 1;
         const newId = `RM-${newNum.toString().padStart(3, '0')}`;
 
         await pool.request()
             .input('MaterialID', sql.VarChar, newId)
             .input('Name', sql.NVarChar, name)
             .input('Unit', sql.NVarChar, unit || '')
-                .input('UnitSize', sql.Decimal(18, 4), unitSize || 0)
             .input('Stock', sql.Decimal(10, 2), stock || 0)
             .input('MinStock', sql.Decimal(10, 2), minStock || 0)
             .input('CostPerUnit', sql.Decimal(10, 2), costPerUnit || 0)
             .input('Category', sql.NVarChar, category || '')
-                .input('FormulaType', sql.NVarChar, formulaType || 'สูตรทั่วไป')
             .query('INSERT INTO RnD_RawMaterials (MaterialID, Name, Unit, Stock, MinStock, CostPerUnit, Category) VALUES (@MaterialID, @Name, @Unit, @Stock, @MinStock, @CostPerUnit, @Category)');
 
         res.status(201).json({ success: true, materialId: newId });
@@ -452,9 +450,9 @@ router.post('/projects', authorizeRoles('admin', 'executive', 'rnd'), async (req
     try {
         const { name, category, researcher, startDate, targetDate, phase, formulaRef } = req.body;
         const pool = await poolPromise;
-        const yr = new Date().getFullYear();
-        const countRes = await pool.request().query(`SELECT COUNT(*) as cnt FROM RnD_Projects WHERE Code LIKE 'RD-${yr}-%'`);
-        const newNum = countRes.recordset[0].cnt + 1;
+        const yr = new Date().getFullYear().toString().substring(2);
+        const countRes = await pool.request().query(`SELECT MAX(CAST(REPLACE(Code, 'RD-${yr}-', '') AS INT)) as maxId FROM RnD_Projects WHERE Code LIKE 'RD-${yr}-[0-9]%'`);
+        const newNum = (countRes.recordset[0].maxId || 0) + 1;
         const newCode = `RD-${yr}-${newNum.toString().padStart(3, '0')}`;
 
         await pool.request()
@@ -483,8 +481,8 @@ router.post('/experiments', authorizeRoles('admin', 'executive', 'rnd'), async (
     try {
         const { projectCode, name, date, result, note, formulaRef, trialRecipe } = req.body;
         const pool = await poolPromise;
-        const countRes = await pool.request().query("SELECT COUNT(*) as cnt FROM RnD_Experiments");
-        const newNum = countRes.recordset[0].cnt + 1;
+        const countRes = await pool.request().query("SELECT MAX(CAST(REPLACE(Code, 'EXP-', '') AS INT)) as maxId FROM RnD_Experiments WHERE Code LIKE 'EXP-[0-9]%'");
+        const newNum = (countRes.recordset[0].maxId || 0) + 1;
         const newCode = `EXP-${newNum.toString().padStart(3, '0')}`;
 
         await pool.request()

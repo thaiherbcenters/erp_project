@@ -79,7 +79,7 @@ router.post('/tasks/wip', authorizeRoles('admin', 'executive', 'planner', 'opera
         
         // Generate IDs
         const datePrefix = getDatePrefix();
-        const joId = await generateSequence(pool, 'Job_Orders', 'JobOrderID', `JO-${datePrefix}-`, 3);
+        const joId = await generateSequence(pool, 'Production_Tasks', 'JobOrderID', `JO-${datePrefix}-`, 3);
         const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `PT-${datePrefix}-`, 3);
         const batchNo = `B${datePrefix.replace(/-/g, '')}-WIP`;
 

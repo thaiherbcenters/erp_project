@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import API_BASE from '../config';
 import { usePlanner } from '../context/PlannerContext';
+import { formatDynamicBatchSize, getDynamicBatchSizeValue, convertToBase } from '../utils/formatters';
 import { useRnD } from '../context/RnDContext';
 import { useProduction } from '../context/ProductionContext';
 import { useAlert } from '../components/CustomAlert';
@@ -351,7 +352,7 @@ export default function Planning() {
                                                     >
                                                         <option value="">-- เลือกสูตร --</option>
                                                         {approvedFormulas.map(f => (
-                                                            <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize.toLocaleString()} {f.unit}/batch)</option>
+                                                            <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.ingredients?.length ? formatDynamicBatchSize(f.ingredients) : `${f.batchSize.toLocaleString()} ${f.unit}`}/batch)</option>
                                                         ))}
                                                     </CustomSelect>
                                                 </div>
@@ -360,7 +361,7 @@ export default function Planning() {
                                                 {matchedFormula && (
                                                     <div style={{ display: 'flex', gap: 12, fontSize: 12, background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 14px', alignItems: 'center' }}>
                                                         <span style={{ color: '#92400e', fontWeight: 600, whiteSpace: 'nowrap' }}>OEM — ผลิตพอดีจำนวนสั่ง</span>
-                                                        <span style={{ color: '#78716c' }}>สูตรอ้างอิง: <strong>{bSize.toLocaleString()} {matchedFormula.unit}/batch</strong></span>
+                                                        <span style={{ color: '#78716c' }}>สูตรอ้างอิง: <strong>{matchedFormula.ingredients?.length ? formatDynamicBatchSize(matchedFormula.ingredients) : `${bSize.toLocaleString()} ${matchedFormula.unit}`}/batch</strong></span>
                                                         <span style={{ color: '#78716c' }}>สเกลวัตถุดิบ: <strong style={{ color: '#0369a1' }}>{bSize > 0 ? ((item.Qty / bSize) * 100).toFixed(1) : 0}%</strong> ของสูตรหลัก</span>
                                                     </div>
                                                 )}
@@ -819,7 +820,7 @@ export default function Planning() {
                             </div>
                             <div className="plan-formula-name">{f.name}</div>
                             <div className="plan-formula-meta">
-                                <span>{f.batchSize.toLocaleString()} {f.unit}/batch</span>
+                                <span>{f.ingredients?.length ? formatDynamicBatchSize(f.ingredients) : `${f.batchSize.toLocaleString()} ${f.unit}`}/batch</span>
                                 <span>{f.ingredients.length} วัตถุดิบ</span>
                             </div>
                         </div>
@@ -1102,7 +1103,8 @@ export default function Planning() {
                 const key = ing.materialId;
                 // OEM scaling: use actual qty vs formula batch size
                 const isOEM = (job.notes && (job.notes.includes('MTO') || job.notes.includes('OEM'))) || (job.productionType && job.productionType.includes('OEM'));
-                const scaleFactor = isOEM ? (job.totalQty / formula.batchSize) : job.batchQty;
+                const actualFormulaBase = getDynamicBatchSizeValue(formula.ingredients) || convertToBase(formula.batchSize, formula.unit) || 1;
+                const scaleFactor = isOEM ? (convertToBase(job.totalQty, job.unit) / actualFormulaBase) : job.batchQty;
                 const requiredQty = ing.qty * scaleFactor;
                 if (materialRequirements[key]) {
                     materialRequirements[key].requiredQty += requiredQty;
@@ -1214,6 +1216,7 @@ export default function Planning() {
         if (!selectedJob) return null;
         const job = selectedJob;
         const formula = MOCK_FORMULAS.find(f => f.id === job.formulaId);
+        const isOEM = (job.notes && (job.notes.includes('MTO') || job.notes.includes('OEM'))) || (job.productionType && job.productionType.includes('OEM'));
 
         return (
             <div className="rnd-modal-overlay" onClick={() => setSelectedJob(null)}>
@@ -1266,8 +1269,14 @@ export default function Planning() {
                                 <span style={{ color: '#2563eb' }}>{job.formulaId}</span>
                             </div>
                             <div className="rnd-modal-info-item">
-                                <label>จำนวน Batch</label>
-                                <span>{job.batchQty} batch × {job.batchSize.toLocaleString()} = {job.totalQty.toLocaleString()} {job.unit}</span>
+                                <label>ยอดผลิตเป้าหมาย</label>
+                                <span>
+                                    {isOEM ? (
+                                        <><strong style={{ color: '#0f172a' }}>{job.totalQty.toLocaleString()} {job.unit}</strong> <span style={{ color: '#64748b', fontSize: '13px' }}>(ผลิตตามสัดส่วน OEM)</span></>
+                                    ) : (
+                                        <>{job.batchQty} batch × {formula?.ingredients?.length ? formatDynamicBatchSize(formula.ingredients) : `${job.batchSize.toLocaleString()} ${job.unit}`} = <strong style={{ color: '#0f172a' }}>{job.totalQty.toLocaleString()} {job.unit}</strong></>
+                                    )}
+                                </span>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>กำหนดเสร็จ</label>
@@ -1285,24 +1294,40 @@ export default function Planning() {
                         {/* วัตถุดิบที่ต้องใช้สำหรับ Job นี้ */}
                         {formula && (() => {
                             // OEM scaling: if totalQty differs from formula batchSize, scale ingredients proportionally
-                            const isOEM = (job.notes && (job.notes.includes('MTO') || job.notes.includes('OEM'))) || (job.productionType && job.productionType.includes('OEM'));
                             
-                            let effectiveTotalBase = job.totalQty;
-                            if (['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(job.unit) && !['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(formula.unit)) {
+                            const isPieceUnit = ['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(job.unit);
+                            
+                            let effectiveTotalBase = convertToBase(job.totalQty, job.unit);
+                            if (isPieceUnit) {
                                 effectiveTotalBase = job.totalQty * (formula.unitSize || 1);
                             }
                             
-                            const scaleFactor = isOEM ? (effectiveTotalBase / formula.batchSize) : job.batchQty;
+                            const actualFormulaBase = getDynamicBatchSizeValue(formula.ingredients) || convertToBase(formula.batchSize, formula.unit) || 1;
+                            const scaleFactor = isOEM ? (effectiveTotalBase / actualFormulaBase) : job.batchQty;
                             const scaleLabel = isOEM 
                                 ? `สเกลตามจำนวนสั่ง ${job.totalQty.toLocaleString()} ${job.unit} (${(scaleFactor * 100).toFixed(1)}% ของสูตรหลัก)`
                                 : `คำนวณจากสูตร × ${job.batchQty} batch`;
+                                
+                            const explanationBlock = isPieceUnit ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#1e40af' }}>
+                                    <div><strong style={{ color: '#1e3a8a' }}>1. หาน้ำหนักเป้าหมาย:</strong> ยอดสั่ง {job.totalQty.toLocaleString()} {job.unit} × ปริมาณบรรจุ {formula.unitSize || 1} กรัม/ชิ้น = <strong style={{ color: '#1d4ed8', fontSize: '14px' }}>{effectiveTotalBase.toLocaleString()} กรัม</strong></div>
+                                    <div><strong style={{ color: '#1e3a8a' }}>2. หาสัดส่วน (Scale Factor):</strong> นำน้ำหนักเป้าหมาย ({effectiveTotalBase.toLocaleString()} กรัม) ÷ น้ำหนักสูตรหลัก 1 Batch ({actualFormulaBase.toLocaleString(undefined, { maximumFractionDigits: 2 })} กรัม) = <strong style={{ color: '#1d4ed8', fontSize: '14px' }}>{(scaleFactor * 100).toFixed(4)}%</strong></div>
+                                    <div style={{ color: '#3b82f6', marginTop: '4px', fontSize: '12px' }}>* ระบบจะนำสัดส่วน {(scaleFactor * 100).toFixed(4)}% ไปคูณกับวัตถุดิบแต่ละตัวในสูตรหลัก เพื่อหาจำนวนที่ต้องใช้จริง</div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', color: '#1e40af' }}>
+                                    <div><strong style={{ color: '#1e3a8a' }}>1. หาน้ำหนักเป้าหมาย:</strong> ยอดสั่ง = <strong style={{ color: '#1d4ed8', fontSize: '14px' }}>{effectiveTotalBase.toLocaleString()} กรัม</strong></div>
+                                    <div><strong style={{ color: '#1e3a8a' }}>2. หาสัดส่วน (Scale Factor):</strong> นำน้ำหนักเป้าหมาย ({effectiveTotalBase.toLocaleString()} กรัม) ÷ น้ำหนักสูตรหลัก 1 Batch ({actualFormulaBase.toLocaleString(undefined, { maximumFractionDigits: 2 })} กรัม) = <strong style={{ color: '#1d4ed8', fontSize: '14px' }}>{(scaleFactor * 100).toFixed(4)}%</strong></div>
+                                    <div style={{ color: '#3b82f6', marginTop: '4px', fontSize: '12px' }}>* ระบบจะนำสัดส่วน {(scaleFactor * 100).toFixed(4)}% ไปคูณกับวัตถุดิบแต่ละตัวในสูตรหลัก เพื่อหาจำนวนที่ต้องใช้จริง</div>
+                                </div>
+                            );
                             
                             const rawMaterials = formula.ingredients.filter(i => i.type !== 'packaging');
                             const packagingItems = formula.ingredients.filter(i => i.type === 'packaging');
 
                             let targetUnits = job.batchQty;
                             if (job.totalQty && formula.unitSize) {
-                                if (['ชิ้น', 'กระปุก', 'ขวด', 'กล่อง', 'หลอด', 'ดวง', 'ม้วน'].includes(job.unit)) {
+                                if (isPieceUnit) {
                                     targetUnits = job.totalQty;
                                 } else {
                                     targetUnits = Math.ceil(job.totalQty / formula.unitSize);
@@ -1311,13 +1336,21 @@ export default function Planning() {
 
                             return (
                                 <>
+                                    {isOEM && (
+                                        <div style={{ background: '#eff6ff', border: '1px solid #93c5fd', borderLeft: '4px solid #3b82f6', padding: '14px 18px', borderRadius: '8px', marginBottom: '20px', fontSize: '13px' }}>
+                                            <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: '10px', fontSize: '14.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span>💡</span> วิธีคำนวณสัดส่วนการใช้วัตถุดิบ
+                                            </div>
+                                            {explanationBlock}
+                                        </div>
+                                    )}
                                     <div className="rnd-modal-section">
                                         <h4><Beaker size={16} /> วัตถุดิบที่ต้องใช้ ({scaleLabel})</h4>
                                         <table className="data-table rnd-ingredients-table">
                                             <thead>
                                                 <tr>
                                                     <th>วัตถุดิบ</th>
-                                                    <th>ต่อ 1 Batch ({formula.batchSize.toLocaleString()} {formula.unit})</th>
+                                                    <th>ต่อ 1 Batch ({formula.ingredients?.length ? formatDynamicBatchSize(formula.ingredients) : `${formula.batchSize.toLocaleString()} ${formula.unit}`})</th>
                                                     <th>จำนวนที่ต้องใช้จริง</th>
                                                     <th>หน่วย</th>
                                                 </tr>
@@ -1353,14 +1386,6 @@ export default function Planning() {
                                                 </thead>
                                                 <tbody>
                                                     {(() => {
-                                                        const maxPkgQty = Math.max(...packagingItems.map(p => parseFloat(p.qty) || 1));
-                                                        let inferredBatchYield = 1;
-                                                        if (maxPkgQty > 50) {
-                                                            inferredBatchYield = maxPkgQty;
-                                                        } else if (formula.unitSize && formula.batchSize) {
-                                                            inferredBatchYield = formula.batchSize / formula.unitSize;
-                                                        }
-
                                                         return packagingItems.map((ing, idx) => {
                                                             const pmMatch = pmMaterials?.find(m => String(m.id) === String(ing.materialId));
                                                             const rawMatch = MOCK_RAW_MATERIALS?.find(m => String(m.id) === String(ing.materialId));
@@ -1371,8 +1396,8 @@ export default function Planning() {
                                                                 : '-';
                                                             
                                                             const baseQty = parseFloat(ing.qty) || 1;
-                                                            const pkgRatio = baseQty / inferredBatchYield;
-                                                            const scaledQty = Math.ceil(targetUnits * pkgRatio);
+                                                            // For packaging, qty defined in formula is per-piece
+                                                            const scaledQty = Math.ceil(targetUnits * baseQty);
 
                                                             return (
                                                             <tr key={idx}>
@@ -1511,7 +1536,7 @@ export default function Planning() {
                                     >
                                         <option value="">-- เลือกสูตรจาก R&D --</option>
                                         {approvedFormulas.map(f => (
-                                            <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.batchSize} {f.unit}/batch)</option>
+                                            <option key={f.id} value={f.id}>{f.id} — {f.name} ({f.ingredients?.length ? formatDynamicBatchSize(f.ingredients) : `${f.batchSize} ${f.unit}`}/batch)</option>
                                         ))}
                                     </CustomSelect>
                                 </div>

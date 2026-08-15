@@ -27,6 +27,40 @@ import API_BASE from '../config';
 import './PageCommon.css';
 import './RnD.css';
 
+// --- Unit Conversion Helpers ---
+const convertToBase = (qty, unit) => {
+    if (!qty || isNaN(qty)) return 0;
+    const val = parseFloat(qty);
+    const u = (unit || '').toLowerCase().trim();
+    if (['กิโลกรัม', 'kg', 'kgs', 'กก.', 'ลิตร', 'l', 'liter', 'liters'].includes(u)) return val * 1000;
+    if (['มิลลิกรัม', 'mg', 'มก.'].includes(u)) return val * 0.001;
+    return val; // Base is grams/ml
+};
+
+const convertFromBase = (valInBase, targetUnit) => {
+    if (!valInBase || isNaN(valInBase)) return 0;
+    const u = (targetUnit || '').toLowerCase().trim();
+    if (['กิโลกรัม', 'kg', 'kgs', 'กก.', 'ลิตร', 'l', 'liter', 'liters'].includes(u)) return valInBase / 1000;
+    if (['มิลลิกรัม', 'mg', 'มก.'].includes(u)) return valInBase / 0.001;
+    return valInBase;
+};
+
+const calculateTotalBatchSize = (ingredients, targetUnit) => {
+    if (!ingredients || !ingredients.length) return 0;
+    const totalBase = ingredients.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + convertToBase(ing.qty, ing.unit), 0);
+    return convertFromBase(totalBase, targetUnit);
+};
+
+const formatDynamicBatchSize = (ingredients) => {
+    if (!ingredients || !ingredients.length) return "0 กรัม";
+    const totalBase = ingredients.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + convertToBase(ing.qty, ing.unit), 0);
+    
+    if (totalBase >= 1000) {
+        return (totalBase / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' กิโลกรัม';
+    }
+    return totalBase.toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' กรัม';
+};
+
 export default function RnD() {
     const { showAlert, showConfirm } = useAlert();
     const { user, getVisibleSubPages, hasSectionPermission, canCreate, canUpdate, canDelete } = useAuth();
@@ -121,7 +155,7 @@ export default function RnD() {
     const removeIngredient = (idx) => {
         setFormulaForm(p => {
             const newIngs = p.ingredients.filter((_, i) => i !== idx);
-            const newBatchSize = newIngs.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+            const newBatchSize = calculateTotalBatchSize(newIngs, p.unit);
             return { ...p, ingredients: newIngs, batchSize: newBatchSize };
         });
     };
@@ -133,7 +167,7 @@ export default function RnD() {
                 const mat = materials.find(m => m.id === value) || pmMaterials.find(m => m.id === value);
                 if (mat) { ings[idx].name = mat.name; ings[idx].unit = mat.unit; }
             }
-            const newBatchSize = ings.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+            const newBatchSize = calculateTotalBatchSize(ings, p.unit);
             return { ...p, ingredients: ings, batchSize: newBatchSize };
         });
     };
@@ -275,7 +309,7 @@ export default function RnD() {
         let ingredients = [];
         try { ingredients = JSON.parse(exp.trialRecipe); } catch(e) {}
         const validIngredients = Array.isArray(ingredients) ? ingredients : [{ materialId: '', name: '', qty: 0, unit: '', type: 'active', engName: '', latinName: '', partUsed: '' }];
-        const initialBatchSize = validIngredients.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + (parseFloat(ing.qty) || 0), 0);
+        const initialBatchSize = calculateTotalBatchSize(validIngredients, formulaForm.unit);
 
         setFormulaForm({
             ...emptyFormulaForm,
@@ -764,7 +798,7 @@ export default function RnD() {
                         <div className="rnd-modal-info-grid">
                             <div className="rnd-modal-info-item">
                                 <label>ขนาดต่อ Batch</label>
-                                <span>{(f.ingredients?.filter(i => i.type !== 'packaging').reduce((s, i) => s + (parseFloat(i.qty) || 0), 0) || f.batchSize || 0).toLocaleString()} {f.unit}</span>
+                                <span>{f.ingredients?.length ? formatDynamicBatchSize(f.ingredients) : `${(f.batchSize || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })} กิโลกรัม`}</span>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ปริมาณบรรจุต่อชิ้น</label>
@@ -791,7 +825,7 @@ export default function RnD() {
                                 ฿{batchCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </div>
                             <div style={{ fontSize: 12, color: '#6b7280' }}>
-                                ต่อหน่วย: ฿{f.batchSize ? (batchCost / (f.ingredients?.filter(i => i.type !== 'packaging').reduce((s, i) => s + (parseFloat(i.qty) || 0), 0) || f.batchSize || 1)).toFixed(2) : '—'} / {f.unit}
+                                ต่อหน่วย: ฿{f.batchSize ? (batchCost / (f.ingredients?.length ? calculateTotalBatchSize(f.ingredients, f.unit) : f.batchSize || 1)).toFixed(2) : '—'} / {f.unit}
                             </div>
                         </div>
 
@@ -844,8 +878,7 @@ export default function RnD() {
                                         const cost = mat ? mat.costPerUnit * ing.qty : 0;
                                         
                                         // Calc Scale
-                                        let baseYieldGrams = f.ingredients?.filter(i => i.type !== 'packaging').reduce((s, i) => s + (parseFloat(i.qty) || 0), 0) || f.batchSize || 1;
-                                        if (f.unit === 'kg' || f.unit === 'L') baseYieldGrams *= 1000;
+                                        let baseYieldGrams = f.ingredients?.filter(i => i.type !== 'packaging').reduce((s, i) => s + convertToBase(i.qty, i.unit), 0) || convertToBase(f.batchSize, f.unit) || 1;
                                         const targetYieldGrams = simTargetUnits * simUnitSize;
                                         const scaleFactor = targetYieldGrams / baseYieldGrams;
                                         const scaledQty = ing.qty * scaleFactor;
@@ -1162,7 +1195,7 @@ export default function RnD() {
                                                 </td>
                                             )}
                                             <td style={{ padding: '8px 4px' }}>
-                                                <input type="number" style={{ ...inputStyle, width: '100%', padding: '6px 8px', minHeight: '38px', boxSizing: 'border-box' }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateIngredient(originalIdx, 'qty', parseFloat(e.target.value) || 0)} />
+                                                <input type="number" style={{ ...inputStyle, width: '100%', padding: '6px 8px', minHeight: '38px', boxSizing: 'border-box' }} placeholder="จำนวน" value={ing.qty === 0 ? 0 : (ing.qty || '')} onChange={e => updateIngredient(originalIdx, 'qty', e.target.value)} />
                                             </td>
                                             <td style={{ padding: '8px 4px' }}>
                                                 <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.unit} onChange={e => updateIngredient(originalIdx, 'unit', e.target.value)}>
@@ -1424,7 +1457,7 @@ export default function RnD() {
                                                             </td>
                                                         )}
                                                         <td style={{ padding: '8px 4px' }}>
-                                                            <input type="number" style={{ ...inputStyle, width: '100%', padding: '6px 8px', minHeight: '38px', boxSizing: 'border-box' }} placeholder="จำนวน" value={ing.qty || ''} onChange={e => updateExpIngredient(idx, 'qty', parseFloat(e.target.value) || 0)} disabled={experimentForm.isViewOnly} />
+                                                            <input type="number" style={{ ...inputStyle, width: '100%', padding: '6px 8px', minHeight: '38px', boxSizing: 'border-box' }} placeholder="จำนวน" value={ing.qty === 0 ? 0 : (ing.qty || '')} onChange={e => updateExpIngredient(idx, 'qty', e.target.value)} disabled={experimentForm.isViewOnly} />
                                                         </td>
                                                         <td style={{ padding: '8px 4px' }}>
                                                             <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', padding: '6px 8px' }} value={ing.unit} onChange={e => updateExpIngredient(idx, 'unit', e.target.value)} disabled={experimentForm.isViewOnly}>
