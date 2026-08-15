@@ -52,12 +52,18 @@ router.post('/login', async (req, res) => {
                  .input('user_id', user.user_id)
                  .query('SELECT page_id, data_scope, can_create, can_read, can_update, can_delete FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
         } catch (dbErr) {
-            // Fallback for older database schema (if migration hasn't been run on production)
-            console.log('Falling back to old permissions query (CRUD columns missing)');
+            console.log('Falling back to old permissions query (CRUD columns missing)', dbErr.message);
             hasCrudColumns = false;
-            permResult = await pool.request()
-                 .input('user_id', user.user_id)
-                 .query('SELECT page_id, data_scope FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+            try {
+                permResult = await pool.request()
+                     .input('user_id', user.user_id)
+                     .query('SELECT page_id, data_scope FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+            } catch (dbErr2) {
+                console.log('Falling back to oldest permissions query (data_scope missing)', dbErr2.message);
+                permResult = await pool.request()
+                     .input('user_id', user.user_id)
+                     .query('SELECT page_id FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+            }
         }
 
         const userData = {
