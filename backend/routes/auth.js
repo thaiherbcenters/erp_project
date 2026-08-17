@@ -85,10 +85,10 @@ router.post('/login', async (req, res) => {
         userData.permissions = permResult.recordset.map(p => ({
             page_id: p.page_id, 
             data_scope: p.data_scope || 'all',
-            can_create: hasCrudColumns ? (p.can_create ?? true) : true,
-            can_read: hasCrudColumns ? (p.can_read ?? true) : true,
-            can_update: hasCrudColumns ? (p.can_update ?? true) : true,
-            can_delete: hasCrudColumns ? (p.can_delete ?? true) : true
+            can_create: hasCrudColumns ? (p.can_create != null ? p.can_create : true) : true,
+            can_read: hasCrudColumns ? (p.can_read != null ? p.can_read : true) : true,
+            can_update: hasCrudColumns ? (p.can_update != null ? p.can_update : true) : true,
+            can_delete: hasCrudColumns ? (p.can_delete != null ? p.can_delete : true) : true
         }));
 
         // Log การ Login สำเร็จ

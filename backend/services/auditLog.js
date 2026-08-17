@@ -24,14 +24,17 @@ async function logAction(req, action, module, targetId = null, description = nul
         const pool = await poolPromise;
 
         // ดึงข้อมูล user จาก JWT token ที่ auth middleware แนบไว้ใน req.user
-        const userId = req.user?.id || req.user?.user_id || null;
-        const username = req.user?.username || req.body?.username || 'unknown';
+        const userId = (req.user && req.user.id) || (req.user && req.user.user_id) || null;
+        const username = (req.user && req.user.username) || (req.body && req.body.username) || 'unknown';
 
         // ดึง IP address (รองรับ proxy เช่น nginx)
-        const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-            || req.connection?.remoteAddress
-            || req.ip
-            || 'unknown';
+        let forwardedFor = req.headers['x-forwarded-for'];
+        let ip = 'unknown';
+        if (forwardedFor && typeof forwardedFor === 'string') {
+            ip = forwardedFor.split(',')[0].trim();
+        } else {
+            ip = (req.connection && req.connection.remoteAddress) || req.ip || 'unknown';
+        }
 
         // ดึง user agent (browser/device info)
         const userAgent = req.headers['user-agent'] || 'unknown';
@@ -46,7 +49,7 @@ async function logAction(req, action, module, targetId = null, description = nul
             .input('oldValue', sql.NVarChar(sql.MAX), oldValue ? JSON.stringify(oldValue) : null)
             .input('newValue', sql.NVarChar(sql.MAX), newValue ? JSON.stringify(newValue) : null)
             .input('ip', sql.NVarChar(45), ip)
-            .input('userAgent', sql.NVarChar(500), userAgent?.substring(0, 500))
+            .input('userAgent', sql.NVarChar(500), userAgent ? userAgent.substring(0, 500) : 'unknown')
             .query(`
                 INSERT INTO Audit_Logs (user_id, username, action, module, target_id, description, old_value, new_value, ip_address, user_agent)
                 VALUES (@userId, @username, @action, @module, @targetId, @description, @oldValue, @newValue, @ip, @userAgent)

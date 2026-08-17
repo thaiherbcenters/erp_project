@@ -14,11 +14,11 @@ router.get('/:userId', async (req, res) => {
 
         const permissions = result.recordset.map(r => ({
             page_id: r.page_id,
-            data_scope: r.data_scope,
-            can_create: r.can_create ?? true,
-            can_read: r.can_read ?? true,
-            can_update: r.can_update ?? true,
-            can_delete: r.can_delete ?? true
+            data_scope: r.data_scope || 'all',
+            can_create: r.can_create != null ? r.can_create : true,
+            can_read: r.can_read != null ? r.can_read : true,
+            can_update: r.can_update != null ? r.can_update : true,
+            can_delete: r.can_delete != null ? r.can_delete : true
         }));
         res.json({ permissions });
     } catch (err) {
