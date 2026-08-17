@@ -55,7 +55,12 @@ export function AuthProvider({ children }) {
     /** ดึงสิทธิ์ของ user จาก Backend API */
     const fetchPermissionsFromAPI = useCallback(async (userId) => {
         try {
-            const res = await fetch(`${API_BASE}/permissions/${userId}`);
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/permissions/${userId}`, {
+                headers: {
+                    'Authorization': token ? `Bearer ${token}` : ''
+                }
+            });
             if (res.ok) {
                 const data = await res.json();
                 const perms = data.permissions || [];
@@ -71,9 +76,13 @@ export function AuthProvider({ children }) {
     /** บันทึกสิทธิ์ของ user ลง Backend API */
     const savePermissionsToAPI = useCallback(async (userId, perms) => {
         try {
+            const token = localStorage.getItem('token');
             await fetch(`${API_BASE}/permissions/${userId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
                 body: JSON.stringify({ permissions: perms }),
             });
         } catch (err) {
