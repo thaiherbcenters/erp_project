@@ -35,17 +35,21 @@ const STEP_ICONS = {
     Play, SearchCheck, Repeat, CheckCircle, Package, ShieldCheck, Warehouse
 };
 
-const WipChecklist = ({ task, targetWeight, onComplete }) => {
+const WipChecklist = ({ task, targetWeight, onComplete, allTasks = [], user }) => {
     const [wipData, setWipData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [checklist, setChecklist] = useState({ raw: false, pkg: false });
+    const { showAlert, showConfirm } = useAlert();
+    const [isSending, setIsSending] = useState(false);
+
+    // Derived state: Check if a WIP task already exists for this Job Order
+    const isSent = allTasks.some(t => t.jobOrderId === task.jobOrderId && t.line === 'WIP Line');
 
     // Mock computation
-    const getRequiredWip = (formulaName, targetWt, expectedQty) => {
-        let name = `น้ำ${formulaName}กึ่งสำเร็จรูป`;
-        if (formulaName === 'ยาหม่อง' || formulaName.includes('ยาหม่อง')) {
-            name = 'น้ำยาหม่องกึ่งสำเร็จรูป';
-        }
+    const getRequiredWip = (taskData, targetWt, expectedQty) => {
+        // Backend saves WIP stock as: ProductName + ' (WIP)'
+        const pName = taskData.productName || taskData.formulaName;
+        let name = `${pName} (WIP)`;
         return { name, requiredQty: parseFloat((targetWt || (expectedQty * 50)).toFixed(4)), unit: 'กรัม' };
     };
 
@@ -57,7 +61,7 @@ const WipChecklist = ({ task, targetWeight, onComplete }) => {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    const required = getRequiredWip(task.formulaName, targetWeight, task.expectedQty);
+                    const required = getRequiredWip(task, targetWeight, task.expectedQty);
                     
                     // Match any WIP that starts with the required name to support Lot/Tank suffixes
                     const matchingWips = (data.data || []).filter(item => item.name && item.name.startsWith(required.name));
@@ -81,7 +85,47 @@ const WipChecklist = ({ task, targetWeight, onComplete }) => {
 
     if (loading) return <div style={{ padding: 12, color: '#64748b' }}>กำลังโหลดข้อมูลสต๊อก WIP...</div>;
 
-    const isEnough = wipData && wipData.currentQty >= wipData.requiredQty;
+    // Use a small epsilon to handle floating point precision issues (e.g. 7.0943 vs 7.094)
+    const isEnough = wipData && (wipData.currentQty >= wipData.requiredQty || Math.abs(wipData.currentQty - wipData.requiredQty) < 0.001);
+
+    const handleSendWipCard = async () => {
+        const confirmed = await showConfirm(
+            'ยืนยันส่งการ์ดงาน WIP', 
+            `คุณต้องการส่งคำสั่งผลิต WIP สำหรับ "${wipData.name}" จำนวน ${wipData.requiredQty.toLocaleString()} ${wipData.unit} ไปยังสถานี WIP ใช่หรือไม่?`, 
+            'info'
+        );
+        if (!confirmed) return;
+
+        setIsSending(true);
+        try {
+            const res = await fetch(`${API_BASE}/production/tasks/wip`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    formulaName: task.formulaName,
+                    expectedQty: wipData.requiredQty,
+                    unit: wipData.unit,
+                    sourceJobOrderId: task.jobOrderId || null,
+                    requesterName: user?.name || user?.username || 'ผู้ปฏิบัติงาน'
+                })
+            });
+
+            if (res.ok) {
+                showAlert('สำเร็จ', 'ส่งการ์ดงานผลิต WIP ไปยังสถานี WIP เรียบร้อยแล้ว', 'success');
+            } else {
+                const data = await res.json();
+                showAlert('ผิดพลาด', data.message || 'ไม่สามารถสร้างการ์ดงาน WIP ได้', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showAlert('ผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        } finally {
+            setIsSending(false);
+        }
+    };
 
     return (
         <div className="op-modal-next-action" style={{ background: '#f8fafc', borderColor: '#e2e8f0', flexDirection: 'column', alignItems: 'stretch', gap: 16, marginBottom: 24, padding: '20px' }}>
@@ -121,18 +165,20 @@ const WipChecklist = ({ task, targetWeight, onComplete }) => {
                         <span style={{ fontSize: 16 }}>⚠️</span>
                         <div>
                             <strong style={{ display: 'block', marginBottom: 4, color: '#b45309' }}>ระบบพักงานชั่วคราว</strong>
-                            <span style={{ color: '#d97706' }}>สต๊อกสินค้ากึ่งสำเร็จรูปไม่เพียงพอ กรุณาเปิดบิลสั่งผลิต WIP สำหรับงานนี้ก่อน</span>
+                            <span style={{ color: '#d97706' }}>สต๊อกสินค้ากึ่งสำเร็จรูปไม่เพียงพอ กรุณาส่งคำสั่งผลิต WIP สำหรับงานนี้ก่อน</span>
                         </div>
                     </div>
                     <button 
-                        onClick={() => window.location.href = `/operator/wip?formula=${encodeURIComponent(task.formulaName)}&wipQty=${wipData.requiredQty}&wipUnit=${encodeURIComponent(wipData.unit || 'กรัม')}&taskQty=${task.expectedQty}&taskUnit=${encodeURIComponent(task.jobUnit || task.unit || 'ชิ้น')}&jobOrderId=${encodeURIComponent(task.jobOrderId || '')}`}
+                        onClick={handleSendWipCard}
+                        disabled={isSending || isSent}
                         style={{ 
-                            background: '#fff', color: '#b45309', border: '1px solid #fcd34d', 
+                            background: isSent ? '#dcfce7' : '#fff', color: isSent ? '#15803d' : '#b45309', border: isSent ? '1px solid #4ade80' : '1px solid #fcd34d', 
                             padding: '6px 12px', borderRadius: 4, fontSize: 13, fontWeight: 600, 
-                            cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 
+                            cursor: (isSending || isSent) ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4,
+                            opacity: isSending ? 0.7 : 1
                         }}
                     >
-                        👉 ไปสร้างใบสั่งผลิต WIP
+                        {isSent ? '✅ ส่งคำสั่งผลิต WIP แล้ว' : isSending ? 'กำลังส่ง...' : '📝 ส่งคำสั่งผลิต WIP'}
                     </button>
                 </div>
             )}
@@ -144,7 +190,7 @@ const WipChecklist = ({ task, targetWeight, onComplete }) => {
                     style={{ opacity: isEnough ? 1 : 0.5, padding: '10px 24px', fontSize: 15 }}
                     onClick={() => onComplete({ usedWip: wipData })}
                 >
-                    <Play size={16} /> เริ่มดำเนินการผลิต
+                    <Play size={16} /> เริ่มดำเนินการบรรจุ
                 </button>
             </div>
         </div>
@@ -238,21 +284,6 @@ export default function Operator() {
         const currentIdx = PRODUCTION_STEPS.findIndex(s => s.key === task.currentStep);
         const nextStep = PRODUCTION_STEPS[currentIdx + 1];
         if (!nextStep) return;
-
-        // ถ้าอยู่ขั้นตอนการผลิต (production_1 หรือ production_2) → ต้องกรอกยอดผลิตก่อน
-        if (task.currentStep === 'production_1' || task.currentStep === 'production_2') {
-            setQtyModal({
-                open: true,
-                taskId: task.id,
-                taskName: `${task.batchNo} — ${task.formulaName}`,
-                expectedQty: task.expectedQty,
-                currentProduced: task.producedQty,
-                currentStep: task.currentStep,
-                nextStepKey: nextStep.key
-            });
-            setQtyForm({ producedQty: '', defectQty: '0', notes: '' });
-            return;
-        }
 
         // If next step is QC, advance AND auto-send QC request
         if (nextStep.key === 'qc_inprocess' || nextStep.key === 'qc_final') {
@@ -395,7 +426,8 @@ export default function Operator() {
         const nextStep = !isLastStep ? PRODUCTION_STEPS[currentIdx + 1] : null;
         const isQcStep = task.currentStep === 'qc_inprocess' || task.currentStep === 'qc_final';
         const waitingQc = isWaitingForQc(task);
-        const qcReqForTask = qcRequests.filter(r => r.taskId === task.id);
+        // Show ALL QC records (In-process and Final) for this specific Job and Batch
+        const qcReqForTask = qcRequests.filter(r => r.jobOrderId === task.jobOrderId && r.batchNo === task.batchNo);
 
         const formula = MOCK_FORMULAS.find(f => f.name === task.formulaName || f.id === task.formulaName);
         
@@ -420,7 +452,7 @@ export default function Operator() {
         const rawMaterials = formula ? formula.ingredients.filter(i => i.type !== 'packaging') : [];
         const packagingItems = formula ? formula.ingredients.filter(i => i.type === 'packaging') : [];
         
-        const totalRmScaled = rawMaterials.reduce((sum, ing) => sum + (ing.qty * scaleFactor), 0);
+        const totalRmScaled = rawMaterials.reduce((sum, ing) => sum + (convertToBase(ing.qty, ing.unit) * scaleFactor), 0);
 
         return (
             <div className="op-workstation-container" style={{ background: '#fff', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden', marginTop: 16 }}>
@@ -429,7 +461,7 @@ export default function Operator() {
                         <ArrowLeft size={18} /> กลับหน้ารวม
                     </button>
                     <div>
-                        <h2 style={{ margin: '0 0 6px 0', fontSize: 20, color: '#0f172a', fontWeight: 800 }}>{task.batchNo} — {task.formulaName}</h2>
+                        <h2 style={{ margin: '0 0 6px 0', fontSize: 20, color: '#0f172a', fontWeight: 800 }}>{task.batchNo} — {task.productName || task.formulaName}</h2>
                         <div className="op-workstation-meta" style={{ display: 'flex', gap: 12, alignItems: 'center', fontSize: 13 }}>
                             <span className="op-jo-ref" style={{ background: '#e0e7ff', color: '#4338ca', padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>{task.jobOrderId}</span>
                             <span className={`op-status-badge ${getStatusBadge(task.status)}`}>{task.status}</span>
@@ -506,7 +538,7 @@ export default function Operator() {
                                     <h4 style={{ margin: 0, fontSize: 15, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
                                         <Play size={18} /> ยืนยันเริ่มปฏิบัติงาน
                                     </h4>
-                                    <span style={{ fontSize: 13, color: '#15803d' }}>กดปุ่มเพื่อเปลี่ยนสถานะเป็นกำลังดำเนินการ และเข้าสู่ขั้นตอนที่ 1</span>
+                                    <span style={{ fontSize: 13, color: '#15803d' }}>กดปุ่มเพื่อเปลี่ยนสถานะเป็นกำลังดำเนินการ และเข้าสู่ขั้นตอนการเตรียมการ</span>
                                 </div>
                                 {canUpdate('operator_dashboard') && (
                                     <button className="op-btn op-btn-start" style={{ background: '#22c55e', borderColor: '#16a34a' }} onClick={() => handleAdvanceStep(task.id)}>
@@ -522,6 +554,8 @@ export default function Operator() {
                                 task={task} 
                                 targetWeight={totalRmScaled > 0 ? totalRmScaled : targetWeight}
                                 onComplete={(extra) => handleAdvanceStep(task.id, extra)} 
+                                allTasks={allTasks}
+                                user={user}
                             />
                         )}
 
@@ -552,7 +586,10 @@ export default function Operator() {
                                 {qcReqForTask.map(r => (
                                     <div key={r.id} className={`op-qc-history-item ${r.status === 'ผ่าน' ? 'passed' : r.status === 'ไม่ผ่าน' ? 'failed' : 'pending'}`}>
                                         <div className="op-qc-history-top">
-                                            <span className="op-qc-history-type">{r.typeLabel}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span className="op-qc-history-type">{r.typeLabel}</span>
+                                                <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{r.id}</span>
+                                            </div>
                                             <span className={`badge ${r.status === 'ผ่าน' ? 'badge-success' : r.status === 'ไม่ผ่าน' ? 'badge-danger' : 'badge-warning'}`}>{r.status}</span>
                                         </div>
                                         <div className="op-qc-history-meta">
@@ -675,6 +712,7 @@ export default function Operator() {
                     groups[joId] = {
                         jobOrderId: joId,
                         formulaName: task.formulaName,
+                        productName: task.productName || task.formulaName,
                         line: task.line,
                         process: task.process,
                         tasks: []
@@ -749,7 +787,7 @@ export default function Operator() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    <div className="op-jo-group-product">{group.formulaName}</div>
+                                                    <div className="op-jo-group-product">{group.productName}</div>
                                                     
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -815,7 +853,7 @@ export default function Operator() {
                                                         {waitingQc ? '⏳ รอ QC' : task.currentStep === 'packaging' ? '📦 รอ Pack' : currentStepObj?.shortLabel}
                                                     </span>
                                                 </div>
-                                                <div className="op-active-product">{task.formulaName}</div>
+                                                <div className="op-active-product">{task.productName || task.formulaName}</div>
                                                 <div className="op-active-process">{task.process} • {task.line}</div>
 
                                                 <WorkflowStepper task={task} compact={true} />
@@ -891,7 +929,7 @@ export default function Operator() {
                                     <div key={group.jobOrderId} className="op-table-group">
                                         <div className="op-table-group-header">
                                             <span className="op-jo-ref" style={{ fontSize: 13, padding: '3px 10px' }}>{group.jobOrderId}</span>
-                                            <span style={{ fontWeight: 600, color: 'var(--text)' }}>{group.formulaName}</span>
+                                            <span style={{ fontWeight: 600, color: 'var(--text)' }}>{group.productName}</span>
                                             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{group.tasks.length} batch • {group.line}</span>
                                             <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', marginLeft: 'auto' }}>
                                                 {totalProducedGroup.toLocaleString()} / {totalExpected.toLocaleString()}
@@ -1036,7 +1074,7 @@ export default function Operator() {
                                                 <span style={{ color: task.status === 'คัดทิ้ง' ? '#dc2626' : 'inherit' }}>{task.id}</span>
                                             </td>
                                             <td><span className="op-jo-ref">{task.jobOrderId}</span></td>
-                                            <td>{task.formulaName}</td>
+                                            <td>{task.productName || task.formulaName}</td>
                                             <td><span className="badge badge-neutral">{task.batchNo}</span></td>
                                             <td>{task.line}</td>
                                             <td style={{ fontWeight: 600, color: '#059669' }}>{task.producedQty.toLocaleString()}</td>
@@ -1087,8 +1125,12 @@ export default function Operator() {
                 <h1>{getPageTitle()}</h1>
                 <p>{getPageDesc()}</p>
             </div>
-            {currentTab === 'operator_dashboard' && (!selectedTask ? renderDashboard() : renderWorkstation())}
-            {currentTab === 'operator_history' && renderHistory()}
+            {selectedTask ? renderWorkstation() : (
+                <>
+                    {currentTab === 'operator_dashboard' && renderDashboard()}
+                    {currentTab === 'operator_history' && renderHistory()}
+                </>
+            )}
 
             {/* ── Production Qty Modal ── */}
             {qtyModal.open && (

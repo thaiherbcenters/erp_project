@@ -29,7 +29,7 @@ import { useProduction } from '../context/ProductionContext';
 import { useAlert } from '../components/CustomAlert';
 import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
-import { PRODUCT_LIST } from '../data/billingData';
+import { UNIT_OPTIONS } from '../data/billingData';
 import ProductionOrderPreview from '../components/ProductionOrderPreview';
 import { useSignatures } from '../hooks/useSignatures';
 import './PageCommon.css';
@@ -108,6 +108,25 @@ export default function Planning() {
     const [loadingSOs, setLoadingSOs] = useState(false);
     const [viewingSODetail, setViewingSODetail] = useState(null);
     const [showSODetailModal, setShowSODetailModal] = useState(false);
+    const [stockProducts, setStockProducts] = useState([]);
+
+    useEffect(() => {
+        const fetchStockProducts = async () => {
+            try {
+                const token = localStorage.getItem('erp_token');
+                const res = await fetch(`${API_BASE}/stock?category=${encodeURIComponent('สินค้าสำเร็จรูป')}&limit=1000`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setStockProducts(data.data || []);
+                }
+            } catch (err) {
+                console.error('Failed to fetch stock products:', err);
+            }
+        };
+        fetchStockProducts();
+    }, []);
 
     useEffect(() => {
         if (currentTab === 'planning_overview' || showCreateModal) {
@@ -619,29 +638,44 @@ export default function Planning() {
         );
     };
 
+    // Handle product selection in create form
+    const handleProductChange = (val) => {
+        const matched = stockProducts.find(p => p.name === val);
+        setCreateForm(prev => ({
+            ...prev,
+            productName: val,
+            unit: matched?.unit || prev.unit || 'ชิ้น'
+        }));
+    };
+
     // Handle formula selection in create form
     const handleFormulaSelect = (formulaId) => {
         const formula = MOCK_FORMULAS.find(f => f.id === formulaId);
         if (formula) {
-            const batchQty = createForm.batchQty || 1;
-            setCreateForm(prev => ({
-                ...prev,
-                formulaId: formula.id,
-                formulaName: formula.name,
-                productName: prev.productName || formula.name,
-                batchSize: formula.batchSize,
-                unit: formula.unit,
-                totalQty: batchQty * formula.batchSize,
-            }));
+            setCreateForm(prev => {
+                const bSize = formula.batchSize;
+                const qty = prev.totalQty || ''; // Do not auto-fill, keep existing or empty
+                const bQty = qty ? Math.ceil(qty / bSize) : 1;
+                return {
+                    ...prev,
+                    formulaId: formula.id,
+                    formulaName: formula.name,
+                    productName: prev.productName || formula.name,
+                    batchSize: bSize,
+                    formulaUnit: formula.unit, // Store formula unit separately
+                    totalQty: qty,
+                    batchQty: bQty,
+                };
+            });
         }
     };
 
     // Handle total qty change
     const handleTotalQtyChange = (val) => {
-        const qty = parseInt(val) || 0;
+        const qty = val === '' ? '' : parseInt(val) || 0;
         setCreateForm(prev => {
             const bSize = prev.batchSize > 0 ? prev.batchSize : 1;
-            const bQty = Math.ceil(qty / bSize);
+            const bQty = qty ? Math.ceil(qty / bSize) : 1;
             return { ...prev, totalQty: qty, batchQty: bQty };
         });
     };
@@ -649,7 +683,8 @@ export default function Planning() {
     // Submit create form
     const handleCreateSubmit = async () => {
         if (!createForm.formulaId) return showAlert('ข้อมูลไม่ครบ', 'กรุณาเลือกสูตรการผลิต', 'warning');
-        if (!createForm.batchQty || createForm.batchQty < 1) return showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุจำนวน Batch', 'warning');
+        if (!createForm.totalQty || createForm.totalQty < 1) return showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุยอดผลิตที่ต้องการรวม', 'warning');
+        if (!createForm.unit) return showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุหน่วยผลิตภัณฑ์', 'warning');
         if (!createForm.dueDate) return showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุวันกำหนดเสร็จ', 'warning');
         setIsCreating(true);
         const res = await createJob(createForm);
@@ -1087,112 +1122,6 @@ export default function Planning() {
         );
     };
 
-    // ══════════════════════════════════════════════════════════════════
-    // 3. ความต้องการวัตถุดิบ (Material Requirement / BOM Explosion)
-    // ══════════════════════════════════════════════════════════════════
-    const renderMaterials = () => {
-        // คำนวณ BOM Explosion จาก Job Orders ที่ยังไม่เสร็จ
-        const activeJobs = jobs.filter(j => j.status === 'กำลังผลิต' || j.status === 'รอผลิต');
-        const materialRequirements = {};
-
-        activeJobs.forEach(job => {
-            const formula = MOCK_FORMULAS.find(f => f.id === job.formulaId);
-            if (!formula) return;
-
-            formula.ingredients.forEach(ing => {
-                const key = ing.materialId;
-                // OEM scaling: use actual qty vs formula batch size
-                const isOEM = (job.notes && (job.notes.includes('MTO') || job.notes.includes('OEM'))) || (job.productionType && job.productionType.includes('OEM'));
-                const actualFormulaBase = getDynamicBatchSizeValue(formula.ingredients) || convertToBase(formula.batchSize, formula.unit) || 1;
-                const scaleFactor = isOEM ? (convertToBase(job.totalQty, job.unit) / actualFormulaBase) : job.batchQty;
-                const requiredQty = ing.qty * scaleFactor;
-                if (materialRequirements[key]) {
-                    materialRequirements[key].requiredQty += requiredQty;
-                    materialRequirements[key].jobs.push(job.id);
-                } else {
-                    const rm = MOCK_RAW_MATERIALS.find(m => m.id === ing.materialId);
-                    materialRequirements[key] = {
-                        materialId: ing.materialId,
-                        name: ing.name,
-                        unit: ing.unit,
-                        requiredQty: requiredQty,
-                        currentStock: rm ? rm.stock : 0,
-                        minStock: rm ? rm.minStock : 0,
-                        costPerUnit: rm ? rm.costPerUnit : 0,
-                        jobs: [job.id],
-                    };
-                }
-            });
-        });
-
-        const materialList = Object.values(materialRequirements);
-        const totalCost = materialList.reduce((sum, m) => sum + (m.requiredQty * m.costPerUnit), 0);
-
-        return (
-            <div className="planning-materials">
-
-                <div className="summary-row">
-                    <div className="card summary-card">
-                        <div className="summary-icon" style={{ background: '#f0ebff', color: '#7b7bf5' }}><Package size={20} /></div>
-                        <div><span className="summary-label">วัตถุดิบที่ต้องใช้</span><span className="summary-value">{materialList.length} รายการ</span></div>
-                    </div>
-                    <div className="card summary-card">
-                        <div className="summary-icon" style={{ background: '#fff8e1', color: '#f9a825' }}><AlertTriangle size={20} /></div>
-                        <div><span className="summary-label">ไม่เพียงพอ</span><span className="summary-value">{materialList.filter(m => m.currentStock < m.requiredQty).length} รายการ</span></div>
-                    </div>
-                    <div className="card summary-card">
-                        <div className="summary-icon" style={{ background: '#e3f2fd', color: '#1e88e5' }}><TrendingUp size={20} /></div>
-                        <div><span className="summary-label">ต้นทุนวัตถุดิบรวม</span><span className="summary-value">฿{totalCost.toLocaleString()}</span></div>
-                    </div>
-                </div>
-
-                <div className="card table-card">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>รหัส</th>
-                                <th>ชื่อวัตถุดิบ</th>
-                                <th>ต้องการ</th>
-                                <th>สต็อกปัจจุบัน</th>
-                                <th>หน่วย</th>
-                                <th>สถานะ</th>
-                                <th>ต้นทุน</th>
-                                <th>ใบสั่งผลิต</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {materialList.map(m => {
-                                const isShort = m.currentStock < m.requiredQty;
-                                return (
-                                    <tr key={m.materialId} className={isShort ? 'plan-row-warning' : ''}>
-                                        <td className="text-bold">{m.materialId}</td>
-                                        <td>{m.name}</td>
-                                        <td style={{ fontWeight: 700 }}>{m.requiredQty}</td>
-                                        <td style={{ color: isShort ? '#ef4444' : '#059669', fontWeight: 600 }}>{m.currentStock}</td>
-                                        <td>{m.unit}</td>
-                                        <td>
-                                            {isShort ? (
-                                                <span className="badge badge-danger">ไม่เพียงพอ (-{(m.requiredQty - m.currentStock).toFixed(1)})</span>
-                                            ) : (
-                                                <span className="badge badge-success">เพียงพอ</span>
-                                            )}
-                                        </td>
-                                        <td>฿{(m.requiredQty * m.costPerUnit).toLocaleString()}</td>
-                                        <td>
-                                            <div className="plan-job-tags">
-                                                {m.jobs.map(j => <span key={j} className="plan-job-tag">{j}</span>)}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        );
-    };
-
 
 
     // ══════════════════════════════════════════════════════════════════
@@ -1519,11 +1448,11 @@ export default function Planning() {
                                     <label style={labelStyle}>ชื่อผลิตภัณฑ์ที่สั่งผลิตจริง <span style={{ color: '#ef4444' }}>*</span></label>
                                     <CustomSelect 
                                         value={createForm.productName} 
-                                        onChange={(e) => setCreateForm({...createForm, productName: e.target.value})}
+                                        onChange={(e) => handleProductChange(e.target.value)}
                                     >
                                         <option value="">-- เลือกผลิตภัณฑ์ที่ต้องการผลิต --</option>
-                                        {PRODUCT_LIST.map(p => (
-                                            <option key={p} value={p}>{p}</option>
+                                        {stockProducts.map(p => (
+                                            <option key={p.id} value={p.name}>{p.name}</option>
                                         ))}
                                     </CustomSelect>
                                 </div>
@@ -1542,7 +1471,7 @@ export default function Planning() {
                                 </div>
                             </div>
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 14, alignItems: 'end' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, alignItems: 'end' }}>
                                 <div>
                                     <label style={labelStyle}>ยอดผลิตที่ต้องการรวม <span style={{ color: '#ef4444' }}>*</span></label>
                                     <input type="number" min="1" style={inputStyle}
@@ -1553,21 +1482,27 @@ export default function Planning() {
                                 </div>
 
                                 <div>
-                                    <label style={labelStyle}>ขนาดต่อ Batch</label>
-                                    <div style={{ ...inputStyle, background: '#f8fafc', display: 'flex', alignItems: 'center', fontWeight: 600, color: '#475569' }}>
-                                        {createForm.batchSize > 0 ? `${createForm.batchSize.toLocaleString()} ${createForm.unit}` : '—'}
-                                    </div>
+                                    <label style={labelStyle}>หน่วยผลิตภัณฑ์ <span style={{ color: '#ef4444' }}>*</span></label>
+                                    <CustomSelect 
+                                        style={inputStyle}
+                                        value={createForm.unit || ''}
+                                        onChange={(e) => setCreateForm({...createForm, unit: e.target.value})}
+                                    >
+                                        <option value="">-- ระบุหน่วย --</option>
+                                        {UNIT_OPTIONS.map(u => (
+                                            <option key={u} value={u}>{u}</option>
+                                        ))}
+                                    </CustomSelect>
                                 </div>
 
                                 <div>
-                                    <label style={labelStyle}>จำนวน Batch</label>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <input type="number" min="1"
-                                            style={{ ...inputStyle, width: 75, textAlign: 'center', fontWeight: 700, color: '#4338ca', borderColor: '#818cf8', flexShrink: 0 }}
-                                            value={createForm.batchQty}
-                                            onChange={(e) => setCreateForm(prev => ({ ...prev, batchQty: parseInt(e.target.value) || 1 }))}
-                                        />
-                                        <span style={{ fontSize: 13, fontWeight: 700, color: '#4338ca' }}>Batch</span>
+                                    <label style={labelStyle}>ขนาดต่อ Batch</label>
+                                    <div style={{ ...inputStyle, background: '#f8fafc', display: 'flex', alignItems: 'center', fontWeight: 600, color: '#475569' }}>
+                                        {selectedFormula 
+                                            ? (selectedFormula.ingredients?.length 
+                                                ? formatDynamicBatchSize(selectedFormula.ingredients) 
+                                                : `${selectedFormula.batchSize?.toLocaleString() || 0} ${selectedFormula.unit || ''}`) 
+                                            : '—'}
                                     </div>
                                 </div>
                             </div>
@@ -1816,8 +1751,6 @@ export default function Planning() {
         switch (currentTab) {
             case 'planning_overview': return 'ภาพรวมการวางแผน (Planning Overview)';
             case 'planning_list': return 'ใบสั่งผลิต (Job Order)';
-            case 'planning_materials': return 'ความต้องการวัตถุดิบ (BOM Explosion)';
-            case 'planning_gantt': return 'แผนภูมิการผลิต (Gantt Chart)';
             case 'planning_qc': return 'เชื่อมโยงผลการตรวจสอบคุณภาพ (QC)';
             default: return 'วางแผนการผลิต (Planning)';
         }
@@ -1827,8 +1760,6 @@ export default function Planning() {
         switch (currentTab) {
             case 'planning_overview': return 'ภาพรวมการวางแผนการผลิต และข้อมูลสูตรที่พร้อมใช้งานจาก R&D';
             case 'planning_list': return 'สร้างและจัดการใบสั่งผลิตโดยอ้างอิงสูตรจากฝ่ายวิจัยและพัฒนา';
-            case 'planning_materials': return `คำนวณวัตถุดิบรวมจากใบสั่งผลิตที่กำลังดำเนินการอยู่`;
-            case 'planning_gantt': return 'แผนภูมิแสดงกำหนดการและช่วงเวลาการผลิตแต่ละรายการ';
             case 'planning_qc': return 'ตรวจสอบสถานะและเชื่อมโยงผล QC ของใบสั่งผลิตแต่ละใบ';
             default: return 'จัดการและวางแผนการผลิต';
         }
@@ -1842,7 +1773,6 @@ export default function Planning() {
             </div>
             {currentTab === 'planning_overview' && renderOverview()}
             {currentTab === 'planning_list' && renderPlanList()}
-            {currentTab === 'planning_materials' && renderMaterials()}
             {renderJobModal()}
             {renderCreateModal()}
             {renderSODetailModal()}

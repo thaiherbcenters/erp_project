@@ -39,7 +39,11 @@ router.post('/incoming', authorizeRoles('admin', 'executive', 'qc'), async (req,
     try {
         const { lotNumber, itemName, supplierName, inspectorId, result_status, notes } = req.body;
         const pool = await poolPromise;
+        
+        const finalRequestID = await generateSequence(pool, 'QC_Incoming', 'RequestID', `QCIC-${getDatePrefix()}`, 3);
+
         const result = await pool.request()
+            .input('RequestID', sql.VarChar, finalRequestID)
             .input('LotNumber', sql.VarChar, lotNumber)
             .input('ItemName', sql.NVarChar, itemName)
             .input('SupplierName', sql.NVarChar, supplierName)
@@ -47,9 +51,9 @@ router.post('/incoming', authorizeRoles('admin', 'executive', 'qc'), async (req,
             .input('Result', sql.VARCHAR, result_status)
             .input('Notes', sql.NVarChar, notes)
             .query(`
-                INSERT INTO QC_Incoming (LotNumber, ItemName, SupplierName, InspectorID, Result, Notes)
+                INSERT INTO QC_Incoming (RequestID, LotNumber, ItemName, SupplierName, InspectorID, Result, Notes)
                 OUTPUT INSERTED.*
-                VALUES (@LotNumber, @ItemName, @SupplierName, @InspectorID, @Result, @Notes)
+                VALUES (@RequestID, @LotNumber, @ItemName, @SupplierName, @InspectorID, @Result, @Notes)
             `);
         res.status(201).json(result.recordset[0]);
     } catch (err) {
@@ -83,8 +87,15 @@ router.post('/requests', authorizeRoles('admin', 'executive', 'qc', 'operator', 
         const { requestID, taskID, jobOrderID, batchNo, formulaName, line, type, requestedAt, status } = req.body;
         const pool = await poolPromise;
         
+        let finalRequestID = requestID;
+        // Auto-generate proper QC ID if frontend sent a timestamp or none
+        if (!finalRequestID || finalRequestID.includes(Date.now().toString().substring(0,5)) || finalRequestID.startsWith('QCR-')) {
+            const prefix = type === 'qc_inprocess' ? 'QCIP' : 'QCF';
+            finalRequestID = await generateSequence(pool, 'QC_Production', 'RequestID', `${prefix}-${getDatePrefix()}`, 3);
+        }
+        
         const result = await pool.request()
-            .input('RequestID', sql.VarChar, requestID)
+            .input('RequestID', sql.VarChar, finalRequestID)
             .input('TaskID', sql.VarChar, taskID)
             .input('JobOrderID', sql.VarChar, jobOrderID)
             .input('BatchNo', sql.VarChar, batchNo)
@@ -166,17 +177,16 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                     if (prodRes.recordset.length > 0) {
                         let stepTimes = {};
                         try { stepTimes = JSON.parse(prodRes.recordset[0].StepTimesJSON || '{}'); } catch(e) {}
-                        stepTimes['production_2'] = new Date().toISOString();
-
+                        // Do not auto-advance to production_2 yet. Let WIP Operator decide.
+                        
                         await pool.request()
                             .input('TaskID', sql.VarChar, taskId)
-                            .input('StepTimesJSON', sql.NVarChar, JSON.stringify(stepTimes))
                             .query(`
                                 UPDATE Production_Tasks 
-                                SET CurrentStep = 'production_2', StepTimesJSON = @StepTimesJSON
+                                SET Status = N'QC ผ่าน'
                                 WHERE TaskID = @TaskID
                             `);
-                        console.log(`✅ QC In-Process passed → Production ${taskId} advanced to production_2`);
+                        console.log(`✅ QC In-Process passed → Production ${taskId} status changed to 'QC ผ่าน'`);
                     }
                 }
 
@@ -201,54 +211,57 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                         const prodTaskId = pkgTask.ProductionTaskID;
                         const productName = pkgTask.Product;
                         
-                        // Sync Production to stock + เสร็จสิ้น
-                        if (prodTaskId) {
-                            const prodResult = await pool.request()
-                                .input('ProdTaskID', sql.VarChar, prodTaskId)
-                                .query('SELECT StepTimesJSON FROM Production_Tasks WHERE TaskID = @ProdTaskID');
-                            let stepTimes = {};
-                            if (prodResult.recordset.length > 0 && prodResult.recordset[0].StepTimesJSON) {
-                                try { stepTimes = JSON.parse(prodResult.recordset[0].StepTimesJSON); } catch(e) {}
-                            }
-                            stepTimes['stock'] = new Date().toISOString();
-                            await pool.request()
-                                .input('ProdTaskID', sql.VarChar, prodTaskId)
-                                .input('StepTimesJSON', sql.NVarChar, JSON.stringify(stepTimes))
-                                .query(`UPDATE Production_Tasks SET CurrentStep = 'stock', Status = N'เสร็จสิ้น', EndTime = GETDATE(), StepTimesJSON = @StepTimesJSON WHERE TaskID = @ProdTaskID`);
-                            console.log(`✅ Production ${prodTaskId} → stock (เสร็จสิ้น)`);
-                        }
-                        
-                        // Update Planner status
-                        if (prodTaskId) {
-                            const joRes = await pool.request()
-                                .input('ProdTaskID', sql.VarChar, prodTaskId)
-                                .query('SELECT JobOrderID FROM Production_Tasks WHERE TaskID = @ProdTaskID');
-                            if (joRes.recordset.length > 0 && joRes.recordset[0].JobOrderID) {
-                                await pool.request()
-                                    .input('PlannerID', sql.VarChar, joRes.recordset[0].JobOrderID)
-                                    .query(`UPDATE Planner SET Status = N'เสร็จสิ้น' WHERE PlannerID = @PlannerID`);
-                                console.log(`✅ Planner ${joRes.recordset[0].JobOrderID} → เสร็จสิ้น`);
-                            }
-                        }
-                        
-                        // Get produced qty
+                        // 1. Get produced qty and sync Production_Tasks
                         let goodQty = pkgTask.PackedQty || 0;
                         let defectQty = 0;
                         let jobOrderID = '';
+                        
                         if (prodTaskId) {
                             const pdRes = await pool.request()
                                 .input('ProdTaskID', sql.VarChar, prodTaskId)
-                                .query('SELECT ProducedQty, DefectQty, JobOrderID FROM Production_Tasks WHERE TaskID = @ProdTaskID');
+                                .query('SELECT ProducedQty, DefectQty, JobOrderID, StepTimesJSON FROM Production_Tasks WHERE TaskID = @ProdTaskID');
+                            
                             if (pdRes.recordset.length > 0) {
                                 const pd = pdRes.recordset[0];
-                                // Use PackedQty if available and valid, otherwise fallback to ProducedQty (which is already the good quantity)
+                                // Use PackedQty if available and valid, otherwise fallback to ProducedQty
                                 if (goodQty <= 0 && pd.ProducedQty > 0) {
                                     goodQty = pd.ProducedQty;
                                 }
                                 defectQty = pd.DefectQty || 0;
                                 jobOrderID = pd.JobOrderID || '';
+                                
+                                // Sync Production to stock + เสร็จสิ้น + Update ProducedQty
+                                let stepTimes = {};
+                                if (pd.StepTimesJSON) {
+                                    try { stepTimes = JSON.parse(pd.StepTimesJSON); } catch(e) {}
+                                }
+                                stepTimes['stock'] = new Date().toISOString();
+                                
+                                await pool.request()
+                                    .input('ProdTaskID', sql.VarChar, prodTaskId)
+                                    .input('StepTimesJSON', sql.NVarChar, JSON.stringify(stepTimes))
+                                    .input('GoodQty', sql.Float, goodQty)
+                                    .query(`
+                                        UPDATE Production_Tasks 
+                                        SET CurrentStep = 'stock', 
+                                            Status = N'เสร็จสิ้น', 
+                                            EndTime = GETDATE(), 
+                                            StepTimesJSON = @StepTimesJSON,
+                                            ProducedQty = CASE WHEN ProducedQty <= 0 THEN @GoodQty ELSE ProducedQty END
+                                        WHERE TaskID = @ProdTaskID
+                                    `);
+                                console.log(`✅ Production ${prodTaskId} → stock (เสร็จสิ้น) updated with Qty ${goodQty}`);
                             }
                         }
+                        
+                        // Update Planner status
+                        if (jobOrderID) {
+                            await pool.request()
+                                .input('PlannerID', sql.VarChar, jobOrderID)
+                                .query(`UPDATE Planner SET Status = N'เสร็จสิ้น' WHERE PlannerID = @PlannerID`);
+                            console.log(`✅ Planner ${jobOrderID} → เสร็จสิ้น`);
+                        }
+                        
                         
                         // Check OEM
                         let isOEM = false;
@@ -445,6 +458,50 @@ router.get('/criteria', async (req, res) => {
     } catch (err) {
         console.error('Error fetching qc criteria:', err);
         res.status(500).json({ message: 'Error fetching qc criteria' });
+    }
+});
+
+// Add new QC Criteria
+router.post('/criteria', authorizeRoles('admin', 'executive', 'qc'), async (req, res) => {
+    try {
+        const { checkItem, standardRequirement, category, stage } = req.body;
+        let productCat = category || 'All';
+        const qcStage = stage || 'Incoming';
+
+        if (productCat.includes('ยาดม')) productCat = 'ยาดม';
+        else if (productCat.includes('ครีม') || productCat.includes('ยาหม่อง')) productCat = 'ครีม';
+        else if (productCat.includes('น้ำมัน')) productCat = 'น้ำมันนวด';
+
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('QCStage', sql.VarChar, qcStage)
+            .input('CheckItem', sql.NVarChar, checkItem)
+            .input('StandardRequirement', sql.NVarChar, standardRequirement)
+            .input('ProductCategory', sql.NVarChar, productCat)
+            .query(`
+                INSERT INTO QC_Criteria (QCStage, CheckItem, StandardRequirement, ProductCategory)
+                OUTPUT INSERTED.*
+                VALUES (@QCStage, @CheckItem, @StandardRequirement, @ProductCategory)
+            `);
+        res.status(201).json(result.recordset[0]);
+    } catch (err) {
+        console.error('Error adding qc criteria:', err);
+        res.status(500).json({ message: 'Error adding qc criteria' });
+    }
+});
+
+// Delete QC Criteria
+router.delete('/criteria/:id', authorizeRoles('admin', 'executive', 'qc'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await poolPromise;
+        await pool.request()
+            .input('CriteriaID', sql.Int, id)
+            .query('DELETE FROM QC_Criteria WHERE CriteriaID = @CriteriaID');
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error deleting qc criteria:', err);
+        res.status(500).json({ message: 'Error deleting qc criteria' });
     }
 });
 

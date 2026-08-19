@@ -7,6 +7,9 @@ const fontkit = require('@pdf-lib/fontkit');
 const { poolPromise } = require('../config/db');
 const { drawThaiText, wrapThaiText } = require('../utils/thaiShaper');
 const { renderTorbor1Page3, renderTorbor1Page4And5, renderRelatedManufacturersOnPage2 } = require('../utils/torbor1PdfRenderer');
+const { generateRequisitionPdf } = require('../utils/requisitionPdfRenderer');
+const sql = require('mssql');
+
 // GET /check-template/:documentType
 // ตรวจสอบว่ามีแฟ้มแม่แบบสำหรับประเภทเอกสารนี้หรือไม่
 router.get('/check-template/:documentType', (req, res) => {
@@ -18,6 +21,92 @@ router.get('/check-template/:documentType', (req, res) => {
     const dir = path.join(__dirname, `../pdf_templates/${documentType}`);
     const exists = fs.existsSync(dir);
     res.json({ exists });
+});
+
+// POST /print/requisition/preview
+router.post('/requisition/preview', async (req, res) => {
+    try {
+        const data = req.body;
+        const pdfBytes = await generateRequisitionPdf(data);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="requisition_preview.pdf"');
+        res.send(Buffer.from(pdfBytes));
+    } catch (error) {
+        console.error('Error generating preview PDF:', error);
+        res.status(500).json({ error: 'Failed to generate preview PDF' });
+    }
+});
+
+// GET /print/requisition/:taskId
+router.get('/requisition/:taskId', async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        const pool = await poolPromise;
+        let taskRes;
+        
+        if (taskId.startsWith('PKG-')) {
+            taskRes = await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query(`
+                    SELECT TaskID, JobOrderID, BatchNo, Product AS FormulaName, 
+                           Qty AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, CreatedAt 
+                    FROM Packaging_Tasks WHERE TaskID = @TaskID
+                `);
+        } else {
+            taskRes = await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query(`
+                    SELECT TaskID, JobOrderID, BatchNo, FormulaName, 
+                           ExpectedQty, JobUnit AS Unit, RequisitionJSON, CreatedAt 
+                    FROM Production_Tasks WHERE TaskID = @TaskID
+                `);
+        }
+
+        if (taskRes.recordset.length === 0) {
+            return res.status(404).json({ error: 'Task not found' });
+        }
+
+        const task = taskRes.recordset[0];
+        let items = [];
+        let requesterName = 'ไม่ระบุ';
+        let issuerName = 'ไม่ระบุ';
+        let issueDate = null;
+        if (task.RequisitionJSON) {
+            try {
+                const parsed = JSON.parse(task.RequisitionJSON);
+                items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+                if (!Array.isArray(parsed)) {
+                    if (parsed.requesterName) requesterName = parsed.requesterName;
+                    if (parsed.issuerName) issuerName = parsed.issuerName;
+                    if (parsed.issueDate) issueDate = parsed.issueDate;
+                }
+            } catch (e) {
+                items = [];
+            }
+        }
+
+        const data = {
+            taskId: task.TaskID,
+            jobOrderId: task.JobOrderID,
+            batchNo: task.BatchNo,
+            formulaName: task.FormulaName,
+            expectedQty: task.ExpectedQty,
+            unit: task.Unit,
+            date: new Date(task.CreatedAt).toLocaleDateString('th-TH'),
+            items: items,
+            requesterName: requesterName,
+            issuerName: issuerName,
+            issueDate: issueDate
+        };
+
+        const pdfBytes = await generateRequisitionPdf(data);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="requisition_${taskId}.pdf"`);
+        res.send(Buffer.from(pdfBytes));
+    } catch (error) {
+        console.error('Error generating requisition PDF:', error);
+        res.status(500).json({ error: 'Failed to generate requisition PDF' });
+    }
 });
 
 router.post('/', async (req, res) => {

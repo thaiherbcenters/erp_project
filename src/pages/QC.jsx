@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
 import { useRnD } from '../context/RnDContext';
 import API_BASE from '../config';
-import { Search, Plus, FileText } from 'lucide-react';
+import { Search, Plus, FileText, Trash2, Save } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
@@ -106,6 +106,7 @@ export default function QC() {
                 const data = await resInc.json();
                 setIncomings(data.map(d => ({
                     id: d.IncomingID,
+                    requestId: d.RequestID || `QCIC-${d.IncomingID}`,
                     lotNumber: d.LotNumber,
                     item: d.ItemName,
                     supplier: d.SupplierName,
@@ -178,6 +179,8 @@ export default function QC() {
     // ── Inspect QC Request (Checklists) ──
     const [checklistData, setChecklistData] = useState([]);
     const [loadingCriteria, setLoadingCriteria] = useState(false);
+    const [newCriteria, setNewCriteria] = useState({ CheckItem: '', StandardRequirement: '' });
+    const [isAddingCriteria, setIsAddingCriteria] = useState(false);
 
     const openInspectModal = async (req) => {
         setInspectingRequest(req);
@@ -210,7 +213,52 @@ export default function QC() {
         setInspectingRequest(null);
         setChecklistData([]);
         setInspectNotes('');
+        setIsAddingCriteria(false);
         setRejectDialog({ open: false, request: null });
+    };
+
+    const handleSaveNewCriteria = async () => {
+        if (!newCriteria.CheckItem) {
+            showAlert('แจ้งเตือน', 'กรุณาระบุหัวข้อที่ตรวจ', 'warning');
+            return;
+        }
+        try {
+            const res = await fetch(`${API_BASE}/qc/criteria`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    checkItem: newCriteria.CheckItem,
+                    standardRequirement: newCriteria.StandardRequirement,
+                    category: inspectingRequest.formulaName,
+                    stage: inspectingRequest.type
+                })
+            });
+            if (res.ok) {
+                const added = await res.json();
+                setChecklistData([...checklistData, { ...added, IsPass: true, ActualValue: '' }]);
+                setNewCriteria({ CheckItem: '', StandardRequirement: '' });
+                setIsAddingCriteria(false);
+                showAlert('สำเร็จ', 'เพิ่มรายการตรวจสอบใหม่เรียบร้อยแล้ว', 'success');
+            } else {
+                showAlert('ข้อผิดพลาด', 'ไม่สามารถบันทึกรายการได้', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถบันทึกรายการได้', 'error');
+        }
+    };
+
+    const handleDeleteCriteriaRow = async (id) => {
+        if(!window.confirm('ต้องการลบหัวข้อตรวจนี้ใช่หรือไม่?')) return;
+        try {
+            const res = await fetch(`${API_BASE}/qc/criteria/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setChecklistData(checklistData.filter(c => c.CriteriaID !== id));
+                showAlert('สำเร็จ', 'ลบรายการตรวจเรียบร้อยแล้ว', 'success');
+            }
+        } catch(err) {
+            console.error(err);
+        }
     };
 
     const handleRejectClick = () => {
@@ -242,9 +290,9 @@ export default function QC() {
                             {requests.filter(r => r.status === 'รอตรวจ').map(req => (
                                 <div key={req.id} className="qc-pending-card">
                                     <div className="qc-pending-header">
-                                        <div>
-                                            <span className="qc-pending-batch">{req.batchNo}</span>
-                                            <span className="qc-pending-jo">← {req.jobOrderId}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            <span className="qc-pending-batch">{req.jobOrderId}</span>
+                                            <span style={{ fontSize: 11, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{req.id}</span>
                                         </div>
                                         <span className="badge badge-warning">⏳ รอตรวจ</span>
                                     </div>
@@ -272,7 +320,7 @@ export default function QC() {
                             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', background: '#f8fafc' }}>
                                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>🔍 แบบฟอร์มตรวจ QC ({inspectingRequest.type === 'qc_inprocess' ? 'In-Process' : 'Final'})</h2>
                                 <p style={{ margin: '4px 0 0', fontSize: 14, color: '#64748b' }}>
-                                    {inspectingRequest.batchNo} — {inspectingRequest.formulaName}
+                                    {inspectingRequest.jobOrderId} — {inspectingRequest.formulaName}
                                 </p>
                             </div>
                             
@@ -281,49 +329,75 @@ export default function QC() {
                                     <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>กำลังโหลดเกณฑ์มาตรฐาน...</div>
                                 ) : (
                                     <div className="qc-checklist-container">
-                                        <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            📋 รายการที่ต้องตรวจสอบ (มาตรฐาน)
-                                        </h3>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                                            <h3 style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+                                                📋 รายการที่ต้องตรวจสอบ (มาตรฐาน)
+                                            </h3>
+                                            <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => setIsAddingCriteria(!isAddingCriteria)}>
+                                                <Plus size={14} /> เพิ่มรายการตรวจ
+                                            </button>
+                                        </div>
                                         
-                                        {checklistData.length === 0 ? (
-                                            <p style={{ color: '#94a3b8', fontSize: 14 }}>ไม่มีหัวข้อตรวจแบบเฉพาะเจาะจง (ใช้การประเมินทั่วไป)</p>
-                                        ) : (
-                                            <table className="data-table" style={{ marginBottom: 20 }}>
-                                                <thead>
-                                                    <tr>
-                                                        <th style={{ width: 60, textAlign: 'center' }}>ผ่าน</th>
-                                                        <th>หัวข้อที่ตรวจ</th>
-                                                        <th>เกณฑ์อ้างอิง Spec</th>
-                                                        <th>ค่าที่วัดได้จริง (Optional)</th>
+                                        <table className="data-table" style={{ marginBottom: 20 }}>
+                                            <thead>
+                                                <tr>
+                                                    <th style={{ width: 60, textAlign: 'center' }}>ผ่าน</th>
+                                                    <th>หัวข้อที่ตรวจ</th>
+                                                    <th>เกณฑ์อ้างอิง Spec</th>
+                                                    <th>ค่าที่วัดได้จริง (Optional)</th>
+                                                    <th style={{ width: 40, textAlign: 'center' }}>ลบ</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {checklistData.length === 0 && !isAddingCriteria ? (
+                                                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>ไม่มีหัวข้อตรวจแบบเฉพาะเจาะจง กรุณาเพิ่มรายการตรวจ หรือใช้การประเมินทั่วไปด้านล่าง</td></tr>
+                                                ) : checklistData.map((item) => (
+                                                    <tr key={item.CriteriaID} style={{ background: item.IsPass ? 'transparent' : '#fef2f2' }}>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                checked={item.IsPass}
+                                                                onChange={(e) => handleChecklistChange(item.CriteriaID, 'IsPass', e.target.checked)}
+                                                                style={{ width: 18, height: 18, cursor: 'pointer', accentColor: item.IsPass ? '#16a34a' : 'initial' }}
+                                                            />
+                                                        </td>
+                                                        <td style={{ fontWeight: 500 }}>{item.CheckItem}</td>
+                                                        <td style={{ color: '#64748b', fontSize: 13 }}>{item.StandardRequirement}</td>
+                                                        <td>
+                                                            <input 
+                                                                type="text" 
+                                                                placeholder="ระบุค่า"
+                                                                value={item.ActualValue}
+                                                                onChange={(e) => handleChecklistChange(item.CriteriaID, 'ActualValue', e.target.value)}
+                                                                style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}
+                                                            />
+                                                        </td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <button onClick={() => handleDeleteCriteriaRow(item.CriteriaID)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }} title="ลบรายการนี้">
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </td>
                                                     </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {checklistData.map((item) => (
-                                                        <tr key={item.CriteriaID} style={{ background: item.IsPass ? 'transparent' : '#fef2f2' }}>
-                                                            <td style={{ textAlign: 'center' }}>
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    checked={item.IsPass}
-                                                                    onChange={(e) => handleChecklistChange(item.CriteriaID, 'IsPass', e.target.checked)}
-                                                                    style={{ width: 18, height: 18, cursor: 'pointer', accentColor: item.IsPass ? '#16a34a' : 'initial' }}
-                                                                />
-                                                            </td>
-                                                            <td style={{ fontWeight: 500 }}>{item.CheckItem}</td>
-                                                            <td style={{ color: '#64748b', fontSize: 13 }}>{item.StandardRequirement}</td>
-                                                            <td>
-                                                                <input 
-                                                                    type="text" 
-                                                                    placeholder="ระบุค่า"
-                                                                    value={item.ActualValue}
-                                                                    onChange={(e) => handleChecklistChange(item.CriteriaID, 'ActualValue', e.target.value)}
-                                                                    style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}
-                                                                />
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        )}
+                                                ))}
+                                                {isAddingCriteria && (
+                                                    <tr style={{ background: '#f8fafc' }}>
+                                                        <td style={{ textAlign: 'center' }}>-</td>
+                                                        <td>
+                                                            <input type="text" placeholder="ระบุหัวข้อที่ตรวจ..." value={newCriteria.CheckItem} onChange={e => setNewCriteria({...newCriteria, CheckItem: e.target.value})} style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #94a3b8', fontSize: 13 }} autoFocus />
+                                                        </td>
+                                                        <td>
+                                                            <input type="text" placeholder="ระบุเกณฑ์อ้างอิง..." value={newCriteria.StandardRequirement} onChange={e => setNewCriteria({...newCriteria, StandardRequirement: e.target.value})} style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #94a3b8', fontSize: 13 }} />
+                                                        </td>
+                                                        <td>-</td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <button onClick={handleSaveNewCriteria} style={{ background: 'none', border: 'none', color: '#16a34a', cursor: 'pointer', padding: 4 }} title="บันทึก">
+                                                                <Save size={18} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
 
                                         <div style={{ marginTop: 20 }}>
                                             <label style={{ display: 'block', fontSize: 14, fontWeight: 600, marginBottom: 6 }}>หมายเหตุรวม (ข้อติชม/สรุปผล):</label>
@@ -423,8 +497,8 @@ export default function QC() {
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th>Batch No.</th>
-                                    <th>ใบสั่งผลิต</th>
+                                    <th>รหัสใบตรวจ</th>
+                                    <th>ใบสั่งผลิต (JO)</th>
                                     <th>ผลิตภัณฑ์</th>
                                     <th>ไลน์</th>
                                     <th>วันที่ส่ง</th>
@@ -437,8 +511,8 @@ export default function QC() {
                             <tbody>
                                 {requests.filter(r => r.status !== 'รอตรวจ').map(req => (
                                     <tr key={req.id}>
-                                        <td className="text-bold">{req.batchNo}</td>
-                                        <td><span className="op-jo-ref">{req.jobOrderId}</span></td>
+                                        <td className="text-bold" style={{ color: '#4338ca' }}>{req.id}</td>
+                                        <td className="text-bold">{req.jobOrderId}</td>
                                         <td>{req.formulaName}</td>
                                         <td>{req.line}</td>
                                         <td>{req.requestedAt}</td>
@@ -571,11 +645,12 @@ export default function QC() {
                         <div className="table-card card">
                             <table className="data-table">
                                 <thead>
-                                    <tr><th>วันที่</th><th>Lot Number</th><th>วัตถุดิบ</th><th>Supplier</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
+                                    <tr><th>รหัสอ้างอิง</th><th>วันที่</th><th>Lot Number</th><th>วัตถุดิบ</th><th>Supplier</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
                                 </thead>
                                 <tbody>
                                     {filteredIncoming.map(item => (
                                         <tr key={item.id}>
+                                            <td className="text-bold" style={{ color: '#475569' }}>{item.requestId}</td>
                                             <td>{item.date}</td>
                                             <td className="text-bold">{item.lotNumber}</td>
                                             <td>{item.item}</td>

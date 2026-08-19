@@ -1,13 +1,12 @@
-const { poolPromise } = require('./config/db');
-async function test() {
-    try {
-        const pool = await poolPromise;
-        const result = await pool.request().query('SELECT TOP 5 TaxInvoiceID, TaxInvoiceNo, ContractID FROM TaxInvoice ORDER BY TaxInvoiceID DESC');
-        console.log(result.recordset);
-        process.exit(0);
-    } catch (err) {
-        console.error(err);
-        process.exit(1);
-    }
-}
+const { poolPromise, sql } = require('./config/db'); 
+async function test() { 
+    try { 
+        const pool = await poolPromise; 
+        await pool.request().query(`UPDATE Packaging_Tasks SET RequisitionJSON = REPLACE(CAST(RequisitionJSON AS NVARCHAR(MAX)), 'ไม่ระบุ', 'ผู้ใช้ระบบ') WHERE TaskID = 'PKG-20260819-001'`); 
+        console.log('Updated'); 
+    } catch(e) { 
+        console.error(e); 
+    } 
+    process.exit(0); 
+} 
 test();

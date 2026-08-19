@@ -3,6 +3,7 @@ const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 const { generateSequence, getDatePrefix } = require('../utils/sequence');
 const { authorizeRoles } = require('../middleware/authorize');
+const { autoDeductPackaging } = require('../utils/stockDeduction');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -57,6 +58,7 @@ router.get('/tasks', async (req, res) => {
             note: row.Note || null,
             productionTaskId: row.ProductionTaskID || null,
             jobOrderId: row.JobOrderID || null,
+            requisitionJSON: row.RequisitionJSON || null,
             createdAt: row.CreatedAt,
             updatedAt: row.UpdatedAt
         }));
@@ -84,8 +86,8 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
                 SET PackedQty = ISNULL(PackedQty, 0) + @AddedQty,
                     DefectQty = ISNULL(DefectQty, 0) + @DefectQty,
                     Status = CASE 
-                        WHEN (ISNULL(PackedQty, 0) + @AddedQty) >= Qty THEN N'บรรจุเสร็จ'
-                        WHEN (ISNULL(PackedQty, 0) + @AddedQty) > 0 THEN N'กำลังบรรจุ'
+                        WHEN (ISNULL(PackedQty, 0) + @AddedQty + ISNULL(DefectQty, 0) + @DefectQty) >= Qty THEN N'บรรจุเสร็จ'
+                        WHEN (ISNULL(PackedQty, 0) + @AddedQty + ISNULL(DefectQty, 0) + @DefectQty) > 0 THEN N'กำลังบรรจุ'
                         ELSE Status 
                     END,
                     UpdatedAt = GETDATE()
@@ -99,15 +101,15 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
 
         const updatedTask = result.recordset[0];
 
-        // --- Auto QC Final: เมื่อ PackedQty >= Qty → ส่ง QC Final อัตโนมัติ ---
-        if (updatedTask.PackedQty >= updatedTask.Qty && updatedTask.Status !== 'รอ QC Final' && updatedTask.Status !== 'QC ผ่าน') {
+        // --- Auto QC Final: เมื่อยอดรวม (ดี+เสีย) >= Qty → ส่ง QC Final อัตโนมัติ ---
+        if ((updatedTask.PackedQty + updatedTask.DefectQty) >= updatedTask.Qty && updatedTask.Status !== 'รอ QC Final' && updatedTask.Status !== 'QC ผ่าน') {
             // 1. Update status to 'รอ QC Final'
             await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
                 .query(`UPDATE Packaging_Tasks SET Status = N'รอ QC Final', UpdatedAt = GETDATE() WHERE TaskID = @TaskID`);
 
             // 2. Auto-create QC Request
-            const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCR-${getDatePrefix()}`, 3);
+            const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCF-${getDatePrefix()}`, 3);
             try {
                 await pool.request()
                     .input('RequestID', sql.VarChar, qcRequestId)
@@ -153,6 +155,41 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
     } catch (err) {
         console.error('Error updating packaging progress:', err);
         res.status(500).json({ message: 'Error updating packaging progress' });
+    }
+});
+
+// Submit requisition for existing task
+router.put('/tasks/:id/requisition', authorizeRoles('admin', 'executive', 'packaging', 'operator'), async (req, res) => {
+    try {
+        const { requisitionItems, requesterName } = req.body;
+        const taskId = req.params.id;
+        
+        if (!requisitionItems || requisitionItems.length === 0) {
+            return res.status(400).json({ message: 'No requisition items provided' });
+        }
+
+        const pool = await poolPromise;
+        const reqJsonStr = JSON.stringify({ items: requisitionItems, requesterName: requesterName || 'ไม่ระบุ' });
+
+        const result = await pool.request()
+            .input('TaskID', sql.VarChar, taskId)
+            .input('RequisitionJSON', sql.NVarChar, reqJsonStr)
+            .input('Status', sql.NVarChar, 'รอเบิกบรรจุภัณฑ์')
+            .query(`
+                UPDATE Packaging_Tasks 
+                SET RequisitionJSON = @RequisitionJSON, Status = @Status, UpdatedAt = GETDATE()
+                OUTPUT INSERTED.* 
+                WHERE TaskID = @TaskID
+            `);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: 'Task not found' });
+        }
+
+        res.json({ message: 'ส่งใบเบิกสำเร็จ', task: result.recordset[0] });
+    } catch (err) {
+        console.error('Error submitting packaging requisition:', err);
+        res.status(500).json({ message: 'Error submitting requisition', error: err.message });
     }
 });
 
@@ -240,10 +277,21 @@ router.put('/tasks/:id/status', authorizeRoles('admin', 'executive', 'packaging'
             }
         };
 
+        // --- Auto Deduct Packaging Materials ---
+        // REMOVED: Stock deduction is now handled by the warehouse when approving the requisition.
+        // if (status === 'กำลังบรรจุ') {
+        //     const reqUser = req.user ? req.user.username : 'system';
+        //     autoDeductPackaging(taskId, reqUser).catch(e => console.error("Auto deduct packaging error:", e));
+        // }
+
+        if (status === 'กำลังบรรจุ') {
+            await syncProductionStep('packaging', 'กำลังทำ', false);
+        }
+
         // บรรจุเสร็จ → Auto-send QC Final + sync production
         if (status === 'บรรจุเสร็จ') {
             // Auto-create QC Final request
-            const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCR-${getDatePrefix()}`, 3);
+            const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCF-${getDatePrefix()}`, 3);
             try {
                 await pool.request()
                     .input('RequestID', sql.VarChar, qcRequestId)

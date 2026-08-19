@@ -26,7 +26,7 @@ router.get('/tasks', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT pt.*, p.Unit as JobUnit 
+            SELECT pt.*, p.Unit as PlannerUnit 
             FROM Production_Tasks pt
             LEFT JOIN Planner p ON pt.JobOrderID = p.PlannerID
             ORDER BY pt.StartTime DESC, pt.CreatedAt DESC
@@ -47,6 +47,7 @@ router.get('/tasks', async (req, res) => {
                 id: row.TaskID,
                 jobOrderId: row.JobOrderID,
                 formulaName: row.FormulaName,
+                productName: row.ProductName || row.FormulaName,
                 process: row.ProcessName,
                 batchNo: row.BatchNo,
                 line: row.Line,
@@ -60,7 +61,8 @@ router.get('/tasks', async (req, res) => {
                 startTime: row.StartTime ? new Date(row.StartTime).toISOString().slice(0, 16).replace('T', ' ') : null,
                 endTime: row.EndTime ? new Date(row.EndTime).toISOString().slice(0, 16).replace('T', ' ') : null,
                 createdAt: row.CreatedAt,
-                jobUnit: row.JobUnit
+                jobUnit: row.JobUnit || row.PlannerUnit,
+                RequisitionJSON: row.RequisitionJSON
             };
         });
 
@@ -74,39 +76,90 @@ router.get('/tasks', async (req, res) => {
 // Create an ad-hoc WIP production task
 router.post('/tasks/wip', authorizeRoles('admin', 'executive', 'planner', 'operator'), async (req, res) => {
     try {
-        const { formulaName, expectedQty, unit, tankNo } = req.body;
+        const { formulaName, expectedQty, unit, tankNo, sourceJobOrderId, requisitionItems, requesterName } = req.body;
         const pool = await poolPromise;
         
         // Generate IDs
         const datePrefix = getDatePrefix();
-        const joId = await generateSequence(pool, 'Production_Tasks', 'JobOrderID', `JO-${datePrefix}-`, 3);
-        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `PT-${datePrefix}-`, 3);
-        const batchNo = `B${datePrefix.replace(/-/g, '')}-WIP`;
+        // Use parent planner's JO ID if provided, otherwise generate a new one
+        const joId = sourceJobOrderId || await generateSequence(pool, 'Production_Tasks', 'JobOrderID', `JO-${datePrefix}`, 3);
+        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `RQ-${datePrefix}`, 3);
+        const batchNo = `B${datePrefix}-WIP`;
+
+        let productName = null;
+        if (joId) {
+            const pRes = await pool.request()
+                .input('PlannerID', sql.VarChar, joId)
+                .query('SELECT ProductName FROM Planner WHERE PlannerID = @PlannerID');
+            if (pRes.recordset.length > 0) {
+                productName = pRes.recordset[0].ProductName;
+            }
+        }
+
+        const reqJsonStr = requisitionItems ? JSON.stringify({ items: requisitionItems, requesterName: requesterName || 'ไม่ระบุ' }) : null;
 
         await pool.request()
             .input('TaskID', sql.VarChar, taskId)
             .input('JobOrderID', sql.VarChar, joId)
             .input('BatchNo', sql.VarChar, batchNo)
             .input('FormulaName', sql.NVarChar, formulaName)
+            .input('ProductName', sql.NVarChar, productName)
             .input('Line', sql.VarChar, tankNo || 'WIP Line')
             .input('ExpectedQty', sql.Float, expectedQty)
             .input('JobUnit', sql.NVarChar, unit || 'กรัม')
-            .input('CurrentStep', sql.VarChar, 'wait')
-            .input('Status', sql.NVarChar, 'รอเริ่มงาน')
+            .input('CurrentStep', sql.VarChar, requisitionItems ? 'requisition' : 'wait')
+            .input('Status', sql.NVarChar, requisitionItems ? 'รอเบิกวัตถุดิบ' : 'รอเริ่มงาน')
+            .input('RequisitionJSON', sql.NVarChar, reqJsonStr)
             .query(`
                 INSERT INTO Production_Tasks (
-                    TaskID, JobOrderID, BatchNo, FormulaName, Line, 
-                    ExpectedQty, JobUnit, CurrentStep, Status, CreatedAt
+                    TaskID, JobOrderID, BatchNo, FormulaName, ProductName, Line, 
+                    ExpectedQty, JobUnit, CurrentStep, Status, CreatedAt, RequisitionJSON
                 ) VALUES (
-                    @TaskID, @JobOrderID, @BatchNo, @FormulaName, @Line,
-                    @ExpectedQty, @JobUnit, @CurrentStep, @Status, GETDATE()
+                    @TaskID, @JobOrderID, @BatchNo, @FormulaName, @ProductName, @Line,
+                    @ExpectedQty, @JobUnit, @CurrentStep, @Status, GETDATE(), @RequisitionJSON
                 )
             `);
             
-        res.status(201).json({ message: 'สร้างใบสั่งผลิต WIP สำเร็จ', taskId });
+        res.status(201).json({ message: 'สร้างใบสั่งผลิต WIP สำเร็จ', taskId, jobOrderId: joId, batchNo });
     } catch (err) {
         console.error('Error creating WIP task:', err);
-        res.status(500).json({ message: 'Error creating WIP task' });
+        res.status(500).json({ message: 'Error creating WIP task', error: err.message, stack: err.stack });
+    }
+});
+
+// Submit requisition for existing task
+router.put('/tasks/:id/requisition', authorizeRoles('admin', 'executive', 'planner', 'operator'), async (req, res) => {
+    try {
+        const { requisitionItems, requesterName } = req.body;
+        const taskId = req.params.id;
+        
+        if (!requisitionItems || requisitionItems.length === 0) {
+            return res.status(400).json({ message: 'No requisition items provided' });
+        }
+
+        const pool = await poolPromise;
+        const reqJsonStr = JSON.stringify({ items: requisitionItems, requesterName: requesterName || 'ไม่ระบุ' });
+
+        const result = await pool.request()
+            .input('TaskID', sql.VarChar, taskId)
+            .input('RequisitionJSON', sql.NVarChar, reqJsonStr)
+            .input('CurrentStep', sql.VarChar, 'requisition')
+            .input('Status', sql.NVarChar, 'รอเบิกวัตถุดิบ')
+            .query(`
+                UPDATE Production_Tasks 
+                SET RequisitionJSON = @RequisitionJSON, CurrentStep = @CurrentStep, Status = @Status 
+                OUTPUT INSERTED.* 
+                WHERE TaskID = @TaskID
+            `);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: 'Task not found' });
+        }
+
+        res.json({ message: 'ส่งใบเบิกสำเร็จ', task: result.recordset[0] });
+    } catch (err) {
+        console.error('Error submitting requisition:', err);
+        res.status(500).json({ message: 'Error submitting requisition' });
     }
 });
 
@@ -147,8 +200,8 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
             return res.status(404).json({ message: 'Task not found' });
         }
 
-        // --- Integration: Deduct WIP Stock when advancing to 'production_1' ---
-        if (currentStep === 'production_1' && req.body.usedWip && req.body.usedWip.id) {
+        // --- Integration: Deduct WIP Stock when advancing to 'packaging' (or legacy 'production_1') ---
+        if ((currentStep === 'production_1' || currentStep === 'packaging') && req.body.usedWip && req.body.usedWip.id) {
             try {
                 const { id, requiredQty, name } = req.body.usedWip;
                 
@@ -164,9 +217,7 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
                     `);
                     
                 // Add Stock_Logs
-                const logId = await generateSequence(pool, 'Stock_Logs', 'LogID', 'LOG-', 6);
                 await pool.request()
-                    .input('LogID', sql.VarChar, logId)
                     .input('ItemID', sql.VarChar, id)
                     .input('ProductName', sql.NVarChar, name)
                     .input('Type', sql.VarChar, 'out')
@@ -176,8 +227,8 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
                     .input('Notes', sql.NVarChar, `เบิกใช้ในกระบวนการผลิตงาน ${taskId}`)
                     .input('CreatedBy', sql.NVarChar, req.user ? req.user.username : 'system')
                     .query(`
-                        INSERT INTO Stock_Logs (LogID, ItemID, ProductName, Type, Quantity, RefNo, RefType, Notes, CreatedBy, CreatedAt)
-                        VALUES (@LogID, @ItemID, @ProductName, @Type, @Quantity, @RefNo, @RefType, @Notes, @CreatedBy, GETDATE())
+                        INSERT INTO Stock_Logs (ItemID, ProductName, Type, Quantity, RefNo, RefType, Notes, CreatedBy)
+                        VALUES (@ItemID, @ProductName, @Type, @Quantity, @RefNo, @RefType, @Notes, @CreatedBy)
                     `);
             } catch (err) {
                 console.error('Error deducting WIP stock:', err);
@@ -190,7 +241,7 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
             try {
                 const taskResult2 = await pool.request()
                     .input('ProdTaskID', sql.VarChar, taskId)
-                    .query('SELECT TaskID, JobOrderID, BatchNo, FormulaName, Line, ExpectedQty, ProducedQty FROM Production_Tasks WHERE TaskID = @ProdTaskID');
+                    .query('SELECT TaskID, JobOrderID, BatchNo, FormulaName, ProductName, Line, ExpectedQty, ProducedQty FROM Production_Tasks WHERE TaskID = @ProdTaskID');
                 
                 if (taskResult2.recordset.length > 0) {
                     const taskData = taskResult2.recordset[0];
@@ -225,7 +276,7 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
                         await pool.request()
                             .input('TaskID', sql.VarChar, pkgId)
                             .input('BatchNo', sql.VarChar, taskData.BatchNo)
-                            .input('Product', sql.NVarChar, taskData.FormulaName)
+                            .input('Product', sql.NVarChar, taskData.ProductName || taskData.FormulaName)
                             .input('Line', sql.VarChar, taskData.Line)
                             .input('Qty', sql.Int, taskData.ExpectedQty || taskData.ProducedQty || 0)
                             .input('PackedQty', sql.Int, 0)
@@ -260,6 +311,140 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
     } catch (err) {
         console.error('Error advancing task step:', err);
         res.status(500).json({ message: 'Error advancing task step' });
+    }
+});
+
+// Route a WIP Task (Send to Packaging OR send to WIP Stock)
+router.put('/tasks/:id/route-wip', authorizeRoles('admin', 'executive', 'planner', 'operator'), async (req, res) => {
+    try {
+        const { action } = req.body;
+        const taskId = req.params.id;
+        const pool = await poolPromise;
+        
+        const taskRes = await pool.request()
+            .input('TaskID', sql.VarChar, taskId)
+            .query('SELECT * FROM Production_Tasks WHERE TaskID = @TaskID');
+            
+        if (taskRes.recordset.length === 0) return res.status(404).json({ message: 'Task not found' });
+        const task = taskRes.recordset[0];
+        
+        let stepTimes = {};
+        try { stepTimes = JSON.parse(task.StepTimesJSON || '{}'); } catch(e) {}
+        
+        if (action === 'packaging') {
+            stepTimes['production_2'] = new Date().toISOString();
+            await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .input('StepTimesJSON', sql.NVarChar, JSON.stringify(stepTimes))
+                .query(`
+                    UPDATE Production_Tasks 
+                    SET CurrentStep = 'production_2', Status = N'กำลังทำ', StepTimesJSON = @StepTimesJSON
+                    WHERE TaskID = @TaskID
+                `);
+            
+            // Auto-create packaging task immediately to replicate advance step logic
+            try {
+                const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG-${getDatePrefix()}`, 3);
+                let pkgDestination = 'คลัง';
+                if (task.JobOrderID) {
+                    try {
+                        const plannerCheck = await pool.request()
+                            .input('PlannerIDCheck', sql.VarChar, task.JobOrderID)
+                            .query('SELECT Notes FROM Planner WHERE PlannerID = @PlannerIDCheck');
+                        if (plannerCheck.recordset.length > 0) {
+                            const pNotes = plannerCheck.recordset[0].Notes || '';
+                            if (pNotes.includes('OEM') || pNotes.includes('ผลิตตาม')) pkgDestination = 'ส่งลูกค้า';
+                        }
+                    } catch(pe) {}
+                }
+                await pool.request()
+                    .input('TaskID', sql.VarChar, pkgId)
+                    .input('BatchNo', sql.VarChar, task.BatchNo)
+                    .input('Product', sql.NVarChar, task.ProductName || task.FormulaName)
+                    .input('Line', sql.VarChar, task.Line)
+                    .input('Qty', sql.Float, task.ExpectedQty || task.ProducedQty || 0)
+                    .input('PackedQty', sql.Float, 0)
+                    .input('Status', sql.NVarChar, 'รอบรรจุ')
+                    .input('Destination', sql.NVarChar, pkgDestination)
+                    .input('ProductionTaskID', sql.VarChar, taskId)
+                    .input('JobOrderID', sql.VarChar, task.JobOrderID)
+                    .query(`
+                        INSERT INTO Packaging_Tasks 
+                        (TaskID, BatchNo, Product, Line, Qty, PackedQty, Status, Destination, ProductionTaskID, JobOrderID)
+                        VALUES (@TaskID, @BatchNo, @Product, @Line, @Qty, @PackedQty, @Status, @Destination, @ProductionTaskID, @JobOrderID)
+                    `);
+            } catch(e) { console.error('Error auto-creating packaging task:', e); }
+
+            return res.json({ message: 'Routed to packaging' });
+            
+        } else if (action === 'wip_stock') {
+            stepTimes['stock'] = new Date().toISOString();
+            await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .input('StepTimesJSON', sql.NVarChar, JSON.stringify(stepTimes))
+                .query(`
+                    UPDATE Production_Tasks 
+                    SET CurrentStep = 'stock', Status = N'เสร็จสิ้น', EndTime = GETDATE(), StepTimesJSON = @StepTimesJSON
+                    WHERE TaskID = @TaskID
+                `);
+                
+            const productName = (task.ProductName || task.FormulaName) + ' (WIP)';
+            
+            // Check if WIP item already exists
+            const existingItem = await pool.request()
+                .input('ProductName', sql.NVarChar, productName)
+                .input('Category', sql.NVarChar, 'สินค้ากึ่งสำเร็จรูป')
+                .query(`SELECT ItemID, Quantity FROM Stock_Items WHERE ProductName = @ProductName AND Category = @Category`);
+            
+            let itemId;
+            let currentQty = 0;
+            const addedQty = task.ProducedQty > 0 ? task.ProducedQty : task.ExpectedQty;
+
+            if (existingItem.recordset.length > 0) {
+                // Update existing
+                itemId = existingItem.recordset[0].ItemID;
+                currentQty = existingItem.recordset[0].Quantity || 0;
+                await pool.request()
+                    .input('ItemID', sql.VarChar, itemId)
+                    .input('Quantity', sql.Float, currentQty + addedQty)
+                    .query(`UPDATE Stock_Items SET Quantity = @Quantity, UpdatedAt = GETDATE() WHERE ItemID = @ItemID`);
+            } else {
+                // Create new
+                itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', 'WIP', 4);
+                await pool.request()
+                    .input('ItemID', sql.VarChar, itemId)
+                    .input('FormulaID', sql.VarChar, task.FormulaID || null)
+                    .input('ProductName', sql.NVarChar, productName)
+                    .input('Category', sql.NVarChar, 'สินค้ากึ่งสำเร็จรูป')
+                    .input('Quantity', sql.Float, addedQty)
+                    .input('Unit', sql.NVarChar, task.JobUnit || 'กรัม')
+                    .query(`
+                        INSERT INTO Stock_Items (ItemID, FormulaID, ProductName, Category, Quantity, Unit)
+                        VALUES (@ItemID, @FormulaID, @ProductName, @Category, @Quantity, @Unit)
+                    `);
+            }
+                
+            await pool.request()
+                .input('ItemID', sql.VarChar, itemId)
+                .input('Type', sql.VarChar, 'IN')
+                .input('Quantity', sql.Float, addedQty)
+                .input('RefNo', sql.VarChar, task.BatchNo)
+                .input('RefType', sql.VarChar, 'production_wip')
+                .input('ProductName', sql.NVarChar, productName)
+                .input('Notes', sql.NVarChar, 'รับเข้าคลังสินค้ากึ่งสำเร็จรูป (WIP)')
+                .input('CreatedBy', sql.VarChar, req.user ? (req.user.username || req.user.name || 'operator') : 'operator')
+                .query(`
+                    INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
+                    VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)
+                `);
+                
+            return res.json({ message: 'Routed to WIP Stock' });
+        }
+        
+        return res.status(400).json({ message: 'Invalid action' });
+    } catch (err) {
+        console.error('Route WIP error:', err);
+        res.status(500).json({ message: err.message || 'Internal server error', error: err.message, stack: err.stack });
     }
 });
 

@@ -182,10 +182,9 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
                                         {signatures.map((sig) => (
                                             <div key={sig.SignatureID} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                                    <div style={{ width: '80px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', borderRadius: '4px', overflow: 'hidden' }}>
-                                                        <img src={sig.ImagePath.startsWith('/api') ? `http://localhost:5000${sig.ImagePath}` : sig.ImagePath} alt="signature" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
-                                                            onError={(e) => { e.target.onerror = null; e.target.src = 'http://localhost:5173' + sig.ImagePath; }} 
-                                                        />
+                                                    <div style={{ width: 120, height: 60, border: '1px solid #e5e7eb', borderRadius: 6, background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 4 }}>
+                                                        <img src={sig.ImagePath} alt="signature" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+                                                            onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerText = 'รูปเสีย'; }} />
                                                     </div>
                                                     <span style={{ fontWeight: '500', color: '#1e293b' }}>{sig.FullName}</span>
                                                 </div>

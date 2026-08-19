@@ -39,26 +39,39 @@ const getMonthPrefix = (date = new Date()) => {
  * @returns {Promise<string>} - The new generated ID
  */
 const generateSequence = async (pool, tableName, columnName, prefix, padLength = 3, separator = '-') => {
-    // Get the maximum value of the column for the given prefix to avoid collisions on deletion
-    const result = await pool.request()
-        .input('prefix', sql.NVarChar, `${prefix}${separator}%`)
-        .query(`SELECT MAX(${columnName}) AS maxVal FROM ${tableName} WHERE ${columnName} LIKE @prefix`);
-
-    let nextSeq = 1;
-    const maxVal = result.recordset[0].maxVal;
+    const fullPrefix = `${prefix}${separator}`;
     
-    if (maxVal) {
-        // Extract the numeric part at the end after the separator
-        const parts = maxVal.split(separator);
-        const seqStr = parts[parts.length - 1];
-        const parsedSeq = parseInt(seqStr, 10);
-        if (!isNaN(parsedSeq)) {
-            nextSeq = parsedSeq + 1;
-        }
-    }
+    // Atomically get the next number from the Sequences table
+    const result = await pool.request()
+        .input('prefix', sql.NVarChar, fullPrefix)
+        .query(`
+            BEGIN TRY
+                BEGIN TRANSACTION;
+                
+                -- Ensure the row exists
+                IF NOT EXISTS (SELECT 1 FROM Sequences WITH (UPDLOCK, SERIALIZABLE) WHERE Prefix = @prefix)
+                BEGIN
+                    INSERT INTO Sequences (Prefix, LastNumber, UpdatedAt) VALUES (@prefix, 0, GETDATE());
+                END
 
+                -- Increment and get the new number
+                UPDATE Sequences 
+                SET LastNumber = LastNumber + 1, UpdatedAt = GETDATE()
+                OUTPUT inserted.LastNumber
+                WHERE Prefix = @prefix;
+                
+                COMMIT TRANSACTION;
+            END TRY
+            BEGIN CATCH
+                IF @@TRANCOUNT > 0
+                    ROLLBACK TRANSACTION;
+                THROW;
+            END CATCH
+        `);
+
+    const nextSeq = result.recordset[0].LastNumber;
     const seq = String(nextSeq).padStart(padLength, '0');
-    return `${prefix}${separator}${seq}`;
+    return `${fullPrefix}${seq}`;
 };
 
 module.exports = {

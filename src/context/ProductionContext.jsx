@@ -232,8 +232,9 @@ export function ProductionProvider({ children }) {
                             console.error('Failed to update packaging task after QC:', pkgErr);
                         }
                     } else if (result === 'ผ่าน') {
-                        // QC passed → advance to next step
-                        advanceTaskStep(request.taskId);
+                        // QC passed → Backend already updated Production_Tasks.Status to 'QC ผ่าน'
+                        // Just refresh the task list to reflect the new status
+                        await fetchTasks();
                     } else if (result === 'ไม่ผ่าน') {
                         // QC failed → handle based on disposition
                         if (disposition === 'reject') {
@@ -296,6 +297,30 @@ export function ProductionProvider({ children }) {
         }
     }, [tasks, fetchTasks]);
 
+    // ── Route WIP Task ──
+    const routeWipTask = useCallback(async (taskId, action) => {
+        try {
+            const res = await fetch(`${API_BASE}/production/tasks/${taskId}/route-wip`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('erp_token')}`
+                },
+                body: JSON.stringify({ action })
+            });
+            if (res.ok) {
+                fetchTasks();
+                return { success: true };
+            } else {
+                const errorData = await res.json();
+                return { success: false, message: errorData.message || 'Error routing task' };
+            }
+        } catch (err) {
+            console.error('Failed to route WIP task:', err);
+            return { success: false, message: 'Server connection error' };
+        }
+    }, [fetchTasks]);
+
     // ── Add Production Log ──
     const addProductionLog = useCallback(async (taskId, payload) => {
         try {
@@ -336,6 +361,7 @@ export function ProductionProvider({ children }) {
         submitQcResult,
         advanceTaskStep,
         startTask,
+        routeWipTask,
         getQcRequestsByType,
         getPendingQcRequests,
         addProductionLog

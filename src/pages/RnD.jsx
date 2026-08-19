@@ -9,7 +9,7 @@
  * =============================================================================
  */
 
-import React, { useState, Fragment } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -95,6 +95,23 @@ export default function RnD() {
     const [simTargetUnits, setSimTargetUnits] = useState(1000);
     const [simUnitSize, setSimUnitSize] = useState(5);
 
+    // Stock Items for dropdown mapping
+    const [stockItems, setStockItems] = useState([]);
+    useEffect(() => {
+        const fetchStock = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/stock?limit=1000`);
+                if (res.ok) {
+                    const json = await res.json();
+                    setStockItems(json.data || []);
+                }
+            } catch (error) {
+                console.error('Failed to fetch stock for RnD dropdown', error);
+            }
+        };
+        fetchStock();
+    }, []);
+
     const {
         formulas, materials, pmMaterials = [], projects, experiments, loading,
         createFormula, updateFormula, updateFormulaStatus, deleteFormula,
@@ -164,7 +181,7 @@ export default function RnD() {
             const ings = [...p.ingredients];
             ings[idx] = { ...ings[idx], [field]: value };
             if (field === 'materialId') {
-                const mat = materials.find(m => m.id === value) || pmMaterials.find(m => m.id === value);
+                const mat = stockItems.find(m => m.id === value) || materials.find(m => m.id === value) || pmMaterials.find(m => m.id === value);
                 if (mat) { ings[idx].name = mat.name; ings[idx].unit = mat.unit; }
             }
             const newBatchSize = calculateTotalBatchSize(ings, p.unit);
@@ -1163,7 +1180,7 @@ export default function RnD() {
                                             <td style={{ padding: '8px 4px' }}>
                                                 <CustomSelect usePortal={true} style={{ ...inputStyle, width: '100%', minWidth: 200, padding: '6px 8px' }} value={ing.materialId} onChange={e => updateIngredient(originalIdx, 'materialId', e.target.value)}>
                                                     <option value="">-- เลือก (ถ้ามี) --</option>
-                                                    {materials.filter(m => m.category !== 'Packaging').map(m => <option key={m.id} value={m.id}>{m.id} — {m.name}</option>)}
+                                                    {stockItems.filter(m => m.id && m.id.startsWith('RM-')).sort((a, b) => a.id.localeCompare(b.id)).map(m => <option key={m.id} value={m.id}>{m.id} — {m.name}</option>)}
                                                 </CustomSelect>
                                             </td>
                                             {!ing.materialId ? (

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
-const { getDatePrefix, getShortDatePrefix } = require('../utils/sequence');
+const { getDatePrefix, getShortDatePrefix, generateSequence } = require('../utils/sequence');
 const { authorizeRoles } = require('../middleware/authorize');
 
 // ── Auto-migrate: add signature columns if missing ──
@@ -151,22 +151,15 @@ router.post('/', authorizeRoles('admin', 'executive', 'planner'), async (req, re
         
         const pool = await poolPromise;
         
-        // Generate new ID (JO-YYYYMMDD-XXX) — same format as SO
-        const today = new Date();
-        const dateStr = today.getFullYear().toString() +
-            (today.getMonth() + 1).toString().padStart(2, '0') +
-            today.getDate().toString().padStart(2, '0');
-        const prefix = `JO-${dateStr}`;
-        const countRes = await pool.request()
-            .input('prefix', sql.VarChar, `${prefix}-%`)
-            .query("SELECT COUNT(*) as cnt FROM Planner WHERE PlannerID LIKE @prefix");
-        const newNum = countRes.recordset[0].cnt + 1;
-        const newId = `${prefix}-${newNum.toString().padStart(3, '0')}`;
+        // Generate new ID (JO-YYYYMMDD-XXX) using Sequences table
+        const dateStr = getDatePrefix();
+        const newId = await generateSequence(pool, 'Planner', 'PlannerID', `JO-${dateStr}`, 3);
         
         const result = await pool.request()
             .input('PlannerID', sql.VarChar, newId)
             .input('FormulaID', sql.VarChar, formulaId)
             .input('FormulaName', sql.NVarChar, formulaName)
+            .input('ProductName', sql.NVarChar, productName || formulaName)
             .input('BatchQty', sql.Int, batchQty)
             .input('BatchSize', sql.Int, batchSize)
             .input('TotalQty', sql.Int, totalQty)
@@ -184,13 +177,13 @@ router.post('/', authorizeRoles('admin', 'executive', 'planner'), async (req, re
             .input('ResponsibleBy', sql.NVarChar, responsibleBy || '')
             .query(`
                 INSERT INTO Planner (
-                    PlannerID, FormulaID, FormulaName, BatchQty, BatchSize, TotalQty, Unit, 
+                    PlannerID, FormulaID, FormulaName, ProductName, BatchQty, BatchSize, TotalQty, Unit, 
                     Status, Priority, PlanDate, DueDate, AssignedLine, Notes, CreatedBy,
                     RequestedBy, CheckedBy, ApprovedBy, ResponsibleBy
                 )
                 OUTPUT INSERTED.*
                 VALUES (
-                    @PlannerID, @FormulaID, @FormulaName, @BatchQty, @BatchSize, @TotalQty, @Unit, 
+                    @PlannerID, @FormulaID, @FormulaName, @ProductName, @BatchQty, @BatchSize, @TotalQty, @Unit, 
                     @Status, @Priority, @PlanDate, @DueDate, @AssignedLine, @Notes, @CreatedBy,
                     @RequestedBy, @CheckedBy, @ApprovedBy, @ResponsibleBy
                 )
@@ -233,33 +226,19 @@ router.post('/:id/release', authorizeRoles('admin', 'executive', 'planner'), asy
         const bPrefix = `B${shortDate}-${formulaCode}`;
         const ptPrefix = `PT-${fullDate}`;
         
-        // Get counts BEFORE transaction to avoid locking issues / duplicates
-        const countRes = await pool.request()
-            .input('bPrefix', sql.NVarChar, `${bPrefix}-%`)
-            .input('ptPrefix', sql.NVarChar, `${ptPrefix}-%`)
-            .query(`
-                SELECT 
-                    (SELECT COUNT(*) FROM Production_Tasks WHERE BatchNo LIKE @bPrefix) as bCount,
-                    (SELECT COUNT(*) FROM Production_Tasks WHERE TaskID LIKE @ptPrefix) as ptCount
-            `);
-            
-        let bSeq = countRes.recordset[0].bCount;
-        let ptSeq = countRes.recordset[0].ptCount;
-        
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         
         try {
             for (let i = 0; i < batchQty; i++) {
-                bSeq++;
-                ptSeq++;
-                const taskId = `${ptPrefix}-${String(ptSeq).padStart(3, '0')}`;
-                const batchNo = `${bPrefix}-${String(bSeq).padStart(2, '0')}`;
+                const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', ptPrefix, 3);
+                const batchNo = await generateSequence(pool, 'Production_Tasks', 'BatchNo', bPrefix, 2);
                 
                 await new sql.Request(transaction)
                     .input('TaskID', sql.VarChar, taskId)
                     .input('JobOrderID', sql.VarChar, id)
                     .input('FormulaName', sql.NVarChar, job.FormulaName)
+                    .input('ProductName', sql.NVarChar, job.ProductName || job.FormulaName)
                     .input('ProcessName', sql.NVarChar, 'เตรียมวัตถุดิบ + ผสม')
                     .input('BatchNo', sql.VarChar, batchNo)
                     .input('Line', sql.VarChar, job.AssignedLine || 'Line A')
@@ -272,11 +251,11 @@ router.post('/:id/release', authorizeRoles('admin', 'executive', 'planner'), asy
                     .input('WorkerID', sql.VarChar, 'system')
                     .query(`
                         INSERT INTO Production_Tasks (
-                            TaskID, JobOrderID, FormulaName, ProcessName, BatchNo, Line, 
+                            TaskID, JobOrderID, FormulaName, ProductName, ProcessName, BatchNo, Line, 
                             ExpectedQty, ProducedQty, DefectQty, Status, CurrentStep, StepTimesJSON, WorkerID
                         )
                         VALUES (
-                            @TaskID, @JobOrderID, @FormulaName, @ProcessName, @BatchNo, @Line,
+                            @TaskID, @JobOrderID, @FormulaName, @ProductName, @ProcessName, @BatchNo, @Line,
                             @ExpectedQty, @ProducedQty, @DefectQty, @Status, @CurrentStep, @StepTimesJSON, @WorkerID
                         )
                     `);

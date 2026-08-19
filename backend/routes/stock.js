@@ -45,9 +45,11 @@ router.get('/', async (req, res) => {
             id: row.ItemID,
             formulaId: row.FormulaID,
             name: row.ProductName,
+            nameEN: row.ProductNameEN,
             category: row.Category,
             qty: row.Quantity,
             unit: row.Unit,
+            location: row.Location,
             minStock: row.MinStock,
             status: row.Quantity <= 0 ? 'สินค้าหมด' : row.Quantity <= row.MinStock ? 'สินค้าเหลือน้อย' : 'มีสินค้า',
             updatedAt: row.UpdatedAt
@@ -293,9 +295,11 @@ router.get('/:id/detail', async (req, res) => {
                 id: item.ItemID,
                 formulaId: item.FormulaID,
                 name: item.ProductName,
+                nameEN: item.ProductNameEN,
                 category: item.Category,
                 qty: item.Quantity,
                 unit: item.Unit,
+                location: item.Location,
                 minStock: item.MinStock,
                 createdAt: item.CreatedAt,
                 updatedAt: item.UpdatedAt
@@ -442,7 +446,7 @@ router.get('/logs/:batchNo/detail', async (req, res) => {
 router.put('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, category, unit, adjustQty, adjustReason } = req.body;
+        const { name, nameEN, category, unit, location, minStock, status, adjustQty, adjustReason } = req.body;
         const pool = await poolPromise;
         const transaction = new sql.Transaction(pool);
         
@@ -453,13 +457,21 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req, re
             await transaction.request()
                 .input('ItemID', sql.VarChar, id)
                 .input('ProductName', sql.NVarChar, name)
+                .input('ProductNameEN', sql.NVarChar, nameEN || null)
                 .input('Category', sql.NVarChar, category)
                 .input('Unit', sql.NVarChar, unit)
+                .input('Location', sql.NVarChar, location)
+                .input('MinStock', sql.Float, minStock)
+                .input('Status', sql.NVarChar, status)
                 .query(`
                     UPDATE Stock_Items 
                     SET ProductName = @ProductName, 
+                        ProductNameEN = @ProductNameEN,
                         Category = @Category, 
                         Unit = @Unit,
+                        Location = @Location,
+                        MinStock = @MinStock,
+                        Status = @Status,
                         UpdatedAt = GETDATE()
                     WHERE ItemID = @ItemID
                 `);
@@ -527,7 +539,7 @@ router.delete('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req,
 // Add new stock item
 router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res) => {
     try {
-        const { name, category, unit, initialQty, adjustReason } = req.body;
+        const { name, nameEN, category, unit, location, minStock, status, initialQty, adjustReason } = req.body;
         const pool = await poolPromise;
         const transaction = new sql.Transaction(pool);
         
@@ -548,12 +560,16 @@ router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res)
             await transaction.request()
                 .input('ItemID', sql.VarChar, itemId)
                 .input('ProductName', sql.NVarChar, name)
+                .input('ProductNameEN', sql.NVarChar, nameEN || null)
                 .input('Category', sql.NVarChar, category)
                 .input('Quantity', sql.Int, Number(initialQty) || 0)
                 .input('Unit', sql.NVarChar, unit)
+                .input('Location', sql.NVarChar, location)
+                .input('MinStock', sql.Float, minStock || 0)
+                .input('Status', sql.NVarChar, status || 'มีสินค้า')
                 .query(`
-                    INSERT INTO Stock_Items (ItemID, ProductName, Category, Quantity, Unit, IsHidden)
-                    VALUES (@ItemID, @ProductName, @Category, @Quantity, @Unit, 0)
+                    INSERT INTO Stock_Items (ItemID, ProductName, ProductNameEN, Category, Quantity, Unit, Location, MinStock, Status, IsHidden)
+                    VALUES (@ItemID, @ProductName, @ProductNameEN, @Category, @Quantity, @Unit, @Location, @MinStock, @Status, 0)
                 `);
 
             // Add log if initial qty > 0
@@ -595,6 +611,235 @@ router.get('/wip-lots', async (req, res) => {
     } catch (err) {
         console.error('Error fetching WIP lots:', err);
         res.status(500).json({ message: 'Error fetching WIP lots' });
+    }
+});
+
+// ==========================================
+// MATERIAL REQUISITIONS
+// ==========================================
+
+// Get pending requisitions (for Stock module)
+router.get('/requisitions', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT TaskID, JobOrderID, BatchNo, FormulaName, ExpectedQty, JobUnit, Status, CreatedAt, RequisitionJSON 
+            FROM Production_Tasks 
+            WHERE CurrentStep = 'requisition' OR Status = 'รอเบิกวัตถุดิบ'
+            UNION ALL
+            SELECT TaskID, JobOrderID, BatchNo, Product AS FormulaName, Qty AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
+            FROM Packaging_Tasks 
+            WHERE Status = N'รอเบิกบรรจุภัณฑ์'
+            ORDER BY CreatedAt ASC
+        `);
+        
+        const stockRes = await pool.request().query('SELECT ItemID, Quantity FROM Stock_Items');
+        const stockDict = {};
+        stockRes.recordset.forEach(s => {
+            stockDict[String(s.ItemID).trim()] = s.Quantity;
+        });
+
+        const requisitions = result.recordset.map(row => {
+            const parsed = row.RequisitionJSON ? JSON.parse(row.RequisitionJSON) : [];
+            let items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+            
+            items = items.map(it => {
+                const currentQty = stockDict[String(it.id).trim()] || 0;
+                return {
+                    ...it,
+                    currentStock: currentQty,
+                    isSufficient: currentQty >= (it.deductQty || 0)
+                };
+            });
+
+            return {
+                id: row.TaskID,
+                jobOrderId: row.JobOrderID,
+                batchNo: row.BatchNo,
+                formulaName: row.FormulaName,
+                expectedQty: row.ExpectedQty,
+                unit: row.JobUnit,
+                status: row.Status,
+                createdAt: row.CreatedAt,
+                items: items,
+                requesterName: parsed.requesterName || 'ไม่ระบุ'
+            };
+        });
+        
+        res.json({ data: requisitions });
+    } catch (err) {
+        console.error('Error fetching requisitions:', err);
+        res.status(500).json({ message: 'Error fetching requisitions' });
+    }
+});
+
+// Get recent issued requisitions (for History Table)
+router.get('/requisitions/history', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT TOP 50 * FROM (
+                SELECT TaskID, JobOrderID, BatchNo, FormulaName, ExpectedQty, JobUnit, Status, CreatedAt, RequisitionJSON 
+                FROM Production_Tasks 
+                WHERE RequisitionJSON IS NOT NULL AND (CurrentStep != 'requisition' AND Status != 'รอเบิกวัตถุดิบ')
+                UNION ALL
+                SELECT TaskID, JobOrderID, BatchNo, Product AS FormulaName, Qty AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
+                FROM Packaging_Tasks 
+                WHERE RequisitionJSON IS NOT NULL AND Status != N'รอเบิกบรรจุภัณฑ์'
+            ) AS CombinedTasks
+            ORDER BY CreatedAt DESC
+        `);
+        
+        const requisitions = result.recordset.map(row => {
+            const parsed = row.RequisitionJSON ? JSON.parse(row.RequisitionJSON) : [];
+            const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+            return {
+                id: row.TaskID,
+                jobOrderId: row.JobOrderID,
+                batchNo: row.BatchNo,
+                formulaName: row.FormulaName,
+                expectedQty: row.ExpectedQty,
+                unit: row.JobUnit,
+                status: row.Status,
+                createdAt: row.CreatedAt,
+                items: items,
+                requesterName: parsed.requesterName || 'ไม่ระบุ'
+            };
+        });
+        
+        res.json({ data: requisitions });
+    } catch (err) {
+        console.error('Error fetching requisition history:', err);
+        res.status(500).json({ message: 'Error fetching requisition history' });
+    }
+});
+
+// Issue materials (Approve Requisition)
+router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 'warehouse'), async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        const pool = await poolPromise;
+        
+        // 1. Get Task
+        let taskRes;
+        let isPackaging = taskId.startsWith('PKG');
+        
+        if (isPackaging) {
+            taskRes = await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query('SELECT RequisitionJSON, Status AS CurrentStep FROM Packaging_Tasks WHERE TaskID = @TaskID');
+        } else {
+            taskRes = await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query('SELECT RequisitionJSON, CurrentStep FROM Production_Tasks WHERE TaskID = @TaskID');
+        }
+            
+        if (taskRes.recordset.length === 0) {
+            return res.status(404).json({ message: 'ไม่พบงานนี้' });
+        }
+        
+        const task = taskRes.recordset[0];
+        const stepStatus = isPackaging ? task.CurrentStep : task.CurrentStep;
+        if ((!isPackaging && stepStatus !== 'requisition') || (isPackaging && stepStatus !== 'รอเบิกบรรจุภัณฑ์')) {
+            return res.status(400).json({ message: 'งานนี้ถูกเบิกจ่ายไปแล้ว หรือไม่ได้อยู่ในสถานะรอเบิก' });
+        }
+        
+        const parsedData = task.RequisitionJSON ? JSON.parse(task.RequisitionJSON) : [];
+        const items = Array.isArray(parsedData) ? parsedData : (parsedData.items || []);
+        if (items.length === 0) {
+            return res.status(400).json({ message: 'ไม่มีรายการวัตถุดิบให้เบิก' });
+        }
+        
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+        
+        try {
+            // 2. Pre-check Stock Sufficiency
+            for (const item of items) {
+                if (!item.id || !item.deductQty) continue;
+                const checkRes = await transaction.request()
+                    .input('ItemID', sql.VarChar, item.id)
+                    .query('SELECT Quantity, ProductName FROM Stock_Items WHERE ItemID = @ItemID');
+                
+                if (checkRes.recordset.length === 0) {
+                    throw new Error(`ไม่พบสินค้า ${item.name} (${item.id}) ในระบบสต็อก`);
+                }
+                
+                const currentQty = checkRes.recordset[0].Quantity;
+                if (currentQty < item.deductQty) {
+                    throw new Error(`สินค้า ${checkRes.recordset[0].ProductName} มีสต็อกไม่เพียงพอ (ต้องการ ${item.deductQty}, มี ${currentQty})`);
+                }
+            }
+
+            // 3. Loop & Deduct Stock
+            for (const item of items) {
+                if (!item.id || !item.deductQty) continue;
+                
+                await transaction.request()
+                    .input('ItemID', sql.VarChar, item.id)
+                    .input('DeductQty', sql.Float, item.deductQty)
+                    .query(`
+                        UPDATE Stock_Items 
+                        SET Quantity = Quantity - @DeductQty, UpdatedAt = GETDATE()
+                        WHERE ItemID = @ItemID
+                    `);
+                    
+                // 3. Insert Logs
+                await transaction.request()
+                    .input('ItemID', sql.VarChar, item.id)
+                    .input('ProductName', sql.NVarChar, item.name || '')
+                    .input('Type', sql.VarChar, 'out')
+                    .input('Quantity', sql.Float, item.deductQty)
+                    .input('RefNo', sql.VarChar, taskId)
+                    .input('RefType', sql.VarChar, 'production')
+                    .input('Notes', sql.NVarChar, `เบิกจ่ายวัตถุดิบเข้างานผลิต ${taskId}`)
+                    .input('CreatedBy', sql.NVarChar, req.user ? req.user.username : 'warehouse')
+                    .query(`
+                        INSERT INTO Stock_Logs (ItemID, ProductName, Type, Quantity, RefNo, RefType, Notes, CreatedBy)
+                        VALUES (@ItemID, @ProductName, @Type, @Quantity, @RefNo, @RefType, @Notes, @CreatedBy)
+                    `);
+            }
+            
+            // 4. Update Task Status
+            // Append issuer info to JSON
+            if (!Array.isArray(parsedData)) {
+                parsedData.issuerName = req.user ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.username : 'เจ้าหน้าที่คลังสินค้า';
+                parsedData.issueDate = new Date().toLocaleDateString('th-TH');
+            }
+            
+            if (isPackaging) {
+                await transaction.request()
+                    .input('TaskID', sql.VarChar, taskId)
+                    .input('Status', sql.NVarChar, 'รอบรรจุ')
+                    .input('RequisitionJSON', sql.NVarChar, JSON.stringify(parsedData))
+                    .query(`
+                        UPDATE Packaging_Tasks 
+                        SET Status = @Status, RequisitionJSON = @RequisitionJSON, UpdatedAt = GETDATE()
+                        WHERE TaskID = @TaskID
+                    `);
+            } else {
+                await transaction.request()
+                    .input('TaskID', sql.VarChar, taskId)
+                    .input('CurrentStep', sql.VarChar, 'wait')
+                    .input('Status', sql.NVarChar, 'รอเริ่มงาน')
+                    .input('RequisitionJSON', sql.NVarChar, JSON.stringify(parsedData))
+                    .query(`
+                        UPDATE Production_Tasks 
+                        SET CurrentStep = @CurrentStep, Status = @Status, RequisitionJSON = @RequisitionJSON
+                        WHERE TaskID = @TaskID
+                    `);
+            }
+                
+            await transaction.commit();
+            res.json({ message: 'อนุมัติเบิกจ่ายและหักสต็อกสำเร็จ' });
+        } catch (txnErr) {
+            await transaction.rollback();
+            throw txnErr;
+        }
+        
+    } catch (err) {
+        console.error('Error issuing materials:', err);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการจ่ายของ: ' + err.message });
     }
 });
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { poolPromise, sql } = require('../config/db');
 const { authorizeRoles } = require('../middleware/authorize');
+const { generateSequence, getDatePrefix } = require('../utils/sequence');
 
 // Helper to format date in local timezone to prevent UTC timezone shifts
 const formatDateLocal = (dateObj) => {
@@ -572,7 +573,7 @@ router.get('/formula-tests/:formulaId', async (req, res) => {
             .input('FormulaID', sql.VarChar, req.params.formulaId)
             .query('SELECT * FROM RnD_Formula_Tests WHERE FormulaID=@FormulaID ORDER BY CreatedAt DESC');
         res.json(result.recordset.map(t => ({
-            id: t.TestID, formulaId: t.FormulaID, testDate: formatDateLocal(t.TestDate),
+            id: t.TestID, requestId: t.RequestID, formulaId: t.FormulaID, testDate: formatDateLocal(t.TestDate),
             testedBy: t.TestedBy, pH: t.pH, viscosity: t.Viscosity, color: t.Color, smell: t.Smell,
             stability: t.Stability, microbial: t.Microbial, overallResult: t.OverallResult, notes: t.Notes,
         })));
@@ -592,7 +593,7 @@ router.get('/formula-tests', async (req, res) => {
             ORDER BY t.CreatedAt DESC
         `);
         res.json(result.recordset.map(t => ({
-            id: t.TestID, formulaId: t.FormulaID, formulaName: t.FormulaName, formulaStatus: t.FormulaStatus,
+            id: t.TestID, requestId: t.RequestID, formulaId: t.FormulaID, formulaName: t.FormulaName, formulaStatus: t.FormulaStatus,
             testDate: formatDateLocal(t.TestDate),
             testedBy: t.TestedBy, pH: t.pH, viscosity: t.Viscosity, color: t.Color, smell: t.Smell,
             stability: t.Stability, microbial: t.Microbial, overallResult: t.OverallResult, notes: t.Notes,
@@ -610,7 +611,10 @@ router.post('/formula-tests', authorizeRoles('admin', 'executive', 'rnd', 'qc'),
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         try {
+            const finalRequestID = await generateSequence(pool, 'RnD_Formula_Tests', 'RequestID', `QCL-${getDatePrefix()}`, 3);
+
             await new sql.Request(transaction)
+                .input('RequestID', sql.VarChar, finalRequestID)
                 .input('FormulaID', sql.VarChar, formulaId)
                 .input('TestDate', sql.Date, new Date())
                 .input('TestedBy', sql.NVarChar, testedBy || '')
@@ -622,7 +626,7 @@ router.post('/formula-tests', authorizeRoles('admin', 'executive', 'rnd', 'qc'),
                 .input('Microbial', sql.NVarChar, microbial || '')
                 .input('OverallResult', sql.NVarChar, overallResult)
                 .input('Notes', sql.NVarChar, notes || '')
-                .query('INSERT INTO RnD_Formula_Tests (FormulaID,TestDate,TestedBy,pH,Viscosity,Color,Smell,Stability,Microbial,OverallResult,Notes) VALUES (@FormulaID,@TestDate,@TestedBy,@pH,@Viscosity,@Color,@Smell,@Stability,@Microbial,@OverallResult,@Notes)');
+                .query('INSERT INTO RnD_Formula_Tests (RequestID,FormulaID,TestDate,TestedBy,pH,Viscosity,Color,Smell,Stability,Microbial,OverallResult,Notes) VALUES (@RequestID,@FormulaID,@TestDate,@TestedBy,@pH,@Viscosity,@Color,@Smell,@Stability,@Microbial,@OverallResult,@Notes)');
 
             // Update formula status based on result
             const newStatus = overallResult === 'ผ่าน' ? 'ทดสอบผ่าน' : 'ทดสอบไม่ผ่าน';

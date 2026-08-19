@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, Edit3, Trash2, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle, Search, Plus } from 'lucide-react';
+import { Eye, Edit3, Trash2, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle, Search, Plus, History } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
@@ -16,7 +16,7 @@ import './PageCommon.css';
 
 export default function Stock() {
     const { hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate, canUpdate, canDelete } = useAuth();
-    const { showAlert } = useAlert();
+    const { showAlert, showConfirm } = useAlert();
     const visibleSubPages = getVisibleSubPages('stock');
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'stock_data';
@@ -39,9 +39,13 @@ export default function Stock() {
     const [logDetailLoading, setLogDetailLoading] = useState(false);
     const [logDetail, setLogDetail] = useState(null);
 
+    // Logs Modal State
+    const [showAllLogsModal, setShowAllLogsModal] = useState(false);
+    const [logsSearchDate, setLogsSearchDate] = useState('');
+
     // ── Edit & Delete State ──
     const [editItem, setEditItem] = useState(null);
-    const [editForm, setEditForm] = useState({ name: '', category: '', unit: '', adjustQty: 0, adjustReason: '' });
+    const [editForm, setEditForm] = useState({ name: '', nameEN: '', category: '', unit: '', location: '', minStock: 0, status: '', adjustQty: 0, adjustReason: '' });
     const [editSaving, setEditSaving] = useState(false);
     const [showAdjust, setShowAdjust] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -50,12 +54,17 @@ export default function Stock() {
 
     // ── Add Item State ──
     const [showAddModal, setShowAddModal] = useState(false);
-    const [addForm, setAddForm] = useState({ name: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', adjustReason: '' });
+    const [addForm, setAddForm] = useState({ name: '', nameEN: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', location: '', minStock: 0, status: 'มีสินค้า', adjustReason: '' });
     const [addSaving, setAddSaving] = useState(false);
 
     // ── Dashboard State ──
     const [dashboardData, setDashboardData] = useState(null);
     const [dashboardLoading, setDashboardLoading] = useState(true);
+
+    const [requisitions, setRequisitions] = useState([]);
+    const [requisitionsHistory, setRequisitionsHistory] = useState([]);
+    const [reqLoading, setReqLoading] = useState(false);
+    const [issuingTaskId, setIssuingTaskId] = useState(null);
 
     // ── Auto-search Debounce ──
     useEffect(() => {
@@ -115,6 +124,29 @@ export default function Stock() {
                         if (json.pagination) setLogsPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
                     }
                 }
+
+                // Fetch Requisitions
+                if (activeTab === 'stock_requisitions') {
+                    setReqLoading(true);
+                    try {
+                        const [reqRes, histRes] = await Promise.all([
+                            fetch(`${API_BASE}/stock/requisitions`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }),
+                            fetch(`${API_BASE}/stock/requisitions/history`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
+                        ]);
+                        if (reqRes.ok) {
+                            const json = await reqRes.json();
+                            setRequisitions(json.data || []);
+                        }
+                        if (histRes.ok) {
+                            const json = await histRes.json();
+                            setRequisitionsHistory(json.data || []);
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    } finally {
+                        setReqLoading(false);
+                    }
+                }
             } catch (err) {
                 console.error('Failed to fetch stock data:', err);
             } finally {
@@ -124,7 +156,49 @@ export default function Stock() {
         fetchData();
     }, [activeTab, stockPagination.page, logsPagination.page, appliedSearchStock, appliedSearchLogs, activeCategory, refreshTrigger]);
 
-    // ── Fetch detail for selected item ──
+    // --- Fetch detail for selected item ---
+    const handlePrintRequisition = async (reqId) => {
+        try {
+            const res = await fetch(`${API_BASE}/print/requisition/${reqId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            if (!res.ok) throw new Error('Failed to generate PDF');
+            
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        } catch (err) {
+            console.error(err);
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถแสดงใบเบิกได้', 'error');
+        }
+    };
+
+    const handleIssueRequisition = async (taskId) => {
+        const ok = await showConfirm('ยืนยันการจ่ายวัตถุดิบ', 'ยืนยันการจ่ายวัตถุดิบเข้างานผลิต ' + taskId + ' ใช่หรือไม่?', 'info');
+        if (!ok) return;
+        setIssuingTaskId(taskId);
+        try {
+            const res = await fetch(`${API_BASE}/stock/requisitions/${taskId}/issue`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showAlert('สำเร็จ', data.message, 'success');
+                setRefreshTrigger(p => p + 1);
+            } else {
+                showAlert('เกิดข้อผิดพลาด', data.message, 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+        } finally {
+            setIssuingTaskId(null);
+        }
+    };
+
     const openDetail = async (item) => {
         setSelectedItem(item);
         setDetailLoading(true);
@@ -163,8 +237,12 @@ export default function Stock() {
         setShowAdjust(false);
         setEditForm({
             name: item.name || '',
+            nameEN: item.nameEN || '',
             category: item.category || '',
             unit: item.unit || '',
+            location: item.location || '',
+            minStock: item.minStock || 0,
+            status: item.status || 'มีสินค้า',
             adjustQty: 0,
             adjustReason: ''
         });
@@ -186,7 +264,7 @@ export default function Stock() {
             if (res.ok) {
                 showAlert('สำเร็จ', 'เพิ่มรายการสินค้าสำเร็จ', 'success');
                 setShowAddModal(false);
-                setAddForm({ name: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', adjustReason: '' });
+                setAddForm({ name: '', nameEN: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', location: '', minStock: 0, status: 'มีสินค้า', adjustReason: '' });
                 // Force fetch
                 setRefreshTrigger(prev => prev + 1);
             } else {
@@ -438,8 +516,8 @@ export default function Stock() {
                                         <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', background: '#fafaf9', borderRadius: 10 }}>ยังไม่มีประวัติ</div>
                                     ) : (
                                         <div style={{ background: '#fafaf9', borderRadius: 10, border: '1px solid #e5e7eb', overflow: 'hidden' }}>
-                                            {detail.logs.map((log, i) => (
-                                                <div key={i} style={{ padding: '12px 16px', borderBottom: i < detail.logs.length - 1 ? '1px solid #e5e7eb' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            {detail.logs.slice(0, 5).map((log, i) => (
+                                                <div key={i} style={{ padding: '12px 16px', borderBottom: i < 4 && i < detail.logs.length - 1 ? '1px solid #e5e7eb' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                                         {['IN', 'ADJ_IN'].includes(log.type) ? (
                                                             <ArrowDownCircle size={20} style={{ color: '#059669' }} />
@@ -468,11 +546,114 @@ export default function Stock() {
                                                     </div>
                                                 </div>
                                             ))}
+                                            {detail.logs.length > 5 && (
+                                                <div style={{ padding: '12px 16px', background: '#f3f4f6', textAlign: 'center', borderTop: '1px solid #e5e7eb' }}>
+                                                    <button 
+                                                        className="btn-secondary" 
+                                                        style={{ fontSize: 12, padding: '6px 16px', borderRadius: 20 }}
+                                                        onClick={() => setShowAllLogsModal(true)}
+                                                    >
+                                                        ดูเพิ่มเติมทั้งหมด ({detail.logs.length} รายการ)
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
                             </>
                         ) : null}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    // ── All Logs Modal ──
+    const renderAllLogsModal = () => {
+        if (!showAllLogsModal || !detail) return null;
+        
+        const filteredLogs = detail.logs.filter(log => {
+            if (!logsSearchDate) return true;
+            // Check if log.date starts with the search date (YYYY-MM-DD)
+            const logDateStr = log.date ? log.date.split('T')[0] : '';
+            return logDateStr === logsSearchDate;
+        });
+
+        return (
+            <div className="rnd-modal-overlay" onClick={() => { setShowAllLogsModal(false); setLogsSearchDate(''); }} style={{ zIndex: 1100 }}>
+                <div className="rnd-modal" style={{ maxWidth: 800 }} onClick={(e) => e.stopPropagation()}>
+                    <div className="rnd-modal-header">
+                        <div>
+                            <h2>📋 ประวัติรับเข้า-เบิกจ่ายทั้งหมด</h2>
+                            <div className="rnd-modal-meta">
+                                <span style={{ color: '#059669', fontWeight: 700 }}>{detail.item.id}</span>
+                                <span>{detail.item.name}</span>
+                            </div>
+                        </div>
+                        <button className="rnd-modal-close" onClick={() => { setShowAllLogsModal(false); setLogsSearchDate(''); }}>
+                            <XCircle size={22} />
+                        </button>
+                    </div>
+
+                    <div className="rnd-modal-body" style={{ padding: '16px 24px' }}>
+                        {/* Search Bar */}
+                        <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+                            <div className="search-box" style={{ flex: 1, maxWidth: 300 }}>
+                                <Calendar size={18} style={{ color: '#94a3b8' }} />
+                                <input 
+                                    type="date" 
+                                    value={logsSearchDate}
+                                    onChange={(e) => setLogsSearchDate(e.target.value)}
+                                    style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', color: '#334155' }}
+                                />
+                                {logsSearchDate && (
+                                    <XCircle size={16} style={{ color: '#ef4444', cursor: 'pointer' }} onClick={() => setLogsSearchDate('')} />
+                                )}
+                            </div>
+                            {logsSearchDate && (
+                                <div style={{ display: 'flex', alignItems: 'center', color: '#64748b', fontSize: 13 }}>
+                                    พบ {filteredLogs.length} รายการ
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Logs List */}
+                        <div style={{ background: '#fafaf9', borderRadius: 10, border: '1px solid #e5e7eb', overflow: 'hidden', maxHeight: '60vh', overflowY: 'auto' }}>
+                            {filteredLogs.length === 0 ? (
+                                <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>ไม่พบประวัติในวันที่เลือก</div>
+                            ) : (
+                                filteredLogs.map((log, i) => (
+                                    <div key={i} style={{ padding: '12px 16px', borderBottom: i < filteredLogs.length - 1 ? '1px solid #e5e7eb' : 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            {['IN', 'ADJ_IN'].includes(log.type) ? (
+                                                <ArrowDownCircle size={20} style={{ color: '#059669' }} />
+                                            ) : (
+                                                <ArrowUpCircle size={20} style={{ color: '#f59e0b' }} />
+                                            )}
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: 13 }}>
+                                                    {log.type === 'IN' ? '📥 รับเข้า' : log.type === 'ADJ_IN' ? '📈 ปรับเพิ่ม' : log.type === 'ADJ_OUT' ? '📉 ปรับลด' : log.refType === 'oem_direct' ? '🚚 OEM ส่งตรง' : '📤 เบิกจ่าย'}
+                                                    {log.ref && (
+                                                        <span style={{ marginLeft: 8, background: '#dbeafe', color: '#1e40af', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
+                                                            {log.ref}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{log.notes}</div>
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontWeight: 800, fontSize: 16, color: ['IN', 'ADJ_IN'].includes(log.type) ? '#059669' : '#ef4444' }}>
+                                                {['IN', 'ADJ_IN'].includes(log.type) ? '+' : '-'}{log.qty?.toLocaleString()}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <Clock size={10} /> {fmtDate(log.date)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -795,6 +976,152 @@ export default function Stock() {
                 </div>
             )}
 
+            {/* ── Tab: Requisitions (รอเบิกจ่าย) ── */}
+            {(activeTab === 'stock_requisitions' && hasSubPermission('stock_requisitions')) && (
+                <div className="subpage-content" key="stock_requisitions">
+                    {/* Kanban Board for Pending Requisitions */}
+                    <div style={{ marginBottom: 30 }}>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Package size={20} color="#f59e0b" /> รายการรอเบิกจ่าย
+                        </h3>
+                        {reqLoading ? (
+                            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>กำลังโหลดข้อมูล...</div>
+                        ) : requisitions.length === 0 ? (
+                            <div style={{ padding: 40, textAlign: 'center', background: '#f8fafc', borderRadius: 12, border: '1px dashed #cbd5e1', color: '#64748b' }}>
+                                ไม่มีรายการรอเบิกจ่าย
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+                                {requisitions.map(req => (
+                                    <div key={req.id} style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                                        <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{req.id}</div>
+                                            <span style={{ fontSize: 12, padding: '4px 8px', borderRadius: 12, background: '#fef3c7', color: '#b45309', fontWeight: 600 }}>
+                                                {req.status}
+                                            </span>
+                                        </div>
+                                        <div style={{ padding: 16, flex: 1 }}>
+                                            <div style={{ fontSize: 14, color: '#475569', marginBottom: 4 }}>สูตร: <strong style={{ color: '#0f172a' }}>{req.formulaName}</strong></div>
+                                            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>ต้องการผลิต: {Number(req.expectedQty).toLocaleString('th-TH', { maximumFractionDigits: 4 })} {req.unit}</div>
+                                            
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>รายการที่ขอเบิก:</div>
+                                            <div style={{ background: '#f1f5f9', borderRadius: 8, padding: 8, maxHeight: 150, overflowY: 'auto' }}>
+                                                {req.items && req.items.length > 0 ? (
+                                                    <table style={{ width: '100%', fontSize: 12 }}>
+                                                        <tbody>
+                                                            {req.items.map((it, idx) => (
+                                                                <tr key={idx} style={{ borderBottom: idx < req.items.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                                                                    <td style={{ padding: '6px 4px', color: '#334155' }}>
+                                                                        {it.name}
+                                                                    </td>
+                                                                    <td style={{ padding: '6px 4px', textAlign: 'right' }}>
+                                                                        {it.isSufficient === false ? (
+                                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#ef4444', background: '#fef2f2', padding: '2px 6px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                                                                <XCircle size={12} /> {Number(it.currentStock || 0).toLocaleString('th-TH', { maximumFractionDigits: 4 })}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#10b981', background: '#ecfdf5', padding: '2px 6px', borderRadius: 4, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                                                                                <CheckCircle size={12} /> {Number(it.currentStock || 0).toLocaleString('th-TH', { maximumFractionDigits: 4 })}
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 600, color: '#0369a1' }}>{Number(it.displayQty || it.deductQty).toLocaleString('th-TH', { maximumFractionDigits: 4 })}</td>
+                                                                    <td style={{ padding: '6px 4px', color: '#64748b' }}>{it.displayUnit || it.unit}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                ) : <div style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center' }}>ไม่มีรายการเบิก</div>}
+                                            </div>
+                                        </div>
+                                        <div style={{ padding: 12, borderTop: '1px solid #f1f5f9', background: '#fff', display: 'flex', gap: 8, flexDirection: 'column' }}>
+                                            <button 
+                                                onClick={() => handlePrintRequisition(req.id)}
+                                                style={{
+                                                    width: '100%', padding: '8px', background: '#ffffff', color: '#1e293b', 
+                                                    border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 600, cursor: 'pointer',
+                                                    display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6,
+                                                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                                }}
+                                            >
+                                                <FileText size={16} color="#64748b" /> ดู/พิมพ์ ใบเบิก
+                                            </button>
+                                            <button 
+                                                onClick={() => handleIssueRequisition(req.id)}
+                                                disabled={issuingTaskId === req.id || req.items.length === 0}
+                                                style={{
+                                                    width: '100%', padding: '10px', background: issuingTaskId === req.id ? '#94a3b8' : '#10b981', color: '#fff', 
+                                                    border: 'none', borderRadius: 8, fontWeight: 600, cursor: issuingTaskId === req.id ? 'not-allowed' : 'pointer',
+                                                    display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6,
+                                                    boxShadow: issuingTaskId === req.id ? 'none' : '0 2px 4px rgba(16, 185, 129, 0.2)'
+                                                }}
+                                            >
+                                                <CheckCircle size={16} /> 
+                                                {issuingTaskId === req.id ? 'กำลังดำเนินการ...' : 'อนุมัติจ่ายของ (ตัดสต็อก)'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* History Table */}
+                    <div>
+                        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <History size={20} color="#3b82f6" /> ประวัติการอนุมัติใบเบิก
+                        </h3>
+                        <div className="table-responsive" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                            <table className="data-table" style={{ width: '100%' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={{ padding: '12px 16px', background: '#f8fafc', color: '#475569', fontWeight: 600, textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>วันที่อนุมัติ</th>
+                                        <th style={{ padding: '12px 16px', background: '#f8fafc', color: '#475569', fontWeight: 600, textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>เลขที่งานผลิต (Ref)</th>
+                                        <th style={{ padding: '12px 16px', background: '#f8fafc', color: '#475569', fontWeight: 600, textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>สูตรที่เบิก</th>
+                                        <th style={{ padding: '12px 16px', background: '#f8fafc', color: '#475569', fontWeight: 600, textAlign: 'left', borderBottom: '1px solid #e2e8f0' }}>สถานะงาน</th>
+                                        <th style={{ padding: '12px 16px', background: '#f8fafc', color: '#475569', fontWeight: 600, textAlign: 'center', borderBottom: '1px solid #e2e8f0' }}>เอกสาร</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {reqLoading ? (
+                                        <tr><td colSpan="5" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>กำลังโหลดประวัติ...</td></tr>
+                                    ) : requisitionsHistory.length === 0 ? (
+                                        <tr><td colSpan="5" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>ไม่มีประวัติการเบิกจ่าย</td></tr>
+                                    ) : (
+                                        requisitionsHistory.map(hist => (
+                                            <tr key={hist.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                                <td style={{ padding: '12px 16px', color: '#334155' }}>
+                                                    {new Date(hist.createdAt).toLocaleString('th-TH')}
+                                                </td>
+                                                <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>{hist.id}</td>
+                                                <td style={{ padding: '12px 16px', color: '#475569' }}>{hist.formulaName}</td>
+                                                <td style={{ padding: '12px 16px' }}>
+                                                    <span style={{ padding: '4px 8px', borderRadius: 12, background: '#dcfce7', color: '#166534', fontSize: 12, fontWeight: 600 }}>
+                                                        อนุมัติแล้ว
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                                    <button 
+                                                        onClick={() => handlePrintRequisition(hist.id)}
+                                                        style={{
+                                                            background: 'none', border: 'none', color: '#3b82f6', cursor: 'pointer',
+                                                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '6px'
+                                                        }}
+                                                        title="พิมพ์ใบเบิก"
+                                                    >
+                                                        <FileText size={18} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── Tab: Data STOCK ── */}
             {(activeTab === 'stock_data' && hasSubPermission('stock_data')) && (
                 <div className="subpage-content" key="stock_data">
@@ -885,7 +1212,10 @@ export default function Stock() {
                                         {filteredStock.map((item) => (
                                             <tr key={item.id}>
                                                 <td style={{ fontWeight: 600, color: '#1e40af' }}>{item.id}</td>
-                                                <td className="text-bold">{item.name}</td>
+                                                <td className="text-bold">
+                                                    <div>{item.name}</div>
+                                                    {item.nameEN && <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal', marginTop: '2px' }}>{item.nameEN}</div>}
+                                                </td>
                                                 <td>{item.category}</td>
                                                 <td style={{ fontWeight: 700, color: item.qty > 0 ? '#059669' : '#ef4444' }}>
                                                     {item.qty?.toLocaleString()}
@@ -1073,6 +1403,7 @@ export default function Stock() {
 
             {/* ── Detail Modal ── */}
             {renderDetailModal()}
+            {renderAllLogsModal()}
             {renderLogDetailModal()}
 
             {/* ── Add Modal ── */}
@@ -1095,7 +1426,17 @@ export default function Stock() {
                                     value={addForm.name}
                                     onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
                                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
-                                    placeholder="ระบุชื่อสินค้า..."
+                                    placeholder="ระบุชื่อสินค้า (ภาษาไทย)..."
+                                />
+                            </div>
+                            <div className="form-group" style={{ marginBottom: 15 }}>
+                                <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>ชื่อภาษาอังกฤษ (English Name)</label>
+                                <input
+                                    type="text"
+                                    value={addForm.nameEN}
+                                    onChange={e => setAddForm(p => ({ ...p, nameEN: e.target.value }))}
+                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+                                    placeholder="ระบุชื่อภาษาอังกฤษ..."
                                 />
                             </div>
 
@@ -1195,6 +1536,15 @@ export default function Stock() {
                                         type="text"
                                         value={editForm.name}
                                         onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+                                        style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, outline: 'none', transition: 'border 0.2s' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', marginBottom: 6, fontWeight: 600, fontSize: 13, color: '#374151' }}>ชื่อภาษาอังกฤษ (English Name)</label>
+                                    <input
+                                        type="text"
+                                        value={editForm.nameEN}
+                                        onChange={(e) => setEditForm(f => ({ ...f, nameEN: e.target.value }))}
                                         style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, outline: 'none', transition: 'border 0.2s' }}
                                     />
                                 </div>

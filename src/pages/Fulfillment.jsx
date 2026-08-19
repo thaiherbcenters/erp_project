@@ -594,8 +594,8 @@ export default function Fulfillment() {
                                     {o.SlipImage && (
                                         <div>
                                             <span style={{ color: '#6b7280', fontSize: 12, display: 'block', marginBottom: 4 }}>หลักฐานการจัดส่ง:</span>
-                                            <a href={`http://localhost:5000${o.SlipImage}`} target="_blank" rel="noopener noreferrer">
-                                                <img src={`http://localhost:5000${o.SlipImage}`} alt="Shipping Slip" style={{ maxHeight: 100, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            <a href={o.SlipImage} target="_blank" rel="noopener noreferrer">
+                                                <img src={o.SlipImage} alt="Shipping Slip" style={{ maxHeight: 100, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
                                             </a>
                                         </div>
                                     )}

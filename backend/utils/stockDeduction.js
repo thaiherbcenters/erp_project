@@ -265,4 +265,85 @@ async function autoReceiveWIP(taskId, reqUser) {
     }
 }
 
-module.exports = { autoDeductStock, autoReceiveWIP };
+async function autoDeductPackaging(taskId, reqUser) {
+    try {
+        const pool = await poolPromise;
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        try {
+            // 1. Get packaging task info
+            const taskRes = await transaction.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query(`
+                    SELECT pt.Product, pt.Qty, pt.BatchNo
+                    FROM Packaging_Tasks pt
+                    WHERE pt.TaskID = @TaskID
+                `);
+            
+            if (taskRes.recordset.length === 0) throw new Error("Packaging task not found");
+            const task = taskRes.recordset[0];
+
+            // Get FormulaID from Product Name
+            const formulaRes = await transaction.request()
+                .input('ProductName', sql.NVarChar, task.Product)
+                .query('SELECT FormulaID FROM RnD_Formulas WHERE Name = @ProductName');
+            
+            if (formulaRes.recordset.length === 0) {
+                console.log('No formula found for product, skipping packaging auto deduct');
+                await transaction.commit();
+                return;
+            }
+            const formulaId = formulaRes.recordset[0].FormulaID;
+
+            // 2. Get packaging ingredients
+            const ingRes = await transaction.request()
+                .input('FormulaID', sql.VarChar, formulaId)
+                .query("SELECT * FROM RnD_Formula_Ingredients WHERE FormulaID = @FormulaID AND IngredientType = 'packaging'");
+            
+            const ingredients = ingRes.recordset;
+            const expectedQty = task.Qty || 0;
+            
+            // 3. Deduct each ingredient
+            for (const ing of ingredients) {
+                if (!ing.MaterialID) continue; 
+                
+                const requiredQty = ing.Qty * expectedQty;
+                if (requiredQty <= 0) continue;
+
+                const itemRes = await transaction.request()
+                    .input('ItemID', sql.VarChar, ing.MaterialID)
+                    .query('SELECT * FROM Stock_Items WHERE ItemID = @ItemID');
+                
+                if (itemRes.recordset.length === 0) continue;
+                const stockItem = itemRes.recordset[0];
+
+                await transaction.request()
+                    .input('ItemID', sql.VarChar, stockItem.ItemID)
+                    .input('DeductQty', sql.Int, Math.ceil(requiredQty))
+                    .query("UPDATE Stock_Items SET Quantity = Quantity - @DeductQty WHERE ItemID = @ItemID");
+                    
+                await transaction.request()
+                    .input('ItemID', sql.VarChar, stockItem.ItemID)
+                    .input('Type', sql.VarChar, 'OUT')
+                    .input('Quantity', sql.Int, Math.ceil(requiredQty))
+                    .input('RefNo', sql.VarChar, taskId)
+                    .input('RefType', sql.VarChar, 'packaging')
+                    .input('CreatedBy', sql.VarChar, reqUser)
+                    .input('Notes', sql.NVarChar, 'ตัดสต็อกบรรจุภัณฑ์อัตโนมัติ เริ่มบรรจุ ' + task.BatchNo)
+                    .query(`INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, CreatedBy, Notes)
+                            VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @CreatedBy, @Notes)`);
+            }
+
+            await transaction.commit();
+            console.log(`✅ Auto-deducted packaging stock for Task ${taskId}`);
+        } catch (innerErr) {
+            await transaction.rollback();
+            throw innerErr;
+        }
+    } catch (err) {
+        console.error('❌ Error auto-deducting packaging stock:', err);
+    }
+}
+
+module.exports = { autoDeductStock, autoReceiveWIP, autoDeductPackaging };

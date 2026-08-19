@@ -116,6 +116,12 @@ export const ALL_PAGES = [
         ],
       },
       {
+        id: 'stock_requisitions', name: 'รายการรอเบิกจ่าย',
+        sections: [
+          { id: 'stock_requisitions_list', name: 'รายการใบเบิกวัตถุดิบ' },
+        ],
+      },
+      {
         id: 'stock_data', name: 'ข้อมูลสต็อกสินค้า',
         sections: [
           { id: 'stock_data_search', name: 'ค้นหาสินค้า' },
@@ -417,18 +423,7 @@ export const ALL_PAGES = [
           { id: 'planning_list_action', name: 'จัดการแผนการผลิต (Create/Edit)' },
         ],
       },
-      {
-        id: 'planning_materials', name: 'Material Requirement',
-        sections: [
-          { id: 'planning_materials_summary', name: 'สรุปความต้องการวัตถุดิบ' },
-        ],
-      },
-      {
-        id: 'planning_gantt', name: 'Gantt / Timeline',
-        sections: [
-          { id: 'planning_gantt_chart', name: 'แผนภูมิการผลิต' },
-        ],
-      },
+
     ],
   },
 
