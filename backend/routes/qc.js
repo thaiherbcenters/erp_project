@@ -71,13 +71,34 @@ router.get('/requests', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT * FROM QC_Production 
-            ORDER BY RequestedAt DESC
+            SELECT q.*, p.ProductName 
+            FROM QC_Production q
+            LEFT JOIN Production_Tasks p ON q.TaskID = p.TaskID
+            ORDER BY q.RequestedAt DESC
         `);
         res.json(result.recordset);
     } catch (err) {
         console.error('Error fetching qc requests:', err);
         res.status(500).json({ message: 'Error fetching qc requests' });
+    }
+});
+
+// Get results for a specific QC request
+router.get('/requests/:id/results', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('RefID', sql.VarChar, req.params.id)
+            .query(`
+                SELECT r.CriteriaID, r.IsPass, r.ActualValue, c.CheckItem, c.StandardRequirement
+                FROM QC_Results r
+                JOIN QC_Criteria c ON r.CriteriaID = c.CriteriaID
+                WHERE r.ReferenceID = @RefID
+            `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error('Error fetching qc results:', err);
+        res.status(500).json({ message: 'Error fetching qc results' });
     }
 });
 
@@ -332,7 +353,7 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                                 .input('ShipAddress', sql.NVarChar, shipAddress)
                                 .input('ShipPhone', sql.NVarChar, shipPhone)
                                 .query(`INSERT INTO Shipping_Orders (ShipmentID, BatchNo, JobOrderID, ProductionTaskID, ProductName, Quantity, CustomerName, CustomerPO, Status, Type, Priority, DueDate, Notes, ShippingAddress, CustomerPhone)
-                                        VALUES (@ShipmentID, @ShipBatchNo, @ShipJobOrderID, @ShipProdTaskID, @ShipProductName, @ShipQty, @ShipCustomerName, @ShipCustomerPO, N'รอจัดส่ง', 'oem', @ShipPriority, @ShipDueDate, @ShipNotes, @ShipAddress, @ShipPhone)`);
+                                        VALUES (@ShipmentID, @ShipBatchNo, @ShipJobOrderID, @ShipProdTaskID, @ShipProductName, @ShipQty, @ShipCustomerName, @ShipCustomerPO, N'รอแพ็ค', 'oem', @ShipPriority, @ShipDueDate, @ShipNotes, @ShipAddress, @ShipPhone)`);
                             console.log(`🚚 Shipping created: ${shipId} for OEM Batch ${batchNo} (Address: ${shipAddress ? 'Yes' : 'N/A'})`);
                         } else {
                             // MTS or WIP → เข้าคลัง

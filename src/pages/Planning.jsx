@@ -226,6 +226,7 @@ export default function Planning() {
         const jobData = {
             formulaId: formula.id,
             formulaName: formula.name,
+            productName: item.ItemName,
             batchQty: 1,
             batchSize: effectiveTotalBase, // Store effective base amount for reference
             totalQty: item.Qty,
@@ -884,7 +885,10 @@ export default function Planning() {
                             ) : jobs.slice(0, 3).map(job => (
                                 <tr key={job.id}>
                                     <td className="text-bold" style={{ whiteSpace: 'nowrap' }}>{job.id}</td>
-                                    <td>{job.formulaName}</td>
+                                    <td>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{job.productName && job.productName !== job.formulaName ? job.productName : job.formulaName}</div>
+        {job.productName && job.productName !== job.formulaName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{job.formulaName}</div>}
+    </td>
                                     <td style={{ whiteSpace: 'nowrap' }}>{job.totalQty.toLocaleString()} {job.unit}</td>
                                     <td><span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span></td>
                                     <td>
@@ -1058,9 +1062,14 @@ export default function Planning() {
                                             </td>
                                             {/* ── ผลิตภัณฑ์ / สูตร (รวมกัน) ── */}
                                             <td style={{ verticalAlign: 'middle', overflow: 'hidden' }}>
-                                                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={job.formulaName}>
-                                                    {job.formulaName}
-                                                </div>
+                                                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={job.productName || job.formulaName}>
+        {job.productName && job.productName !== job.formulaName ? job.productName : job.formulaName}
+    </div>
+    {job.productName && job.productName !== job.formulaName && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {job.formulaName}
+        </div>
+    )}
                                                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                                                     <span className="plan-formula-ref" style={{ fontSize: 10 }}>{job.formulaId}</span>
                                                 </div>
@@ -1191,11 +1200,11 @@ export default function Planning() {
                         <div className="rnd-modal-info-grid">
                             <div className="rnd-modal-info-item">
                                 <label>ผลิตภัณฑ์</label>
-                                <span>{job.formulaName}</span>
+                                <span>{job.productName || job.formulaName}</span>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>สูตรอ้างอิง (R&D)</label>
-                                <span style={{ color: '#2563eb' }}>{job.formulaId}</span>
+                                <span style={{ color: '#2563eb' }}>{job.formulaName} ({job.formulaId})</span>
                             </div>
                             <div className="rnd-modal-info-item">
                                 <label>ยอดผลิตเป้าหมาย</label>

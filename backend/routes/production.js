@@ -21,6 +21,182 @@ const formatDateLocal = (dateObj) => {
 // PRODUCTION TASKS MODULE
 // ==========================================
 
+// GET /tasks/:id/timeline
+router.get('/tasks/:id/timeline', async (req, res) => {
+    try {
+        const taskId = req.params.id;
+        const pool = await poolPromise;
+        const events = [];
+
+        // 1. Get Production Task
+        const prodRes = await pool.request()
+            .input('TaskID', sql.VarChar, taskId)
+            .query(`SELECT * FROM Production_Tasks WHERE TaskID = @TaskID`);
+        
+        if (prodRes.recordset.length > 0) {
+            const task = prodRes.recordset[0];
+            const jo = task.JobOrderID;
+
+            // Start Event
+            if (task.CreatedAt) {
+                events.push({
+                    type: 'start',
+                    title: 'เริ่มงาน / สร้างใบสั่งผลิต',
+                    time: task.CreatedAt,
+                    by: 'ฝ่ายวางแผน',
+                    status: 'เสร็จสิ้น',
+                    docType: null
+                });
+            }
+
+            // Material Requisition
+            let reqTime = task.CreatedAt;
+            let steps = {};
+            if (task.StepTimesJSON) {
+                try {
+                    steps = JSON.parse(task.StepTimesJSON);
+                    if (steps.prepare) reqTime = steps.prepare;
+                } catch(e){}
+            }
+
+            if (task.RequisitionJSON) {
+                let reqBy = 'ฝ่ายผลิต';
+                try {
+                    const rData = JSON.parse(task.RequisitionJSON);
+                    if (rData.requesterName) reqBy = rData.requesterName;
+                } catch(e) {}
+                events.push({
+                    type: 'requisition',
+                    title: 'เบิกวัตถุดิบ (Raw Materials)',
+                    time: reqTime,
+                    by: reqBy,
+                    status: 'อนุมัติจ่ายของแล้ว',
+                    docType: 'rm_req',
+                    taskId: task.TaskID
+                });
+            }
+
+            // Steps
+            if (steps.prepare) {
+                events.push({ type: 'step', title: 'กระบวนการ: เตรียมการ', time: steps.prepare, by: 'ฝ่ายผลิต', status: 'เสร็จสิ้น' });
+            }
+            if (steps.production_1) {
+                events.push({ type: 'step', title: 'กระบวนการ: เตรียมวัตถุดิบ + ผสม', time: steps.production_1, by: 'ฝ่ายผลิต', status: 'เสร็จสิ้น' });
+            }
+            if (steps.production_2) {
+                events.push({ type: 'step', title: 'กระบวนการ: บรรจุลงภาชนะ / พักรอ', time: steps.production_2, by: 'ฝ่ายผลิต', status: 'เสร็จสิ้น' });
+            }
+            if (steps.packaging) {
+                events.push({ type: 'step', title: 'ส่งงานไปฝ่ายบรรจุภัณฑ์', time: steps.packaging, by: 'ระบบ', status: 'เสร็จสิ้น' });
+            }
+
+            // Finished
+            if (task.Status === 'เสร็จสิ้น') {
+                events.push({
+                    type: 'finish',
+                    title: 'จบงาน / นำของเข้าคลัง',
+                    time: steps.stock || task.EndTime || task.UpdatedAt,
+                    by: 'ระบบ',
+                    status: 'เสร็จสิ้น'
+                });
+            }
+
+            // 2. Get QC Requests
+            const qcRes = await pool.request()
+                .input('JobOrderID', sql.VarChar, jo)
+                .input('BatchNo', sql.VarChar, task.BatchNo)
+                .query(`SELECT * FROM QC_Production WHERE JobOrderID = @JobOrderID AND BatchNo = @BatchNo`);
+            
+            qcRes.recordset.forEach(qc => {
+                const isCompleted = qc.Status !== 'รอตรวจ';
+                const label = qc.Type === 'qc_inprocess' ? 'QC In-Process (ระหว่างผลิต)' : 'QC Final (ขั้นสุดท้าย)';
+                events.push({
+                    type: 'qc',
+                    title: isCompleted ? `ส่งตรวจและประเมินผล ${label}` : `ส่งตรวจ ${label}`,
+                    time: (isCompleted ? qc.InspectedAt : qc.RequestedAt) || qc.RequestedAt,
+                    by: (isCompleted ? qc.Inspector : qc.RequesterName) || 'QC',
+                    status: qc.Status,
+                    docType: isCompleted ? 'qc_pdf' : null,
+                    taskId: qc.RequestID,
+                    notes: qc.Notes
+                });
+            });
+
+            // 3. Get Packaging Tasks
+            const pkgRes = await pool.request()
+                .input('ProdTaskID', sql.VarChar, task.TaskID)
+                .input('JobOrderID', sql.VarChar, jo)
+                .query(`SELECT * FROM Packaging_Tasks WHERE ProductionTaskID = @ProdTaskID OR JobOrderID = @JobOrderID`);
+            
+            pkgRes.recordset.forEach(pkg => {
+                // Packaging Requisition
+                if (pkg.RequisitionJSON) {
+                    let reqBy = 'ฝ่ายบรรจุภัณฑ์';
+                    try {
+                        const pData = JSON.parse(pkg.RequisitionJSON);
+                        if (pData.requesterName) reqBy = pData.requesterName;
+                    } catch(e){}
+                    events.push({
+                        type: 'requisition',
+                        title: 'เบิกบรรจุภัณฑ์ (Packaging Materials)',
+                        time: pkg.CreatedAt,
+                        by: reqBy,
+                        status: 'อนุมัติจ่ายของแล้ว',
+                        docType: 'pkg_req',
+                        taskId: pkg.TaskID
+                    });
+                }
+            });
+
+            // 4. Get WIP Tasks (Sub-tasks for this JobOrder)
+            const wipRes = await pool.request()
+                .input('JobOrderID', sql.VarChar, jo)
+                .input('TaskID', sql.VarChar, task.TaskID)
+                .query(`SELECT * FROM Production_Tasks WHERE JobOrderID = @JobOrderID AND TaskID != @TaskID AND (Line = 'WIP Line' OR BatchNo LIKE '%-WIP%')`);
+            
+            for (let wip of wipRes.recordset) {
+                // WIP Created
+                events.push({
+                    type: 'wip',
+                    title: `ส่งคำสั่งผลิต WIP (${wip.FormulaName})`,
+                    time: wip.CreatedAt,
+                    by: 'ฝ่ายผลิต',
+                    status: wip.Status,
+                    docType: null
+                });
+                
+                // WIP QC Requests
+                const wipQcRes = await pool.request()
+                    .input('JobOrderID', sql.VarChar, jo)
+                    .input('BatchNo', sql.VarChar, wip.BatchNo)
+                    .query(`SELECT * FROM QC_Production WHERE JobOrderID = @JobOrderID AND BatchNo = @BatchNo`);
+                
+                wipQcRes.recordset.forEach(qc => {
+                    const isCompleted = qc.Status !== 'รอตรวจ';
+                    const label = qc.Type === 'qc_inprocess' ? 'QC In-Process (WIP)' : 'QC Final (WIP)';
+                    events.push({
+                        type: 'qc',
+                        title: isCompleted ? `ส่งตรวจและประเมินผล ${label} - ${wip.FormulaName}` : `ส่งตรวจ ${label} - ${wip.FormulaName}`,
+                        time: (isCompleted ? qc.InspectedAt : qc.RequestedAt) || qc.RequestedAt,
+                        by: (isCompleted ? qc.Inspector : qc.RequesterName) || 'QC',
+                        status: qc.Status,
+                        docType: isCompleted ? 'qc_pdf' : null,
+                        taskId: qc.RequestID,
+                        notes: qc.Notes
+                    });
+                });
+            }
+        }
+
+        // Sort chronologically
+        events.sort((a, b) => new Date(a.time) - new Date(b.time));
+        res.json(events);
+    } catch (err) {
+        console.error('Error fetching timeline:', err);
+        res.status(500).json({ message: 'Error fetching timeline' });
+    }
+});
+
 // Get all production tasks
 router.get('/tasks', async (req, res) => {
     try {
@@ -83,7 +259,7 @@ router.post('/tasks/wip', authorizeRoles('admin', 'executive', 'planner', 'opera
         const datePrefix = getDatePrefix();
         // Use parent planner's JO ID if provided, otherwise generate a new one
         const joId = sourceJobOrderId || await generateSequence(pool, 'Production_Tasks', 'JobOrderID', `JO-${datePrefix}`, 3);
-        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `RQ-${datePrefix}`, 3);
+        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `PT-${datePrefix}`, 3);
         const batchNo = `B${datePrefix}-WIP`;
 
         let productName = null;

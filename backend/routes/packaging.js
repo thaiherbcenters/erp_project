@@ -26,9 +26,13 @@ router.get('/tasks', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT * FROM Packaging_Tasks 
+            SELECT 
+                pt.*, 
+                p.FormulaName 
+            FROM Packaging_Tasks pt
+            LEFT JOIN Production_Tasks p ON pt.ProductionTaskID = p.TaskID
             ORDER BY 
-                CASE Status 
+                CASE pt.Status 
                     WHEN N'กำลังบรรจุ' THEN 1 
                     WHEN N'รอบรรจุ' THEN 2 
                     WHEN N'บรรจุเสร็จ' THEN 3 
@@ -36,7 +40,7 @@ router.get('/tasks', async (req, res) => {
                     WHEN N'QC ผ่าน' THEN 5
                     ELSE 6 
                 END ASC, 
-                CreatedAt DESC
+                pt.CreatedAt DESC
         `);
 
         // Format data to match frontend expectations (null-safe)
@@ -44,6 +48,7 @@ router.get('/tasks', async (req, res) => {
             id: row.TaskID,
             code: row.TaskID,
             product: row.Product || '',
+            formulaName: row.FormulaName || row.Product || '',
             batch: row.BatchNo || '',
             packType: row.PackType || '-',
             line: row.Line || '-',

@@ -8,6 +8,7 @@ const { poolPromise } = require('../config/db');
 const { drawThaiText, wrapThaiText } = require('../utils/thaiShaper');
 const { renderTorbor1Page3, renderTorbor1Page4And5, renderRelatedManufacturersOnPage2 } = require('../utils/torbor1PdfRenderer');
 const { generateRequisitionPdf } = require('../utils/requisitionPdfRenderer');
+const { generateQcRequestPdf } = require('../utils/qcRequestPdfRenderer');
 const sql = require('mssql');
 
 // GET /check-template/:documentType
@@ -575,6 +576,105 @@ router.post('/', async (req, res) => {
     } catch (err) {
         console.error("Print API Error:", err);
         res.status(500).send(err.message);
+    }
+});
+
+// GET /print/qc-request/:taskId
+router.get('/qc-request/:taskId', async (req, res) => {
+    try {
+        const { taskId } = req.params;
+        const pool = await poolPromise;
+        
+        let searchTaskId = taskId;
+        if (taskId.startsWith('PKG')) {
+            const pkgRes = await pool.request()
+                .input('PKGID', sql.VarChar, taskId)
+                .query(`SELECT ProductionTaskID FROM Packaging_Tasks WHERE TaskID = @PKGID`);
+            if (pkgRes.recordset.length > 0 && pkgRes.recordset[0].ProductionTaskID) {
+                searchTaskId = pkgRes.recordset[0].ProductionTaskID;
+            }
+        }
+
+        // 1. Fetch QC Request data
+        const qcRes = await pool.request()
+            .input('TaskID', sql.VarChar, taskId)
+            .input('SearchTaskID', sql.VarChar, searchTaskId)
+            .query(`
+                SELECT TOP 1 * FROM QC_Production 
+                WHERE TaskID = @TaskID OR RequestID = @TaskID
+                   OR TaskID = @SearchTaskID OR RequestID = @SearchTaskID
+                ORDER BY RequestedAt DESC
+            `);
+            
+        if (qcRes.recordset.length === 0) {
+            return res.status(404).json({ error: 'ไม่พบคำขอตรวจ QC สำหรับงานนี้' });
+        }
+        const qcData = qcRes.recordset[0];
+
+        let taskInfo = {};
+        const realTaskId = qcData.TaskID || '';
+        const isPkg = realTaskId.startsWith('PKG');
+        const queryStr = isPkg ? 
+            `SELECT BatchNo, Line, Qty, Product AS FormulaName FROM Packaging_Tasks WHERE TaskID = @RealTaskID` :
+            `SELECT BatchNo, Line, ExpectedQty, ProducedQty, ProductName, FormulaName FROM Production_Tasks WHERE TaskID = @RealTaskID`;
+            
+        const tRes = await pool.request()
+            .input('RealTaskID', sql.VarChar, realTaskId)
+            .query(queryStr);
+            
+        if (tRes.recordset.length > 0) {
+            const t = tRes.recordset[0];
+            taskInfo = {
+                batchNo: qcData.BatchNo || t.BatchNo,
+                line: t.Line || '-',
+                qty: isPkg ? t.Qty : (t.ProducedQty || t.ExpectedQty),
+                formulaName: qcData.FormulaName || t.FormulaName || t.ProductName,
+            };
+        } else {
+            taskInfo = {
+                batchNo: qcData.BatchNo,
+                formulaName: qcData.FormulaName,
+                qty: 'ระบุในใบงาน',
+                line: '-'
+            };
+        }
+            
+
+        
+        const qcResultsRaw = await pool.request()
+            .input('RefID', sql.VarChar, qcData.RequestID)
+            .query(`
+                SELECT r.IsPass, r.ActualValue, c.CheckItem, c.StandardRequirement
+                FROM QC_Results r
+                JOIN QC_Criteria c ON r.CriteriaID = c.CriteriaID
+                WHERE r.ReferenceID = @RefID
+            `);
+
+        const pdfData = {
+            requestID: qcData.RequestID,
+            taskID: qcData.TaskID,
+            jobOrderID: qcData.JobOrderID,
+            type: qcData.Type,
+            batchNo: taskInfo.batchNo,
+            formulaName: taskInfo.formulaName,
+            qty: taskInfo.qty,
+            line: taskInfo.line,
+            requesterName: qcData.RequestedBy || 'ผู้ปฏิบัติงาน',
+            requestedAt: qcData.RequestedAt || qcData.CreatedAt,
+            status: qcData.Status,
+            inspectedBy: qcData.Inspector,
+            inspectedAt: qcData.InspectedAt || qcData.UpdatedAt,
+            qcNotes: qcData.Notes || '',
+            checklist: qcResultsRaw.recordset || []
+        };
+
+        const pdfBytes = await generateQcRequestPdf(pdfData);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="qc_request_${taskId}.pdf"`);
+        res.send(Buffer.from(pdfBytes));
+    } catch (err) {
+        console.error("Print QC Request Error:", err);
+        res.status(500).send("Error generating QC Request PDF");
     }
 });
 

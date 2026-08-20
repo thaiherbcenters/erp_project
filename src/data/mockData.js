@@ -364,10 +364,10 @@ export const ALL_PAGES = [
         ],
       },
       {
-        id: 'qc_final', name: 'QC Final (ก่อนบรรจุ)',
+        id: 'qc_final', name: 'QC Final (หลังบรรจุ)',
         sections: [
           { id: 'qc_final_search', name: 'ค้นหา' },
-          { id: 'qc_final_table', name: 'ตารางก่อนบรรจุ' },
+          { id: 'qc_final_table', name: 'ตารางหลังบรรจุ' },
         ],
       },
       {
@@ -442,6 +442,13 @@ export const ALL_PAGES = [
         id: 'operator_wip', name: 'การทำ WIP', path: '/operator/wip',
         sections: [
           { id: 'operator_wip_create', name: 'สร้างใบสั่งผลิต WIP' }
+        ],
+      },
+      {
+        id: 'operator_packaging', name: 'งานบรรจุ', path: '/operator/packaging',
+        sections: [
+          { id: 'operator_packaging_stats', name: 'สถิติการบรรจุ' },
+          { id: 'operator_packaging_orders', name: 'คำสั่งบรรจุ' },
         ],
       },
       {

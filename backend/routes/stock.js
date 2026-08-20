@@ -731,7 +731,7 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
         } else {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
-                .query('SELECT RequisitionJSON, CurrentStep FROM Production_Tasks WHERE TaskID = @TaskID');
+                .query('SELECT RequisitionJSON, CurrentStep, BatchNo, ProductName, FormulaName, Line, ExpectedQty, ProducedQty, JobOrderID FROM Production_Tasks WHERE TaskID = @TaskID');
         }
             
         if (taskRes.recordset.length === 0) {
@@ -818,10 +818,55 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
                         WHERE TaskID = @TaskID
                     `);
             } else {
+                let nextStep = 'packaging';
+                let nextStatus = 'รอบรรจุ';
+
+                // Also auto-create Packaging task like in production.js advance logic
+                const checkPkg = await pool.request()
+                    .input('BatchNoCheck', sql.VarChar, task.BatchNo || '')
+                    .input('ProdTaskIDCheck', sql.VarChar, taskId)
+                    .query(`
+                        SELECT COUNT(*) as cnt FROM Packaging_Tasks 
+                        WHERE BatchNo = @BatchNoCheck OR ProductionTaskID = @ProdTaskIDCheck
+                    `);
+                    if (checkPkg.recordset[0].cnt === 0) {
+                        const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG-${getDatePrefix()}`, 3);
+                        let pkgDestination = 'คลัง';
+                        if (task.JobOrderID) {
+                            try {
+                                const plannerCheck = await pool.request()
+                                    .input('PlannerIDCheck', sql.VarChar, task.JobOrderID)
+                                    .query('SELECT Notes FROM Planner WHERE PlannerID = @PlannerIDCheck');
+                                if (plannerCheck.recordset.length > 0) {
+                                    const pNotes = plannerCheck.recordset[0].Notes || '';
+                                    if (pNotes.includes('OEM') || pNotes.includes('ผลิตตามออร์เดอร์') || pNotes.includes('ผลิตตามออเดอร์') || pNotes.includes('ผลิตตามคำสั่งซื้อ')) {
+                                        pkgDestination = 'ส่งลูกค้า';
+                                    }
+                                }
+                            } catch(pe) { console.error(pe); }
+                        }
+
+                        await transaction.request()
+                            .input('PkgTaskID', sql.VarChar, pkgId)
+                            .input('BatchNoPkg', sql.VarChar, task.BatchNo)
+                            .input('ProductPkg', sql.NVarChar, task.ProductName || task.FormulaName || '')
+                            .input('LinePkg', sql.VarChar, task.Line || '')
+                            .input('QtyPkg', sql.Int, task.ExpectedQty || task.ProducedQty || 0)
+                            .input('StatusPkg', sql.NVarChar, 'รอบรรจุ')
+                            .input('DestinationPkg', sql.NVarChar, pkgDestination)
+                            .input('ProductionTaskIDPkg', sql.VarChar, taskId)
+                            .input('JobOrderIDPkg', sql.VarChar, task.JobOrderID || null)
+                            .query(`
+                                INSERT INTO Packaging_Tasks 
+                                (TaskID, BatchNo, Product, Line, Qty, PackedQty, Status, Destination, ProductionTaskID, JobOrderID)
+                                VALUES (@PkgTaskID, @BatchNoPkg, @ProductPkg, @LinePkg, @QtyPkg, 0, @StatusPkg, @DestinationPkg, @ProductionTaskIDPkg, @JobOrderIDPkg)
+                            `);
+                    }
+
                 await transaction.request()
                     .input('TaskID', sql.VarChar, taskId)
-                    .input('CurrentStep', sql.VarChar, 'wait')
-                    .input('Status', sql.NVarChar, 'รอเริ่มงาน')
+                    .input('CurrentStep', sql.VarChar, nextStep)
+                    .input('Status', sql.NVarChar, nextStatus)
                     .input('RequisitionJSON', sql.NVarChar, JSON.stringify(parsedData))
                     .query(`
                         UPDATE Production_Tasks 

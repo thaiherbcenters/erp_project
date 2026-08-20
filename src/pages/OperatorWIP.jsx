@@ -13,7 +13,7 @@ import './Operator.css';
 import API_BASE from '../config';
 
 const OperatorWIP = () => {
-    const { user, canCreate } = useAuth();
+    const { currentUser: user, canCreate } = useAuth();
     const { showAlert, showConfirm } = useAlert();
     const navigate = useNavigate();
     const location = useLocation();
@@ -281,6 +281,27 @@ const OperatorWIP = () => {
         } catch (err) {
             console.error(err);
             showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถโหลดใบเบิก PDF ได้', 'error');
+        }
+    };
+
+    const handleViewQcPdf = async (e, taskId) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`${API_BASE}/print/qc-request/${taskId}`, {
+                method: 'GET',
+                headers: { 
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (!res.ok) throw new Error('Failed to fetch QC Request PDF');
+            
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        } catch (err) {
+            console.error(err);
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถโหลดใบส่งตรวจ QC (PDF) ได้', 'error');
         }
     };
 
@@ -801,7 +822,24 @@ const OperatorWIP = () => {
                                                         </button>
                                                     )}
 
-                                                    {(!t.RequisitionJSON && t.status !== 'QC ผ่าน' && t.currentStep !== 'stock') && (
+                                                    {(['qc_inprocess', 'รอตรวจ QC', 'กำลังตรวจ', 'QC ผ่าน', 'QC ไม่ผ่าน', 'รอตรวจซ้ำ', 'เสร็จสิ้น'].includes(t.status) || ['qc_inprocess', 'qc'].includes(t.currentStep)) && (
+                                                        <button 
+                                                            onClick={(e) => handleViewQcPdf(e, t.id)}
+                                                            style={{ 
+                                                                padding: '6px', borderRadius: 6, background: '#ffffff', color: '#d97706', 
+                                                                border: '1px solid #fde68a', cursor: 'pointer', transition: 'all 0.15s ease',
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                boxShadow: '0 1px 2px rgba(217, 119, 6, 0.1)'
+                                                            }}
+                                                            onMouseEnter={e => { e.currentTarget.style.background = '#fef3c7'; e.currentTarget.style.color = '#b45309'; e.currentTarget.style.borderColor = '#fcd34d'; }}
+                                                            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.color = '#d97706'; e.currentTarget.style.borderColor = '#fde68a'; }}
+                                                            title="ดูใบส่งตรวจ QC (PDF)"
+                                                        >
+                                                            <FileText size={16} />
+                                                        </button>
+                                                    )}
+
+                                                    {(!t.RequisitionJSON && !['qc_inprocess', 'รอตรวจ QC', 'กำลังตรวจ', 'QC ผ่าน', 'QC ไม่ผ่าน', 'รอตรวจซ้ำ', 'เสร็จสิ้น'].includes(t.status) && !['qc_inprocess', 'qc'].includes(t.currentStep) && t.status !== 'QC ผ่าน' && t.currentStep !== 'stock') && (
                                                         <span style={{ color: '#cbd5e1', fontSize: 12 }}>—</span>
                                                     )}
                                                 </div>
@@ -859,6 +897,14 @@ const OperatorWIP = () => {
                                         <div style={{ background: detailModalTask.status === 'QC ผ่าน' ? '#dcfce7' : '#f1f5f9', color: detailModalTask.status === 'QC ผ่าน' ? '#15803d' : '#475569', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 600, border: `1px solid ${detailModalTask.status === 'QC ผ่าน' ? '#bbf7d0' : '#e2e8f0'}` }}>
                                             สถานะการผลิต: {detailModalTask.status}
                                         </div>
+                                        {['qc_inprocess', 'รอตรวจ QC', 'กำลังตรวจ', 'QC ผ่าน', 'QC ไม่ผ่าน', 'รอตรวจซ้ำ'].includes(detailModalTask.status) || ['qc_inprocess'].includes(detailModalTask.currentStep) ? (
+                                            <button 
+                                                onClick={(e) => handleViewQcPdf(e, detailModalTask.id)}
+                                                style={{ background: '#fef3c7', color: '#b45309', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 600, border: '1px solid #fde68a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                                            >
+                                                📄 ดูใบส่งตรวจ QC
+                                            </button>
+                                        ) : null}
                                         {detailModalTask.currentStep === 'stock' && (
                                             <div style={{ background: '#dcfce7', color: '#16a34a', padding: '6px 12px', borderRadius: 20, fontSize: 13, fontWeight: 600, border: '1px solid #bbf7d0' }}>
                                                 📦 การจัดเก็บ: เข้าคลัง WIP แล้ว

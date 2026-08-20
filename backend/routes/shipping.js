@@ -58,9 +58,11 @@ router.get('/', async (req, res) => {
             SELECT * FROM Shipping_Orders 
             ORDER BY 
                 CASE Status 
-                    WHEN N'รอจัดส่ง' THEN 1 
-                    WHEN N'กำลังจัดส่ง' THEN 2 
-                    WHEN N'ส่งมอบแล้ว' THEN 3 
+                    WHEN N'รอแพ็ค' THEN 1
+                    WHEN N'กำลังแพ็ค' THEN 2
+                    WHEN N'รอจัดส่ง' THEN 3 
+                    WHEN N'กำลังจัดส่ง' THEN 4 
+                    WHEN N'ส่งมอบแล้ว' THEN 5 
                 END,
                 CreatedAt DESC
         `);
@@ -90,7 +92,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update shipping status
-router.put('/:id/status', authorizeRoles('admin', 'executive', 'shipping', 'stock'), async (req, res) => {
+router.put('/:id/status', authorizeRoles('admin', 'executive', 'shipping', 'stock', 'packaging'), async (req, res) => {
     try {
         const { status, shippedBy, notes } = req.body;
         const pool = await poolPromise;
@@ -136,6 +138,7 @@ router.get('/stats/summary', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query(`
             SELECT 
+                COUNT(CASE WHEN Status = N'รอแพ็ค' THEN 1 END) as pendingPack,
                 COUNT(CASE WHEN Status = N'รอจัดส่ง' THEN 1 END) as pending,
                 COUNT(CASE WHEN Status = N'กำลังจัดส่ง' THEN 1 END) as inTransit,
                 COUNT(CASE WHEN Status = N'ส่งมอบแล้ว' THEN 1 END) as delivered,

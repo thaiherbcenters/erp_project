@@ -78,6 +78,7 @@ router.get('/', async (req, res) => {
                 id: job.PlannerID,
                 formulaId: job.FormulaID,
                 formulaName: job.FormulaName,
+                productName: job.ProductName,
                 batchQty: job.BatchQty,
                 batchSize: job.BatchSize,
                 totalQty: job.TotalQty,

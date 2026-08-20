@@ -63,7 +63,7 @@ const formatDynamicBatchSize = (ingredients) => {
 
 export default function RnD() {
     const { showAlert, showConfirm } = useAlert();
-    const { user, getVisibleSubPages, hasSectionPermission, canCreate, canUpdate, canDelete } = useAuth();
+    const { currentUser: user, getVisibleSubPages, hasSectionPermission, canCreate, canUpdate, canDelete } = useAuth();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('rnd');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;

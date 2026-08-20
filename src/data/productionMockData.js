@@ -305,6 +305,7 @@ export const MOCK_JOB_ORDERS = [
 export const PRODUCTION_STEPS = [
     { key: 'pending',        label: 'รอเริ่มงาน',           shortLabel: 'Pending',        icon: 'Timer',       description: 'ยังไม่เริ่มดำเนินการ' },
     { key: 'prepare',        label: 'เตรียมการ',           shortLabel: 'Prepare',        icon: 'ListChecks',  description: 'เตรียมวัตถุดิบและตรวจสอบ WIP' },
+    { key: 'requisition',    label: 'รอเบิกจ่าย',          shortLabel: 'Requisition',    icon: 'SearchCheck', description: 'รอคลังสินค้าเบิกจ่าย WIP' },
     { key: 'packaging',      label: 'บรรจุภัณฑ์',          shortLabel: 'Packaging',      icon: 'Package',     description: 'บรรจุภัณฑ์ / ติดฉลาก / แพ็ค' },
     { key: 'qc_final',       label: 'QC Final',            shortLabel: 'QC ขั้นสุดท้าย', icon: 'ShieldCheck', description: 'ตรวจสอบคุณภาพขั้นสุดท้าย' },
     { key: 'stock',          label: 'เข้าคลัง',            shortLabel: 'Stock',          icon: 'Warehouse',   description: 'สินค้าเข้าคลัง พร้อมจำหน่าย' },

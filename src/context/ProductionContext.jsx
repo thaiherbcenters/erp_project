@@ -50,14 +50,17 @@ export function ProductionProvider({ children }) {
                     jobOrderId: dbItem.JobOrderID,
                     batchNo: dbItem.BatchNo,
                     formulaName: dbItem.FormulaName,
+                    productName: dbItem.ProductName,
                     line: dbItem.Line,
                     type: dbItem.Type,
                     typeLabel: dbItem.Type === 'qc_inprocess' ? 'QC In-Process (ระหว่างผลิต)' : 'QC Final (ขั้นสุดท้าย)',
                     requestedAt: dbItem.RequestedAt ? new Date(dbItem.RequestedAt).toLocaleString('th-TH') : '',
+                    requestedAtISO: dbItem.RequestedAt || null,
                     status: dbItem.Status,
                     result: dbItem.Status,
                     inspector: dbItem.Inspector,
                     inspectedAt: dbItem.InspectedAt ? new Date(dbItem.InspectedAt).toLocaleString('th-TH') : '',
+                    inspectedAtISO: dbItem.InspectedAt || null,
                     notes: dbItem.Notes || '',
                 }));
                 setQcRequests(mappedData);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight, Printer, Phone } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight, Printer, Phone, Box } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 import './PageCommon.css';
 
@@ -216,6 +216,8 @@ export default function Fulfillment() {
 
     const getStatusBadge = (status) => {
         switch (status) {
+            case 'รอแพ็ค': return 'badge-secondary';
+            case 'กำลังแพ็ค': return 'badge-secondary';
             case 'รอจัดส่ง': return 'badge-warning';
             case 'กำลังจัดส่ง': return 'badge-info';
             case 'ส่งมอบแล้ว': return 'badge-success';
@@ -224,6 +226,8 @@ export default function Fulfillment() {
     };
     const getStatusIcon = (status) => {
         switch (status) {
+            case 'รอแพ็ค': return <Box size={14} />;
+            case 'กำลังแพ็ค': return <Box size={14} />;
             case 'รอจัดส่ง': return <Clock size={14} />;
             case 'กำลังจัดส่ง': return <Truck size={14} />;
             case 'ส่งมอบแล้ว': return <CheckCircle size={14} />;

@@ -88,6 +88,48 @@ const WipChecklist = ({ task, targetWeight, onComplete, allTasks = [], user }) =
     // Use a small epsilon to handle floating point precision issues (e.g. 7.0943 vs 7.094)
     const isEnough = wipData && (wipData.currentQty >= wipData.requiredQty || Math.abs(wipData.currentQty - wipData.requiredQty) < 0.001);
 
+    const handleSendRequisition = async () => {
+        const confirmed = await showConfirm(
+            'ยืนยันการขอเบิกวัตถุดิบ', 
+            `คุณต้องการส่งใบเบิก "${wipData.name}" จำนวน ${wipData.requiredQty.toLocaleString()} ${wipData.unit} จากคลังสินค้าใช่หรือไม่?`, 
+            'info'
+        );
+        if (!confirmed) return;
+
+        setIsSending(true);
+        try {
+            const res = await fetch(`${API_BASE}/production/tasks/${task.id}/requisition`, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    requisitionItems: [{
+                        id: wipData.id,
+                        name: wipData.name,
+                        deductQty: wipData.requiredQty,
+                        unit: wipData.unit
+                    }],
+                    requesterName: user?.name || user?.username || 'ผู้ปฏิบัติงาน'
+                })
+            });
+
+            if (res.ok) {
+                showAlert('สำเร็จ', 'ส่งใบเบิกไปยังคลังสินค้าเรียบร้อยแล้ว', 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                const data = await res.json();
+                showAlert('ผิดพลาด', data.message || 'ไม่สามารถส่งใบเบิกได้', 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showAlert('ผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        } finally {
+            setIsSending(false);
+        }
+    };
+
     const handleSendWipCard = async () => {
         const confirmed = await showConfirm(
             'ยืนยันส่งการ์ดงาน WIP', 
@@ -186,11 +228,11 @@ const WipChecklist = ({ task, targetWeight, onComplete, allTasks = [], user }) =
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
                 <button 
                     className="op-btn op-btn-start" 
-                    disabled={!isEnough}
-                    style={{ opacity: isEnough ? 1 : 0.5, padding: '10px 24px', fontSize: 15 }}
-                    onClick={() => onComplete({ usedWip: wipData })}
+                    disabled={!isEnough || isSending}
+                    style={{ opacity: (!isEnough || isSending) ? 0.5 : 1, padding: '10px 24px', fontSize: 15, background: '#1d4ed8', borderColor: '#1e40af' }}
+                    onClick={handleSendRequisition}
                 >
-                    <Play size={16} /> เริ่มดำเนินการบรรจุ
+                    <ChevronRight size={16} /> บันทึกและส่งใบเบิกวัตถุดิบ
                 </button>
             </div>
         </div>
@@ -198,7 +240,7 @@ const WipChecklist = ({ task, targetWeight, onComplete, allTasks = [], user }) =
 };
 
 export default function Operator() {
-    const { user, getVisibleSubPages, hasSectionPermission, canUpdate } = useAuth();
+    const { currentUser: user, getVisibleSubPages, hasSectionPermission, canUpdate } = useAuth();
     const { tasks: allTasks, advanceTaskStep, startTask, sendQcRequest, qcRequests, addProductionLog } = useProduction();
     const tasks = useMemo(() => allTasks.filter(t => t.line !== 'WIP Line'), [allTasks]);
     const { showAlert, showConfirm } = useAlert();
@@ -219,6 +261,8 @@ export default function Operator() {
     const [qtyModal, setQtyModal] = useState({ open: false, taskId: null, taskName: '', expectedQty: 0, currentProduced: 0 });
     const [qtyForm, setQtyForm] = useState({ producedQty: '', defectQty: '0', notes: '' });
     const [checklist, setChecklist] = useState({ wip: null, raw: false, pkg: false });
+    const [taskTimeline, setTaskTimeline] = useState([]);
+    const [loadingTimeline, setLoadingTimeline] = useState(false);
 
     useEffect(() => {
         if (selectedTask) {
@@ -277,6 +321,43 @@ export default function Operator() {
     };
 
     // ── Handle advancing to next step (with QC auto-send) ──
+    useEffect(() => {
+        if (!selectedTask || (selectedTask.status !== 'เสร็จสิ้น' && selectedTask.status !== 'คัดทิ้ง')) {
+            setTaskTimeline([]);
+            return;
+        }
+        const fetchTimeline = async () => {
+            setLoadingTimeline(true);
+            try {
+                const res = await fetch(`${API_BASE}/production/tasks/${selectedTask.id}/timeline`, {
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    setTaskTimeline(data);
+                }
+            } catch (err) {
+                console.error('Error fetching timeline:', err);
+            } finally {
+                setLoadingTimeline(false);
+            }
+        };
+        fetchTimeline();
+    }, [selectedTask]);
+
+    const handleViewPdf = async (url) => {
+        try {
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } });
+            if (!res.ok) throw new Error('Failed to load PDF');
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            window.open(blobUrl, '_blank');
+        } catch (err) {
+            console.error(err);
+            showAlert('ผิดพลาด', 'ไม่สามารถโหลดเอกสาร PDF ได้', 'error');
+        }
+    };
+
     const handleAdvanceStep = (taskId, extraPayload = {}) => {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
@@ -560,7 +641,7 @@ export default function Operator() {
                         )}
 
                         {/* Normal Next Step (non-QC) */}
-                        {!isLastStep && !isQcStep && task.currentStep !== 'packaging' && task.currentStep !== 'pending' && task.currentStep !== 'prepare' && task.status !== 'เสร็จสิ้น' && !waitingQc && (
+                        {!isLastStep && !isQcStep && task.currentStep !== 'requisition' && task.currentStep !== 'packaging' && task.currentStep !== 'pending' && task.currentStep !== 'prepare' && task.status !== 'เสร็จสิ้น' && !waitingQc && (
                             <div className="op-modal-next-action" style={{ marginBottom: 24 }}>
                                 <span style={{ fontSize: 15 }}>ขั้นตอนถัดไป: <strong>{nextStep?.label}</strong></span>
                                 {canUpdate('operator_dashboard') && (
@@ -568,6 +649,15 @@ export default function Operator() {
                                         <ChevronRight size={16} /> ไปขั้นตอนถัดไป
                                     </button>
                                 )}
+                            </div>
+                        )}
+
+                        {/* Requisition Wait State */}
+                        {task.currentStep === 'requisition' && (
+                            <div className="op-modal-next-action" style={{ background: '#fdfce8', borderColor: '#fef08a', marginBottom: 24, justifyContent: 'center' }}>
+                                <span style={{ color: '#a16207', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Warehouse size={18} /> รอคลังสินค้าเบิกจ่ายวัตถุดิบ...
+                                </span>
                             </div>
                         )}
 
@@ -579,27 +669,34 @@ export default function Operator() {
                         )}
 
 
-                        {/* QC History for this task */}
-                        {qcReqForTask.length > 0 && (
+                        {/* Unified Work History (Only visible in Production History for completed/rejected tasks) */}
+                        {(task.status === 'เสร็จสิ้น' || task.status === 'คัดทิ้ง') && (
                             <div className="op-qc-history">
-                                <h4 style={{ margin: '16px 0 12px', fontSize: 14, fontWeight: 700, color: '#334155' }}>📋 ประวัติ QC ของงานนี้</h4>
-                                {qcReqForTask.map(r => (
-                                    <div key={r.id} className={`op-qc-history-item ${r.status === 'ผ่าน' ? 'passed' : r.status === 'ไม่ผ่าน' ? 'failed' : 'pending'}`}>
-                                        <div className="op-qc-history-top">
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                <span className="op-qc-history-type">{r.typeLabel}</span>
-                                                <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{r.id}</span>
+                                <h4 style={{ margin: '16px 0 12px', fontSize: 14, fontWeight: 700, color: '#334155' }}>📋 ประวัติการทำงานและเอกสาร</h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    {taskTimeline.map((ev, i) => (
+                                        <div key={i} className={`op-qc-history-item ${ev.status === 'ไม่ผ่าน' ? 'failed' : ev.status === 'รอดำเนินการ' ? 'pending' : 'passed'}`} style={{ borderLeftColor: ev.status === 'ไม่ผ่าน' ? '#ef4444' : ev.status === 'รอดำเนินการ' ? '#f59e0b' : '#10b981' }}>
+                                            <div className="op-qc-history-top" style={{ flexWrap: 'wrap' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <span className="op-qc-history-type" style={{ fontSize: 13 }}>{ev.title}</span>
+                                                    <span style={{ fontSize: 11, background: '#f1f5f9', color: '#64748b', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{ev.refId}</span>
+                                                </div>
+                                                {ev.status && <span className={`badge ${ev.status === 'ไม่ผ่าน' ? 'badge-danger' : ev.status === 'รอดำเนินการ' ? 'badge-warning' : 'badge-success'}`}>{ev.status}</span>}
                                             </div>
-                                            <span className={`badge ${r.status === 'ผ่าน' ? 'badge-success' : r.status === 'ไม่ผ่าน' ? 'badge-danger' : 'badge-warning'}`}>{r.status}</span>
+                                            <div className="op-qc-history-meta">
+                                                <span>📅 {ev.timestamp}</span>
+                                                {ev.actor && <span>👤 โดย: {ev.actor}</span>}
+                                                {ev.documentUrl && (
+                                                    <button onClick={() => handleViewPdf(ev.documentUrl)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: 12, textDecoration: 'underline', padding: 0, marginLeft: 8 }}>
+                                                        ดูเอกสาร (PDF)
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {ev.details && <div className="op-qc-history-note" style={{ marginTop: 6, fontSize: 12 }}>💬 {ev.details}</div>}
                                         </div>
-                                        <div className="op-qc-history-meta">
-                                            <span>📅 ส่ง: {r.requestedAt}</span>
-                                            {r.inspectedAt && <span>✅ ตรวจ: {r.inspectedAt}</span>}
-                                            {r.inspector && <span>👤 โดย: {r.inspector}</span>}
-                                        </div>
-                                        {r.notes && <div className="op-qc-history-note">💬 {r.notes}</div>}
-                                    </div>
-                                ))}
+                                    ))}
+                                    {loadingTimeline && <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center', padding: 8 }}>กำลังโหลดประวัติ...</div>}
+                                </div>
                             </div>
                         )}
                     </div>

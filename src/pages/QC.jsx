@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
 import { useRnD } from '../context/RnDContext';
 import API_BASE from '../config';
-import { Search, Plus, FileText, Trash2, Save } from 'lucide-react';
+import { Search, Plus, FileText, Trash2, Save, Eye, ListChecks } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
@@ -182,26 +182,62 @@ export default function QC() {
     const [newCriteria, setNewCriteria] = useState({ CheckItem: '', StandardRequirement: '' });
     const [isAddingCriteria, setIsAddingCriteria] = useState(false);
 
+    const handleViewQcPdf = async (e, taskId) => {
+        e.preventDefault();
+        try {
+            const res = await fetch(`${API_BASE}/print/qc-request/${taskId}`, {
+                method: 'GET',
+                headers: { 
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (!res.ok) throw new Error('Failed to fetch QC Request PDF');
+            
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+        } catch (err) {
+            console.error(err);
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถโหลดใบส่งตรวจ QC (PDF) ได้', 'error');
+        }
+    };
+
     const openInspectModal = async (req) => {
         setInspectingRequest(req);
-        setInspectNotes('');
+        setInspectNotes(req.notes || '');
         setLoadingCriteria(true);
-        // fetch criteria
         try {
-            const url = `${API_BASE}/qc/criteria?category=${encodeURIComponent(req.formulaName || '')}&stage=${req.type}`;
-            const res = await fetch(url);
-            if (res.ok) {
-                const criteria = await res.json();
-                setChecklistData(criteria.map(c => ({
-                    CriteriaID: c.CriteriaID,
-                    CheckItem: c.CheckItem,
-                    StandardRequirement: c.StandardRequirement,
-                    IsPass: true, // Default pass
-                    ActualValue: ''
-                })));
+            if (req.status === 'รอตรวจ') {
+                // fetch criteria
+                const url = `${API_BASE}/qc/criteria?category=${encodeURIComponent(req.formulaName || '')}&stage=${req.type}`;
+                const res = await fetch(url);
+                if (res.ok) {
+                    const criteria = await res.json();
+                    setChecklistData(criteria.map(c => ({
+                        CriteriaID: c.CriteriaID,
+                        CheckItem: c.CheckItem,
+                        StandardRequirement: c.StandardRequirement,
+                        IsPass: true, // Default pass
+                        ActualValue: ''
+                    })));
+                }
+            } else {
+                // fetch saved results
+                const res = await fetch(`${API_BASE}/qc/requests/${req.id}/results`);
+                if (res.ok) {
+                    const results = await res.json();
+                    setChecklistData(results.map(r => ({
+                        CriteriaID: r.CriteriaID,
+                        CheckItem: r.CheckItem,
+                        StandardRequirement: r.StandardRequirement,
+                        IsPass: r.IsPass,
+                        ActualValue: r.ActualValue
+                    })));
+                }
             }
         } catch (err) {
-            console.error('Failed to load QC criteria', err);
+            console.error('Failed to load QC criteria or results', err);
         } finally {
             setLoadingCriteria(false);
         }
@@ -296,7 +332,7 @@ export default function QC() {
                                         </div>
                                         <span className="badge badge-warning">⏳ รอตรวจ</span>
                                     </div>
-                                    <div className="qc-pending-product">{req.formulaName}</div>
+                                    <div className="qc-pending-product">{req.productName || req.formulaName}</div>
                                     <div className="qc-pending-meta">
                                         <span>📅 ส่ง: {req.requestedAt}</span>
                                         <span>🏭 {req.line}</span>
@@ -317,11 +353,20 @@ export default function QC() {
                 {inspectingRequest && inspectingRequest.type === type && (
                     <div className="rnd-modal-overlay" onClick={() => setInspectingRequest(null)}>
                         <div className="rnd-modal" style={{ maxWidth: 800, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-                            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', background: '#f8fafc' }}>
-                                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>🔍 แบบฟอร์มตรวจ QC ({inspectingRequest.type === 'qc_inprocess' ? 'In-Process' : 'Final'})</h2>
-                                <p style={{ margin: '4px 0 0', fontSize: 14, color: '#64748b' }}>
-                                    {inspectingRequest.jobOrderId} — {inspectingRequest.formulaName}
-                                </p>
+                            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', background: '#f8fafc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>🔍 แบบฟอร์มตรวจ QC ({inspectingRequest.type === 'qc_inprocess' ? 'In-Process' : 'Final'})</h2>
+                                    <p style={{ margin: '4px 0 0', fontSize: 14, color: '#64748b' }}>
+                                        {inspectingRequest.jobOrderId} — {inspectingRequest.productName || inspectingRequest.formulaName}
+                                    </p>
+                                </div>
+                                <button 
+                                    className="btn-secondary"
+                                    onClick={(e) => handleViewQcPdf(e, inspectingRequest.taskId || inspectingRequest.id)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+                                >
+                                    📄 ดูใบส่งตรวจ (PDF)
+                                </button>
                             </div>
                             
                             <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
@@ -333,9 +378,11 @@ export default function QC() {
                                             <h3 style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
                                                 📋 รายการที่ต้องตรวจสอบ (มาตรฐาน)
                                             </h3>
-                                            <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => setIsAddingCriteria(!isAddingCriteria)}>
-                                                <Plus size={14} /> เพิ่มรายการตรวจ
-                                            </button>
+                                            {inspectingRequest.status === 'รอตรวจ' && (
+                                                <button className="btn-secondary" style={{ padding: '4px 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => setIsAddingCriteria(!isAddingCriteria)}>
+                                                    <Plus size={14} /> เพิ่มรายการตรวจ
+                                                </button>
+                                            )}
                                         </div>
                                         
                                         <table className="data-table" style={{ marginBottom: 20 }}>
@@ -345,12 +392,12 @@ export default function QC() {
                                                     <th>หัวข้อที่ตรวจ</th>
                                                     <th>เกณฑ์อ้างอิง Spec</th>
                                                     <th>ค่าที่วัดได้จริง (Optional)</th>
-                                                    <th style={{ width: 40, textAlign: 'center' }}>ลบ</th>
+                                                    {inspectingRequest.status === 'รอตรวจ' && <th style={{ width: 40, textAlign: 'center' }}>ลบ</th>}
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {checklistData.length === 0 && !isAddingCriteria ? (
-                                                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>ไม่มีหัวข้อตรวจแบบเฉพาะเจาะจง กรุณาเพิ่มรายการตรวจ หรือใช้การประเมินทั่วไปด้านล่าง</td></tr>
+                                                    <tr><td colSpan={inspectingRequest.status === 'รอตรวจ' ? "5" : "4"} style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>ไม่มีหัวข้อตรวจแบบเฉพาะเจาะจง {inspectingRequest.status === 'รอตรวจ' && 'กรุณาเพิ่มรายการตรวจ หรือใช้การประเมินทั่วไปด้านล่าง'}</td></tr>
                                                 ) : checklistData.map((item) => (
                                                     <tr key={item.CriteriaID} style={{ background: item.IsPass ? 'transparent' : '#fef2f2' }}>
                                                         <td style={{ textAlign: 'center' }}>
@@ -358,7 +405,8 @@ export default function QC() {
                                                                 type="checkbox" 
                                                                 checked={item.IsPass}
                                                                 onChange={(e) => handleChecklistChange(item.CriteriaID, 'IsPass', e.target.checked)}
-                                                                style={{ width: 18, height: 18, cursor: 'pointer', accentColor: item.IsPass ? '#16a34a' : 'initial' }}
+                                                                disabled={inspectingRequest.status !== 'รอตรวจ'}
+                                                                style={{ width: 18, height: 18, cursor: inspectingRequest.status !== 'รอตรวจ' ? 'default' : 'pointer', accentColor: item.IsPass ? '#16a34a' : 'initial' }}
                                                             />
                                                         </td>
                                                         <td style={{ fontWeight: 500 }}>{item.CheckItem}</td>
@@ -369,17 +417,20 @@ export default function QC() {
                                                                 placeholder="ระบุค่า"
                                                                 value={item.ActualValue}
                                                                 onChange={(e) => handleChecklistChange(item.CriteriaID, 'ActualValue', e.target.value)}
+                                                                disabled={inspectingRequest.status !== 'รอตรวจ'}
                                                                 style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}
                                                             />
                                                         </td>
-                                                        <td style={{ textAlign: 'center' }}>
-                                                            <button onClick={() => handleDeleteCriteriaRow(item.CriteriaID)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }} title="ลบรายการนี้">
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </td>
+                                                        {inspectingRequest.status === 'รอตรวจ' && (
+                                                            <td style={{ textAlign: 'center' }}>
+                                                                <button onClick={() => handleDeleteCriteriaRow(item.CriteriaID)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }} title="ลบรายการนี้">
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </td>
+                                                        )}
                                                     </tr>
                                                 ))}
-                                                {isAddingCriteria && (
+                                                {isAddingCriteria && inspectingRequest.status === 'รอตรวจ' && (
                                                     <tr style={{ background: '#f8fafc' }}>
                                                         <td style={{ textAlign: 'center' }}>-</td>
                                                         <td>
@@ -405,8 +456,9 @@ export default function QC() {
                                                 rows={3} 
                                                 value={inspectNotes}
                                                 onChange={e => setInspectNotes(e.target.value)}
-                                                placeholder="ความเห็นจากเจ้าหน้าที่ QC..."
-                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, resize: 'vertical' }}
+                                                placeholder={inspectingRequest.status !== 'รอตรวจ' ? '-' : "ความเห็นจากเจ้าหน้าที่ QC..."}
+                                                disabled={inspectingRequest.status !== 'รอตรวจ'}
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14, resize: 'vertical', background: inspectingRequest.status !== 'รอตรวจ' ? '#f8fafc' : '#fff' }}
                                             />
                                         </div>
                                     </div>
@@ -414,14 +466,18 @@ export default function QC() {
                             </div>
                             
                             <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 12, background: '#f8fafc', borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }}>
-                                <button className="btn-secondary" onClick={() => setInspectingRequest(null)}>ยกเลิก</button>
-                                <button className="btn-danger" onClick={handleRejectClick}>
-                                    ❌ ไม่ผ่าน
-                                </button>
-                                {canCreate('qc_formula_lab') && (
-                                    <button className="btn-primary" onClick={() => handleInspectSubmit('ผ่าน')}>
-                                        ✅ ผ่าน QC (Approve)
-                                    </button>
+                                <button className="btn-secondary" onClick={() => setInspectingRequest(null)}>ปิด</button>
+                                {inspectingRequest.status === 'รอตรวจ' && (
+                                    <>
+                                        <button className="btn-danger" onClick={handleRejectClick}>
+                                            ❌ ไม่ผ่าน
+                                        </button>
+                                        {canCreate('qc_formula_lab') && (
+                                            <button className="btn-primary" onClick={() => handleInspectSubmit('ผ่าน')}>
+                                                ✅ ผ่าน QC (Approve)
+                                            </button>
+                                        )}
+                                    </>
                                 )}
                             </div>
                         </div>
@@ -435,7 +491,7 @@ export default function QC() {
                             <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb' }}>
                                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#dc2626' }}>⚠️ QC ไม่ผ่าน — เลือกวิธีจัดการ</h2>
                                 <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>
-                                    {rejectDialog.request?.batchNo} — {rejectDialog.request?.formulaName}
+                                    {rejectDialog.request?.batchNo} — {rejectDialog.request?.productName || rejectDialog.request?.formulaName}
                                 </p>
                             </div>
                             <div style={{ padding: '20px 24px' }}>
@@ -506,6 +562,7 @@ export default function QC() {
                                     <th>ผู้ตรวจ</th>
                                     <th>ผลตรวจ</th>
                                     <th>หมายเหตุ</th>
+                                    <th style={{ width: 60, textAlign: 'center' }}>จัดการ</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -513,13 +570,45 @@ export default function QC() {
                                     <tr key={req.id}>
                                         <td className="text-bold" style={{ color: '#4338ca' }}>{req.id}</td>
                                         <td className="text-bold">{req.jobOrderId}</td>
-                                        <td>{req.formulaName}</td>
+                                        <td>{req.productName || req.formulaName}</td>
                                         <td>{req.line}</td>
                                         <td>{req.requestedAt}</td>
                                         <td>{req.inspectedAt || '—'}</td>
                                         <td>{req.inspector || '—'}</td>
                                         <td><span className={`badge ${getResultBadge(req.status)}`}>{req.status}</span></td>
                                         <td>{req.notes || '—'}</td>
+                                        <td style={{ textAlign: 'center' }}>
+                                            <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                                                <button 
+                                                    onClick={() => openInspectModal(req)}
+                                                    style={{ 
+                                                        background: '#ffffff', border: '1px solid #e2e8f0', color: '#64748b', 
+                                                        cursor: 'pointer', padding: '4px 8px', borderRadius: 6,
+                                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#334155'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.color = '#64748b'; }}
+                                                    title="ดูรายละเอียด"
+                                                >
+                                                    <Eye size={16} />
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => handleViewQcPdf(e, req.taskId || req.id)}
+                                                    style={{ 
+                                                        background: '#ffffff', border: '1px solid #bae6fd', color: '#0284c7', 
+                                                        cursor: 'pointer', padding: '4px 8px', borderRadius: 6,
+                                                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                                        transition: 'all 0.15s ease'
+                                                    }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background = '#e0f2fe'; e.currentTarget.style.borderColor = '#7dd3fc'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#bae6fd'; }}
+                                                    title="ดูเอกสาร (PDF)"
+                                                >
+                                                    <FileText size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -616,7 +705,7 @@ export default function QC() {
                                 <div className="qc-dashboard-alert-items">
                                     {pendingRequests.map(r => (
                                         <span key={r.id} className="qc-dashboard-alert-tag">
-                                            {r.batchNo} — {r.formulaName} ({r.typeLabel})
+                                            {r.batchNo} — {r.productName || r.formulaName} ({r.typeLabel})
                                         </span>
                                     ))}
                                 </div>
@@ -969,7 +1058,7 @@ export default function QC() {
                                 {formulaTests.map(t => (
                                     <tr key={t.id}>
                                         <td className="text-bold">{t.formulaId}</td>
-                                        <td>{t.formulaName}</td>
+                                        <td>{t.productName || t.formulaName}</td>
                                         <td>{t.testDate}</td>
                                         <td>{t.testedBy}</td>
                                         <td>{t.pH}</td>
