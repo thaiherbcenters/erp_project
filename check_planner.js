@@ -1,0 +1,1 @@
+require('dotenv').config({path: 'backend/.env'}); const { poolPromise } = require('./backend/config/db'); async function run() { const pool = await poolPromise; const res = await pool.request().query(\SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Planner'\); console.log(res.recordset.map(r => r.COLUMN_NAME)); process.exit(0); } run();

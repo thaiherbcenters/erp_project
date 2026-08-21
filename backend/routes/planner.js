@@ -74,6 +74,15 @@ router.get('/', async (req, res) => {
                 return `${year}-${month}-${day}`;
             };
 
+            // Determine productionType from Notes
+            let pType = 'ผลิตตามแผน (MTS)';
+            if (job.Notes) {
+                const notesStr = job.Notes.toLowerCase();
+                if (notesStr.includes('oem') || notesStr.includes('ผลิตตามออร์เดอร์') || notesStr.includes('ผลิตตามออเดอร์') || notesStr.includes('ผลิตตามคำสั่งซื้อ')) {
+                    pType = 'ผลิตตามคำสั่งซื้อ (OEM)';
+                }
+            }
+
             return {
                 id: job.PlannerID,
                 formulaId: job.FormulaID,
@@ -89,6 +98,7 @@ router.get('/', async (req, res) => {
                 dueDate: formatDateLocal(job.DueDate),
                 assignedLine: job.AssignedLine,
                 notes: job.Notes,
+                productionType: pType,
                 createdBy: job.CreatedBy,
                 progress: progress,
                 requestedBy: job.RequestedBy || '',

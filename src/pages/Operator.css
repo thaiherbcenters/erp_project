@@ -877,3 +877,14 @@
     color: #7c3aed;
     border: 1px solid #ddd6fe;
 }
+
+.op-active-card.status-progress {
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    border: 2px solid #93c5fd;
+    animation: opPulseGlowBlue 2s ease-in-out infinite;
+}
+
+@keyframes opPulseGlowBlue {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.2); }
+    50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15); }
+}

@@ -15,8 +15,6 @@ import React, { useRef } from 'react';
 import { ArrowLeft, Printer, X } from 'lucide-react';
 import { useSignatures } from '../hooks/useSignatures';
 
-const LOGO_URL = 'https://lh3.googleusercontent.com/d/10lptwep_aBvzXnQUHFAyS8cou2nrYyKK';
-
 /**
  * แปลงวันที่จาก YYYY-MM-DD เป็นรูปแบบไทย เช่น "3 สิงหาคม 2569"
  */
@@ -266,7 +264,7 @@ export default function ProductionOrderPreview({ job, onClose }) {
                             <div style={{ display: 'flex', border: '1px solid #000' }}>
                                 {/* Logo */}
                                 <div style={{ width: '100px', borderRight: '1px solid #000', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <img src={LOGO_URL} alt="Logo" style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'contain' }} />
+                                    <img src="/images/logos/logo-thc.png" alt="Logo" style={{ maxWidth: '80px', maxHeight: '80px', objectFit: 'contain' }} />
                                 </div>
                                 {/* Info Grid */}
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>

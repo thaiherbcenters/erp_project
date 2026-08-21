@@ -359,6 +359,7 @@ export function ProductionProvider({ children }) {
     const value = {
         tasks,
         qcRequests,
+        fetchTasks,
         fetchQcRequests,
         sendQcRequest,
         submitQcResult,

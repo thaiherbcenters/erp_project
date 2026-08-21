@@ -56,6 +56,17 @@ export default function Stock() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [addForm, setAddForm] = useState({ name: '', nameEN: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', location: '', minStock: 0, status: 'มีสินค้า', adjustReason: '' });
     const [addSaving, setAddSaving] = useState(false);
+    const [nextItemId, setNextItemId] = useState("");
+    useEffect(() => { 
+        if (showAddModal && addForm.category) {
+            fetch(API_BASE + "/stock/next-id?category=" + encodeURIComponent(addForm.category), {
+                headers: { "Authorization": "Bearer " + localStorage.getItem("token") }
+            })
+            .then(r => r.json())
+            .then(d => { if (d.nextId) setNextItemId(d.nextId); })
+            .catch(err => console.error(err));
+        }
+    }, [showAddModal, addForm.category]);
 
     // ── Dashboard State ──
     const [dashboardData, setDashboardData] = useState(null);
@@ -1413,6 +1424,11 @@ export default function Stock() {
                         <div className="rnd-modal-header">
                             <div>
                                 <h2>➕ เพิ่มรายการสินค้าใหม่</h2>
+                                {nextItemId && (
+                                    <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                                        รหัสสินค้าที่จะถูกสร้าง: <span style={{ fontWeight: "bold", color: "#3b82f6" }}>{nextItemId}</span>
+                                    </div>
+                                )}
                             </div>
                             <button className="rnd-modal-close" onClick={() => setShowAddModal(false)}>
                                 <XCircle size={22} />
@@ -1426,7 +1442,7 @@ export default function Stock() {
                                     value={addForm.name}
                                     onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
                                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
-                                    placeholder="ระบุชื่อสินค้า (ภาษาไทย)..."
+                                    placeholder="ระบุชื่อสินค้า (ภาษาไทย)..." autoComplete="off" name="new_item_name"
                                 />
                             </div>
                             <div className="form-group" style={{ marginBottom: 15 }}>

@@ -56,7 +56,11 @@ async function generateRequisitionPdf(data) {
     // Header Info
     const dateStr = data.date || new Date().toLocaleDateString('th-TH');
     const refId = data.batchNo || data.taskId || '-';
-    const reqNo = data.taskId || '-';
+    let reqNo = data.taskId || '-';
+    // Append auto-running sequence ONLY if it's a subsequent requisition (e.g. 2nd time -> -02)
+    if (typeof data.reqIndex === 'number' && data.reqIndex > 0) {
+        reqNo = `${reqNo}-${String(data.reqIndex + 1).padStart(2, '0')}`;
+    }
 
     drawThaiText(page, `เลขที่ใบเบิก: ${reqNo}`, margin, y, fontSize, font, rgb(0, 0, 0));
     drawThaiText(page, `เลขที่อ้างอิงงานผลิต: ${data.jobOrderId || '-'} / ${refId}`, width / 2, y, fontSize, font, rgb(0, 0, 0));

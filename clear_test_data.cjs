@@ -1,22 +1,45 @@
-require('dotenv').config({ path: './backend/.env' });
-const sql = require('mssql');
-const { poolPromise } = require('./backend/config/db');
+require('dotenv').config({path: './backend/.env'});
+const { poolPromise, sql } = require('./backend/config/db.js');
 
-(async () => {
+async function run() {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
     try {
-        const pool = await poolPromise;
-        const transaction = new sql.Transaction(pool);
         await transaction.begin();
-        try {
-            await transaction.request().query("DELETE FROM Stock_Logs WHERE RefType = 'production'");
-            await transaction.request().query("DELETE FROM Production_Tasks");
-            await transaction.request().query("DELETE FROM Planner");
-            await transaction.commit();
-            console.log('Successfully cleared all production test data.');
-        } catch(e) {
-            await transaction.rollback();
-            throw e;
+        
+        const tablesToClear = [
+            // Sales & Quotation
+            'QuotationItemHistory', 'QuotationHistory', 'QuotationItem', 'Quotation',
+            'SalesOrderItemHistory', 'SalesOrderHistory', 'SalesOrderItem', 'SalesOrder',
+            
+            // Production & Planner
+            'Production_Logs', 'Packaging_Tasks', 'Production_Tasks', 'Planner',
+            
+            // Shipping
+            'Shipping_Orders',
+            
+            // QC
+            'QC_Results', 'QC_Incoming', 'QC_InProcess', 'QC_FinishedGoods', 'QC_Production', 'QC_Defect_NCR',
+            
+            // Stock Logs
+            'Stock_Logs'
+        ];
+
+        for (const table of tablesToClear) {
+            console.log(`Clearing ${table}...`);
+            await transaction.request().query(`DELETE FROM ${table}`);
         }
-        process.exit(0);
-    } catch(e) { console.error(e); process.exit(1); }
-})();
+
+        // Reset Sequences to 0 or delete them
+        await transaction.request().query(`DELETE FROM Sequences`);
+
+        await transaction.commit();
+        console.log('✅ Successfully cleared all test transaction data!');
+    } catch (err) {
+        console.error('❌ Error clearing data:', err);
+        await transaction.rollback();
+    }
+    process.exit(0);
+}
+
+run();

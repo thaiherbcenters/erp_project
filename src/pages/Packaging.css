@@ -379,3 +379,25 @@
 .pkg-pending-card.in-progress .pkg-pending-id {
     background: #3b82f6;
 }
+
+
+/* status-wait (รอบรรจุ - Purple) */
+.pkg-pending-card.status-wait {
+    background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 100%);
+    border: 1px solid #ddd6fe;
+}
+.pkg-pending-card.status-wait:hover {
+    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.12);
+    border-color: #a78bfa;
+}
+.pkg-pending-card.status-wait::before {
+    background: #8b5cf6;
+}
+.pkg-pending-card.status-wait .pkg-pending-id {
+    background: #8b5cf6;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+}

@@ -630,6 +630,10 @@ router.get('/requisitions', async (req, res) => {
             SELECT TaskID, JobOrderID, BatchNo, Product AS FormulaName, Qty AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
             FROM Packaging_Tasks 
             WHERE Status = N'รอเบิกบรรจุภัณฑ์'
+            UNION ALL
+            SELECT ShipmentID AS TaskID, ShipmentID AS JobOrderID, BatchNo, ProductName AS FormulaName, Quantity AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
+            FROM Shipping_Orders 
+            WHERE Status = N'รอคลังอนุมัติ'
             ORDER BY CreatedAt ASC
         `);
         
@@ -641,7 +645,15 @@ router.get('/requisitions', async (req, res) => {
 
         const requisitions = result.recordset.map(row => {
             const parsed = row.RequisitionJSON ? JSON.parse(row.RequisitionJSON) : [];
-            let items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+            let history = [];
+            if (Array.isArray(parsed)) {
+                if (parsed.length > 0 && parsed[0].id && !parsed[0].items) history = [{ items: parsed }];
+                else history = parsed;
+            } else if (parsed && parsed.items) {
+                history = [parsed];
+            }
+            let pendingReq = history.length > 0 ? history[history.length - 1] : { items: [] };
+            let items = pendingReq.items || [];
             
             items = items.map(it => {
                 const currentQty = stockDict[String(it.id).trim()] || 0;
@@ -686,13 +698,25 @@ router.get('/requisitions/history', async (req, res) => {
                 SELECT TaskID, JobOrderID, BatchNo, Product AS FormulaName, Qty AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
                 FROM Packaging_Tasks 
                 WHERE RequisitionJSON IS NOT NULL AND Status != N'รอเบิกบรรจุภัณฑ์'
+                UNION ALL
+                SELECT ShipmentID AS TaskID, ShipmentID AS JobOrderID, BatchNo, ProductName AS FormulaName, Quantity AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
+                FROM Shipping_Orders 
+                WHERE RequisitionJSON IS NOT NULL AND Status != N'รอคลังอนุมัติ' AND Status != N'รอเบิกวัสดุแพ็ค'
             ) AS CombinedTasks
             ORDER BY CreatedAt DESC
         `);
         
         const requisitions = result.recordset.map(row => {
             const parsed = row.RequisitionJSON ? JSON.parse(row.RequisitionJSON) : [];
-            const items = Array.isArray(parsed) ? parsed : (parsed.items || []);
+            let history = [];
+            if (Array.isArray(parsed)) {
+                if (parsed.length > 0 && parsed[0].id && !parsed[0].items) history = [{ items: parsed }];
+                else history = parsed;
+            } else if (parsed && parsed.items) {
+                history = [parsed];
+            }
+            let targetReq = history.length > 0 ? history[history.length - 1] : { items: [] };
+            const items = targetReq.items || [];
             return {
                 id: row.TaskID,
                 jobOrderId: row.JobOrderID,
@@ -703,7 +727,7 @@ router.get('/requisitions/history', async (req, res) => {
                 status: row.Status,
                 createdAt: row.CreatedAt,
                 items: items,
-                requesterName: parsed.requesterName || 'ไม่ระบุ'
+                requesterName: targetReq.requesterName || 'ไม่ระบุ'
             };
         });
         
@@ -723,11 +747,16 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
         // 1. Get Task
         let taskRes;
         let isPackaging = taskId.startsWith('PKG');
+        let isShipping = taskId.startsWith('SHP');
         
         if (isPackaging) {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
                 .query('SELECT RequisitionJSON, Status AS CurrentStep FROM Packaging_Tasks WHERE TaskID = @TaskID');
+        } else if (isShipping) {
+            taskRes = await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query('SELECT RequisitionJSON, Status AS CurrentStep FROM Shipping_Orders WHERE ShipmentID = @TaskID');
         } else {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
@@ -739,13 +768,25 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
         }
         
         const task = taskRes.recordset[0];
-        const stepStatus = isPackaging ? task.CurrentStep : task.CurrentStep;
-        if ((!isPackaging && stepStatus !== 'requisition') || (isPackaging && stepStatus !== 'รอเบิกบรรจุภัณฑ์')) {
-            return res.status(400).json({ message: 'งานนี้ถูกเบิกจ่ายไปแล้ว หรือไม่ได้อยู่ในสถานะรอเบิก' });
+        const stepStatus = task.CurrentStep;
+        if (isShipping && stepStatus !== 'รอคลังอนุมัติ') {
+            return res.status(400).json({ message: 'งานจัดส่งนี้ไม่ได้อยู่ในสถานะรอคลังอนุมัติ' });
+        } else if (isPackaging && stepStatus !== 'รอเบิกบรรจุภัณฑ์') {
+            return res.status(400).json({ message: 'งานบรรจุนี้ไม่ได้อยู่ในสถานะรอเบิกบรรจุภัณฑ์' });
+        } else if (!isPackaging && !isShipping && stepStatus !== 'requisition') {
+            return res.status(400).json({ message: 'งานผลิตนี้ถูกเบิกจ่ายไปแล้ว หรือไม่ได้อยู่ในสถานะรอเบิก' });
         }
         
-        const parsedData = task.RequisitionJSON ? JSON.parse(task.RequisitionJSON) : [];
-        const items = Array.isArray(parsedData) ? parsedData : (parsedData.items || []);
+        let parsedData = task.RequisitionJSON ? JSON.parse(task.RequisitionJSON) : [];
+        let history = [];
+        if (Array.isArray(parsedData)) {
+            if (parsedData.length > 0 && parsedData[0].id && !parsedData[0].items) history = [{ items: parsedData }];
+            else history = parsedData;
+        } else if (parsedData && parsedData.items) {
+            history = [parsedData];
+        }
+        let pendingReq = history.length > 0 ? history[history.length - 1] : { items: [] };
+        const items = pendingReq.items || [];
         if (items.length === 0) {
             return res.status(400).json({ message: 'ไม่มีรายการวัตถุดิบให้เบิก' });
         }
@@ -791,8 +832,8 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
                     .input('Type', sql.VarChar, 'out')
                     .input('Quantity', sql.Float, item.deductQty)
                     .input('RefNo', sql.VarChar, taskId)
-                    .input('RefType', sql.VarChar, 'production')
-                    .input('Notes', sql.NVarChar, `เบิกจ่ายวัตถุดิบเข้างานผลิต ${taskId}`)
+                    .input('RefType', sql.VarChar, isShipping ? 'shipping' : 'production')
+                    .input('Notes', sql.NVarChar, isShipping ? `เบิกบรรจุภัณฑ์สำหรับงานจัดส่ง ${taskId}` : `เบิกจ่ายวัตถุดิบเข้างานผลิต ${taskId}`)
                     .input('CreatedBy', sql.NVarChar, req.user ? req.user.username : 'warehouse')
                     .query(`
                         INSERT INTO Stock_Logs (ItemID, ProductName, Type, Quantity, RefNo, RefType, Notes, CreatedBy)
@@ -801,13 +842,21 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
             }
             
             // 4. Update Task Status
-            // Append issuer info to JSON
-            if (!Array.isArray(parsedData)) {
-                parsedData.issuerName = req.user ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.username : 'เจ้าหน้าที่คลังสินค้า';
-                parsedData.issueDate = new Date().toLocaleDateString('th-TH');
-            }
+            pendingReq.issuerName = req.user ? `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.username : 'เจ้าหน้าที่คลังสินค้า';
+            pendingReq.issueDate = new Date().toLocaleDateString('th-TH');
+            parsedData = history;
             
-            if (isPackaging) {
+            if (isShipping) {
+                await transaction.request()
+                    .input('TaskID', sql.VarChar, taskId)
+                    .input('Status', sql.NVarChar, 'รอแพ็ค')
+                    .input('RequisitionJSON', sql.NVarChar, JSON.stringify(parsedData))
+                    .query(`
+                        UPDATE Shipping_Orders 
+                        SET Status = @Status, RequisitionJSON = @RequisitionJSON, UpdatedAt = GETDATE()
+                        WHERE ShipmentID = @TaskID
+                    `);
+            } else if (isPackaging) {
                 await transaction.request()
                     .input('TaskID', sql.VarChar, taskId)
                     .input('Status', sql.NVarChar, 'รอบรรจุ')
@@ -818,17 +867,19 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
                         WHERE TaskID = @TaskID
                     `);
             } else {
-                let nextStep = 'packaging';
-                let nextStatus = 'รอบรรจุ';
+                const isWipTask = task.Line === 'WIP Line' || (task.BatchNo && task.BatchNo.includes('-WIP'));
+                let nextStep = isWipTask ? 'wait' : 'packaging';
+                let nextStatus = isWipTask ? 'รอเริ่มงาน' : 'รอบรรจุ';
 
-                // Also auto-create Packaging task like in production.js advance logic
-                const checkPkg = await pool.request()
-                    .input('BatchNoCheck', sql.VarChar, task.BatchNo || '')
-                    .input('ProdTaskIDCheck', sql.VarChar, taskId)
-                    .query(`
-                        SELECT COUNT(*) as cnt FROM Packaging_Tasks 
-                        WHERE BatchNo = @BatchNoCheck OR ProductionTaskID = @ProdTaskIDCheck
-                    `);
+                if (!isWipTask) {
+                    // Auto-create Packaging task like in production.js advance logic
+                    const checkPkg = await pool.request()
+                        .input('BatchNoCheck', sql.VarChar, task.BatchNo || '')
+                        .input('ProdTaskIDCheck', sql.VarChar, taskId)
+                        .query(`
+                            SELECT COUNT(*) as cnt FROM Packaging_Tasks 
+                            WHERE BatchNo = @BatchNoCheck OR ProductionTaskID = @ProdTaskIDCheck
+                        `);
                     if (checkPkg.recordset[0].cnt === 0) {
                         const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG-${getDatePrefix()}`, 3);
                         let pkgDestination = 'คลัง';
@@ -862,6 +913,7 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
                                 VALUES (@PkgTaskID, @BatchNoPkg, @ProductPkg, @LinePkg, @QtyPkg, 0, @StatusPkg, @DestinationPkg, @ProductionTaskIDPkg, @JobOrderIDPkg)
                             `);
                     }
+                }
 
                 await transaction.request()
                     .input('TaskID', sql.VarChar, taskId)

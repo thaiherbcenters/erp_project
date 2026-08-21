@@ -28,9 +28,11 @@ router.get('/tasks', async (req, res) => {
         const result = await pool.request().query(`
             SELECT 
                 pt.*, 
-                p.FormulaName 
+                p.FormulaName,
+                pl.Notes as PlannerNotes
             FROM Packaging_Tasks pt
             LEFT JOIN Production_Tasks p ON pt.ProductionTaskID = p.TaskID
+            LEFT JOIN Planner pl ON pt.JobOrderID = pl.PlannerID
             ORDER BY 
                 CASE pt.Status 
                     WHEN N'กำลังบรรจุ' THEN 1 
@@ -44,29 +46,41 @@ router.get('/tasks', async (req, res) => {
         `);
 
         // Format data to match frontend expectations (null-safe)
-        const formattedTasks = result.recordset.map(row => ({
-            id: row.TaskID,
-            code: row.TaskID,
-            product: row.Product || '',
-            formulaName: row.FormulaName || row.Product || '',
-            batch: row.BatchNo || '',
-            packType: row.PackType || '-',
-            line: row.Line || '-',
-            qty: row.Qty || 0,
-            packed: row.PackedQty || 0,
-            defectQty: row.DefectQty || 0,
-            assignee: row.Assignee || '-',
-            dueDate: row.DueDate ? formatDateLocal(row.DueDate) : null,
-            status: row.Status || 'รอบรรจุ',
-            destination: row.Destination || 'คลัง',
-            customer: row.Customer || null,
-            note: row.Note || null,
-            productionTaskId: row.ProductionTaskID || null,
-            jobOrderId: row.JobOrderID || null,
+        const formattedTasks = result.recordset.map(row => {
+            // Determine productionType from PlannerNotes
+            let pType = 'ผลิตตามแผน (MTS)';
+            if (row.PlannerNotes) {
+                const notesStr = row.PlannerNotes.toLowerCase();
+                if (notesStr.includes('oem') || notesStr.includes('ผลิตตามออร์เดอร์') || notesStr.includes('ผลิตตามออเดอร์') || notesStr.includes('ผลิตตามคำสั่งซื้อ')) {
+                    pType = 'ผลิตตามคำสั่งซื้อ (OEM)';
+                }
+            }
+
+            return {
+                id: row.TaskID,
+                code: row.TaskID,
+                product: row.Product || '',
+                formulaName: row.FormulaName || row.Product || '',
+                batch: row.BatchNo || '',
+                packType: row.PackType || '-',
+                line: row.Line || '-',
+                qty: row.Qty || 0,
+                packed: row.PackedQty || 0,
+                defectQty: row.DefectQty || 0,
+                assignee: row.Assignee || '-',
+                dueDate: row.DueDate ? formatDateLocal(row.DueDate) : null,
+                status: row.Status || 'รอบรรจุ',
+                destination: row.Destination || 'คลัง',
+                customer: row.Customer || null,
+                note: row.Note || null,
+                productionTaskId: row.ProductionTaskID || null,
+                jobOrderId: row.JobOrderID || null,
+                productionType: pType,
             requisitionJSON: row.RequisitionJSON || null,
             createdAt: row.CreatedAt,
             updatedAt: row.UpdatedAt
-        }));
+        };
+        });
 
         res.json(formattedTasks);
     } catch (err) {

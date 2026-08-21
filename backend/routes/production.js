@@ -260,7 +260,7 @@ router.post('/tasks/wip', authorizeRoles('admin', 'executive', 'planner', 'opera
         // Use parent planner's JO ID if provided, otherwise generate a new one
         const joId = sourceJobOrderId || await generateSequence(pool, 'Production_Tasks', 'JobOrderID', `JO-${datePrefix}`, 3);
         const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `PT-${datePrefix}`, 3);
-        const batchNo = `B${datePrefix}-WIP`;
+        const batchNo = await generateSequence(pool, 'Production_Tasks', 'BatchNo', `B${datePrefix}-WIP`, 2, '-');
 
         let productName = null;
         if (joId) {
@@ -272,7 +272,10 @@ router.post('/tasks/wip', authorizeRoles('admin', 'executive', 'planner', 'opera
             }
         }
 
-        const reqJsonStr = requisitionItems ? JSON.stringify({ items: requisitionItems, requesterName: requesterName || 'ไม่ระบุ' }) : null;
+        let reqJsonStr = null;
+        if (requisitionItems) {
+            reqJsonStr = JSON.stringify([{ items: requisitionItems, requesterName: requesterName || 'ไม่ระบุ', requestedAt: new Date().toISOString() }]);
+        }
 
         await pool.request()
             .input('TaskID', sql.VarChar, taskId)

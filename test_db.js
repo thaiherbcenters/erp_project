@@ -1,0 +1,1 @@
+require('dotenv').config({path: './backend/.env'}); const { poolPromise } = require('./backend/config/db.js'); async function run() { const pool = await poolPromise; const res = await pool.request().query('SELECT RequisitionJSON FROM Shipping_Orders WHERE ShipmentID=''SHP-20260821-001'''); console.log(res.recordset[0]); process.exit(0); } run();

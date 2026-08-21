@@ -243,9 +243,10 @@ export default function QC() {
         }
     };
 
-    const handleInspectSubmit = (finalResult, disposition = null) => {
+    const handleInspectSubmit = async (finalResult, disposition = null) => {
         if (!inspectingRequest) return;
-        submitQcResult(inspectingRequest.id, finalResult, 'qc_user', inspectNotes, checklistData, disposition);
+        await submitQcResult(inspectingRequest.id, finalResult, 'qc_user', inspectNotes, checklistData, disposition);
+        showAlert('สำเร็จ', 'บันทึกผลการตรวจสอบคุณภาพเรียบร้อยแล้ว', 'success');
         setInspectingRequest(null);
         setChecklistData([]);
         setInspectNotes('');
@@ -327,15 +328,22 @@ export default function QC() {
                                 <div key={req.id} className="qc-pending-card">
                                     <div className="qc-pending-header">
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span className="qc-pending-batch">{req.jobOrderId}</span>
-                                            <span style={{ fontSize: 11, background: '#f1f5f9', color: '#475569', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>{req.id}</span>
+                                            <span className="qc-pending-batch" style={{ whiteSpace: 'nowrap' }}>{req.id}</span>
                                         </div>
-                                        <span className="badge badge-warning">⏳ รอตรวจ</span>
+                                        <span className="badge badge-warning" style={{ whiteSpace: 'nowrap' }}>⏳ รอตรวจ</span>
                                     </div>
                                     <div className="qc-pending-product">{req.productName || req.formulaName}</div>
-                                    <div className="qc-pending-meta">
-                                        <span>📅 ส่ง: {req.requestedAt}</span>
-                                        <span>🏭 {req.line}</span>
+                                    
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                                        <div style={{ fontSize: 12, color: '#475569', display: 'flex', gap: 6, alignItems: 'center' }}>
+                                            <span style={{ fontWeight: 600 }}>อ้างอิงงาน:</span> 
+                                            <span style={{ color: '#3b82f6', background: '#eff6ff', padding: '2px 6px', borderRadius: 4 }}>{req.jobOrderId}</span>
+                                        </div>
+                                        <div className="qc-pending-meta" style={{ marginTop: 2 }}>
+                                            <span style={{ whiteSpace: 'nowrap' }}>🏭 {req.line}</span>
+                                            <span style={{ color: '#cbd5e1' }}>|</span>
+                                            <span style={{ whiteSpace: 'nowrap' }}>📅 ส่ง: {req.requestedAt}</span>
+                                        </div>
                                     </div>
                                     
                                     <div className="qc-pending-actions">

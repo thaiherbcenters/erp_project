@@ -1,0 +1,1 @@
+require('dotenv').config({path: './backend/.env'}); const { poolPromise } = require('./backend/config/db.js'); async function run() { const pool = await poolPromise; const res = await pool.request().query('SELECT TaskID, BatchNo, Line, CurrentStep FROM Production_Tasks'); console.log(res.recordset); process.exit(0); } run();

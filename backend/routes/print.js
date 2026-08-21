@@ -53,6 +53,14 @@ router.get('/requisition/:taskId', async (req, res) => {
                            Qty AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, CreatedAt 
                     FROM Packaging_Tasks WHERE TaskID = @TaskID
                 `);
+        } else if (taskId.startsWith('SHP-')) {
+            taskRes = await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query(`
+                    SELECT ShipmentID AS TaskID, ShipmentID AS JobOrderID, BatchNo, ProductName AS FormulaName, 
+                           Quantity AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, CreatedAt 
+                    FROM Shipping_Orders WHERE ShipmentID = @TaskID
+                `);
         } else {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
@@ -72,21 +80,36 @@ router.get('/requisition/:taskId', async (req, res) => {
         let requesterName = 'ไม่ระบุ';
         let issuerName = 'ไม่ระบุ';
         let issueDate = null;
+        let reqIndex = req.query.index != null ? parseInt(req.query.index) : 0;
+        let historyLength = 1;
+        
         if (task.RequisitionJSON) {
             try {
-                const parsed = JSON.parse(task.RequisitionJSON);
-                items = Array.isArray(parsed) ? parsed : (parsed.items || []);
-                if (!Array.isArray(parsed)) {
-                    if (parsed.requesterName) requesterName = parsed.requesterName;
-                    if (parsed.issuerName) issuerName = parsed.issuerName;
-                    if (parsed.issueDate) issueDate = parsed.issueDate;
+                let parsed = JSON.parse(task.RequisitionJSON);
+                let history = [];
+                if (Array.isArray(parsed)) {
+                    if (parsed.length > 0 && parsed[0].id && !parsed[0].items) history = [{ items: parsed }];
+                    else history = parsed;
+                } else if (parsed && parsed.items) {
+                    history = [parsed];
                 }
+                
+                historyLength = history.length;
+                reqIndex = req.query.index != null ? parseInt(req.query.index) : (history.length - 1);
+                let targetReq = history[reqIndex] || { items: [] };
+                
+                items = targetReq.items || [];
+                requesterName = targetReq.requesterName || requesterName;
+                issuerName = targetReq.issuerName || issuerName;
+                issueDate = targetReq.issueDate || issueDate;
             } catch (e) {
                 items = [];
             }
         }
 
         const data = {
+            reqIndex: reqIndex,
+            historyLength: historyLength,
             taskId: task.TaskID,
             jobOrderId: task.JobOrderID,
             batchNo: task.BatchNo,

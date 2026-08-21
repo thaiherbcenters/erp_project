@@ -39,6 +39,13 @@ const getStatusBadge = (status) => {
     return map[status] || 'badge-info';
 };
 
+const getCardStatusClass = (status) => {
+    if (status === 'รอเบิกบรรจุภัณฑ์') return 'status-req';
+    if (status === 'รอบรรจุ') return 'status-wait';
+    if (status === 'กำลังบรรจุ') return 'in-progress';
+    return '';
+};
+
 const getDestBadge = (dest) => {
     if (dest === 'คลัง') return { bg: '#e0e7ff', color: '#4338ca', icon: <Warehouse size={12} /> };
     return { bg: '#d1fae5', color: '#065f46', icon: <Truck size={12} /> };
@@ -773,20 +780,24 @@ export default function Packaging() {
                         </h3>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                             {orders.filter(o => o.status === 'รอเบิกบรรจุภัณฑ์' || o.status === 'รอบรรจุ' || o.status === 'กำลังบรรจุ').map(order => (
-                                <div key={order.id} className={`pkg-pending-card ${order.status === 'กำลังบรรจุ' ? 'in-progress' : ''}`} onClick={() => setSelectedOrder(order)}>
+                                <div key={order.id} className={`pkg-pending-card ${getCardStatusClass(order.status)}`} onClick={() => setSelectedOrder(order)}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                            <span className="pkg-pending-id">{order.code || order.id}</span>
-                                            <span className="badge badge-neutral" style={{ fontSize: 11 }}>
-                                                <Star size={10} style={{ marginRight: 2, verticalAlign: 'middle'}}/> ความสำคัญ: ปกติ
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                                            <span className="pkg-pending-id" style={{ whiteSpace: 'nowrap' }}>{order.code || order.id}</span>
+                                            <span className={`badge ${getStatusBadge(order.status)}`} style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                                                {order.status}
                                             </span>
                                         </div>
                                         <div className="pkg-pending-product">{order.product}</div>
                                         
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12, color: '#64748b' }}>
+                                                <Star size={13} style={{ color: '#f59e0b' }} />
+                                                <span>ความสำคัญ: <strong style={{ color: '#334155' }}>ปกติ</strong></span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12, color: '#64748b' }}>
                                                 <Tag size={13} />
-                                                <span>ประเภท: ผลิตตามแผน (MTS)</span>
+                                                <span>ประเภท: {order.productionType || 'ผลิตตามแผน (MTS)'}</span>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: 12, color: '#64748b' }}>
                                                 <Calendar size={13} />
@@ -806,11 +817,6 @@ export default function Packaging() {
                                             <span style={{ color: '#7b7bf5', fontSize: 16 }}>{order.qty?.toLocaleString()}</span>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            {order.status === 'กำลังบรรจุ' && (
-                                                <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 6, background: '#e0e7ff', color: '#4338ca' }}>
-                                                    กำลังบรรจุ...
-                                                </span>
-                                            )}
                                             <button 
                                                 className="btn-primary"
                                                 onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }}

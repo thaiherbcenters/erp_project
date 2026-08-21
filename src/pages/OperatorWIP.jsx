@@ -602,12 +602,14 @@ const OperatorWIP = () => {
             setFormData(prev => ({ ...prev, expectedQty: '' }));
             setCheckedItems({});
             
-            // Redirect back if came from production task
-            if (fromTask) {
-                setTimeout(() => {
+            // Redirect back if came from FG task (indicated by URL params)
+            setTimeout(() => {
+                if (location.search) {
                     navigate('/operator');
-                }, 1500);
-            }
+                } else {
+                    setViewMode('list');
+                }
+            }, 1500);
             
         } catch (err) {
             console.error('Submit error:', err);
@@ -670,7 +672,7 @@ const OperatorWIP = () => {
                     ) : (
                         <div className="op-active-grid">
                             {activeWipTasks.map(task => (
-                                <div key={task.id} className="op-active-card">
+                                <div key={task.id} className={`op-active-card ${task.status === 'กำลังทำ' ? 'status-progress' : ''}`}>
                                     <div className="op-active-top">
                                         <div>
                                             <span className="op-active-batch">{task.batchNo}</span>
@@ -702,7 +704,7 @@ const OperatorWIP = () => {
                                             onMouseEnter={e => { e.currentTarget.style.background = '#2563eb'; e.currentTarget.style.color = '#fff'; }}
                                             onMouseLeave={e => { e.currentTarget.style.background = '#eff6ff'; e.currentTarget.style.color = '#2563eb'; }}
                                         >
-                                            ▶ เริ่มทำ WIP
+                                            {task.status === 'กำลังทำ' ? '▶ ทำต่อ' : '▶ เริ่มทำ WIP'}
                                         </button>
                                     </div>
                                 </div>
@@ -977,8 +979,12 @@ const OperatorWIP = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                     <button 
                         onClick={() => {
-                            setFromTask(false);
-                            setViewMode('list');
+                            if (location.search) {
+                                navigate('/operator');
+                            } else {
+                                setFromTask(false);
+                                setViewMode('list');
+                            }
                         }}
                         style={{ 
                             background: '#f59e0b', 

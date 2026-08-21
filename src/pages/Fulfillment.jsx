@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
-import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight, Printer, Phone, Box } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight, Printer, Phone, Box, Pencil } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
+import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 
 import API_BASE from '../config';
 
 export default function Fulfillment() {
     const { getVisibleSubPages, hasSectionPermission } = useAuth();
+    const { showAlert, showConfirm } = useAlert();
     const location = useLocation();
     const visibleSubPages = getVisibleSubPages('fulfillment');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
@@ -18,6 +20,8 @@ export default function Fulfillment() {
     const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [updatingId, setUpdatingId] = useState(null);
+    const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+    const [editCustomerData, setEditCustomerData] = useState({ CustomerName: '', CustomerPO: '', CustomerPhone: '', ShippingAddress: '' });
 
     useEffect(() => {
         fetchData();
@@ -39,7 +43,21 @@ export default function Fulfillment() {
         }
     };
 
-    const updateStatus = async (id, newStatus) => {
+    const updateStatus = async (id, newStatus, cb = null) => {
+        let title = 'ยืนยันการทำรายการ';
+        let message = `คุณต้องการอัปเดตสถานะเป็น "${newStatus}" ใช่หรือไม่?`;
+
+        if (newStatus === 'กำลังจัดส่ง') {
+            title = 'ยืนยันการจัดส่ง';
+            message = `คุณต้องการเริ่มดำเนินการจัดส่งออเดอร์ ${id} ใช่หรือไม่?`;
+        } else if (newStatus === 'ส่งมอบแล้ว') {
+            title = 'ยืนยันการส่งมอบ';
+            message = `คุณต้องการยืนยันว่าออเดอร์ ${id} ส่งมอบให้ลูกค้าเรียบร้อยแล้วใช่หรือไม่?`;
+        }
+
+        const confirmed = await showConfirm(title, message, 'info');
+        if (!confirmed) return;
+
         setUpdatingId(id);
         try {
             const res = await fetch(`${API_BASE}/shipping/${id}/status`, {
@@ -49,11 +67,39 @@ export default function Fulfillment() {
             });
             if (res.ok) {
                 fetchData();
+                if (cb) cb();
+                showAlert('สำเร็จ', 'อัปเดตสถานะการจัดส่งเรียบร้อยแล้ว', 'success');
+            } else {
+                showAlert('ข้อผิดพลาด', 'อัปเดตสถานะไม่สำเร็จ', 'error');
             }
         } catch (err) {
             console.error('Failed to update status:', err);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
         } finally {
             setUpdatingId(null);
+        }
+    };
+
+    const handleUpdateCustomerInfo = async () => {
+        if (!selectedOrder) return;
+        try {
+            const res = await fetch(`${API_BASE}/shipping/${selectedOrder.ShipmentID}/customer-info`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editCustomerData)
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                setSelectedOrder(prev => ({ ...prev, ...updated }));
+                setOrders(prev => prev.map(o => o.ShipmentID === updated.ShipmentID ? { ...o, ...updated } : o));
+                showAlert('สำเร็จ', 'อัปเดตข้อมูลลูกค้าและที่อยู่จัดส่งเรียบร้อยแล้ว', 'success');
+                setIsEditingCustomer(false);
+            } else {
+                showAlert('ข้อผิดพลาด', 'อัปเดตข้อมูลไม่สำเร็จ', 'error');
+            }
+        } catch (err) {
+            console.error('Failed to update customer info:', err);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
         }
     };
 
@@ -73,9 +119,13 @@ export default function Fulfillment() {
 
     const submitShipment = async (id) => {
         if (!shipForm.courier) {
-            alert('กรุณาระบุบริษัทขนส่ง');
+            showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาระบุบริษัทขนส่ง', 'warning');
             return;
         }
+
+        const confirmed = await showConfirm('ยืนยันการจัดส่ง', `คุณต้องการบันทึกข้อมูลการจัดส่งและเปลี่ยนสถานะออเดอร์ ${id} เป็น "กำลังจัดส่ง" ใช่หรือไม่?`, 'info');
+        if (!confirmed) return;
+
         setSubmittingShip(true);
         try {
             const formData = new FormData();
@@ -95,12 +145,13 @@ export default function Fulfillment() {
                 setShipForm({ courier: '', trackingNo: '', slipFile: null, slipPreview: null });
                 setSelectedOrder(null);
                 fetchData();
+                showAlert('สำเร็จ', 'บันทึกข้อมูลและเริ่มจัดส่งเรียบร้อยแล้ว', 'success');
             } else {
-                alert('เกิดข้อผิดพลาดในการบันทึกข้อมูลการจัดส่ง');
+                showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกข้อมูลการจัดส่ง', 'error');
             }
         } catch (err) {
             console.error('Failed to submit shipment:', err);
-            alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกข้อมูล', 'error');
         } finally {
             setSubmittingShip(false);
         }
@@ -454,25 +505,74 @@ export default function Fulfillment() {
 
                         {/* ลูกค้า */}
                         <div style={{ background: '#faf5ff', borderRadius: 10, border: '1px solid #e9d5ff', padding: 16, marginBottom: 16 }}>
-                            <h4 style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <User size={16} style={{ color: '#7c3aed' }} /> ข้อมูลลูกค้า OEM
-                            </h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
-                                <div><span style={{ color: '#6b7280' }}>ชื่อลูกค้า:</span> <strong>{o.CustomerName || '-'}</strong></div>
-                                <div><span style={{ color: '#6b7280' }}>PO ลูกค้า:</span> <strong>{o.CustomerPO || '-'}</strong></div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <Phone size={13} style={{ color: '#6b7280' }} />
-                                    <span style={{ color: '#6b7280' }}>เบอร์โทร:</span> <strong>{o.CustomerPhone || '-'}</strong>
-                                </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                                <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <User size={16} style={{ color: '#7c3aed' }} /> ข้อมูลลูกค้า OEM
+                                </h4>
+                                {!isEditingCustomer ? (
+                                    <button 
+                                        className="btn-sm" 
+                                        onClick={() => {
+                                            setEditCustomerData({
+                                                CustomerName: o.CustomerName || '',
+                                                CustomerPO: o.CustomerPO || '',
+                                                CustomerPhone: o.CustomerPhone || '',
+                                                ShippingAddress: o.ShippingAddress || ''
+                                            });
+                                            setIsEditingCustomer(true);
+                                        }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                                    >
+                                        <Pencil size={12} /> แก้ไขข้อมูล
+                                    </button>
+                                ) : (
+                                    <div style={{ display: 'flex', gap: 6 }}>
+                                        <button className="btn-sm" onClick={() => setIsEditingCustomer(false)} style={{ background: '#f1f5f9', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: 12 }}>ยกเลิก</button>
+                                        <button className="btn-sm" onClick={handleUpdateCustomerInfo} style={{ background: '#7c3aed', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12 }}>บันทึก</button>
+                                    </div>
+                                )}
                             </div>
-                            {/* ที่อยู่จัดส่ง */}
-                            <div style={{ marginTop: 10, padding: '10px 12px', background: '#f3e8ff', borderRadius: 8, border: '1px solid #d8b4fe' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                                    <MapPin size={14} style={{ color: '#7c3aed' }} />
-                                    <span style={{ fontSize: 12, fontWeight: 700, color: '#7c3aed' }}>ที่อยู่จัดส่ง</span>
+
+                            {!isEditingCustomer ? (
+                                <>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
+                                        <div><span style={{ color: '#6b7280' }}>ชื่อลูกค้า:</span> <strong>{o.CustomerName || '-'}</strong></div>
+                                        <div><span style={{ color: '#6b7280' }}>PO ลูกค้า:</span> <strong>{o.CustomerPO || '-'}</strong></div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                            <Phone size={13} style={{ color: '#6b7280' }} />
+                                            <span style={{ color: '#6b7280' }}>เบอร์โทร:</span> <strong>{o.CustomerPhone || '-'}</strong>
+                                        </div>
+                                    </div>
+                                    <div style={{ marginTop: 10, padding: '10px 12px', background: '#f3e8ff', borderRadius: 8, border: '1px solid #d8b4fe' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                            <MapPin size={14} style={{ color: '#7c3aed' }} />
+                                            <span style={{ fontSize: 12, fontWeight: 700, color: '#7c3aed' }}>ที่อยู่จัดส่ง</span>
+                                        </div>
+                                        <p style={{ fontSize: 13, margin: 0, lineHeight: 1.6, color: '#374151', whiteSpace: 'pre-wrap' }}>{o.ShippingAddress || 'ยังไม่ระบุที่อยู่จัดส่ง'}</p>
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13 }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                        <div>
+                                            <label style={{ display: 'block', color: '#6b7280', marginBottom: 4 }}>ชื่อลูกค้า</label>
+                                            <input type="text" className="form-input" value={editCustomerData.CustomerName} onChange={e => setEditCustomerData({...editCustomerData, CustomerName: e.target.value})} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', color: '#6b7280', marginBottom: 4 }}>PO ลูกค้า</label>
+                                            <input type="text" className="form-input" value={editCustomerData.CustomerPO} onChange={e => setEditCustomerData({...editCustomerData, CustomerPO: e.target.value})} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', color: '#6b7280', marginBottom: 4 }}>เบอร์โทร</label>
+                                        <input type="text" className="form-input" value={editCustomerData.CustomerPhone} onChange={e => setEditCustomerData({...editCustomerData, CustomerPhone: e.target.value})} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #cbd5e1' }} />
+                                    </div>
+                                    <div>
+                                        <label style={{ display: 'block', color: '#6b7280', marginBottom: 4 }}>ที่อยู่จัดส่ง</label>
+                                        <textarea className="form-input" rows={3} value={editCustomerData.ShippingAddress} onChange={e => setEditCustomerData({...editCustomerData, ShippingAddress: e.target.value})} style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #cbd5e1', resize: 'vertical' }} />
+                                    </div>
                                 </div>
-                                <p style={{ fontSize: 13, margin: 0, lineHeight: 1.6, color: '#374151' }}>{o.ShippingAddress || 'ยังไม่ระบุที่อยู่จัดส่ง'}</p>
-                            </div>
+                            )}
                         </div>
 
                         {/* Timeline */}
@@ -635,7 +735,7 @@ export default function Fulfillment() {
                                 )}
                                 {o.Status === 'กำลังจัดส่ง' && (
                                     <button className="btn-primary" style={{ background: '#059669', borderColor: '#059669', display: 'flex', alignItems: 'center', gap: 6 }}
-                                        onClick={() => { updateStatus(o.ShipmentID, 'ส่งมอบแล้ว'); close(); }}>
+                                        onClick={() => updateStatus(o.ShipmentID, 'ส่งมอบแล้ว', close)}>
                                         <CheckCircle size={16} /> ยืนยันส่งมอบแล้ว
                                     </button>
                                 )}

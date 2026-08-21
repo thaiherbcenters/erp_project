@@ -23,7 +23,7 @@ import {
     Clock, Package, AlertTriangle, Activity, ClipboardList,
     Timer, TrendingUp, Repeat, ShieldCheck, Warehouse,
     SearchCheck, ChevronRight, ChevronLeft, ArrowLeft, Eye, XCircle, Send, Plus, Save,
-    Calendar, Tag, Star
+    Calendar, Tag, Star, FileText
 } from 'lucide-react';
 import { PRODUCTION_STEPS } from '../data/productionMockData';
 import { getDynamicBatchSizeValue, convertToBase } from '../utils/formatters';
@@ -41,6 +41,7 @@ const WipChecklist = ({ task, targetWeight, onComplete, allTasks = [], user }) =
     const [checklist, setChecklist] = useState({ raw: false, pkg: false });
     const { showAlert, showConfirm } = useAlert();
     const [isSending, setIsSending] = useState(false);
+    const { fetchTasks } = useProduction();
 
     // Derived state: Check if a WIP task already exists for this Job Order
     const isSent = allTasks.some(t => t.jobOrderId === task.jobOrderId && t.line === 'WIP Line');
@@ -117,7 +118,7 @@ const WipChecklist = ({ task, targetWeight, onComplete, allTasks = [], user }) =
 
             if (res.ok) {
                 showAlert('สำเร็จ', 'ส่งใบเบิกไปยังคลังสินค้าเรียบร้อยแล้ว', 'success');
-                setTimeout(() => window.location.reload(), 1500);
+                fetchTasks(); // update UI without full page reload
             } else {
                 const data = await res.json();
                 showAlert('ผิดพลาด', data.message || 'ไม่สามารถส่งใบเบิกได้', 'error');
@@ -684,15 +685,34 @@ export default function Operator() {
                                                 {ev.status && <span className={`badge ${ev.status === 'ไม่ผ่าน' ? 'badge-danger' : ev.status === 'รอดำเนินการ' ? 'badge-warning' : 'badge-success'}`}>{ev.status}</span>}
                                             </div>
                                             <div className="op-qc-history-meta">
-                                                <span>📅 {ev.timestamp}</span>
-                                                {ev.actor && <span>👤 โดย: {ev.actor}</span>}
-                                                {ev.documentUrl && (
-                                                    <button onClick={() => handleViewPdf(ev.documentUrl)} style={{ background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: 12, textDecoration: 'underline', padding: 0, marginLeft: 8 }}>
-                                                        ดูเอกสาร (PDF)
+                                                <span>📅 {ev.timestamp || (ev.time ? new Date(ev.time).toLocaleString('th-TH') : '-')}</span>
+                                                {(ev.actor || ev.by) && <span>👤 โดย: {ev.actor || ev.by}</span>}
+                                                {(ev.documentUrl || ev.docType) && (
+                                                    <button onClick={() => {
+                                                        let url = ev.documentUrl;
+                                                        if (!url && ev.docType === 'rm_req') url = `${API_BASE}/print/requisition/${ev.taskId}`;
+                                                        if (!url && ev.docType === 'pkg_req') url = `${API_BASE}/print/requisition/${ev.taskId}`;
+                                                        if (!url && ev.docType === 'qc_pdf') url = `${API_BASE}/print/qc-request/${ev.taskId}`;
+                                                        if (url) handleViewPdf(url);
+                                                    }} style={{ 
+                                                        background: '#eff6ff', 
+                                                        border: '1px solid #bfdbfe', 
+                                                        color: '#2563eb', 
+                                                        cursor: 'pointer', 
+                                                        fontSize: 11, 
+                                                        fontWeight: 600,
+                                                        padding: '4px 10px', 
+                                                        marginLeft: 'auto',
+                                                        borderRadius: '12px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}>
+                                                        <FileText size={12} /> ดูเอกสาร (PDF)
                                                     </button>
                                                 )}
                                             </div>
-                                            {ev.details && <div className="op-qc-history-note" style={{ marginTop: 6, fontSize: 12 }}>💬 {ev.details}</div>}
+                                            {(ev.details || ev.notes) && <div className="op-qc-history-note" style={{ marginTop: 6, fontSize: 12 }}>💬 {ev.details || ev.notes}</div>}
                                         </div>
                                     ))}
                                     {loadingTimeline && <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center', padding: 8 }}>กำลังโหลดประวัติ...</div>}

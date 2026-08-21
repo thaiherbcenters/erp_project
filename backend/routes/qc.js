@@ -298,15 +298,15 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                         }
                         
                         if (isOEM) {
-                            // OEM → Stock log + Shipping
+                            // OEM → Stock log (IN to staging) + Shipping
                             await pool.request()
                                 .input('ItemID', sql.VarChar, 'OEM-DIRECT')
-                                .input('Type', sql.VarChar, 'OUT')
+                                .input('Type', sql.VarChar, 'IN')
                                 .input('Quantity', sql.Int, goodQty)
                                 .input('RefNo', sql.VarChar, batchNo)
                                 .input('RefType', sql.VarChar, 'oem_direct')
                                 .input('ProductName', sql.NVarChar, productName)
-                                .input('Notes', sql.NVarChar, `OEM ส่งตรงให้ลูกค้า — Batch: ${batchNo} (${goodQty} ชิ้น)`)
+                                .input('Notes', sql.NVarChar, `รับสินค้า OEM เตรียมจัดส่ง — Batch: ${batchNo}`)
                                 .input('CreatedBy', sql.VarChar, 'system')
                                 .query(`INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
                                         VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)`);
