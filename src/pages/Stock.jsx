@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Eye, Edit3, Trash2, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle, Search, Plus, History } from 'lucide-react';
+import { Eye, Edit3, Trash2, XCircle, Package, Truck, ArrowDownCircle, ArrowUpCircle, Factory, FileText, Clock, TrendingUp, AlertTriangle, CheckCircle, Search, Plus, History, Tag } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
@@ -38,6 +38,7 @@ export default function Stock() {
     const [selectedLog, setSelectedLog] = useState(null);
     const [logDetailLoading, setLogDetailLoading] = useState(false);
     const [logDetail, setLogDetail] = useState(null);
+    const [fgItems, setFgItems] = useState([]);
 
     // Logs Modal State
     const [showAllLogsModal, setShowAllLogsModal] = useState(false);
@@ -54,9 +55,10 @@ export default function Stock() {
 
     // ── Add Item State ──
     const [showAddModal, setShowAddModal] = useState(false);
-    const [addForm, setAddForm] = useState({ name: '', nameEN: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', location: '', minStock: 0, status: 'มีสินค้า', adjustReason: '' });
+    const [addForm, setAddForm] = useState({ name: '', nameEN: '', category: 'สินค้าสำเร็จรูป', initialQty: 0, unit: 'ชิ้น', location: '', minStock: 0, status: 'มีสินค้า', adjustReason: '', labelConfigs: [] });
     const [addSaving, setAddSaving] = useState(false);
     const [nextItemId, setNextItemId] = useState("");
+    
     useEffect(() => { 
         if (showAddModal && addForm.category) {
             fetch(API_BASE + "/stock/next-id?category=" + encodeURIComponent(addForm.category), {
@@ -67,6 +69,17 @@ export default function Stock() {
             .catch(err => console.error(err));
         }
     }, [showAddModal, addForm.category]);
+
+    useEffect(() => {
+        if ((showAddModal && addForm.category === 'ฉลาก/สิ่งพิมพ์') || (editItem && editForm.category === 'ฉลาก/สิ่งพิมพ์')) {
+            if (fgItems.length === 0) {
+                fetch(`${API_BASE}/stock?category=สินค้าสำเร็จรูป&limit=1000`)
+                    .then(r => r.json())
+                    .then(d => setFgItems(d.data || d))
+                    .catch(e => console.error('Failed to fetch FG items for label config', e));
+            }
+        }
+    }, [showAddModal, addForm.category, editItem, editForm?.category, fgItems.length]);
 
     // ── Dashboard State ──
     const [dashboardData, setDashboardData] = useState(null);
@@ -243,9 +256,21 @@ export default function Stock() {
     };
 
     // ── Open Edit Modal ──
-    const openEdit = (item) => {
+    const openEdit = async (item) => {
         setEditItem(item);
         setShowAdjust(false);
+        let labelConfigs = [];
+        if (item.category === 'ฉลาก/สิ่งพิมพ์') {
+            try {
+                const res = await fetch(`${API_BASE}/stock/${item.id}/detail`);
+                if (res.ok) {
+                    const data = await res.json();
+                    labelConfigs = data.item.labelConfigs || [];
+                }
+            } catch (err) {
+                console.error('Failed to fetch label configs:', err);
+            }
+        }
         setEditForm({
             name: item.name || '',
             nameEN: item.nameEN || '',
@@ -255,7 +280,8 @@ export default function Stock() {
             minStock: item.minStock || 0,
             status: item.status || 'มีสินค้า',
             adjustQty: 0,
-            adjustReason: ''
+            adjustReason: '',
+            labelConfigs
         });
     };
 
@@ -372,6 +398,126 @@ export default function Stock() {
     const fmtDate = (d) => {
         if (!d) return '-';
         return new Date(d).toLocaleString('th-TH', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+
+    // ── Label Config Section for Modal ──
+    const renderLabelConfigSection = (formState, setFormState) => {
+        if (formState.category !== 'ฉลาก/สิ่งพิมพ์') return null;
+        return (
+            <div style={{ marginTop: 20, marginBottom: 20 }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: 14, color: '#1e40af', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Tag size={16} /> ตั้งค่าผูกสติ๊กเกอร์กับสินค้า (Label Configuration)
+                </h4>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 10, alignItems: 'end', marginBottom: 15 }}>
+                        <div>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 4, display: 'block' }}>เลือกสินค้า (FG)</label>
+                            <CustomSelect
+                                usePortal={true}
+                                value={formState._tempFgItemId || ''}
+                                onChange={e => {
+                                    const fg = fgItems.find(f => f.id === e.target.value);
+                                    setFormState(prev => ({ ...prev, _tempFgItemId: fg?.id, _tempFgProductName: fg?.name }));
+                                }}
+                                style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff' }}
+                            >
+                                <option value="">-- เลือกสินค้า --</option>
+                                {fgItems.map(fg => (
+                                    <option key={fg.id} value={fg.id}>[{fg.id}] {fg.name}</option>
+                                ))}
+                            </CustomSelect>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 4, display: 'block' }}>ติดที่</label>
+                            <CustomSelect
+                                usePortal={true}
+                                value={formState._tempApplyTo || 'ขวด'}
+                                onChange={e => setFormState(prev => ({ ...prev, _tempApplyTo: e.target.value }))}
+                                style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid #cbd5e1', borderRadius: 6, background: '#fff' }}
+                            >
+                                <option value="ขวด">ขวด</option>
+                                <option value="ฝา">ฝา</option>
+                                <option value="กล่อง">กล่อง</option>
+                            </CustomSelect>
+                        </div>
+                        <div>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: '#4b5563', marginBottom: 4, display: 'block' }}>จำนวน/ชิ้น</label>
+                            <input 
+                                type="number" min="1"
+                                value={formState._tempQtyPerUnit || 1}
+                                onChange={e => setFormState(prev => ({ ...prev, _tempQtyPerUnit: parseInt(e.target.value) || 1 }))}
+                                style={{ width: '100%', padding: '8px 10px', fontSize: 13, border: '1px solid #cbd5e1', borderRadius: 6 }}
+                            />
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={() => {
+                                if (!formState._tempFgItemId) {
+                                    showAlert('แจ้งเตือน', 'กรุณาเลือกสินค้า FG', 'warning');
+                                    return;
+                                }
+                                const newConfig = {
+                                    fgItemId: formState._tempFgItemId,
+                                    fgProductName: formState._tempFgProductName,
+                                    applyTo: formState._tempApplyTo || 'ขวด',
+                                    qtyPerUnit: formState._tempQtyPerUnit || 1
+                                };
+                                setFormState(prev => ({
+                                    ...prev,
+                                    labelConfigs: [...(prev.labelConfigs || []), newConfig],
+                                    _tempFgItemId: '',
+                                    _tempFgProductName: '',
+                                    _tempApplyTo: 'ขวด',
+                                    _tempQtyPerUnit: 1
+                                }));
+                            }}
+                            style={{ padding: '8px 12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', height: 35 }}
+                        >
+                            <Plus size={16} />
+                        </button>
+                    </div>
+
+                    {(formState.labelConfigs || []).length > 0 ? (
+                        <table className="data-table" style={{ fontSize: 13 }}>
+                            <thead>
+                                <tr style={{ background: '#f1f5f9' }}>
+                                    <th style={{ padding: '8px 10px' }}>รหัส FG</th>
+                                    <th style={{ padding: '8px 10px' }}>ชื่อสินค้า</th>
+                                    <th style={{ padding: '8px 10px' }}>ติดที่</th>
+                                    <th style={{ padding: '8px 10px' }}>ใช้/ชิ้น</th>
+                                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>ลบ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {formState.labelConfigs.map((cfg, idx) => (
+                                    <tr key={idx}>
+                                        <td style={{ padding: '8px 10px', fontWeight: 600, color: '#475569' }}>{cfg.fgItemId}</td>
+                                        <td style={{ padding: '8px 10px' }}>{cfg.fgProductName}</td>
+                                        <td style={{ padding: '8px 10px' }}>{cfg.applyTo}</td>
+                                        <td style={{ padding: '8px 10px' }}>{cfg.qtyPerUnit}</td>
+                                        <td style={{ padding: '8px 10px', textAlign: 'center' }}>
+                                            <button 
+                                                onClick={() => setFormState(prev => ({
+                                                    ...prev,
+                                                    labelConfigs: prev.labelConfigs.filter((_, i) => i !== idx)
+                                                }))}
+                                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '15px', color: '#94a3b8', fontSize: 13, background: '#fff', borderRadius: 6, border: '1px dashed #cbd5e1' }}>
+                            ยังไม่มีการตั้งค่าผูกสติ๊กเกอร์กับสินค้าใดๆ
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
     };
 
     // ── Detail Modal ──
@@ -1165,7 +1311,7 @@ export default function Stock() {
                     {hasSectionPermission('stock_data_search') && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                             <div className="sub-tabs-container" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 5, flex: 1 }}>
-                                {['สินค้าสำเร็จรูป', 'สินค้ากึ่งสำเร็จรูป', 'วัตถุดิบ', 'บรรจุภัณฑ์', 'วัสดุสิ้นเปลือง'].map(cat => (
+                                {['สินค้าสำเร็จรูป', 'สินค้ากึ่งสำเร็จรูป', 'วัตถุดิบ', 'บรรจุภัณฑ์', 'ฉลาก/สิ่งพิมพ์', 'วัสดุสิ้นเปลือง'].map(cat => (
                                     <button 
                                         key={cat} 
                                         className={`sub-tab-btn ${activeCategory === cat ? 'active' : ''}`}
@@ -1181,7 +1327,8 @@ export default function Stock() {
                                         {cat === 'สินค้าสำเร็จรูป' ? '🟢 สินค้าสำเร็จรูป (FG)' : 
                                          cat === 'สินค้ากึ่งสำเร็จรูป' ? '🟠 สินค้ากึ่งสำเร็จรูป (WIP)' : 
                                          cat === 'วัตถุดิบ' ? '🟡 วัตถุดิบ (RM)' : 
-                                         cat === 'บรรจุภัณฑ์' ? '🔵 บรรจุภัณฑ์ (PM)' : '🟤 วัสดุสิ้นเปลือง'}
+                                         cat === 'บรรจุภัณฑ์' ? '🔵 บรรจุภัณฑ์ (PM)' : 
+                                         cat === 'ฉลาก/สิ่งพิมพ์' ? '🏷️ ฉลาก/สิ่งพิมพ์ (LB)' : '🟤 วัสดุสิ้นเปลือง'}
                                     </button>
                                 ))}
                             </div>
@@ -1469,6 +1616,7 @@ export default function Stock() {
                                         <option value="สินค้ากึ่งสำเร็จรูป">สินค้ากึ่งสำเร็จรูป (WIP)</option>
                                         <option value="วัตถุดิบ">วัตถุดิบ (RM)</option>
                                         <option value="บรรจุภัณฑ์">บรรจุภัณฑ์ (PM)</option>
+                                        <option value="ฉลาก/สิ่งพิมพ์">ฉลาก/สิ่งพิมพ์ (LB)</option>
                                         <option value="วัสดุสิ้นเปลือง">วัสดุสิ้นเปลือง</option>
                                     </CustomSelect>
                                 </div>
@@ -1508,6 +1656,8 @@ export default function Stock() {
                                     />
                                 </div>
                             </div>
+
+                            {renderLabelConfigSection(addForm, setAddForm)}
 
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 20 }}>
                                 <button
@@ -1576,6 +1726,7 @@ export default function Stock() {
                                         <option value="สินค้ากึ่งสำเร็จรูป">สินค้ากึ่งสำเร็จรูป (WIP)</option>
                                         <option value="วัตถุดิบ">วัตถุดิบ (RM)</option>
                                         <option value="บรรจุภัณฑ์">บรรจุภัณฑ์ (PM)</option>
+                                        <option value="ฉลาก/สิ่งพิมพ์">ฉลาก/สิ่งพิมพ์ (LB)</option>
                                         <option value="วัสดุสิ้นเปลือง">วัสดุสิ้นเปลือง</option>
                                     </CustomSelect>
                                 </div>
@@ -1660,6 +1811,9 @@ export default function Stock() {
                                     </div>
                                 )}
                             </div>
+
+                            {renderLabelConfigSection(editForm, setEditForm)}
+
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24 }}>
                                 <button
                                     onClick={() => setEditItem(null)}

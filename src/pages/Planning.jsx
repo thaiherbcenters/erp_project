@@ -257,7 +257,7 @@ export default function Planning() {
                 if (allCreated) {
                     // Automatically mark SO as 'วางแผนแล้ว'
                     const token = localStorage.getItem('token');
-                    fetch(`${API_BASE}/sales-orders/${prev.id}/status`, {
+                    fetch(`${API_BASE}/sales-orders/${prev.soId}/status`, {
                         method: 'PATCH',
                         headers: {
                             'Content-Type': 'application/json',
@@ -797,50 +797,89 @@ export default function Planning() {
                     <ShoppingCart size={16} /> คำสั่งขายที่รอวางแผน (Pending Sales Orders)
                 </h3>
                 <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>ออเดอร์จากฝ่ายขายที่รอการจัดทำแผนผลิต (ใบสั่งผลิต)</p>
-                <div className="table-card">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>เลขที่ SO</th>
-                                <th>ลูกค้า / อ้างอิง PO</th>
-                                <th>กำหนดส่งมอบ</th>
-                                <th style={{ textAlign: 'center' }}>จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loadingSOs ? (
-                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลคำสั่งขาย...</td></tr>
-                            ) : pendingSalesOrders.length === 0 ? (
-                                <tr><td colSpan="4" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีคำสั่งขายที่รอวางแผนในขณะนี้ 🎉</td></tr>
-                            ) : pendingSalesOrders.map(so => (
-                                <tr key={so.SalesOrderID}>
-                                    <td className="text-bold" style={{ color: 'var(--primary)' }}>{so.SalesOrderNo}</td>
-                                    <td>
-                                        <div>{so.CustomerName}</div>
-                                        {so.CustomerPONumber && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>PO: {so.CustomerPONumber}</div>}
-                                    </td>
-                                    <td>{so.DeliveryDate ? new Date(so.DeliveryDate).toLocaleDateString('th-TH') : 'ไม่ระบุ'}</td>
-                                    <td style={{ textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
-                                            <button 
-                                                className="doc-action-btn" title="ดูรายละเอียด"
-                                                onClick={() => handleViewSODetail(so.SalesOrderID)}
-                                            >
-                                                <Eye size={15} />
-                                            </button>
-                                            <button 
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#e0f2fe', color: '#0369a1', border: 'none', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
-                                                onClick={() => handleCreateFromSO(so)}
-                                            >
-                                                <ClipboardList size={14} /> จัดทำแผนผลิต
-                                            </button>
+                {loadingSOs ? (
+                    <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลคำสั่งขาย...</div>
+                ) : pendingSalesOrders.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีคำสั่งขายที่รอวางแผนในขณะนี้ 🎉</div>
+                ) : (
+                    <div className="custom-scrollbar" style={{ display: 'flex', overflowX: 'auto', gap: '16px', paddingBottom: '12px' }}>
+                        {pendingSalesOrders.map(so => (
+                            <div key={so.SalesOrderID} style={{
+                                flex: '0 0 auto',
+                                width: '320px',
+                                background: '#fff',
+                                borderRadius: '12px',
+                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                                border: '1px solid #e2e8f0',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                display: 'flex',
+                                flexDirection: 'column'
+                            }}>
+                                {/* Left color bar */}
+                                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: '#8b5cf6' }}></div>
+                                
+                                <div style={{ padding: '16px 16px 12px 20px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                                        <span style={{ 
+                                            background: '#8b5cf6', color: '#fff', padding: '4px 10px', 
+                                            borderRadius: '6px', fontSize: '13px', fontWeight: 600, letterSpacing: '0.3px' 
+                                        }}>
+                                            {so.SalesOrderNo}
+                                        </span>
+                                    </div>
+                                    
+                                    <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>
+                                        {so.CustomerName}
+                                    </h4>
+                                    
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {so.CustomerPONumber && (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748b' }}>
+                                                <FileText size={14} style={{ color: '#94a3b8' }} />
+                                                <span>PO: <strong style={{ color: '#475569' }}>{so.CustomerPONumber}</strong></span>
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748b' }}>
+                                            <CalendarDays size={14} style={{ color: '#94a3b8' }} />
+                                            <span>กำหนดส่ง: <strong style={{ color: '#475569' }}>{so.DeliveryDate ? new Date(so.DeliveryDate).toLocaleDateString('th-TH') : 'ไม่ระบุ'}</strong></span>
                                         </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                                    </div>
+                                </div>
+
+                                <div style={{ 
+                                    marginTop: 'auto', 
+                                    background: '#f8fafc', 
+                                    borderTop: '1px dashed #cbd5e1', 
+                                    padding: '12px 16px 12px 20px',
+                                    display: 'flex',
+                                    gap: '10px'
+                                }}>
+                                    <button 
+                                        onClick={() => handleViewSODetail(so.SalesOrderID)}
+                                        style={{ 
+                                            flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', 
+                                            background: '#fff', border: '1px solid #cbd5e1', color: '#475569', 
+                                            padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600
+                                        }}
+                                    >
+                                        <Eye size={14} /> รายละเอียด
+                                    </button>
+                                    <button 
+                                        onClick={() => handleCreateFromSO(so)}
+                                        style={{ 
+                                            flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', 
+                                            background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe', 
+                                            padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600
+                                        }}
+                                    >
+                                        <ClipboardList size={14} /> จัดทำแผนผลิต
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* สูตรที่พร้อมใช้งาน (จาก R&D) */}

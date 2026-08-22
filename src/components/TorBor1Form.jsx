@@ -142,7 +142,6 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
     const [showFormulaModal, setShowFormulaModal] = useState(false);
     const [currentDocId, setCurrentDocId] = useState(documentId);
     const [linkedFormulaId, setLinkedFormulaId] = useState(null);
-    const [loading, setLoading] = useState(false);
     const [hasFormatChanges, setHasFormatChanges] = useState(false);
     const [draggedSection5Idx, setDraggedSection5Idx] = useState(null);
 
@@ -685,10 +684,12 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeActiveIngredients: [...(prev.RecipeActiveIngredients || []), { thaiName: '', engName: '', latinName: '', partUsed: '', quantity: '' }] }));
         setHasFormatChanges(true);
+        setHasFormatChanges(true);
     };
     const removeActiveIngredient = (index) => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeActiveIngredients: (prev.RecipeActiveIngredients || []).filter((_, i) => i !== index) }));
+        setHasFormatChanges(true);
         setHasFormatChanges(true);
     };
     const handleActiveIngredientChange = (index, field, val) => {
@@ -697,6 +698,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         list[index] = { ...list[index], [field]: val };
         setForm({ ...form, RecipeActiveIngredients: list });
         setHasFormatChanges(true);
+        setHasFormatChanges(true);
     };
 
     // --- Extracts ---
@@ -704,10 +706,12 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeExtracts: [...(prev.RecipeExtracts || []), { extractName: '', latinName: '', partUsed: '', solvent: '', ratio: '', quantity: '' }] }));
         setHasFormatChanges(true);
+        setHasFormatChanges(true);
     };
     const removeExtract = (index) => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeExtracts: (prev.RecipeExtracts || []).filter((_, i) => i !== index) }));
+        setHasFormatChanges(true);
         setHasFormatChanges(true);
     };
     const handleExtractChange = (index, field, val) => {
@@ -716,6 +720,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         list[index] = { ...list[index], [field]: val };
         setForm({ ...form, RecipeExtracts: list });
         setHasFormatChanges(true);
+        setHasFormatChanges(true);
     };
 
     // --- Excipients ---
@@ -723,10 +728,12 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeExcipients: [...(prev.RecipeExcipients || []), { name: '', casNumber: '', function: '', quantity: '' }] }));
         setHasFormatChanges(true);
+        setHasFormatChanges(true);
     };
     const removeExcipient = (index) => {
         if (readOnly) return;
         setForm(prev => ({ ...prev, RecipeExcipients: (prev.RecipeExcipients || []).filter((_, i) => i !== index) }));
+        setHasFormatChanges(true);
         setHasFormatChanges(true);
     };
     const handleExcipientChange = (index, field, val) => {
@@ -734,6 +741,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         const list = [...(form.RecipeExcipients || [])];
         list[index] = { ...list[index], [field]: val };
         setForm({ ...form, RecipeExcipients: list });
+        setHasFormatChanges(true);
         setHasFormatChanges(true);
     };
 

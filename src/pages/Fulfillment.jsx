@@ -452,9 +452,6 @@ export default function Fulfillment() {
                                                     <CheckCircle size={14} /> ส่งมอบแล้ว
                                                 </button>
                                             )}
-                                            {order.Status === 'ส่งมอบแล้ว' && (
-                                                <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>✅ เสร็จสิ้น</span>
-                                            )}
                                         </div>
                                     </td>
                                 </tr>

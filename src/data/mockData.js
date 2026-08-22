@@ -452,6 +452,14 @@ export const ALL_PAGES = [
         ],
       },
       {
+        id: 'operator_labeling', name: 'งานติดฉลาก', path: '/operator/labeling',
+        sections: [
+          { id: 'operator_labeling_stats', name: 'สถิติการติดฉลาก' },
+          { id: 'operator_labeling_tasks', name: 'รายการงานติดฉลาก' },
+          { id: 'operator_labeling_config', name: 'ตั้งค่าสติ๊กเกอร์' },
+        ],
+      },
+      {
         id: 'operator_history', name: 'ประวัติการผลิต',
         sections: [
           { id: 'operator_history_search', name: 'ค้นหาประวัติ' },

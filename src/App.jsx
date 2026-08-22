@@ -55,6 +55,7 @@ const Planning = lazy(() => import('./pages/Planning'));
 const Operator = lazy(() => import('./pages/Operator'));
 const OperatorWIP = lazy(() => import('./pages/OperatorWIP'));
 const OperatorPackaging = lazy(() => import('./pages/OperatorPackaging'));
+const OperatorLabeling = lazy(() => import('./pages/OperatorLabeling'));
 const RnD = lazy(() => import('./pages/RnD'));
 const Packaging = lazy(() => import('./pages/Packaging'));
 const Fulfillment = lazy(() => import('./pages/Fulfillment'));
@@ -129,6 +130,9 @@ function App() {
                 } />
                 <Route path="/operator/packaging" element={
                   <ProtectedRoute pageId="operator_packaging"><OperatorPackaging /></ProtectedRoute>
+                } />
+                <Route path="/operator/labeling" element={
+                  <ProtectedRoute pageId="operator_labeling"><OperatorLabeling /></ProtectedRoute>
                 } />
                 <Route path="/packaging" element={
                   <ProtectedRoute pageId="packaging"><Packaging /></ProtectedRoute>

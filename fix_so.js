@@ -1,0 +1,1 @@
+const sql = require('mssql'); const dbConfig = require('./backend/config/dbConfig'); async function fix() { try { const p = await sql.connect(dbConfig); await p.query(\UPDATE SalesOrder SET Status = N'??????????' WHERE SalesOrderNo = 'SO-20260821-001'\); console.log('Fixed'); process.exit(0); } catch(e) { console.error(e); process.exit(1); } } fix();

@@ -8,6 +8,36 @@ const { authorizeRoles } = require('../middleware/authorize');
 // STOCK (INVENTORY) MODULE
 // ==========================================
 
+// Get next ID preview based on category
+router.get('/next-id', async (req, res) => {
+    try {
+        const { category } = req.query;
+        let prefix = 'STK';
+        if (category === 'สินค้าสำเร็จรูป') prefix = 'FG';
+        else if (category === 'สินค้ากึ่งสำเร็จรูป') prefix = 'WIP';
+        else if (category === 'วัตถุดิบ') prefix = 'RM';
+        else if (category === 'บรรจุภัณฑ์') prefix = 'PM';
+        else if (category === 'ฉลาก/สิ่งพิมพ์') prefix = 'LB';
+        else if (category === 'วัสดุสิ้นเปลือง') prefix = 'SP';
+
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input('Prefix', sql.VarChar, `${prefix}-%`)
+            .query(`
+                SELECT MAX(CAST(SUBSTRING(ItemID, LEN(@Prefix), LEN(ItemID)) AS INT)) as maxVal 
+                FROM Stock_Items 
+                WHERE ItemID LIKE @Prefix AND ISNUMERIC(SUBSTRING(ItemID, LEN(@Prefix), LEN(ItemID))) = 1
+            `);
+        
+        let maxVal = result.recordset[0].maxVal || 0;
+        const nextId = `${prefix}-${String(maxVal + 1).padStart(3, '0')}`;
+        res.json({ nextId });
+    } catch (err) {
+        console.error('Error fetching next ID:', err);
+        res.status(500).json({ message: 'Error fetching next ID' });
+    }
+});
+
 // Get all stock items
 router.get('/', async (req, res) => {
     try {
@@ -290,6 +320,20 @@ router.get('/:id/detail', async (req, res) => {
             .input('ItemID', sql.VarChar, itemId)
             .query('SELECT * FROM WIP_Lots WHERE ItemID = @ItemID ORDER BY CreatedAt DESC');
 
+        // 5. Get Label Configs if applicable
+        let labelConfigs = [];
+        if (item.Category === 'ฉลาก/สิ่งพิมพ์') {
+            const lcRes = await pool.request()
+                .input('StickerItemID', sql.VarChar, itemId)
+                .query('SELECT * FROM Label_Configurations WHERE StickerItemID = @StickerItemID');
+            labelConfigs = lcRes.recordset.map(lc => ({
+                fgItemId: lc.FGItemID,
+                fgProductName: lc.FGProductName,
+                applyTo: lc.ApplyTo,
+                qtyPerUnit: lc.QtyPerUnit
+            }));
+        }
+
         res.json({
             item: {
                 id: item.ItemID,
@@ -302,7 +346,8 @@ router.get('/:id/detail', async (req, res) => {
                 location: item.Location,
                 minStock: item.MinStock,
                 createdAt: item.CreatedAt,
-                updatedAt: item.UpdatedAt
+                updatedAt: item.UpdatedAt,
+                labelConfigs
             },
             logs: logsRes.recordset.map(l => ({
                 id: l.LogID,
@@ -446,7 +491,7 @@ router.get('/logs/:batchNo/detail', async (req, res) => {
 router.put('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, nameEN, category, unit, location, minStock, status, adjustQty, adjustReason } = req.body;
+        const { name, nameEN, category, unit, location, minStock, status, adjustQty, adjustReason, labelConfigs } = req.body;
         const pool = await poolPromise;
         const transaction = new sql.Transaction(pool);
         
@@ -475,6 +520,29 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req, re
                         UpdatedAt = GETDATE()
                     WHERE ItemID = @ItemID
                 `);
+
+            // If category is label, update label configs
+            if (category === 'ฉลาก/สิ่งพิมพ์' && Array.isArray(labelConfigs)) {
+                // Delete existing configs for this sticker
+                await transaction.request()
+                    .input('StickerItemID', sql.VarChar, id)
+                    .query('DELETE FROM Label_Configurations WHERE StickerItemID = @StickerItemID');
+                
+                // Insert new ones
+                for (const cfg of labelConfigs) {
+                    await transaction.request()
+                        .input('FGItemID', sql.VarChar, cfg.fgItemId)
+                        .input('FGProductName', sql.NVarChar, cfg.fgProductName)
+                        .input('StickerItemID', sql.VarChar, id)
+                        .input('StickerName', sql.NVarChar, name)
+                        .input('ApplyTo', sql.NVarChar, cfg.applyTo || 'ขวด')
+                        .input('QtyPerUnit', sql.Int, cfg.qtyPerUnit || 1)
+                        .query(`
+                            INSERT INTO Label_Configurations (FGItemID, FGProductName, StickerItemID, StickerName, ApplyTo, QtyPerUnit)
+                            VALUES (@FGItemID, @FGProductName, @StickerItemID, @StickerName, @ApplyTo, @QtyPerUnit)
+                        `);
+                }
+            }
 
             // Handle adjustment if provided
             const qty = Number(adjustQty);
@@ -539,7 +607,7 @@ router.delete('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req,
 // Add new stock item
 router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res) => {
     try {
-        const { name, nameEN, category, unit, location, minStock, status, initialQty, adjustReason } = req.body;
+        const { name, nameEN, category, unit, location, minStock, status, initialQty, adjustReason, labelConfigs } = req.body;
         const pool = await poolPromise;
         const transaction = new sql.Transaction(pool);
         
@@ -552,6 +620,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res)
             else if (category === 'สินค้ากึ่งสำเร็จรูป') prefix = 'WIP';
             else if (category === 'วัตถุดิบ') prefix = 'RM';
             else if (category === 'บรรจุภัณฑ์') prefix = 'PM';
+            else if (category === 'ฉลาก/สิ่งพิมพ์') prefix = 'LB';
             else if (category === 'วัสดุสิ้นเปลือง') prefix = 'SP';
             
             const itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', prefix, 3);
@@ -571,6 +640,23 @@ router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res)
                     INSERT INTO Stock_Items (ItemID, ProductName, ProductNameEN, Category, Quantity, Unit, Location, MinStock, Status, IsHidden)
                     VALUES (@ItemID, @ProductName, @ProductNameEN, @Category, @Quantity, @Unit, @Location, @MinStock, @Status, 0)
                 `);
+
+            // If category is label, insert label configs
+            if (category === 'ฉลาก/สิ่งพิมพ์' && Array.isArray(labelConfigs)) {
+                for (const cfg of labelConfigs) {
+                    await transaction.request()
+                        .input('FGItemID', sql.VarChar, cfg.fgItemId)
+                        .input('FGProductName', sql.NVarChar, cfg.fgProductName)
+                        .input('StickerItemID', sql.VarChar, itemId)
+                        .input('StickerName', sql.NVarChar, name)
+                        .input('ApplyTo', sql.NVarChar, cfg.applyTo || 'ขวด')
+                        .input('QtyPerUnit', sql.Int, cfg.qtyPerUnit || 1)
+                        .query(`
+                            INSERT INTO Label_Configurations (FGItemID, FGProductName, StickerItemID, StickerName, ApplyTo, QtyPerUnit)
+                            VALUES (@FGItemID, @FGProductName, @StickerItemID, @StickerName, @ApplyTo, @QtyPerUnit)
+                        `);
+                }
+            }
 
             // Add log if initial qty > 0
             const qty = Number(initialQty) || 0;

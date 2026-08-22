@@ -70,12 +70,15 @@
 }
 
 .qc-pending-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 12px;
+    display: flex;
+    overflow-x: auto;
+    gap: 16px;
+    padding-bottom: 12px;
 }
 
 .qc-pending-card {
+    flex: 0 0 auto;
+    width: 340px;
     background: #fff;
     border: 2px solid #fde68a;
     border-radius: 10px;

@@ -198,12 +198,15 @@
 }
 
 .op-active-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 12px;
+    display: flex;
+    overflow-x: auto;
+    gap: 16px;
+    padding-bottom: 12px;
 }
 
 .op-active-card {
+    flex: 0 0 auto;
+    width: 400px;
     background: linear-gradient(135deg, #fefce8, #fef9c3);
     border: 2px solid #fde68a;
     border-radius: 10px;
@@ -678,13 +681,16 @@
    =========================================================================== */
 
 .op-jo-group-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 14px;
+    display: flex;
+    overflow-x: auto;
+    gap: 16px;
+    padding-bottom: 12px;
 }
 
 /* Group Card */
 .op-jo-group-card {
+    flex: 0 0 auto;
+    width: 340px;
     background: linear-gradient(135deg, #f0ebff 0%, #ffffff 100%);
     border: 1px solid #ddd6fe;
     border-radius: 14px;

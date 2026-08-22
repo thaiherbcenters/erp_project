@@ -1,0 +1,1 @@
+require('dotenv').config({path:'backend/.env'}); require('./backend/config/db.js').poolPromise.then(p=>p.query('SELECT TaskID, JobOrderID, FormulaName, ProcessName, BatchNo FROM Production_Tasks WHERE TaskID LIKE \%20260822%\')).then(r=>{console.table(r.recordset);process.exit(0)})

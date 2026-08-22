@@ -52,8 +52,14 @@
   box-sizing: border-box;
 }
 
+body, html, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* ห้าม scroll หน้าเว็บทั้งหน้า ให้ไป scroll ด้านใน main-content เอา */
+}
+
 body {
-  min-height: 100vh;
   background: var(--bg);
 }
 

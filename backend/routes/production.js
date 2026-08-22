@@ -259,7 +259,7 @@ router.post('/tasks/wip', authorizeRoles('admin', 'executive', 'planner', 'opera
         const datePrefix = getDatePrefix();
         // Use parent planner's JO ID if provided, otherwise generate a new one
         const joId = sourceJobOrderId || await generateSequence(pool, 'Production_Tasks', 'JobOrderID', `JO-${datePrefix}`, 3);
-        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `PT-${datePrefix}`, 3);
+        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `WIP-${datePrefix}`, 3);
         const batchNo = await generateSequence(pool, 'Production_Tasks', 'BatchNo', `B${datePrefix}-WIP`, 2, '-');
 
         let productName = null;
