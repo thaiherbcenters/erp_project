@@ -291,6 +291,10 @@ export default function Stock() {
             showAlert('แจ้งเตือน', 'กรุณาระบุชื่อสินค้า', 'warning');
             return;
         }
+        if (addForm.category === 'ฉลาก/สิ่งพิมพ์' && addForm._tempFgItemId) {
+            showAlert('แจ้งเตือน', 'คุณเลือกสินค้า FG ไว้แต่ยังไม่ได้กดปุ่ม + (สีฟ้า) เพื่อเพิ่มเข้ารายการ กรุณากด + ก่อนบันทึกครับ', 'warning');
+            return;
+        }
         setAddSaving(true);
         try {
             const res = await fetch(`${API_BASE}/stock`, {
@@ -321,6 +325,11 @@ export default function Stock() {
 
         if (Number(editForm.adjustQty) !== 0 && !editForm.adjustReason.trim()) {
             showAlert('แจ้งเตือน', 'กรุณาระบุสาเหตุหรือที่มาของการปรับปรุงจำนวนสินค้า', 'warning');
+            return;
+        }
+
+        if (editForm.category === 'ฉลาก/สิ่งพิมพ์' && editForm._tempFgItemId) {
+            showAlert('แจ้งเตือน', 'คุณเลือกสินค้า FG ไว้แต่ยังไม่ได้กดปุ่ม + (สีฟ้า) เพื่อเพิ่มเข้ารายการ กรุณากด + ก่อนบันทึกครับ', 'warning');
             return;
         }
 
@@ -1360,6 +1369,7 @@ export default function Stock() {
                                             <th>รหัสสินค้า</th>
                                             <th>ชื่อสินค้า</th>
                                             <th>หมวดหมู่</th>
+                                            {activeCategory === 'ฉลาก/สิ่งพิมพ์' && <th>สินค้าที่ผูก (FG)</th>}
                                             <th>ยอดคงเหลือ</th>
                                             <th>หน่วย</th>
                                             <th>สถานะ</th>
@@ -1375,6 +1385,18 @@ export default function Stock() {
                                                     {item.nameEN && <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal', marginTop: '2px' }}>{item.nameEN}</div>}
                                                 </td>
                                                 <td>{item.category}</td>
+                                                {activeCategory === 'ฉลาก/สิ่งพิมพ์' && (
+                                                    <td style={{ fontSize: '12px', color: '#2563eb', fontWeight: 500, maxWidth: '200px', whiteSpace: 'normal' }}>
+                                                        {item.mappedFGs ? (
+                                                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                                                                <Tag size={12} style={{ marginTop: '2px', flexShrink: 0 }} />
+                                                                <span>{item.mappedFGs}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span style={{ color: '#94a3b8', fontWeight: 400 }}>-</span>
+                                                        )}
+                                                    </td>
+                                                )}
                                                 <td style={{ fontWeight: 700, color: item.qty > 0 ? '#059669' : '#ef4444' }}>
                                                     {item.qty?.toLocaleString()}
                                                 </td>

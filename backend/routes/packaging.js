@@ -185,88 +185,42 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
                                 });
                             }
                             labelConfigJSON = JSON.stringify(configs);
-                            initialStatus = allSufficient ? 'พร้อมติดฉลาก' : 'รอสติ๊กเกอร์';
+                            initialStatus = 'รอสติ๊กเกอร์'; // Always require requisition
                         } else {
-                            // No label config = skip labeling, go directly to QC Final
-                            initialStatus = null;
+                            initialStatus = 'พร้อมติดฉลาก'; // No config, just assume ready
                         }
                     } else {
-                        // FG not found in stock, skip labeling
-                        initialStatus = null;
+                        initialStatus = 'พร้อมติดฉลาก'; // FG not found, just assume ready
                     }
                 } catch (cfgErr) {
                     console.error('Error checking label config:', cfgErr);
-                    initialStatus = null;
+                    initialStatus = 'พร้อมติดฉลาก';
                 }
             }
 
-            // 4. Create Labeling Task (or skip to QC Final if no config)
-            if (initialStatus) {
-                try {
-                    const lblId = await generateSequence(pool, 'Labeling_Tasks', 'TaskID', `LBL-${getDatePrefix()}`, 3);
-                    await pool.request()
-                        .input('TaskID', sql.VarChar, lblId)
-                        .input('PackagingTaskID', sql.VarChar, taskId)
-                        .input('ProductionTaskID', sql.VarChar, updatedTask.ProductionTaskID || null)
-                        .input('JobOrderID', sql.VarChar, updatedTask.JobOrderID || null)
-                        .input('ProductName', sql.NVarChar, updatedTask.Product)
-                        .input('BatchNo', sql.VarChar, updatedTask.BatchNo)
-                        .input('Qty', sql.Int, updatedTask.PackedQty || updatedTask.Qty)
-                        .input('LabelType', sql.VarChar, labelType)
-                        .input('CustomerName', sql.NVarChar, customerName)
-                        .input('Status', sql.NVarChar, initialStatus)
-                        .input('Line', sql.VarChar, updatedTask.Line || 'Line A')
-                        .input('LabelConfigJSON', sql.NVarChar, labelConfigJSON)
-                        .query(`
-                            INSERT INTO Labeling_Tasks (TaskID, PackagingTaskID, ProductionTaskID, JobOrderID, ProductName, BatchNo, Qty, LabelType, CustomerName, Status, Line, LabelConfigJSON)
-                            VALUES (@TaskID, @PackagingTaskID, @ProductionTaskID, @JobOrderID, @ProductName, @BatchNo, @Qty, @LabelType, @CustomerName, @Status, @Line, @LabelConfigJSON)
-                        `);
-                    console.log(`✅ Auto Labeling Task: ${lblId} (${labelType}) for Batch ${updatedTask.BatchNo}`);
-
-                    // Sync Production stepper to labeling
-                    if (updatedTask.ProductionTaskID) {
-                        const prodResult = await pool.request()
-                            .input('ProdTaskID', sql.VarChar, updatedTask.ProductionTaskID)
-                            .query('SELECT StepTimesJSON FROM Production_Tasks WHERE TaskID = @ProdTaskID');
-                        let stepTimes = {};
-                        if (prodResult.recordset.length > 0 && prodResult.recordset[0].StepTimesJSON) {
-                            try { stepTimes = JSON.parse(prodResult.recordset[0].StepTimesJSON); } catch(e) {}
-                        }
-                        stepTimes['labeling'] = new Date().toISOString();
-                        await pool.request()
-                            .input('ProdTaskID', sql.VarChar, updatedTask.ProductionTaskID)
-                            .input('StepTimesJSON', sql.NVarChar, JSON.stringify(stepTimes))
-                            .query(`UPDATE Production_Tasks SET CurrentStep = 'labeling', StepTimesJSON = @StepTimesJSON WHERE TaskID = @ProdTaskID`);
-                    }
-                } catch (lblErr) {
-                    console.error('Error creating labeling task:', lblErr);
-                }
-            } else {
-                // No label configuration → fallback to original QC Final flow
+            // 4. Create Labeling Task
+            try {
+                const lblId = await generateSequence(pool, 'Labeling_Tasks', 'TaskID', `LBL-${getDatePrefix()}`, 3);
                 await pool.request()
-                    .input('TaskID', sql.VarChar, taskId)
-                    .query(`UPDATE Packaging_Tasks SET Status = N'รอ QC Final', UpdatedAt = GETDATE() WHERE TaskID = @TaskID`);
+                    .input('TaskID', sql.VarChar, lblId)
+                    .input('PackagingTaskID', sql.VarChar, taskId)
+                    .input('ProductionTaskID', sql.VarChar, updatedTask.ProductionTaskID || null)
+                    .input('JobOrderID', sql.VarChar, updatedTask.JobOrderID || null)
+                    .input('ProductName', sql.NVarChar, updatedTask.Product)
+                    .input('BatchNo', sql.VarChar, updatedTask.BatchNo)
+                    .input('Qty', sql.Int, updatedTask.PackedQty || updatedTask.Qty)
+                    .input('LabelType', sql.VarChar, labelType)
+                    .input('CustomerName', sql.NVarChar, customerName)
+                    .input('Status', sql.NVarChar, initialStatus)
+                    .input('Line', sql.VarChar, updatedTask.Line || 'Line A')
+                    .input('LabelConfigJSON', sql.NVarChar, labelConfigJSON)
+                    .query(`
+                        INSERT INTO Labeling_Tasks (TaskID, PackagingTaskID, ProductionTaskID, JobOrderID, ProductName, BatchNo, Qty, LabelType, CustomerName, Status, Line, LabelConfigJSON)
+                        VALUES (@TaskID, @PackagingTaskID, @ProductionTaskID, @JobOrderID, @ProductName, @BatchNo, @Qty, @LabelType, @CustomerName, @Status, @Line, @LabelConfigJSON)
+                    `);
+                console.log(`✅ Auto Labeling Task: ${lblId} (${labelType}) for Batch ${updatedTask.BatchNo}`);
 
-                const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCF-${getDatePrefix()}`, 3);
-                try {
-                    await pool.request()
-                        .input('RequestID', sql.VarChar, qcRequestId)
-                        .input('TaskID', sql.VarChar, updatedTask.ProductionTaskID || taskId)
-                        .input('JobOrderID', sql.VarChar, updatedTask.JobOrderID || updatedTask.BatchNo)
-                        .input('BatchNo', sql.VarChar, updatedTask.BatchNo)
-                        .input('FormulaName', sql.NVarChar, updatedTask.Product)
-                        .input('Line', sql.VarChar, updatedTask.Line || 'Line A')
-                        .input('Type', sql.VarChar, 'qc_final')
-                        .input('Status', sql.NVarChar, 'รอตรวจ')
-                        .query(`
-                            INSERT INTO QC_Production (RequestID, TaskID, JobOrderID, BatchNo, FormulaName, Line, Type, Status, RequestedAt)
-                            VALUES (@RequestID, @TaskID, @JobOrderID, @BatchNo, @FormulaName, @Line, @Type, @Status, GETDATE())
-                        `);
-                    console.log(`✅ Auto QC Final (no label config): ${qcRequestId}`);
-                } catch (qcErr) {
-                    console.error('Error auto-creating QC:', qcErr);
-                }
-
+                // Sync Production stepper to labeling
                 if (updatedTask.ProductionTaskID) {
                     const prodResult = await pool.request()
                         .input('ProdTaskID', sql.VarChar, updatedTask.ProductionTaskID)
@@ -275,12 +229,14 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
                     if (prodResult.recordset.length > 0 && prodResult.recordset[0].StepTimesJSON) {
                         try { stepTimes = JSON.parse(prodResult.recordset[0].StepTimesJSON); } catch(e) {}
                     }
-                    stepTimes['qc_final'] = new Date().toISOString();
+                    stepTimes['labeling'] = new Date().toISOString();
                     await pool.request()
                         .input('ProdTaskID', sql.VarChar, updatedTask.ProductionTaskID)
                         .input('StepTimesJSON', sql.NVarChar, JSON.stringify(stepTimes))
-                        .query(`UPDATE Production_Tasks SET CurrentStep = 'qc_final', StepTimesJSON = @StepTimesJSON WHERE TaskID = @ProdTaskID`);
+                        .query(`UPDATE Production_Tasks SET CurrentStep = 'labeling', StepTimesJSON = @StepTimesJSON WHERE TaskID = @ProdTaskID`);
                 }
+            } catch (lblErr) {
+                console.error('Error creating labeling task:', lblErr);
             }
         }
 

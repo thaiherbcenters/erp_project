@@ -44,17 +44,22 @@ router.get('/', async (req, res) => {
         const { search, category, page, limit } = req.query;
         const pool = await poolPromise;
         
-        let queryStr = `SELECT * FROM Stock_Items WHERE (IsHidden = 0 OR IsHidden IS NULL)`;
+        let queryStr = `
+            SELECT s.*, 
+                (SELECT STRING_AGG(FGProductName, ', ') FROM Label_Configurations lc WHERE lc.StickerItemID = s.ItemID) as MappedFGs
+            FROM Stock_Items s 
+            WHERE (s.IsHidden = 0 OR s.IsHidden IS NULL)
+        `;
         
         if (category && category !== 'all' && category !== 'ทั้งหมด') {
-            queryStr += ` AND Category = @Category`;
+            queryStr += ` AND s.Category = @Category`;
         }
         
         if (search) {
-            queryStr += ` AND (ProductName LIKE @Search OR ItemID LIKE @Search OR Category LIKE @Search)`;
+            queryStr += ` AND (s.ProductName LIKE @Search OR s.ItemID LIKE @Search OR s.Category LIKE @Search)`;
         }
         
-        queryStr += ` ORDER BY UpdatedAt DESC`;
+        queryStr += ` ORDER BY s.UpdatedAt DESC`;
 
         const request = pool.request();
         if (category && category !== 'all' && category !== 'ทั้งหมด') {
@@ -82,7 +87,8 @@ router.get('/', async (req, res) => {
             location: row.Location,
             minStock: row.MinStock,
             status: row.Quantity <= 0 ? 'สินค้าหมด' : row.Quantity <= row.MinStock ? 'สินค้าเหลือน้อย' : 'มีสินค้า',
-            updatedAt: row.UpdatedAt
+            updatedAt: row.UpdatedAt,
+            mappedFGs: row.MappedFGs || null
         }));
         
         const pagedItems = items.slice((p - 1) * l, p * l);
@@ -717,6 +723,10 @@ router.get('/requisitions', async (req, res) => {
             FROM Packaging_Tasks 
             WHERE Status = N'รอเบิกบรรจุภัณฑ์'
             UNION ALL
+            SELECT TaskID, JobOrderID, BatchNo, ProductName AS FormulaName, Qty AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
+            FROM Labeling_Tasks 
+            WHERE Status = N'รอเบิกสติ๊กเกอร์'
+            UNION ALL
             SELECT ShipmentID AS TaskID, ShipmentID AS JobOrderID, BatchNo, ProductName AS FormulaName, Quantity AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
             FROM Shipping_Orders 
             WHERE Status = N'รอคลังอนุมัติ'
@@ -785,6 +795,10 @@ router.get('/requisitions/history', async (req, res) => {
                 FROM Packaging_Tasks 
                 WHERE RequisitionJSON IS NOT NULL AND Status != N'รอเบิกบรรจุภัณฑ์'
                 UNION ALL
+                SELECT TaskID, JobOrderID, BatchNo, ProductName AS FormulaName, Qty AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
+                FROM Labeling_Tasks 
+                WHERE RequisitionJSON IS NOT NULL AND Status != N'รอเบิกสติ๊กเกอร์'
+                UNION ALL
                 SELECT ShipmentID AS TaskID, ShipmentID AS JobOrderID, BatchNo, ProductName AS FormulaName, Quantity AS ExpectedQty, 'ชิ้น' AS JobUnit, Status, CreatedAt, RequisitionJSON 
                 FROM Shipping_Orders 
                 WHERE RequisitionJSON IS NOT NULL AND Status != N'รอคลังอนุมัติ' AND Status != N'รอเบิกวัสดุแพ็ค'
@@ -834,6 +848,7 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
         let taskRes;
         let isPackaging = taskId.startsWith('PKG');
         let isShipping = taskId.startsWith('SHP');
+        let isLabeling = taskId.startsWith('LBL');
         
         if (isPackaging) {
             taskRes = await pool.request()
@@ -843,6 +858,10 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
                 .query('SELECT RequisitionJSON, Status AS CurrentStep FROM Shipping_Orders WHERE ShipmentID = @TaskID');
+        } else if (isLabeling) {
+            taskRes = await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query('SELECT RequisitionJSON, Status AS CurrentStep FROM Labeling_Tasks WHERE TaskID = @TaskID');
         } else {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
@@ -859,7 +878,9 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
             return res.status(400).json({ message: 'งานจัดส่งนี้ไม่ได้อยู่ในสถานะรอคลังอนุมัติ' });
         } else if (isPackaging && stepStatus !== 'รอเบิกบรรจุภัณฑ์') {
             return res.status(400).json({ message: 'งานบรรจุนี้ไม่ได้อยู่ในสถานะรอเบิกบรรจุภัณฑ์' });
-        } else if (!isPackaging && !isShipping && stepStatus !== 'requisition') {
+        } else if (isLabeling && stepStatus !== 'รอเบิกสติ๊กเกอร์') {
+            return res.status(400).json({ message: 'งานติดฉลากนี้ไม่ได้อยู่ในสถานะรอเบิกสติ๊กเกอร์' });
+        } else if (!isPackaging && !isShipping && !isLabeling && stepStatus !== 'requisition') {
             return res.status(400).json({ message: 'งานผลิตนี้ถูกเบิกจ่ายไปแล้ว หรือไม่ได้อยู่ในสถานะรอเบิก' });
         }
         
@@ -949,6 +970,16 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
                     .input('RequisitionJSON', sql.NVarChar, JSON.stringify(parsedData))
                     .query(`
                         UPDATE Packaging_Tasks 
+                        SET Status = @Status, RequisitionJSON = @RequisitionJSON, UpdatedAt = GETDATE()
+                        WHERE TaskID = @TaskID
+                    `);
+            } else if (isLabeling) {
+                await transaction.request()
+                    .input('TaskID', sql.VarChar, taskId)
+                    .input('Status', sql.NVarChar, 'พร้อมติดฉลาก')
+                    .input('RequisitionJSON', sql.NVarChar, JSON.stringify(parsedData))
+                    .query(`
+                        UPDATE Labeling_Tasks 
                         SET Status = @Status, RequisitionJSON = @RequisitionJSON, UpdatedAt = GETDATE()
                         WHERE TaskID = @TaskID
                     `);

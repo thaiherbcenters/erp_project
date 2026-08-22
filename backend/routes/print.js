@@ -61,6 +61,14 @@ router.get('/requisition/:taskId', async (req, res) => {
                            Quantity AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, CreatedAt 
                     FROM Shipping_Orders WHERE ShipmentID = @TaskID
                 `);
+        } else if (taskId.startsWith('LBL-')) {
+            taskRes = await pool.request()
+                .input('TaskID', sql.VarChar, taskId)
+                .query(`
+                    SELECT TaskID, JobOrderID, BatchNo, ProductName AS FormulaName, 
+                           Qty AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, CreatedAt 
+                    FROM Labeling_Tasks WHERE TaskID = @TaskID
+                `);
         } else {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)

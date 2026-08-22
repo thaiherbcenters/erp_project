@@ -1,4 +1,4 @@
-﻿/**
+/**
  * labeling.js — Routes for Labeling Tasks (ติดฉลาก)
  */
 const express = require('express');
@@ -52,14 +52,15 @@ router.put('/tasks/:id/start', authorizeRoles('admin','executive','planner','ope
 router.put('/tasks/:id/progress', authorizeRoles('admin','executive','planner','operator'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { labeledQty } = req.body;
+        const { labeledQty, defectQty } = req.body;
         const pool = await poolPromise;
         const result = await pool.request()
             .input('TaskID', sql.VarChar, id)
             .input('LabeledQty', sql.Int, labeledQty || 0)
+            .input('DefectQty', sql.Int, defectQty || 0)
             .query(`
                 UPDATE Labeling_Tasks 
-                SET LabeledQty = @LabeledQty, UpdatedAt = GETDATE()
+                SET LabeledQty = @LabeledQty, DefectQty = @DefectQty, UpdatedAt = GETDATE()
                 OUTPUT INSERTED.*
                 WHERE TaskID = @TaskID
             `);
@@ -68,6 +69,68 @@ router.put('/tasks/:id/progress', authorizeRoles('admin','executive','planner','
     } catch (err) {
         console.error('Error updating labeling progress:', err);
         res.status(500).json({ message: 'Error updating progress' });
+    }
+});
+
+// ==========================================
+// GET /tasks/:id/check-stock — เช็คสต็อกสติ๊กเกอร์แบบสดๆ
+// ==========================================
+router.get('/tasks/:id/check-stock', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await poolPromise;
+        
+        // 1. Get task
+        const taskRes = await pool.request()
+            .input('TaskID', sql.VarChar, id)
+            .query('SELECT ProductName, Qty FROM Labeling_Tasks WHERE TaskID = @TaskID');
+        
+        if (taskRes.recordset.length === 0) return res.status(404).json({ message: 'Task not found' });
+        const task = taskRes.recordset[0];
+
+        // 2. Find FG Item
+        const fgRes = await pool.request()
+            .input('ProductName', sql.NVarChar, task.ProductName)
+            .query(`SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName AND Category = N'สินค้าสำเร็จรูป'`);
+            
+        let configs = [];
+        if (fgRes.recordset.length > 0) {
+            const fgItemId = fgRes.recordset[0].ItemID;
+            
+            // 3. Get label configs for this FG
+            const configRes = await pool.request()
+                .input('FGItemID', sql.VarChar, fgItemId)
+                .query('SELECT * FROM Label_Configurations WHERE FGItemID = @FGItemID');
+                
+            for (const cfg of configRes.recordset) {
+                // 4. Get live stock
+                const stockRes = await pool.request()
+                    .input('StickerID', sql.VarChar, cfg.StickerItemID)
+                    .query('SELECT Quantity FROM Stock_Items WHERE ItemID = @StickerID');
+                    
+                const stockQty = stockRes.recordset.length > 0 ? stockRes.recordset[0].Quantity : 0;
+                const needed = (cfg.QtyPerUnit || 1) * task.Qty;
+                
+                configs.push({
+                    stickerItemId: cfg.StickerItemID,
+                    stickerName: cfg.StickerName,
+                    applyTo: cfg.ApplyTo,
+                    qtyPerUnit: cfg.QtyPerUnit,
+                    stockAvailable: stockQty,
+                    needed: needed,
+                    isEnough: stockQty >= needed
+                });
+            }
+        }
+        
+        res.json({ 
+            taskQty: task.Qty, 
+            configs, 
+            allSufficient: configs.length === 0 || configs.every(c => c.isEnough) 
+        });
+    } catch (err) {
+        console.error('Error checking sticker stock:', err);
+        res.status(500).json({ message: 'Error checking stock' });
     }
 });
 
@@ -225,6 +288,39 @@ router.put('/tasks/:id/sticker-received', authorizeRoles('admin','executive','pl
     } catch (err) {
         console.error('Error updating sticker received:', err);
         res.status(500).json({ message: 'Error updating sticker received' });
+    }
+});
+
+// ==========================================
+// PUT /tasks/:id/requisition — ขอเบิกสติ๊กเกอร์ (MTS)
+// ==========================================
+router.put('/tasks/:id/requisition', authorizeRoles('admin','executive','planner','operator'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { requisitionItems, requesterName } = req.body;
+        
+        if (!requisitionItems || requisitionItems.length === 0) {
+            return res.status(400).json({ message: 'No requisition items provided' });
+        }
+
+        const reqJsonStr = JSON.stringify({ items: requisitionItems, requesterName: requesterName || 'ไม่ระบุ', requestedAt: new Date().toISOString() });
+        const pool = await poolPromise;
+        
+        const result = await pool.request()
+            .input('TaskID', sql.VarChar, id)
+            .input('RequisitionJSON', sql.NVarChar, reqJsonStr)
+            .query(`
+                UPDATE Labeling_Tasks 
+                SET Status = N'รอเบิกสติ๊กเกอร์', RequisitionJSON = @RequisitionJSON, UpdatedAt = GETDATE()
+                OUTPUT INSERTED.*
+                WHERE TaskID = @TaskID
+            `);
+            
+        if (result.rowsAffected[0] === 0) return res.status(404).json({ message: 'Task not found' });
+        res.json(result.recordset[0]);
+    } catch (err) {
+        console.error('Error submitting sticker requisition:', err);
+        res.status(500).json({ message: 'Error submitting sticker requisition' });
     }
 });
 
