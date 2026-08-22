@@ -9,7 +9,7 @@ const config = {
     port: parseInt(process.env.DB_PORT) || 1433,
     options: {
         trustServerCertificate: true, // Keep true if using self-signed cert on local network 10.0.0.x
-        encrypt: true, // Security fix: encrypt traffic to true
+        encrypt: false, // Fix: Reverted to false to prevent 500 error on production server
         useUTC: false, // Fix timezone issue (+7 hrs double offset)
     },
     connectionTimeout: 10000,
