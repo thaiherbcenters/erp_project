@@ -761,7 +761,7 @@ const PRODUCT_IMAGES = {
 const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม', 'กระปุก', 'ขวด', 'ถุง', 'ซอง', 'หลอด', 'กล่อง', 'แผง', 'ขวด(โหล)', 'โหล'];
 
 export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistory }) {
-    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
+    const { signatures: availableSignatures, userSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
 
@@ -826,7 +826,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
-        signer: 'thawat',
+        signer: '',
         customerOrder: '',
         purchaseNo: '',
         salesperson: '',
@@ -848,6 +848,12 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         fdaServiceTrademark: false,
         fdaServiceTrademarkPrice: 5000
     });
+
+    useEffect(() => {
+        if (!editId && defaultSignerKey) {
+            setFormData(prev => ({ ...prev, signer: defaultSignerKey }));
+        }
+    }, [defaultSignerKey, editId]);
 
     useEffect(() => {
         if (formData.notes && !formData.notes.includes('<div')) {
@@ -1029,7 +1035,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             shippingCost: data.ShippingCost || 0,
                             depositPercent: data.DepositPercent || '0',
                             customDepositAmount: data.DepositPercent === 'custom' ? data.DepositAmount : 0,
-                            signer: data.Signer || 'thawat',
+                            signer: data.Signer || '',
                             customerOrder: data.CustomerOrder || '',
                             purchaseNo: data.PurchaseNo || '',
                             salesperson: data.Salesperson || '',
@@ -2278,7 +2284,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 <label>ผู้มีอำนาจลงนาม (ลายเซ็น)</label>
                                 <CustomSelect name="signer" value={formData.signer} onChange={handleFormChange}>
                                     <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                                            {availableSignatures.map(sig => (
+                                            {userSignatures.map(sig => (
                                                 <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
                                             ))}
                                         </CustomSelect>

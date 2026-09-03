@@ -687,7 +687,7 @@ const PRODUCT_IMAGES = {
 const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม', 'กระปุก', 'ขวด', 'ถุง', 'ซอง', 'หลอด', 'กล่อง', 'แผง', 'ขวด(โหล)', 'โหล'];
 
 export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHistory }) {
-    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
+    const { signatures: availableSignatures, userSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
 
@@ -752,7 +752,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
-        signer: 'thawat',
+        signer: '',
         customerOrder: '',
         purchaseNo: '',
         salesperson: '',
@@ -774,6 +774,12 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
         fdaServiceTrademark: false,
         fdaServiceTrademarkPrice: 5000
     });
+
+    useEffect(() => {
+        if (!editId && defaultSignerKey) {
+            setFormData(prev => ({ ...prev, signer: defaultSignerKey }));
+        }
+    }, [defaultSignerKey, editId]);
 
     useEffect(() => {
         if (formData.notes && !formData.notes.includes('<div')) {
@@ -2161,7 +2167,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                                 <label>ผู้มีอำนาจลงนาม (ลายเซ็น)</label>
                                 <CustomSelect name="signer" value={formData.signer || ''} onChange={handleFormChange}>
                                     <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                                            {availableSignatures.map(sig => (
+                                            {userSignatures.map(sig => (
                                                 <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
                                             ))}
                                         </CustomSelect>

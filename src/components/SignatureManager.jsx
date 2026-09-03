@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Plus, Trash2, X, Upload } from 'lucide-react';
 
+import CustomSelect from './CustomSelect';
+import { useAlert } from './CustomAlert';
+
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = false }) => {
+    const { showAlert, showConfirm } = useAlert();
     const [isOpen, setIsOpen] = useState(isInline);
     const [signatures, setSignatures] = useState(currentSignatures || []);
     const [loading, setLoading] = useState(false);
@@ -13,6 +17,9 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
     const [newName, setNewName] = useState('');
     const [newImage, setNewImage] = useState(null);
     const [previewUrl, setPreviewUrl] = useState('');
+
+    const [users, setUsers] = useState([]);
+    const [selectedUserId, setSelectedUserId] = useState('');
 
     const fetchSignatures = async () => {
         try {
@@ -35,9 +42,27 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
         }
     };
 
+    const fetchUsers = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/users`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                setUsers(data);
+            } else if (data.success) {
+                setUsers(data.users || data.data || []);
+            }
+        } catch (error) {
+            console.error('Failed to fetch users:', error);
+        }
+    };
+
     useEffect(() => {
         if (isOpen || isInline) {
             fetchSignatures();
+            fetchUsers();
         }
     }, [isOpen, isInline]);
 
@@ -51,7 +76,7 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
 
     const handleAdd = async () => {
         if (!newName || !newImage) {
-            alert('กรุณากรอกชื่อและเลือกไฟล์รูปลายเซ็น (Please provide name and image)');
+            showAlert('แจ้งเตือน', 'กรุณากรอกชื่อและเลือกไฟล์รูปลายเซ็น', 'warning');
             return;
         }
 
@@ -59,6 +84,9 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
             const formData = new FormData();
             formData.append('fullName', newName);
             formData.append('signatureImage', newImage);
+            if (selectedUserId) {
+                formData.append('userId', selectedUserId);
+            }
 
             const token = localStorage.getItem('token');
             const res = await fetch(`${API_BASE}/signatures`, {
@@ -74,19 +102,22 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
                 setNewName('');
                 setNewImage(null);
                 setPreviewUrl('');
+                setSelectedUserId('');
                 setShowAddForm(false);
                 fetchSignatures(); // refresh list
+                showAlert('สำเร็จ', 'เพิ่มลายเซ็นใหม่เรียบร้อยแล้ว', 'success');
             } else {
-                alert('Error: ' + data.message);
+                showAlert('ข้อผิดพลาด', data.message, 'error');
             }
         } catch (error) {
             console.error('Failed to upload signature:', error);
-            alert('Failed to upload signature');
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถอัพโหลดลายเซ็นได้', 'error');
         }
     };
 
     const handleDelete = async (id) => {
-        if (!window.confirm('คุณต้องการลบลายเซ็นนี้ใช่หรือไม่?')) return;
+        const ok = await showConfirm('ยืนยันการลบ', 'คุณต้องการลบลายเซ็นนี้ใช่หรือไม่?', 'warning');
+        if (!ok) return;
 
         try {
             const token = localStorage.getItem('token');
@@ -99,9 +130,13 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
             const data = await res.json();
             if (data.success) {
                 fetchSignatures(); // refresh list
+                showAlert('สำเร็จ', 'ลบลายเซ็นเรียบร้อยแล้ว', 'success');
+            } else {
+                showAlert('ข้อผิดพลาด', data.message, 'error');
             }
         } catch (error) {
             console.error('Failed to delete signature:', error);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถลบลายเซ็นได้', 'error');
         }
     };
 
@@ -118,9 +153,21 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
             ) : (
                                 <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
                                     <h4 style={{ margin: '0 0 16px 0' }}>เพิ่มลายเซ็นใหม่</h4>
-                                    
+
                                     <div style={{ marginBottom: '12px' }}>
-                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#475569' }}>ชื่อผู้ลงนาม (Name)</label>
+                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#475569' }}>ผูกบัญชีผู้ใช้ (ออปชั่น)</label>
+                                        <CustomSelect 
+                                            value={selectedUserId}
+                                            onChange={(e) => setSelectedUserId(e.target.value)}
+                                            style={{ width: '100%', marginBottom: '12px' }}
+                                        >
+                                            <option value="">-- เลือกรหัสผู้ใช้งาน (ไม่ผูกก็ได้) --</option>
+                                            {users.map(u => (
+                                                <option key={u.id} value={u.id}>{u.displayName} ({u.role})</option>
+                                            ))}
+                                        </CustomSelect>
+                                        
+                                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#475569' }}>ชื่อที่แสดงบนเอกสาร (Name)</label>
                                         <input 
                                             type="text" 
                                             value={newName} 
@@ -186,7 +233,10 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
                                                         <img src={sig.ImagePath} alt="signature" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
                                                             onError={(e) => { e.target.style.display='none'; e.target.parentNode.innerText = 'รูปเสีย'; }} />
                                                     </div>
-                                                    <span style={{ fontWeight: '500', color: '#1e293b' }}>{sig.FullName}</span>
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <span style={{ fontWeight: '500', color: '#1e293b' }}>{sig.FullName}</span>
+                                                        {sig.user_id && <span style={{ fontSize: '12px', color: '#3b82f6', marginTop: '4px' }}>ผูกกับบัญชี: {users.find(u => u.id === sig.user_id)?.displayName || `User ID ${sig.user_id}`}</span>}
+                                                    </div>
                                                 </div>
                                                 <button 
                                                     onClick={() => handleDelete(sig.SignatureID)}

@@ -1,0 +1,1 @@
+const {poolPromise} = require('./config/db'); poolPromise.then(async pool => { const res = await pool.request().query('SELECT OBJECT_NAME(parent_object_id) AS TableName FROM sys.foreign_keys WHERE referenced_object_id = OBJECT_ID(''Customer'')'); console.log(res.recordset); process.exit(0); })

@@ -173,7 +173,13 @@ router.delete('/:id', authorizeRoles('admin', 'executive', 'sales'), async (req,
         res.json({ success: true, message: 'Customer deleted' });
     } catch (err) {
         console.error('Error deleting customer:', err);
-        res.status(500).json({ success: false, message: 'Failed to delete customer', error: err.message });
+        if (err.number === 547) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'ไม่สามารถลบลูกค้ารายนี้ได้ เนื่องจากมีข้อมูลเอกสาร (เช่น สัญญา, ใบเสนอราคา) ผูกติดอยู่ในระบบ กรุณาลบเอกสารที่เกี่ยวข้องให้หมดก่อนครับ' 
+            });
+        }
+        res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการลบข้อมูลลูกค้า', error: err.message });
     }
 });
 

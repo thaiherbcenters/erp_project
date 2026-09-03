@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT SignatureID, KeyName, FullName, ImagePath, IsActive, CreatedAt
+            SELECT SignatureID, KeyName, FullName, ImagePath, IsActive, CreatedAt, user_id
             FROM Signatures
             WHERE IsActive = 1
             ORDER BY FullName ASC
@@ -54,7 +54,7 @@ router.get('/', async (req, res) => {
 // POST new signature
 router.post('/', upload.single('signatureImage'), async (req, res) => {
     try {
-        const { fullName } = req.body;
+        const { fullName, userId } = req.body;
         const file = req.file;
 
         if (!fullName || !file) {
@@ -66,15 +66,22 @@ router.post('/', upload.single('signatureImage'), async (req, res) => {
         const imagePath = '/api/uploads/signatures/' + file.filename;
 
         const pool = await poolPromise;
-        const result = await pool.request()
+        let request = pool.request()
             .input('keyName', sql.NVarChar, keyName)
             .input('fullName', sql.NVarChar, fullName)
-            .input('imagePath', sql.NVarChar, imagePath)
-            .query(`
-                INSERT INTO Signatures (KeyName, FullName, ImagePath)
-                OUTPUT INSERTED.*
-                VALUES (@keyName, @fullName, @imagePath)
-            `);
+            .input('imagePath', sql.NVarChar, imagePath);
+            
+        if (userId) {
+            request = request.input('userId', sql.Int, userId);
+        } else {
+            request = request.input('userId', sql.Int, null);
+        }
+
+        const result = await request.query(`
+            INSERT INTO Signatures (KeyName, FullName, ImagePath, user_id)
+            OUTPUT INSERTED.*
+            VALUES (@keyName, @fullName, @imagePath, @userId)
+        `);
 
         res.json({ success: true, message: 'Signature added successfully.', data: result.recordset[0] });
     } catch (err) {

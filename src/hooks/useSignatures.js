@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import API_BASE from '../config';
+import { useAuth } from '../context/AuthContext';
 
 export function useSignatures() {
     const [signatures, setSignatures] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const { currentUser } = useAuth();
 
     useEffect(() => {
         const fetchSignatures = async () => {
@@ -41,5 +43,19 @@ export function useSignatures() {
         return path;
     };
 
-    return { signatures, loading, error, getSignatureUrl };
+    // ลายเซ็นของ user ที่ล็อกอินอยู่เท่านั้น (สำหรับ dropdown เลือกลายเซ็น)
+    // admin เห็นทั้งหมด, user ทั่วไปเห็นเฉพาะที่ผูกกับตัวเอง
+    const userSignatures = useMemo(() => {
+        if (!currentUser || signatures.length === 0) return [];
+        if (currentUser.role === 'admin') return signatures;
+        return signatures.filter(s => s.user_id == currentUser.id);
+    }, [currentUser, signatures]);
+
+    const defaultSignerKey = useMemo(() => {
+        if (!currentUser || signatures.length === 0) return null;
+        const userSig = signatures.find(s => s.user_id == currentUser.id);
+        return userSig ? userSig.KeyName : null;
+    }, [currentUser, signatures]);
+
+    return { signatures, userSignatures, loading, error, getSignatureUrl, defaultSignerKey };
 }

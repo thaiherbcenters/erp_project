@@ -329,7 +329,7 @@ export default function Layout() {
                     <div className="user-info card-style">
                         <span className="user-avatar">{currentUser?.avatar}</span>
                         <div className="user-details">
-                            <span className="user-name">{currentUser?.displayName}</span>
+                        <span className="user-name">{currentUser?.name || currentUser?.displayName || currentUser?.username}</span>
                             <span className="user-role">{getRoleLabel(currentUser?.role)}</span>
                         </div>
                     </div>

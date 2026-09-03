@@ -327,7 +327,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     const [showQuotationModal, setShowQuotationModal] = useState(false);
     const [showContractModal, setShowContractModal] = useState(false);
     const [showPreview, setShowPreview] = useState(false);
-    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
+    const { signatures: availableSignatures, userSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
 
     const findSignature = (val) => {
         if (!val || !availableSignatures) return null;
@@ -360,7 +360,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             customDepositAmount: 0,
             showDepositInPrint: false,
             notes: '',
-            salesManager: 'jutharat',
+            salesManager: '',
             productionManager: 'thawat',
         }));
         setItems([
@@ -392,7 +392,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
         customerPONumber: '',
         contractId: '',
         notes: '',
-        salesManager: 'jutharat',
+        salesManager: '',
         productionManager: 'thawat',
     });
 
@@ -505,6 +505,12 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
         return '';
     };
 
+    useEffect(() => {
+        if (!editId && defaultSignerKey) {
+            setFormData(prev => ({ ...prev, salesManager: defaultSignerKey }));
+        }
+    }, [defaultSignerKey, editId]);
+
     // Fetch existing SO for editing
     useEffect(() => {
         const activeEditId = typeof editId === 'object' && editId !== null ? editId.id : editId;
@@ -539,8 +545,8 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                             depositPercent: d.DepositPercent || '0',
                             customDepositAmount: d.DepositPercent === 'custom' ? d.DepositAmount : 0,
                             showDepositInPrint: d.ShowDepositInPrint !== undefined ? !!d.ShowDepositInPrint : (d.DepositPercent && d.DepositPercent !== '0'),
-                            preparedBy: d.PreparedBy || d.SalesManager || 'jutharat',
-                            salesManager: d.SalesManager || 'jutharat',
+                            preparedBy: d.PreparedBy || d.SalesManager || '',
+                            salesManager: d.SalesManager || '',
                             productionManager: d.ProductionManager || 'thawat',
                             customerPONumber: d.CustomerPONumber || '',
                             contractId: d.ContractID || '',
@@ -1605,7 +1611,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>ผู้จัดทำ / Prepared By</label>
                         <CustomSelect name="preparedBy" value={formData.preparedBy || formData.salesManager} onChange={handleFormChange}>
                             <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                            {availableSignatures.map(sig => (
+                            {userSignatures.map(sig => (
                                 <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
                             ))}
                         </CustomSelect>
@@ -1614,7 +1620,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>ผู้อนุมัติฝ่ายขาย / Sales Manager</label>
                         <CustomSelect name="salesManager" value={formData.salesManager} onChange={handleFormChange}>
                             <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                            {availableSignatures.map(sig => (
+                            {userSignatures.map(sig => (
                                 <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
                             ))}
                         </CustomSelect>
@@ -1623,7 +1629,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>ผู้รับทราบการผลิต / Production</label>
                         <CustomSelect name="productionManager" value={formData.productionManager} onChange={handleFormChange}>
                             <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                            {availableSignatures.map(sig => (
+                            {userSignatures.map(sig => (
                                 <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
                             ))}
                         </CustomSelect>

@@ -723,6 +723,7 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
     const [addBankModal, setAddBankModal] = useState({ visible: false, bankName: '', accountName: '', accountNo: '', logo: null });
     const [showBankDropdown, setShowBankDropdown] = useState(false);
 
+    const { signatures: availableSignatures, userSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
     const [formData, setFormData] = useState({
         docType: 'delivery_order_thc', // delivery_order_thc, delivery_order_psf, delivery_order_elt, delivery_order_thc
         billStatus: 'ktb',
@@ -752,7 +753,7 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
-        signer: 'thawat',
+        signer: '',
         customerOrder: '',
         purchaseNo: '',
         salesperson: '',
@@ -774,6 +775,12 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
         fdaServiceTrademark: false,
         fdaServiceTrademarkPrice: 5000
     });
+
+    useEffect(() => {
+        if (!editId && defaultSignerKey) {
+            setFormData(prev => ({ ...prev, signer: defaultSignerKey }));
+        }
+    }, [defaultSignerKey, editId]);
 
     useEffect(() => {
         if (formData.notes && !formData.notes.includes('<div')) {
@@ -857,24 +864,6 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
         fetchCustomerTypes();
     }, []);
 
-    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
-    useEffect(() => {
-        const fetchSignatures = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${API_BASE}/signatures`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const json = await res.json();
-                if (json.success) {
-                    setAvailableSignatures(json.data);
-                }
-            } catch (err) {
-                console.error('Failed to fetch signatures', err);
-            }
-        };
-        fetchSignatures();
-    }, []);
 
     const parseAddressToSplit = (fullAddress) => {
         if (!fullAddress) return { addr_no: '-', addr_soi: '-', addr_road: '-', addr_subdistrict: '-', addr_district: '-', addr_province: '-', addr_zip: '-' };
@@ -2181,7 +2170,7 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                                     <div style={{ flex: 1 }}>
                                         <CustomSelect name="signer" value={formData.signer || ''} onChange={handleFormChange}>
                                             <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                                            {availableSignatures.map(sig => (
+                                            {userSignatures.map(sig => (
                                                 <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
                                             ))}
                                         </CustomSelect>

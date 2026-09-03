@@ -701,7 +701,7 @@ const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม
 export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHistory, hideControls }) {
     // ★★★ UNIT FIX VERSION 2 - 2026-08-14 14:52 ★★★
     console.log('★★★ QuotationForm LOADED - UNIT FIX v2 - timestamp:', Date.now(), '★★★');
-    const { signatures: availableSignatures, getSignatureUrl } = useSignatures();
+    const { signatures: availableSignatures, userSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
 
@@ -766,7 +766,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
-        signer: 'jutharat',
+        signer: '', // will be set by defaultSignerKey
         notes: DEFAULT_NORMAL_NOTES,
         showDiscountInPrint: false,
         showVatInPrint: false,
@@ -783,6 +783,12 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         fdaServiceTrademark: false,
         fdaServiceTrademarkPrice: 5000
     });
+
+    useEffect(() => {
+        if (!editId && defaultSignerKey) {
+            setFormData(prev => ({ ...prev, signer: defaultSignerKey }));
+        }
+    }, [defaultSignerKey, editId]);
 
     useEffect(() => {
         if (formData.notes && !formData.notes.includes('<div')) {
@@ -967,7 +973,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                             shippingCost: data.ShippingCost || 0,
                             depositPercent: data.DepositPercent || '0',
                             customDepositAmount: data.DepositPercent === 'custom' ? data.DepositAmount : 0,
-                            signer: data.Signer || 'jutharat',
+                            signer: data.Signer || '',
                             notes: data.Notes || '',
                             showDiscountInPrint: data.ShowDiscountInPrint,
                             showVatInPrint: data.ShowVatInPrint,
@@ -1383,6 +1389,8 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
     else { cellHeight = '35px'; imgSize = '30px'; }
 
     const selectedSignature = availableSignatures.find(s => s.KeyName === formData.signer);
+
+
 
 
     return (
@@ -2149,7 +2157,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 <label>ผู้เสนอราคา / ผู้วางบิล (ลายเซ็น)</label>
                                 <CustomSelect name="signer" value={formData.signer} onChange={handleFormChange}>
                                     <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                                            {availableSignatures.map(sig => (
+                                            {userSignatures.map(sig => (
                                                 <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
                                             ))}
                                         </CustomSelect>

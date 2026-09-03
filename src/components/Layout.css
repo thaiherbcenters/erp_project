@@ -232,13 +232,14 @@
 
 /* ===== Sidebar Footer ===== */
 .sidebar-footer {
-    padding: 16px 16px 80px; /* เพิ่ม padding ล่างเยอะๆ 80px เลยเพื่อให้ดันพ้น taskbar แน่นอน */
+    padding: 16px 16px 24px; /* ลด padding ลงให้เป็นปกติ */
     background: var(--bg-white);
     border-top: 1px solid var(--border-light);
     display: flex;
     flex-direction: column;
     gap: 12px;
     flex-shrink: 0;
+    margin-top: auto;
 }
 
 .user-info {
