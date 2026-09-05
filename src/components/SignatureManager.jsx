@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Trash2, X, Upload } from 'lucide-react';
+import { Settings, Plus, Trash2, X, Upload, Edit } from 'lucide-react';
 
 import CustomSelect from './CustomSelect';
 import { useAlert } from './CustomAlert';
@@ -12,8 +12,9 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
     const [signatures, setSignatures] = useState(currentSignatures || []);
     const [loading, setLoading] = useState(false);
     
-    // New signature form state
+    // New/Edit signature form state
     const [showAddForm, setShowAddForm] = useState(false);
+    const [editSignatureId, setEditSignatureId] = useState(null);
     const [newName, setNewName] = useState('');
     const [newImage, setNewImage] = useState(null);
     const [previewUrl, setPreviewUrl] = useState('');
@@ -74,8 +75,8 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
         }
     };
 
-    const handleAdd = async () => {
-        if (!newName || !newImage) {
+    const handleSave = async () => {
+        if (!newName || (!newImage && !editSignatureId)) {
             showAlert('แจ้งเตือน', 'กรุณากรอกชื่อและเลือกไฟล์รูปลายเซ็น', 'warning');
             return;
         }
@@ -83,14 +84,19 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
         try {
             const formData = new FormData();
             formData.append('fullName', newName);
-            formData.append('signatureImage', newImage);
+            if (newImage) {
+                formData.append('signatureImage', newImage);
+            }
             if (selectedUserId) {
                 formData.append('userId', selectedUserId);
             }
 
             const token = localStorage.getItem('token');
-            const res = await fetch(`${API_BASE}/signatures`, {
-                method: 'POST',
+            const url = editSignatureId ? `${API_BASE}/signatures/${editSignatureId}` : `${API_BASE}/signatures`;
+            const method = editSignatureId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
                 headers: {
                     'Authorization': `Bearer ${token}`
                 },
@@ -99,20 +105,34 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
 
             const data = await res.json();
             if (data.success) {
-                setNewName('');
-                setNewImage(null);
-                setPreviewUrl('');
-                setSelectedUserId('');
-                setShowAddForm(false);
+                resetForm();
                 fetchSignatures(); // refresh list
-                showAlert('สำเร็จ', 'เพิ่มลายเซ็นใหม่เรียบร้อยแล้ว', 'success');
+                showAlert('สำเร็จ', editSignatureId ? 'แก้ไขลายเซ็นเรียบร้อยแล้ว' : 'เพิ่มลายเซ็นใหม่เรียบร้อยแล้ว', 'success');
             } else {
                 showAlert('ข้อผิดพลาด', data.message, 'error');
             }
         } catch (error) {
-            console.error('Failed to upload signature:', error);
-            showAlert('ข้อผิดพลาด', 'ไม่สามารถอัพโหลดลายเซ็นได้', 'error');
+            console.error('Failed to upload/update signature:', error);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถบันทึกลายเซ็นได้', 'error');
         }
+    };
+
+    const resetForm = () => {
+        setNewName('');
+        setNewImage(null);
+        setPreviewUrl('');
+        setSelectedUserId('');
+        setEditSignatureId(null);
+        setShowAddForm(false);
+    };
+
+    const handleEditClick = (sig) => {
+        setEditSignatureId(sig.SignatureID);
+        setNewName(sig.FullName);
+        setSelectedUserId(sig.user_id || '');
+        setPreviewUrl(sig.ImagePath);
+        setNewImage(null);
+        setShowAddForm(true);
     };
 
     const handleDelete = async (id) => {
@@ -152,7 +172,7 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
                 </button>
             ) : (
                                 <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
-                                    <h4 style={{ margin: '0 0 16px 0' }}>เพิ่มลายเซ็นใหม่</h4>
+                                    <h4 style={{ margin: '0 0 16px 0' }}>{editSignatureId ? 'แก้ไขลายเซ็น' : 'เพิ่มลายเซ็นใหม่'}</h4>
 
                                     <div style={{ marginBottom: '12px' }}>
                                         <label style={{ display: 'block', marginBottom: '6px', fontSize: '14px', color: '#475569' }}>ผูกบัญชีผู้ใช้ (ออปชั่น)</label>
@@ -203,13 +223,13 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
                                     
                                     <div style={{ display: 'flex', gap: '10px' }}>
                                         <button 
-                                            onClick={handleAdd}
+                                            onClick={handleSave}
                                             style={{ flex: 1, padding: '10px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
                                         >
                                             บันทึก (Save)
                                         </button>
                                         <button 
-                                            onClick={() => { setShowAddForm(false); setNewImage(null); setPreviewUrl(''); setNewName(''); }}
+                                            onClick={resetForm}
                                             style={{ flex: 1, padding: '10px', background: '#fff', color: '#64748b', border: '1px solid #cbd5e1', borderRadius: '6px', cursor: 'pointer' }}
                                         >
                                             ยกเลิก (Cancel)
@@ -238,13 +258,22 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
                                                         {sig.user_id && <span style={{ fontSize: '12px', color: '#3b82f6', marginTop: '4px' }}>ผูกกับบัญชี: {users.find(u => u.id === sig.user_id)?.displayName || `User ID ${sig.user_id}`}</span>}
                                                     </div>
                                                 </div>
-                                                <button 
-                                                    onClick={() => handleDelete(sig.SignatureID)}
-                                                    style={{ background: '#fee2e2', color: '#ef4444', border: 'none', width: '32px', height: '32px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                                                    title="ลบ"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button 
+                                                        onClick={() => handleEditClick(sig)}
+                                                        style={{ background: '#fef3c7', color: '#d97706', border: 'none', width: '32px', height: '32px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                        title="แก้ไข"
+                                                    >
+                                                        <Edit size={16} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => handleDelete(sig.SignatureID)}
+                                                        style={{ background: '#fee2e2', color: '#ef4444', border: 'none', width: '32px', height: '32px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                        title="ลบ"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>

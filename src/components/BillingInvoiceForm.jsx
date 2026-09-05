@@ -1264,10 +1264,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
         const ok = await showConfirm('ยืนยันการบันทึก', 'คุณต้องการบันทึกใบวางบิล/ใบแจ้งหนี้นี้ใช่หรือไม่?', 'info');
         if (!ok) return;
 
-        if (!formData.customerTypeId) {
-            showAlert('ข้อผิดพลาด', 'กรุณาระบุประเภทลูกค้าก่อนบันทึก', 'warning');
-            return;
-        }
+
 
         setStatus('saving');
 

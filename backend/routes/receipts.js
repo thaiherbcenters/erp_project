@@ -21,14 +21,14 @@ router.get('/', async (req, res) => {
         let whereClauses = [];
         const request = pool.request();
         if (search) {
-            whereClauses.push('(ReceiptNo LIKE @search OR CustomerName LIKE @search OR Status LIKE @search)');
+            whereClauses.push('(r.ReceiptNo LIKE @search OR r.CustomerName LIKE @search OR r.Status LIKE @search)');
             request.input('search', sql.NVarChar, `%${search}%`);
         }
         // No category filter needed for billing invoice specific table
 
         const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-        const countResult = await request.query(`SELECT COUNT(*) as total FROM Receipt ${whereClause}`);
+        const countResult = await request.query(`SELECT COUNT(*) as total FROM Receipt r ${whereClause}`);
         const total = countResult.recordset[0].total;
 
         request.input('offset', sql.Int, offset);
@@ -36,11 +36,12 @@ router.get('/', async (req, res) => {
 
         const result = await request.query(`
             SELECT 
-                CustomerID, ReceiptID, ReceiptNo, ContractID, CustomerName, BillDate, ValidUntil, 
-                GrandTotal, Status, CreatedAt, Revision
-            FROM Receipt
+                r.CustomerID, r.ReceiptID, r.ReceiptNo, r.ContractID, r.CustomerName, r.BillDate, r.ValidUntil, 
+                r.GrandTotal, r.Status, r.CreatedAt, r.Revision, u.display_name AS CreatedByName
+            FROM Receipt r
+            LEFT JOIN Users u ON r.CreatedBy = u.user_id
             ${whereClause}
-            ORDER BY ReceiptID DESC
+            ORDER BY r.ReceiptID DESC
             OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
         `);
         res.json({ 
@@ -216,6 +217,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         request.input('customerBranch', sql.NVarChar, customerBranch || null);
         request.input('chequeNo', sql.NVarChar, chequeNo || null);
         request.input('chequeDate', sql.Date, chequeDate || null);
+        request.input('createdBy', sql.Int, req.user ? req.user.id : null);
 
         const headerResult = await request.query(`
             INSERT INTO Receipt (
@@ -224,7 +226,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
                 FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
-                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate
+                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate,
+                CreatedBy
             )
             OUTPUT INSERTED.ReceiptID
             VALUES (
@@ -233,7 +236,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
                 @remainingAmount, @signer, @customerOrder, @purchaseNo, @salesperson, @termOfPayment, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
                 @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice,
-                @deliverTo, @dueDate, @paymentMethod, @customerBank, @customerBranch, @chequeNo, @chequeDate
+                @deliverTo, @dueDate, @paymentMethod, @customerBank, @customerBranch, @chequeNo, @chequeDate,
+                @createdBy
             )
         `);
 

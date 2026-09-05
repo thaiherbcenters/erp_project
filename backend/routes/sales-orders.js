@@ -148,11 +148,12 @@ router.get('/', async (req, res) => {
         const pool = await poolPromise;
         const result = await pool.request().query(`
             SELECT 
-                SalesOrderID, SalesOrderNo, QuotationNo, ContractID, CustomerName, 
-                OrderDate, DeliveryDate, GrandTotal, CustomerPONumber,
-                Status, CreatedBy, CreatedAt, Revision
-            FROM SalesOrder
-            ORDER BY SalesOrderID DESC
+                so.SalesOrderID, so.SalesOrderNo, so.QuotationNo, so.ContractID, so.CustomerName, 
+                so.OrderDate, so.DeliveryDate, so.GrandTotal, so.CustomerPONumber,
+                so.Status, so.CreatedBy, so.CreatedAt, so.Revision, u.display_name AS CreatedByName
+            FROM SalesOrder so
+            LEFT JOIN Users u ON so.CreatedBy = u.user_id
+            ORDER BY so.SalesOrderID DESC
         `);
         res.json({ success: true, count: result.recordset.length, data: result.recordset });
     } catch (err) {
@@ -254,7 +255,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
         request.input('grandTotal', sql.Decimal(18, 2), grandTotal || 0);
         request.input('customerPO', sql.NVarChar, customerPONumber || null);
         request.input('notes', sql.NVarChar, notes || '');
-        request.input('createdBy', sql.NVarChar, createdBy || '');
+        request.input('createdBy', sql.Int, req.user ? req.user.id : null);
         request.input('contractId', sql.Int, contractId || null);
 
         request.input('showDiscountInPrint', sql.Bit, showDiscountInPrint ? 1 : 0);

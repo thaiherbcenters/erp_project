@@ -1040,13 +1040,14 @@ export default function Sales() {
                                             <th>ยอดรวม (บาท)</th>
                                             <th>วันที่</th>
                                             <th>สถานะ</th>
+                                            <th>ผู้สร้าง</th>
                                             <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredQuotations.length === 0 ? (
                                             <tr>
-                                                <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                                                <td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
                                                     ไม่มีข้อมูลใบเสนอราคา
                                                 </td>
                                             </tr>
@@ -1067,6 +1068,7 @@ export default function Sales() {
                                                         onChange={(newVal) => handleUpdateDocStatus(q.QuotationID || q.id, 'Quotation', newVal)}
                                                     />
 </td>
+                                                <td>{q.CreatedByName || '-'}</td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                         <button 
@@ -1217,13 +1219,14 @@ export default function Sales() {
                                             <th>ยอดเงินรวม</th>
                                             <th>วันที่</th>
                                             <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                            <th>ผู้สร้าง</th>
                                             <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {localTaxInvoices.length === 0 ? (
                                             <tr>
-                                                <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
+                                                <td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
                                                     ไม่มีข้อมูลใบแจ้งหนี้/ใบส่งสินค้า
                                                 </td>
                                             </tr>
@@ -1244,6 +1247,7 @@ export default function Sales() {
                                                         onChange={(newVal) => handleUpdateDocStatus(q.TaxInvoiceID || q.id, 'TaxInvoice', newVal)}
                                                     />
 </td>
+                                                    <td>{q.CreatedByName || '-'}</td>
                                                     <td style={{ textAlign: 'center' }}>
                                                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                             <button
@@ -1393,13 +1397,14 @@ export default function Sales() {
                                             <th>ยอดรวม (บาท)</th>
                                             <th>วันที่</th>
                                             <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                            <th>ผู้สร้าง</th>
                                             <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {localDeliveryOrders.length === 0 ? (
                                             <tr>
-                                                <td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
+                                                <td colSpan="10" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
                                                     ไม่มีข้อมูลใบส่งสินค้า
                                                 </td>
                                             </tr>
@@ -1421,6 +1426,7 @@ export default function Sales() {
                                                         onChange={(newVal) => handleUpdateDocStatus(q.DeliveryOrderID || q.id, 'DeliveryOrder', newVal)}
                                                     />
 </td>
+                                                    <td>{q.CreatedByName || '-'}</td>
                                                     <td style={{ textAlign: 'center' }}>
                                                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                             <button
@@ -1565,13 +1571,14 @@ export default function Sales() {
                                             <th>ยอดเงินรวม</th>
                                             <th>วันที่</th>
                                             <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                            <th>ผู้สร้าง</th>
                                             <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {receipts.length === 0 ? (
                                             <tr>
-                                                <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
+                                                <td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-light)' }}>
                                                     ไม่มีข้อมูลใบเสร็จรับเงิน
                                                 </td>
                                             </tr>
@@ -1591,6 +1598,7 @@ export default function Sales() {
                                                         onChange={(newVal) => handleUpdateDocStatus(q.ReceiptID, 'Receipt', newVal)}
                                                     />
                                                 </td>
+                                                    <td>{q.CreatedByName || '-'}</td>
                                                     <td style={{ textAlign: 'center' }}>
                                                         <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                             <button
@@ -1731,12 +1739,13 @@ export default function Sales() {
                                             <th>ยอดรวม (บาท)</th>
                                             <th>วันที่สั่ง</th>
                                             <th>สถานะ</th>
+                                            <th>ผู้สร้าง</th>
                                             <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {filteredOrders.length === 0 ? (
-                                            <tr><td colSpan="9" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ยังไม่มีรายการ Sales Order</td></tr>
+                                            <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ยังไม่มีรายการ Sales Order</td></tr>
                                         ) : filteredOrders.map((o, idx) => (
                                             <tr key={o.SalesOrderID}>
                                                 <td>{idx + 1}</td>
@@ -1754,6 +1763,7 @@ export default function Sales() {
                                                 <td>{(o.GrandTotal || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                                 <td>{o.OrderDate ? new Date(o.OrderDate).toLocaleDateString('th-TH') : ''}</td>
                                                 <td><span className={`badge ${getOrderStatusClass(o.Status)}`}>{o.Status}</span></td>
+                                                <td>{o.CreatedByName || '-'}</td>
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                         {o.Revision > 0 && (
@@ -1875,12 +1885,13 @@ export default function Sales() {
                                         <th>ยอดรวม (บาท)</th>
                                         <th>วันที่บิล</th>
                                         <th>สถานะ</th>
+                                        <th>ผู้สร้าง</th>
                                         <th style={{ textAlign: 'center' }}>จัดการ</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {localBillings.length === 0 ? (
-                                        <tr><td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลใบวางบิล/ใบแจ้งหนี้</td></tr>
+                                        <tr><td colSpan="9" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>ไม่มีข้อมูลใบวางบิล/ใบแจ้งหนี้</td></tr>
                                     ) : localBillings.map((b, idx) => (
                                         <tr key={b.BillingInvoiceID || b.id}>
                                             <td>{idx + 1}</td>
@@ -1896,6 +1907,7 @@ export default function Sales() {
                                                     onChange={(newVal) => handleUpdateDocStatus(b.BillingInvoiceID || b.id, 'BillingInvoice', newVal)}
                                                 />
                                             </td>
+                                            <td>{b.CreatedByName || '-'}</td>
                                             <td style={{ textAlign: 'center' }}>
                                                 <div style={{ display: 'flex', gap: '2px', justifyContent: 'center', flexWrap: 'nowrap' }}>
                                                     <button 

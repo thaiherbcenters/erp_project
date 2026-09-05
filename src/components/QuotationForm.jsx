@@ -1276,10 +1276,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         const ok = await showConfirm('ยืนยันการบันทึก', 'คุณต้องการบันทึกใบเสนอราคานี้ใช่หรือไม่?', 'info');
         if (!ok) return;
 
-        if (!formData.customerTypeId) {
-            showAlert('ข้อผิดพลาด', 'กรุณาระบุประเภทลูกค้าก่อนบันทึก', 'warning');
-            return;
-        }
+
 
         setStatus('saving');
 

@@ -21,19 +21,19 @@ router.get('/', async (req, res) => {
         let whereClauses = [];
         const request = pool.request();
         if (search) {
-            whereClauses.push('(QuotationNo LIKE @search OR CustomerName LIKE @search OR Status LIKE @search)');
+            whereClauses.push('(q.QuotationNo LIKE @search OR q.CustomerName LIKE @search OR q.Status LIKE @search)');
             request.input('search', sql.NVarChar, `%${search}%`);
         }
         
         if (category === 'quotation') {
-            whereClauses.push("DocType LIKE 'quotation_%'");
+            whereClauses.push("q.DocType LIKE 'quotation_%'");
         } else if (category === 'billing') {
-            whereClauses.push("DocType NOT LIKE 'quotation_%'");
+            whereClauses.push("q.DocType NOT LIKE 'quotation_%'");
         }
 
         const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-        const countResult = await request.query(`SELECT COUNT(*) as total FROM Quotation ${whereClause}`);
+        const countResult = await request.query(`SELECT COUNT(*) as total FROM Quotation q ${whereClause}`);
         const total = countResult.recordset[0].total;
 
         request.input('offset', sql.Int, offset);
@@ -41,11 +41,12 @@ router.get('/', async (req, res) => {
 
         const result = await request.query(`
             SELECT 
-                QuotationID, QuotationNo, ContractID, CustomerName, BillDate, ValidUntil, 
-                GrandTotal, Status, CreatedAt, Revision
-            FROM Quotation
+                q.QuotationID, q.QuotationNo, q.ContractID, q.CustomerName, q.BillDate, q.ValidUntil, 
+                q.GrandTotal, q.Status, q.CreatedAt, q.Revision, u.display_name AS CreatedByName
+            FROM Quotation q
+            LEFT JOIN Users u ON q.CreatedBy = u.user_id
             ${whereClause}
-            ORDER BY QuotationID DESC
+            ORDER BY q.QuotationID DESC
             OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
         `);
         res.json({ 
@@ -209,6 +210,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
         request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
         request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
+        request.input('createdBy', sql.Int, req.user ? req.user.id : null);
 
         const headerResult = await request.query(`
             INSERT INTO Quotation (
@@ -216,7 +218,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                CreatedBy
             )
             OUTPUT INSERTED.QuotationID
             VALUES (
@@ -224,7 +227,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
                 @billDate, @validUntil, @subTotal, @discountPercent, @discountAmount, @afterDiscount,
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
                 @remainingAmount, @signer, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
-                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice
+                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice,
+                @createdBy
             )
         `);
 

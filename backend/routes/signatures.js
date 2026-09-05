@@ -113,4 +113,52 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+// PUT update signature
+router.put('/:id', upload.single('signatureImage'), async (req, res) => {
+    try {
+        const { fullName, userId } = req.body;
+        const file = req.file;
+        const signatureId = req.params.id;
+
+        if (!fullName) {
+            return res.status(400).json({ success: false, message: 'Name is required.' });
+        }
+
+        const pool = await poolPromise;
+        let request = pool.request()
+            .input('id', sql.Int, signatureId)
+            .input('fullName', sql.NVarChar, fullName);
+
+        if (userId && userId !== 'null' && userId !== 'undefined' && userId !== '') {
+            request = request.input('userId', sql.Int, userId);
+        } else {
+            request = request.input('userId', sql.Int, null);
+        }
+
+        let updateQuery = `
+            UPDATE Signatures
+            SET FullName = @fullName, user_id = @userId, UpdatedAt = GETDATE()
+        `;
+
+        if (file) {
+            const imagePath = '/api/uploads/signatures/' + file.filename;
+            request = request.input('imagePath', sql.NVarChar, imagePath);
+            updateQuery += `, ImagePath = @imagePath`;
+        }
+
+        updateQuery += ` OUTPUT INSERTED.* WHERE SignatureID = @id`;
+
+        const result = await request.query(updateQuery);
+
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ success: false, message: 'Signature not found.' });
+        }
+
+        res.json({ success: true, message: 'Signature updated successfully.', data: result.recordset[0] });
+    } catch (err) {
+        console.error('Error updating signature:', err);
+        res.status(500).json({ success: false, message: 'Failed to update signature', error: err.message });
+    }
+});
+
 module.exports = router;

@@ -1261,10 +1261,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
         const ok = await showConfirm('ยืนยันการบันทึก', 'คุณต้องการบันทึกใบแจ้งหนี้/ใบส่งสินค้านี้ใช่หรือไม่?', 'info');
         if (!ok) return;
 
-        if (!formData.customerTypeId) {
-            showAlert('ข้อผิดพลาด', 'กรุณาระบุประเภทลูกค้าก่อนบันทึก', 'warning');
-            return;
-        }
+
 
         setStatus('saving');
 

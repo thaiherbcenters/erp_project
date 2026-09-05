@@ -21,14 +21,14 @@ router.get('/', async (req, res) => {
         let whereClauses = [];
         const request = pool.request();
         if (search) {
-            whereClauses.push('(TaxInvoiceNo LIKE @search OR CustomerName LIKE @search OR Status LIKE @search)');
+            whereClauses.push('(ti.TaxInvoiceNo LIKE @search OR ti.CustomerName LIKE @search OR ti.Status LIKE @search)');
             request.input('search', sql.NVarChar, `%${search}%`);
         }
         // No category filter needed for billing invoice specific table
 
         const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-        const countResult = await request.query(`SELECT COUNT(*) as total FROM TaxInvoice ${whereClause}`);
+        const countResult = await request.query(`SELECT COUNT(*) as total FROM TaxInvoice ti ${whereClause}`);
         const total = countResult.recordset[0].total;
 
         request.input('offset', sql.Int, offset);
@@ -36,11 +36,12 @@ router.get('/', async (req, res) => {
 
         const result = await request.query(`
             SELECT 
-                CustomerID, TaxInvoiceID, TaxInvoiceNo, ContractID, CustomerName, BillDate, ValidUntil, 
-                GrandTotal, Status, CreatedAt, Revision
-            FROM TaxInvoice
+                ti.CustomerID, ti.TaxInvoiceID, ti.TaxInvoiceNo, ti.ContractID, ti.CustomerName, ti.BillDate, ti.ValidUntil, 
+                ti.GrandTotal, ti.Status, ti.CreatedAt, ti.Revision, u.display_name AS CreatedByName
+            FROM TaxInvoice ti
+            LEFT JOIN Users u ON ti.CreatedBy = u.user_id
             ${whereClause}
-            ORDER BY TaxInvoiceID DESC
+            ORDER BY ti.TaxInvoiceID DESC
             OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
         `);
         res.json({ 
@@ -204,6 +205,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createTaxInvoiceSche
         request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
         request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
+        request.input('createdBy', sql.Int, req.user ? req.user.id : null);
 
         const headerResult = await request.query(`
             INSERT INTO TaxInvoice (
@@ -211,7 +213,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createTaxInvoiceSche
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                CreatedBy
             )
             OUTPUT INSERTED.TaxInvoiceID
             VALUES (
@@ -219,7 +222,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createTaxInvoiceSche
                 @billDate, @validUntil, @subTotal, @discountPercent, @discountAmount, @afterDiscount,
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
                 @remainingAmount, @signer, @customerOrder, @purchaseNo, @salesperson, @termOfPayment, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
-                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice
+                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice,
+                @createdBy
             )
         `);
 

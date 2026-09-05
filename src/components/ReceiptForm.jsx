@@ -1342,10 +1342,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         const ok = await showConfirm('ยืนยันการบันทึก', 'คุณต้องการบันทึกใบเสร็จรับเงิน RECEIPT (ORIGINAL)นี้ใช่หรือไม่?', 'info');
         if (!ok) return;
 
-        if (!formData.customerTypeId) {
-            showAlert('ข้อผิดพลาด', 'กรุณาระบุประเภทลูกค้าก่อนบันทึก', 'warning');
-            return;
-        }
+
 
         setStatus('saving');
 
