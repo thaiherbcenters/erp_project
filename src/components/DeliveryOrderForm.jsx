@@ -8,6 +8,7 @@ import CustomSelect from './CustomSelect';
 import ContractSelectorModal from './ContractSelectorModal';
 import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
+import { TipTapCell } from './TipTapCell';
 import BillingPrintContainer from './BillingPrintContainer';
 import '../pages/PageCommon.css';
 
@@ -2198,12 +2199,10 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label>หมายเหตุ (ข้อความนี้จะแสดงท้ายบิล สามารถแก้ไขข้อความได้เลย)</label>
-                            <div 
-                                contentEditable 
-                                suppressContentEditableWarning={true}
-                                onBlur={(e) => setFormData(prev => ({ ...prev, notes: e.target.innerHTML }))}
-                                style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '12px', minHeight: '80px', background: 'white', fontSize: '13px', outline: 'none' }}
-                                dangerouslySetInnerHTML={{ __html: formData.notes }}
+                            <TipTapCell
+                                value={formData.notes}
+                                onChange={(html) => setFormData(prev => ({ ...prev, notes: html }))}
+                                style={{ border: '1px solid #e2e8f0', borderRadius: '6px', minHeight: '80px', background: 'white', fontSize: '13px' }}
                             />
                         </div>
                     </div>

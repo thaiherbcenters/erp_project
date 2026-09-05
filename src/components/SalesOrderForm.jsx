@@ -8,6 +8,7 @@ import CustomSelect from './CustomSelect';
 import ContractSelectorModal from './ContractSelectorModal';
 import QuotationSelectorModal from './QuotationSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
+import { TipTapCell } from './TipTapCell';
 import '../pages/PageCommon.css';
 const PRODUCT_CATALOG = {
     "ยาดมสมุนไพร": { price: 79, promo: { newQty: 40, newPrice: 25, oldQty: 50, oldPrice: 20 }, unit: 'ขวด' },
@@ -1588,10 +1589,9 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             {/* ── หมายเหตุ ── */}
             <div style={sectionStyle}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>หมายเหตุ</label>
-                <div 
-                    contentEditable
-                    onBlur={(e) => setFormData(prev => ({ ...prev, notes: e.target.innerHTML }))}
-                    dangerouslySetInnerHTML={{ __html: formData.notes }}
+                <TipTapCell
+                    value={formData.notes}
+                    onChange={(html) => setFormData(prev => ({ ...prev, notes: html }))}
                     style={{ ...inputStyle, minHeight: '80px', overflowY: 'auto', backgroundColor: '#fff' }}
                     placeholder="หมายเหตุเพิ่มเติม..."
                 />
