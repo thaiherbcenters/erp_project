@@ -60,9 +60,14 @@ router.post('/login', async (req, res) => {
                      .query('SELECT page_id, data_scope FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
             } catch (dbErr2) {
                 console.log('Falling back to oldest permissions query (data_scope missing)', dbErr2.message);
-                permResult = await pool.request()
-                     .input('user_id', user.user_id)
-                     .query('SELECT page_id FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+                try {
+                    permResult = await pool.request()
+                         .input('user_id', user.user_id)
+                         .query('SELECT page_id FROM UserPermissions WHERE user_id = @user_id AND is_granted = 1');
+                } catch (dbErr3) {
+                    console.log('Permission query completely failed (table might be missing)', dbErr3.message);
+                    permResult = { recordset: [] };
+                }
             }
         }
 
@@ -102,7 +107,10 @@ router.post('/login', async (req, res) => {
 
     } catch (err) {
         console.error('Login error:', err);
-        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ', error: err.stack });
+        res.status(500).json({ 
+            message: 'เกิดข้อผิดพลาด: ' + err.message, 
+            error: err.stack 
+        });
     }
 });
 
