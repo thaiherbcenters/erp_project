@@ -605,7 +605,7 @@ function translateNotesToEN(html) {
 }
 
 const DEFAULT_NORMAL_NOTES = `<p><strong>หมายเหตุ:</strong></p>
-<p><span style="color: #ef4444; font-size: 11pt;">ชำระมัดจำ 50 % ณ วันที่สั่งซื้อ หรือสั่งผลิต ชำระส่วนที่เหลือ วันที่รับสินค้า</span></p>
+<p><span style="color: #ef4444; font-size: 16px;">ชำระมัดจำ 50 % ณ วันที่สั่งซื้อ หรือสั่งผลิต ชำระส่วนที่เหลือ วันที่รับสินค้า</span></p>
 <p><span style="color: #ef4444;">ห้ามวางจำหน่ายตามร้านค้าทั่วไป!</span></p>
 <p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;- สินค้าไม่ผ่านกระบวนการทาง อย.</span></p>
 <p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;- สินค้าสามารถขายได้เฉพาะงานมงคล งานบุญ งานขาวดำ</span></p>

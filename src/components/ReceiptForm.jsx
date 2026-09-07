@@ -683,7 +683,7 @@ function translateNotesToEN(html) {
     return res;
 }
 
-const DEFAULT_NORMAL_NOTES = `<p><span style="font-size: 9pt;">หมายเหตุ: ใบเสร็จรับเงินฉบับนี้จะถือว่าถูกต้องและสมบูรณ์ต่อเมื่อมีลายเซ็นของผู้มีอำนาจและเมื่อเรียกเก็บเงินตามบิลได้เรียบร้อย</span></p>`;
+const DEFAULT_NORMAL_NOTES = `<p><span style="font-size: 12px;">หมายเหตุ: ใบเสร็จรับเงินฉบับนี้จะถือว่าถูกต้องและสมบูรณ์ต่อเมื่อมีลายเซ็นของผู้มีอำนาจและเมื่อเรียกเก็บเงินตามบิลได้เรียบร้อย</span></p>`;
 
 const DEFAULT_FDA_NOTES = DEFAULT_NORMAL_NOTES;
 
