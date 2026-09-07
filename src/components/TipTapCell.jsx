@@ -80,7 +80,7 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                                     editor.chain().focus().unsetFontSize().run();
                                 }
                             }}
-                            style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none', flexShrink: 0 }}
+                            style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none', flexShrink: 0, width: '75px' }}
                             value={editor.getAttributes('textStyle').fontSize || ''}
                         >
                             <option value="">ขนาด</option>
