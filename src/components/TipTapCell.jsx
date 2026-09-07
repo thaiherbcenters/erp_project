@@ -44,7 +44,6 @@ const FontSize = Extension.create({
 
 export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) => {
     const lastEmittedHTML = useRef(value || '');
-    // Save the editor selection BEFORE the dropdown steals focus
     const savedSelection = useRef(null);
 
     const editor = useEditor({
@@ -72,7 +71,6 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
         editor.commands.setContent(value || '', false);
     }, [value, editor]);
 
-    // Capture selection right before any toolbar element steals focus
     const saveSelection = useCallback(() => {
         if (editor) {
             savedSelection.current = {
@@ -82,21 +80,14 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
         }
     }, [editor]);
 
-    // Restore selection, apply a chain of commands, then notify React
-    const applyWithSelection = useCallback((chainFn) => {
-        if (!editor) return;
+    // Build a chain that restores selection first, then appends extra commands
+    const chainWithSelection = useCallback(() => {
         const sel = savedSelection.current;
+        const c = editor.chain().focus();
         if (sel && sel.from !== sel.to) {
-            // Restore the text selection that was lost when dropdown took focus
-            editor.chain()
-                .focus()
-                .setTextSelection({ from: sel.from, to: sel.to })
-                .run();
-        } else {
-            editor.chain().focus().run();
+            return c.setTextSelection({ from: sel.from, to: sel.to });
         }
-        // Now apply the actual formatting command
-        chainFn();
+        return c;
     }, [editor]);
 
     if (!editor) return null;
@@ -105,25 +96,21 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
 
     const handleFontSizeChange = (e) => {
         const val = e.target.value;
-        applyWithSelection(() => {
-            if (val) {
-                editor.chain().focus().setFontSize(val + 'px').run();
-            } else {
-                editor.chain().focus().unsetFontSize().run();
-            }
-        });
+        if (val) {
+            chainWithSelection().setFontSize(val + 'px').run();
+        } else {
+            chainWithSelection().unsetFontSize().run();
+        }
     };
 
     const handleColorChange = (e) => {
-        applyWithSelection(() => {
-            editor.chain().focus().setColor(e.target.value).run();
-        });
+        chainWithSelection().setColor(e.target.value).run();
     };
 
-    const toolbarAction = (fn) => (e) => {
+    const tbtn = (fn) => (e) => {
         e.preventDefault();
         saveSelection();
-        applyWithSelection(fn);
+        fn();
     };
 
     const currentFontSize = (editor.getAttributes('textStyle').fontSize || '').replace('px', '');
@@ -133,7 +120,6 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
             {editor && !readOnly && (
                 <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
                     <div style={{ background: '#333', padding: '6px', borderRadius: '8px', display: 'flex', gap: '4px', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', flexWrap: 'nowrap' }}>
-                        {/* Font Size */}
                         <select 
                             onMouseDown={saveSelection}
                             onChange={handleFontSizeChange}
@@ -146,10 +132,8 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                             ))}
                         </select>
                         
-                        {/* Color Picker */}
                         <div style={{ position: 'relative', width: '22px', height: '22px', minWidth: '22px', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', border: '1px solid #666' }}>
-                            <input 
-                                type="color"
+                            <input type="color"
                                 onMouseDown={(e) => { e.stopPropagation(); saveSelection(); }}
                                 onChange={handleColorChange}
                                 value={editor.getAttributes('textStyle').color || '#000000'}
@@ -159,71 +143,36 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                         </div>
 
                         <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 1px' }}></div>
-                        
-                        {/* Bold */}
-                        <button type="button"
-                            onMouseDown={toolbarAction(() => editor.chain().focus().toggleBold().run())}
+                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().toggleBold().run())}
                             style={{ background: editor.isActive('bold') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
-                            title="ตัวหนา"
                         >B</button>
-                        
-                        {/* Italic */}
-                        <button type="button"
-                            onMouseDown={toolbarAction(() => editor.chain().focus().toggleItalic().run())}
+                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().toggleItalic().run())}
                             style={{ background: editor.isActive('italic') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', fontStyle: 'italic', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
-                            title="ตัวเอียง"
                         >I</button>
-                        
-                        {/* Underline */}
-                        <button type="button"
-                            onMouseDown={toolbarAction(() => editor.chain().focus().toggleUnderline().run())}
+                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().toggleUnderline().run())}
                             style={{ background: editor.isActive('underline') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', textDecoration: 'underline', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
-                            title="ขีดเส้นใต้"
                         >U</button>
-                        
-                        {/* Strikethrough */}
-                        <button type="button"
-                            onMouseDown={toolbarAction(() => editor.chain().focus().toggleStrike().run())}
+                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().toggleStrike().run())}
                             style={{ background: editor.isActive('strike') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', textDecoration: 'line-through', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
-                            title="ขีดทับ"
                         >S</button>
-                        
                         <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 1px' }}></div>
-                        
-                        {/* Align Left */}
-                        <button type="button"
-                            onMouseDown={toolbarAction(() => editor.chain().focus().setTextAlign('left').run())}
+                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().setTextAlign('left').run())}
                             style={{ background: editor.isActive({ textAlign: 'left' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         ><AlignLeft size={13} /></button>
-                        
-                        {/* Align Center */}
-                        <button type="button"
-                            onMouseDown={toolbarAction(() => editor.chain().focus().setTextAlign('center').run())}
+                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().setTextAlign('center').run())}
                             style={{ background: editor.isActive({ textAlign: 'center' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         ><AlignCenter size={13} /></button>
-                        
-                        {/* Align Right */}
-                        <button type="button"
-                            onMouseDown={toolbarAction(() => editor.chain().focus().setTextAlign('right').run())}
+                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().setTextAlign('right').run())}
                             style={{ background: editor.isActive({ textAlign: 'right' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         ><AlignRight size={13} /></button>
-                        
                         <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 1px' }}></div>
-                        
-                        {/* Clear Formatting */}
-                        <button type="button"
-                            onMouseDown={toolbarAction(() => { editor.commands.unsetAllMarks(); editor.commands.clearNodes(); })}
+                        <button type="button" onMouseDown={tbtn(() => { editor.commands.unsetAllMarks(); editor.commands.clearNodes(); })}
                             style={{ background: 'transparent', color: '#fca5a5', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-                            title="ล้างรูปแบบทั้งหมด"
                         ><Eraser size={13} /></button>
                     </div>
                 </BubbleMenu>
             )}
-            <EditorContent 
-                editor={editor} 
-                style={{ flex: 1 }} 
-                className="tiptap-cell-editor" 
-            />
+            <EditorContent editor={editor} style={{ flex: 1 }} className="tiptap-cell-editor" />
             {!editor.getText() && placeholder && !readOnly && (
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', color: '#9ca3af', pointerEvents: 'none', fontSize: '14px' }}>
                     {placeholder}
