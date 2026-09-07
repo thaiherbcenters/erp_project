@@ -44,6 +44,13 @@
   margin: 0;
   width: 100%;
 }
+.tiptap-cell-editor hr,
+.print-notes-container hr {
+  border: none !important;
+  border-top: 1.5px solid #333 !important;
+  margin: 12px 0 !important;
+  width: 100%;
+}
 
 
 * {

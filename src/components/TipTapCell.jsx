@@ -6,7 +6,7 @@ import TextStyle from '@tiptap/extension-text-style';
 import { Extension } from '@tiptap/core';
 import Underline from '@tiptap/extension-underline';
 import Color from '@tiptap/extension-color';
-import { AlignLeft, AlignCenter, AlignRight, Eraser } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, Eraser, Minus } from 'lucide-react';
 
 const FontSize = Extension.create({
     name: 'fontSize',
@@ -165,6 +165,10 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                         <button type="button" onMouseDown={tbtn(() => chainWithSelection().setTextAlign('right').run())}
                             style={{ background: editor.isActive({ textAlign: 'right' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         ><AlignRight size={13} /></button>
+                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().setHorizontalRule().run())}
+                            style={{ background: 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            title="เพิ่มเส้นคั่น"
+                        ><Minus size={13} /></button>
                         <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 1px' }}></div>
                         <button type="button" onMouseDown={tbtn(() => { editor.commands.unsetAllMarks(); editor.commands.clearNodes(); })}
                             style={{ background: 'transparent', color: '#fca5a5', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
