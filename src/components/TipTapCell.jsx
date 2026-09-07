@@ -56,8 +56,11 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
     });
 
     useEffect(() => {
-        if (editor && value !== editor.getHTML()) {
-            editor.commands.setContent(value || '');
+        if (editor && value !== undefined) {
+            // Prevent aggressive re-setting if the user is actively using the editor or menu
+            if (value !== editor.getHTML() && !editor.isFocused) {
+                editor.commands.setContent(value || '', false);
+            }
         }
     }, [value, editor]);
 
@@ -75,9 +78,9 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (val) {
-                                    editor.chain().focus().setFontSize(val).run();
+                                    editor.chain().setFontSize(val).run();
                                 } else {
-                                    editor.chain().focus().unsetFontSize().run();
+                                    editor.chain().unsetFontSize().run();
                                 }
                             }}
                             style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none', flexShrink: 0, width: '75px' }}
@@ -92,7 +95,7 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                         <div style={{ position: 'relative', width: '24px', height: '24px', minWidth: '24px', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', border: '1px solid #666' }}>
                             <input 
                                 type="color" 
-                                onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+                                onChange={(e) => editor.chain().setColor(e.target.value).run()}
                                 value={editor.getAttributes('textStyle').color || '#000000'}
                                 style={{ position: 'absolute', top: '-5px', left: '-5px', width: '34px', height: '34px', padding: '0', border: 'none', cursor: 'pointer' }}
                                 title="สีข้อความ"
