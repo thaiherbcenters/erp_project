@@ -604,26 +604,21 @@ function translateNotesToEN(html) {
     return res;
 }
 
-const DEFAULT_NORMAL_NOTES = `<div style="font-weight:bold; color: black;">หมายเหตุ:
-    <br>
-    <span style="color:red; font-size: 11pt;">ชำระมัดจำ 50 % ณ วันที่สั่งซื้อ หรือสั่งผลิต ชำระส่วนที่เหลือ วันที่รับสินค้า</span>
-    <br>
-    <span style="color:red;">ห้ามวางจำหน่ายตามร้านค้าทั่วไป!</span>
-</div>
-<div style="color:red; margin-left: 20px;">- สินค้าไม่ผ่านกระบวนการทาง อย.</div>
-<div style="color:red; margin-left: 20px;">- สินค้าสามารถขายได้เฉพาะงานมงคล งานบุญ งานขาวดำ</div>
-<div style="color:red; margin-left: 30px;">ใช้เป็นของชำร่วย ,ของฝาก,ของขวัญ</div>
-<div style="color:red; margin-left: 20px;">- สินค้าขายเฉพาะกลุ่ม</div>
-<div style="color:red; margin-left: 30px;">(ราคารวมฉลากและรูปแบบโลโก้ชื่อแบรนด์)</div>
-<div style="color:red; text-align: center; font-weight: bold;">**ราคานี้ยังไม่รวมค่าจัดส่ง**</div>`;
+const DEFAULT_NORMAL_NOTES = `<p><strong>หมายเหตุ:</strong></p>
+<p><span style="color: #ef4444; font-size: 11pt;">ชำระมัดจำ 50 % ณ วันที่สั่งซื้อ หรือสั่งผลิต ชำระส่วนที่เหลือ วันที่รับสินค้า</span></p>
+<p><span style="color: #ef4444;">ห้ามวางจำหน่ายตามร้านค้าทั่วไป!</span></p>
+<p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;- สินค้าไม่ผ่านกระบวนการทาง อย.</span></p>
+<p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;- สินค้าสามารถขายได้เฉพาะงานมงคล งานบุญ งานขาวดำ</span></p>
+<p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ใช้เป็นของชำร่วย ,ของฝาก,ของขวัญ</span></p>
+<p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;- สินค้าขายเฉพาะกลุ่ม</span></p>
+<p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(ราคารวมฉลากและรูปแบบโลโก้ชื่อแบรนด์)</span></p>
+<p style="text-align: center"><strong><span style="color: #ef4444;">**ราคานี้ยังไม่รวมค่าจัดส่ง**</span></strong></p>`;
 
-const DEFAULT_FDA_NOTES = `<div style="font-weight:bold; color: black; font-size: 14px; line-height: 1.5;">
-เงื่อนไข : <span style="color:red; font-weight: normal;">กรณีที่ลูกค้าตกลงโอนชำระเงินรายการตามใบเสนอราคาเรียบร้อยแล้ว<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ทางบริษัท(โรงงาน)ขอสงวนสิทธิ์ในการคืนเงินทุกกรณี<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="font-weight: bold;">**หากมีการเปลี่ยนแปลงอันที่จะเกิดขึ้นทาง บริษัทขอพิจารณาไม่เกิน 15% ของจำนวนทั้งหมด**</span></span><br>
-<hr style="margin: 8px 0; border: none; border-top: 1px solid #000;">
-หมายเหตุ : <span style="color:red">**ค่าดำเนินการขึ้นทะเบียนและค่าธรรมเนียมชำระเพียงครั้งเดียว 100% ในครั้งแรกที่ยื่นคำขอ**</span>
-</div>`;
+const DEFAULT_FDA_NOTES = `<p><strong>เงื่อนไข : </strong><span style="color: #ef4444;">กรณีที่ลูกค้าตกลงโอนชำระเงินรายการตามใบเสนอราคาเรียบร้อยแล้ว</span></p>
+<p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ทางบริษัท(โรงงาน)ขอสงวนสิทธิ์ในการคืนเงินทุกกรณี</span></p>
+<p><span style="color: #ef4444;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>**หากมีการเปลี่ยนแปลงอันที่จะเกิดขึ้นทาง บริษัทขอพิจารณาไม่เกิน 15% ของจำนวนทั้งหมด**</strong></span></p>
+<hr>
+<p><strong>หมายเหตุ : </strong><span style="color: #ef4444;"><strong>**ค่าดำเนินการขึ้นทะเบียนและค่าธรรมเนียมชำระเพียงครั้งเดียว 100% ในครั้งแรกที่ยื่นคำขอ**</strong></span></p>`;
 
 const PRODUCT_CATALOG = {
     "ยาดมสมุนไพร": { price: 79, promo: { newQty: 40, newPrice: 25, oldQty: 50, oldPrice: 20 } },

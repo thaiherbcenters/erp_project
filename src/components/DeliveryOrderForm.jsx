@@ -605,12 +605,10 @@ function translateNotesToEN(html) {
     return res;
 }
 
-const DEFAULT_NORMAL_NOTES = `<div style="font-weight:bold; font-size: 9pt;">เงื่อนไข & ข้อตกลง :</div>
-<div style="font-size: 8.5pt; margin-left: 10px; line-height: 1.5;">
-    1. สินค้าที่ผลิตไม่สามารถเปลี่ยนแปลง ยกเลิก หรือคืนในกรณีการสั่งผลิตสินค้า ยกเว้นสินค้ามีปัญหาจากกระบวนการผลิต<br>
-    2. การตรวจรับสินค้าให้ตรวจสอบหลังรับสินค้า ต้องรายงานภายในวันเท่านั้น มิฉะนั้นถือว่ายอมรับสินค้าที่ส่งมอบ<br>
-    3. สินค้าที่มอบแล้วจะไม่สามารถเปลี่ยนแปลงใดๆ ขอสงวนสิทธิ์เรียกชำระเงินตามมูลค่าสินค้าที่ส่งมอบ
-</div>`;
+const DEFAULT_NORMAL_NOTES = `<p><strong><span style="font-size: 9pt;">เงื่อนไข & ข้อตกลง :</span></strong></p>
+<p><span style="font-size: 8.5pt;">&nbsp;&nbsp;&nbsp;&nbsp;1. สินค้าที่ผลิตไม่สามารถเปลี่ยนแปลง ยกเลิก หรือคืนในกรณีการสั่งผลิตสินค้า ยกเว้นสินค้ามีปัญหาจากกระบวนการผลิต</span></p>
+<p><span style="font-size: 8.5pt;">&nbsp;&nbsp;&nbsp;&nbsp;2. การตรวจรับสินค้าให้ตรวจสอบหลังรับสินค้า ต้องรายงานภายในวันเท่านั้น มิฉะนั้นถือว่ายอมรับสินค้าที่ส่งมอบ</span></p>
+<p><span style="font-size: 8.5pt;">&nbsp;&nbsp;&nbsp;&nbsp;3. สินค้าที่มอบแล้วจะไม่สามารถเปลี่ยนแปลงใดๆ ขอสงวนสิทธิ์เรียกชำระเงินตามมูลค่าสินค้าที่ส่งมอบ</span></p>`;
 
 const DEFAULT_FDA_NOTES = DEFAULT_NORMAL_NOTES;
 

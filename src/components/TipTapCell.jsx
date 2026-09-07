@@ -63,7 +63,7 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
 
     if (!editor) return null;
 
-    const FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '20px'];
+    const FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '20px', '11pt', '12pt', '14pt'];
     const COLORS = ['#000000', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
 
     return (
@@ -74,21 +74,23 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                         <select 
                             onChange={(e) => editor.chain().focus().setFontSize(e.target.value).run()} 
                             style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none' }}
-                            value={editor.getAttributes('textStyle').fontSize || '14px'}
+                            value={editor.getAttributes('textStyle').fontSize || ''}
                         >
                             <option value="">ขนาด</option>
                             {FONT_SIZES.map(size => (
-                                <option key={size} value={size}>{size.replace('px', '')}</option>
+                                <option key={size} value={size}>{size}</option>
                             ))}
                         </select>
                         
-                        <input 
-                            type="color" 
-                            onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
-                            value={editor.getAttributes('textStyle').color || '#000000'}
-                            style={{ width: '24px', height: '24px', padding: '0', border: 'none', background: 'transparent', cursor: 'pointer' }}
-                            title="สีข้อความ"
-                        />
+                        <div style={{ position: 'relative', width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #666' }}>
+                            <input 
+                                type="color" 
+                                onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
+                                value={editor.getAttributes('textStyle').color || '#000000'}
+                                style={{ position: 'absolute', top: '-5px', left: '-5px', width: '34px', height: '34px', padding: '0', border: 'none', cursor: 'pointer' }}
+                                title="สีข้อความ"
+                            />
+                        </div>
 
                         <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 2px' }}></div>
                         <button
