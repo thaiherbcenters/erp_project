@@ -781,15 +781,6 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
         }
     }, [defaultSignerKey, editId]);
 
-    useEffect(() => {
-        if (formData.notes && !formData.notes.includes('<div')) {
-            const isFda = formData.docType && formData.docType.includes('fda');
-            setFormData(prev => ({
-                ...prev,
-                notes: isFda ? DEFAULT_FDA_NOTES : DEFAULT_NORMAL_NOTES
-            }));
-        }
-    }, [formData.notes]);
 
     useEffect(() => {
         if (!editId) {
