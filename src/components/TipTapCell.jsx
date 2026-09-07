@@ -72,8 +72,15 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                 <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
                     <div style={{ background: '#333', padding: '6px', borderRadius: '8px', display: 'flex', gap: '6px', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
                         <select 
-                            onChange={(e) => editor.chain().focus().setFontSize(e.target.value).run()} 
-                            style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none' }}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (val) {
+                                    editor.chain().focus().setFontSize(val).run();
+                                } else {
+                                    editor.chain().focus().unsetFontSize().run();
+                                }
+                            }}
+                            style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none', flexShrink: 0 }}
                             value={editor.getAttributes('textStyle').fontSize || ''}
                         >
                             <option value="">ขนาด</option>
@@ -82,7 +89,7 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                             ))}
                         </select>
                         
-                        <div style={{ position: 'relative', width: '24px', height: '24px', borderRadius: '4px', overflow: 'hidden', border: '1px solid #666' }}>
+                        <div style={{ position: 'relative', width: '24px', height: '24px', minWidth: '24px', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', border: '1px solid #666' }}>
                             <input 
                                 type="color" 
                                 onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
