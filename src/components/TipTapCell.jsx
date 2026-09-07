@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
@@ -39,6 +39,9 @@ const FontSize = Extension.create({
 });
 
 export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) => {
+    // Track the last value WE sent out via onChange, so we don't fight ourselves
+    const lastEmittedHTML = useRef(value || '');
+
     const editor = useEditor({
         extensions: [
             StarterKit,
@@ -51,23 +54,26 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
         content: value || '',
         editable: !readOnly,
         onUpdate: ({ editor }) => {
-            onChange(editor.getHTML());
+            const html = editor.getHTML();
+            lastEmittedHTML.current = html;
+            onChange(html);
         },
     });
 
+    // Only sync from parent when value changes from an EXTERNAL source
+    // (e.g. loading from DB, switching documents, language toggle)
+    // NOT when our own onChange triggered the parent re-render
     useEffect(() => {
-        if (editor && value !== undefined) {
-            // Prevent aggressive re-setting if the user is actively using the editor or menu
-            if (value !== editor.getHTML() && !editor.isFocused) {
-                editor.commands.setContent(value || '', false);
-            }
-        }
+        if (!editor) return;
+        if (value === lastEmittedHTML.current) return; // This is our own echo, skip
+        // External change — update editor content
+        lastEmittedHTML.current = value || '';
+        editor.commands.setContent(value || '', false);
     }, [value, editor]);
 
     if (!editor) return null;
 
     const FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '20px', '11pt', '12pt', '14pt'];
-    const COLORS = ['#000000', '#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
 
     return (
         <div style={{ ...style, display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
@@ -78,9 +84,9 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (val) {
-                                    editor.chain().setFontSize(val).run();
+                                    editor.chain().focus().setFontSize(val).run();
                                 } else {
-                                    editor.chain().unsetFontSize().run();
+                                    editor.chain().focus().unsetFontSize().run();
                                 }
                             }}
                             style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '12px', outline: 'none', flexShrink: 0, width: '75px' }}
@@ -95,7 +101,7 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                         <div style={{ position: 'relative', width: '24px', height: '24px', minWidth: '24px', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', border: '1px solid #666' }}>
                             <input 
                                 type="color" 
-                                onChange={(e) => editor.chain().setColor(e.target.value).run()}
+                                onChange={(e) => editor.chain().focus().setColor(e.target.value).run()}
                                 value={editor.getAttributes('textStyle').color || '#000000'}
                                 style={{ position: 'absolute', top: '-5px', left: '-5px', width: '34px', height: '34px', padding: '0', border: 'none', cursor: 'pointer' }}
                                 title="สีข้อความ"
