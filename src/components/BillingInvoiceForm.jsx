@@ -786,14 +786,6 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
 
 
     useEffect(() => {
-        if (!editId && formData.notes) {
-            const isFda = formData.docType && formData.docType.includes('fda');
-            const storageKey = `TemplateNotes_BillingInvoice_${isFda ? 'FDA' : 'Normal'}`;
-            localStorage.setItem(storageKey, formData.notes);
-        }
-    }, [formData.notes, formData.docType, editId]);
-
-    useEffect(() => {
         if (!editId) {
             const isFda = formData.docType && formData.docType.includes('fda');
             const storageKey = `TemplateNotes_BillingInvoice_${isFda ? 'FDA' : 'Normal'}`;
@@ -2152,7 +2144,14 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                             <label>หมายเหตุ (ข้อความนี้จะแสดงท้ายบิล สามารถแก้ไขข้อความได้เลย)</label>
                             <TipTapCell
                                 value={formData.notes}
-                                onChange={(html) => setFormData(prev => ({ ...prev, notes: html }))}
+                                onChange={(html) => {
+                                    setFormData(prev => ({ ...prev, notes: html }));
+                                    if (!editId) {
+                                        const isFda = formData.docType && formData.docType.includes('fda');
+                                        const storageKey = `TemplateNotes_BillingInvoice_${isFda ? 'FDA' : 'Normal'}`;
+                                        localStorage.setItem(storageKey, html);
+                                    }
+                                }}
                                 style={{ border: '1px solid #e2e8f0', borderRadius: '6px', minHeight: '80px', background: 'white', fontSize: '13px' }}
                             />
                         </div>

@@ -513,12 +513,6 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     }, [defaultSignerKey, editId]);
 
     useEffect(() => {
-        if (!editId && formData.notes !== undefined) {
-            localStorage.setItem('TemplateNotes_SalesOrder', formData.notes);
-        }
-    }, [formData.notes, editId]);
-
-    useEffect(() => {
         if (!editId) {
             setFormData(prev => ({ ...prev, notes: localStorage.getItem('TemplateNotes_SalesOrder') || '' }));
         }
@@ -1603,7 +1597,12 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 6, color: 'var(--text-secondary)' }}>หมายเหตุ</label>
                 <TipTapCell
                     value={formData.notes}
-                    onChange={(html) => setFormData(prev => ({ ...prev, notes: html }))}
+                    onChange={(html) => {
+                        setFormData(prev => ({ ...prev, notes: html }));
+                        if (!editId) {
+                            localStorage.setItem('TemplateNotes_SalesOrder', html);
+                        }
+                    }}
                     style={{ ...inputStyle, minHeight: '80px', overflowY: 'auto', backgroundColor: '#fff' }}
                     placeholder="หมายเหตุเพิ่มเติม..."
                 />
