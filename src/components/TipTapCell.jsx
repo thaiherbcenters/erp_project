@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TextAlign from '@tiptap/extension-text-align';
@@ -8,8 +8,6 @@ import Underline from '@tiptap/extension-underline';
 import Color from '@tiptap/extension-color';
 import { AlignLeft, AlignCenter, AlignRight, Eraser } from 'lucide-react';
 
-// FontSize extension — uses `commands` (not `chain`) so it integrates
-// properly with the editor command pipeline without short-circuiting.
 const FontSize = Extension.create({
     name: 'fontSize',
     addOptions() {
@@ -45,8 +43,9 @@ const FontSize = Extension.create({
 });
 
 export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) => {
-    // Track the last HTML we emitted so useEffect doesn't fight our own changes
     const lastEmittedHTML = useRef(value || '');
+    // Save the editor selection BEFORE the dropdown steals focus
+    const savedSelection = useRef(null);
 
     const editor = useEditor({
         extensions: [
@@ -66,8 +65,6 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
         },
     });
 
-    // Only sync from parent when value changes from an EXTERNAL source
-    // (loading from DB, switching documents, language toggle — NOT our own onChange echo)
     useEffect(() => {
         if (!editor) return;
         if (value === lastEmittedHTML.current) return;
@@ -75,22 +72,61 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
         editor.commands.setContent(value || '', false);
     }, [value, editor]);
 
+    // Capture selection right before any toolbar element steals focus
+    const saveSelection = useCallback(() => {
+        if (editor) {
+            savedSelection.current = {
+                from: editor.state.selection.from,
+                to: editor.state.selection.to,
+            };
+        }
+    }, [editor]);
+
+    // Restore selection, apply a chain of commands, then notify React
+    const applyWithSelection = useCallback((chainFn) => {
+        if (!editor) return;
+        const sel = savedSelection.current;
+        if (sel && sel.from !== sel.to) {
+            // Restore the text selection that was lost when dropdown took focus
+            editor.chain()
+                .focus()
+                .setTextSelection({ from: sel.from, to: sel.to })
+                .run();
+        } else {
+            editor.chain().focus().run();
+        }
+        // Now apply the actual formatting command
+        chainFn();
+    }, [editor]);
+
     if (!editor) return null;
 
-    const FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '20px', '24px'];
+    const FONT_SIZES = ['10', '12', '14', '16', '18', '20', '24'];
 
     const handleFontSizeChange = (e) => {
         const val = e.target.value;
-        if (val) {
-            editor.chain().focus().setFontSize(val).run();
-        } else {
-            editor.chain().focus().unsetFontSize().run();
-        }
+        applyWithSelection(() => {
+            if (val) {
+                editor.chain().focus().setFontSize(val + 'px').run();
+            } else {
+                editor.chain().focus().unsetFontSize().run();
+            }
+        });
     };
 
     const handleColorChange = (e) => {
-        editor.chain().focus().setColor(e.target.value).run();
+        applyWithSelection(() => {
+            editor.chain().focus().setColor(e.target.value).run();
+        });
     };
+
+    const toolbarAction = (fn) => (e) => {
+        e.preventDefault();
+        saveSelection();
+        applyWithSelection(fn);
+    };
+
+    const currentFontSize = (editor.getAttributes('textStyle').fontSize || '').replace('px', '');
 
     return (
         <div style={{ ...style, display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
@@ -99,22 +135,22 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                     <div style={{ background: '#333', padding: '6px', borderRadius: '8px', display: 'flex', gap: '4px', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', flexWrap: 'nowrap' }}>
                         {/* Font Size */}
                         <select 
+                            onMouseDown={saveSelection}
                             onChange={handleFontSizeChange}
-                            onMouseDown={(e) => e.preventDefault()}
-                            style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '11px', outline: 'none', flexShrink: 0, width: '62px', cursor: 'pointer' }}
-                            value={editor.getAttributes('textStyle').fontSize || ''}
+                            style={{ background: '#555', color: '#fff', border: 'none', borderRadius: '4px', padding: '2px 4px', fontSize: '11px', outline: 'none', flexShrink: 0, width: '55px', cursor: 'pointer' }}
+                            value={currentFontSize}
                         >
                             <option value="">ขนาด</option>
                             {FONT_SIZES.map(size => (
-                                <option key={size} value={size}>{size.replace('px', '')}</option>
+                                <option key={size} value={size}>{size}</option>
                             ))}
                         </select>
                         
                         {/* Color Picker */}
                         <div style={{ position: 'relative', width: '22px', height: '22px', minWidth: '22px', flexShrink: 0, borderRadius: '4px', overflow: 'hidden', border: '1px solid #666' }}>
                             <input 
-                                type="color" 
-                                onMouseDown={(e) => e.stopPropagation()}
+                                type="color"
+                                onMouseDown={(e) => { e.stopPropagation(); saveSelection(); }}
                                 onChange={handleColorChange}
                                 value={editor.getAttributes('textStyle').color || '#000000'}
                                 style={{ position: 'absolute', top: '-4px', left: '-4px', width: '30px', height: '30px', padding: '0', border: 'none', cursor: 'pointer' }}
@@ -125,25 +161,29 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                         <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 1px' }}></div>
                         
                         {/* Bold */}
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleBold().run(); }}
+                        <button type="button"
+                            onMouseDown={toolbarAction(() => editor.chain().focus().toggleBold().run())}
                             style={{ background: editor.isActive('bold') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
                             title="ตัวหนา"
                         >B</button>
                         
                         {/* Italic */}
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleItalic().run(); }}
+                        <button type="button"
+                            onMouseDown={toolbarAction(() => editor.chain().focus().toggleItalic().run())}
                             style={{ background: editor.isActive('italic') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', fontStyle: 'italic', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
                             title="ตัวเอียง"
                         >I</button>
                         
                         {/* Underline */}
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleUnderline().run(); }}
+                        <button type="button"
+                            onMouseDown={toolbarAction(() => editor.chain().focus().toggleUnderline().run())}
                             style={{ background: editor.isActive('underline') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', textDecoration: 'underline', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
                             title="ขีดเส้นใต้"
                         >U</button>
                         
                         {/* Strikethrough */}
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().toggleStrike().run(); }}
+                        <button type="button"
+                            onMouseDown={toolbarAction(() => editor.chain().focus().toggleStrike().run())}
                             style={{ background: editor.isActive('strike') ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px 5px', borderRadius: '4px', cursor: 'pointer', textDecoration: 'line-through', fontWeight: 'bold', fontSize: '12px', display: 'flex', alignItems: 'center' }}
                             title="ขีดทับ"
                         >S</button>
@@ -151,24 +191,28 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                         <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 1px' }}></div>
                         
                         {/* Align Left */}
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().setTextAlign('left').run(); }}
+                        <button type="button"
+                            onMouseDown={toolbarAction(() => editor.chain().focus().setTextAlign('left').run())}
                             style={{ background: editor.isActive({ textAlign: 'left' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         ><AlignLeft size={13} /></button>
                         
                         {/* Align Center */}
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().setTextAlign('center').run(); }}
+                        <button type="button"
+                            onMouseDown={toolbarAction(() => editor.chain().focus().setTextAlign('center').run())}
                             style={{ background: editor.isActive({ textAlign: 'center' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         ><AlignCenter size={13} /></button>
                         
                         {/* Align Right */}
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.chain().focus().setTextAlign('right').run(); }}
+                        <button type="button"
+                            onMouseDown={toolbarAction(() => editor.chain().focus().setTextAlign('right').run())}
                             style={{ background: editor.isActive({ textAlign: 'right' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         ><AlignRight size={13} /></button>
                         
                         <div style={{ width: '1px', height: '16px', background: '#555', margin: '0 1px' }}></div>
                         
                         {/* Clear Formatting */}
-                        <button type="button" onMouseDown={(e) => { e.preventDefault(); editor.commands.unsetAllMarks(); editor.commands.clearNodes(); }}
+                        <button type="button"
+                            onMouseDown={toolbarAction(() => { editor.commands.unsetAllMarks(); editor.commands.clearNodes(); })}
                             style={{ background: 'transparent', color: '#fca5a5', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                             title="ล้างรูปแบบทั้งหมด"
                         ><Eraser size={13} /></button>
