@@ -783,12 +783,19 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
 
 
     useEffect(() => {
+        if (!editId && formData.notes) {
+            const isFda = formData.docType && formData.docType.includes('fda');
+            const storageKey = `TemplateNotes_DeliveryOrder_${isFda ? 'FDA' : 'Normal'}`;
+            localStorage.setItem(storageKey, formData.notes);
+        }
+    }, [formData.notes, formData.docType, editId]);
+
+    useEffect(() => {
         if (!editId) {
             const isFda = formData.docType && formData.docType.includes('fda');
-            setFormData(prev => ({
-                ...prev,
-                notes: isFda ? DEFAULT_FDA_NOTES : DEFAULT_NORMAL_NOTES
-            }));
+            const storageKey = `TemplateNotes_DeliveryOrder_${isFda ? 'FDA' : 'Normal'}`;
+            const defaultNotes = isFda ? DEFAULT_FDA_NOTES : DEFAULT_NORMAL_NOTES;
+            setFormData(prev => ({ ...prev, notes: localStorage.getItem(storageKey) || defaultNotes }));
 
             // Fetch next bill number from API
             const fetchNextNo = async () => {

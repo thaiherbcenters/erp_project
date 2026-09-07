@@ -788,13 +788,19 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
 
 
     useEffect(() => {
+        if (!editId && formData.notes) {
+            const isFda = formData.docType && formData.docType.includes('fda');
+            const storageKey = `TemplateNotes_Quotation_${isFda ? 'FDA' : 'Normal'}`;
+            localStorage.setItem(storageKey, formData.notes);
+        }
+    }, [formData.notes, formData.docType, editId]);
+
+    useEffect(() => {
         if (!editId) {
             const isFda = formData.docType && formData.docType.includes('fda');
-            if (isFda && (!formData.notes || formData.notes === DEFAULT_NORMAL_NOTES)) {
-                setFormData(prev => ({ ...prev, notes: DEFAULT_FDA_NOTES }));
-            } else if (!isFda && (!formData.notes || formData.notes === DEFAULT_FDA_NOTES)) {
-                setFormData(prev => ({ ...prev, notes: DEFAULT_NORMAL_NOTES }));
-            }
+            const storageKey = `TemplateNotes_Quotation_${isFda ? 'FDA' : 'Normal'}`;
+            const defaultNotes = isFda ? DEFAULT_FDA_NOTES : DEFAULT_NORMAL_NOTES;
+            setFormData(prev => ({ ...prev, notes: localStorage.getItem(storageKey) || defaultNotes }));
 
             // Fetch next bill number from API
             const fetchNextNo = async () => {

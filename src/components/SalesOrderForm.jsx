@@ -512,6 +512,18 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
         }
     }, [defaultSignerKey, editId]);
 
+    useEffect(() => {
+        if (!editId && formData.notes !== undefined) {
+            localStorage.setItem('TemplateNotes_SalesOrder', formData.notes);
+        }
+    }, [formData.notes, editId]);
+
+    useEffect(() => {
+        if (!editId) {
+            setFormData(prev => ({ ...prev, notes: localStorage.getItem('TemplateNotes_SalesOrder') || '' }));
+        }
+    }, [editId]);
+
     // Fetch existing SO for editing
     useEffect(() => {
         const activeEditId = typeof editId === 'object' && editId !== null ? editId.id : editId;
