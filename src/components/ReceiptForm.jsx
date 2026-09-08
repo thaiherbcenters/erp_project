@@ -1182,7 +1182,11 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         newItem.promoType = '';
                         newItem.isPromo = false;
                         newItem.promoMultiplier = 1;
-                        newItem.price = '';
+                        if (customProduct.price !== undefined && customProduct.price !== null && customProduct.price !== '') {
+                            newItem.price = customProduct.price;
+                        } else {
+                            newItem.price = '';
+                        }
                     }
                 } else if (field === 'promoType') {
                     const baseName = newItem.basePromoName || newItem.name;
@@ -1198,7 +1202,12 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         if (PRODUCT_CATALOG[baseName] && PRODUCT_CATALOG[baseName].price !== '') {
                             newItem.price = PRODUCT_CATALOG[baseName].price;
                         } else {
-                            newItem.price = '';
+                            const cProd = customProducts.find(p => p.name === baseName);
+                            if (cProd && cProd.price !== undefined && cProd.price !== null && cProd.price !== '') {
+                                newItem.price = cProd.price;
+                            } else {
+                                newItem.price = '';
+                            }
                         }
                     }
                 } else if (field === 'isPromo') {
@@ -1216,7 +1225,12 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         if (PRODUCT_CATALOG[baseName] && PRODUCT_CATALOG[baseName].price !== '') {
                             newItem.price = PRODUCT_CATALOG[baseName].price;
                         } else {
-                            newItem.price = '';
+                            const cProd = customProducts.find(p => p.name === baseName);
+                            if (cProd && cProd.price !== undefined && cProd.price !== null && cProd.price !== '') {
+                                newItem.price = cProd.price;
+                            } else {
+                                newItem.price = '';
+                            }
                         }
                     }
                 } else if (field === 'promoMultiplier') {
@@ -3310,15 +3324,34 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                             showAlert('แจ้งเตือน', 'มีชื่อสินค้านี้อยู่แล้ว', 'warning');
                                             return;
                                         }
-                                        const newProduct = { name: val, image: addProductModal.image, price: addProductModal.price ? Number(addProductModal.price) : 0 };
+                                        const itemPrice = (addProductModal.price !== '' && addProductModal.price !== null && !isNaN(parseFloat(addProductModal.price)))
+                                            ? parseFloat(addProductModal.price)
+                                            : '';
+                                        const newProduct = {
+                                            name: val,
+                                            image: addProductModal.image || null,
+                                            price: itemPrice
+                                        };
                                         const newCustom = [...customProducts, newProduct];
                                         setCustomProducts(newCustom);
                                         localStorage.setItem('customProducts', JSON.stringify(newCustom));
                                         if (addProductModal.targetItemId) {
-                                            handleItemChange(addProductModal.targetItemId, 'name', val);
-                                            if (addProductModal.price) {
-                                                handleItemChange(addProductModal.targetItemId, 'price', Number(addProductModal.price));
-                                            }
+                                            setItems(prev => prev.map(item => {
+                                                if (item.id === addProductModal.targetItemId) {
+                                                    return {
+                                                        ...item,
+                                                        name: val,
+                                                        basePromoName: val,
+                                                        image: addProductModal.image || null,
+                                                        price: itemPrice,
+                                                        promoType: '',
+                                                        isPromo: false,
+                                                        promoMultiplier: 1,
+                                                        manualTotal: undefined
+                                                    };
+                                                }
+                                                return item;
+                                            }));
                                         }
                                         setAddProductModal({ visible: false, targetItemId: null, name: '', image: null, price: '' });
                                     }
