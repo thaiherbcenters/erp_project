@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Save, Printer, ArrowLeft, Plus, Trash2, FileText, CheckCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
