@@ -781,6 +781,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
     });
 
     const userModifiedFdaQty = useRef({ register: false, trademark: false });
+    const userModifiedProjectName = useRef(false);
 
     useEffect(() => {
         if (!editId && defaultSignerKey) {
@@ -1029,6 +1030,9 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
 
     const handleFormChange = (e) => {
         const { name, value, type, checked } = e.target;
+        if (name === 'fdaProjectName') {
+            userModifiedProjectName.current = true;
+        }
         setFormData(prev => {
             const nextData = { ...prev, [name]: type === 'checkbox' ? checked : value };
             
@@ -1181,6 +1185,18 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
             });
         }
     }, [validProductCount, editId, isFda]);
+
+    useEffect(() => {
+        if (!editId && isFda && !userModifiedProjectName.current) {
+            let projects = [];
+            if (formData.fdaServiceRegister) projects.push('ขึ้นทะเบียนตำรับยา (G)');
+            if (formData.fdaServiceTrademark) projects.push('ยื่นจดทะเบียนเครื่องหมายการค้า');
+            const autoProjectName = projects.join(' และ ') || 'ขึ้นทะเบียนตำรับยา (G)';
+            if (formData.fdaProjectName !== autoProjectName) {
+                setFormData(prev => ({ ...prev, fdaProjectName: autoProjectName }));
+            }
+        }
+    }, [formData.fdaServiceRegister, formData.fdaServiceTrademark, isFda, editId]);
     
     let subTotal = 0;
     if (isFda) {
@@ -2422,7 +2438,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                         <span style={{ fontWeight: 'bold' }}>เลขประจำตัวผู้เสียภาษี :</span> {formData.taxId || '-'}
                                     </td>
                                     <td style={{ border: '1px solid black', padding: '4px 8px' }}>
-                                        <span style={{ fontWeight: 'bold' }}>โครงการ :</span> <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>ขึ้นทะเบียนตำรับยา (G)</span>
+                                        <span style={{ fontWeight: 'bold' }}>โครงการ :</span> <span style={{ fontWeight: 'bold', marginLeft: '10px' }}>{formData.fdaProjectName || 'ขึ้นทะเบียนตำรับยา (G)'}</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -2440,7 +2456,17 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                             <thead>
                                 <tr style={{ backgroundColor: '#e0e0e0' }}>
                                     <th colSpan="5" style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>
-                                        ขั้นตอนการดำเนินงานขึ้นทะเบียนตำรับ อย.(G)ในการสั่งผลิต {validProductCount} ผลิตภัณฑ์
+                                        {(() => {
+                                            let headerText = 'ขั้นตอนการดำเนินงาน';
+                                            if (formData.fdaServiceRegister && formData.fdaServiceTrademark) {
+                                                headerText += 'ขึ้นทะเบียนตำรับ อย.(G) และยื่นจดทะเบียนเครื่องหมายการค้า';
+                                            } else if (formData.fdaServiceRegister) {
+                                                headerText += 'ขึ้นทะเบียนตำรับ อย.(G)';
+                                            } else if (formData.fdaServiceTrademark) {
+                                                headerText += 'ยื่นจดทะเบียนเครื่องหมายการค้า';
+                                            }
+                                            return `${headerText}ในการสั่งผลิต ${validProductCount} ผลิตภัณฑ์`;
+                                        })()}
                                     </th>
                                 </tr>
                             </thead>
