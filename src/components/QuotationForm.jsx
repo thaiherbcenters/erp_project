@@ -718,7 +718,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         }
     });
 
-    const [addProductModal, setAddProductModal] = useState({ visible: false, targetItemId: null, name: '', image: null });
+    const [addProductModal, setAddProductModal] = useState({ visible: false, targetItemId: null, name: '', image: null, price: '' });
     const [showCustomerModal, setShowCustomerModal] = useState(false);
     const [showContractModal, setShowContractModal] = useState(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
@@ -776,9 +776,13 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         fdaCreditTerms: 'ชำระเต็มจำนวน',
         fdaServiceRegister: true,
         fdaServiceRegisterPrice: 30000,
+        fdaServiceRegisterQuantity: 1,
         fdaServiceTrademark: false,
-        fdaServiceTrademarkPrice: 5000
+        fdaServiceTrademarkPrice: 5000,
+        fdaServiceTrademarkQuantity: 1
     });
+
+    const userModifiedFdaQty = useRef({ register: false, trademark: false });
 
     useEffect(() => {
         if (!editId && defaultSignerKey) {
@@ -972,8 +976,10 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                             fdaCreditTerms: data.FdaCreditTerms || 'ชำระเต็มจำนวน',
                             fdaServiceRegister: data.FdaServiceRegister !== undefined ? Boolean(data.FdaServiceRegister) : true,
                             fdaServiceRegisterPrice: data.FdaServiceRegisterPrice !== undefined ? parseFloat(data.FdaServiceRegisterPrice) : 30000,
+                            fdaServiceRegisterQuantity: data.FdaServiceRegisterQuantity !== undefined && data.FdaServiceRegisterQuantity !== null ? data.FdaServiceRegisterQuantity : (data.items?.length || 1),
                             fdaServiceTrademark: data.FdaServiceTrademark !== undefined ? Boolean(data.FdaServiceTrademark) : false,
-                            fdaServiceTrademarkPrice: data.FdaServiceTrademarkPrice !== undefined ? parseFloat(data.FdaServiceTrademarkPrice) : 5000
+                            fdaServiceTrademarkPrice: data.FdaServiceTrademarkPrice !== undefined ? parseFloat(data.FdaServiceTrademarkPrice) : 5000,
+                            fdaServiceTrademarkQuantity: data.FdaServiceTrademarkQuantity !== undefined && data.FdaServiceTrademarkQuantity !== null ? data.FdaServiceTrademarkQuantity : (data.items?.length || 1)
                         });
 
                         if (data.items && data.items.length > 0) {
@@ -1165,13 +1171,42 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
     // การคำนวณยอดเงิน
     const isFda = formData.docType && formData.docType.includes('fda');
     const validProductCount = items.filter(item => item.name && item.name.trim() !== '').length || 1;
+
+    // Auto-sync service quantity with product count if user has not manually edited it
+    useEffect(() => {
+        if (!editId && isFda) {
+            setFormData(prev => {
+                let updated = false;
+                const next = { ...prev };
+                if (!userModifiedFdaQty.current.register && prev.fdaServiceRegisterQuantity !== validProductCount) {
+                    next.fdaServiceRegisterQuantity = validProductCount;
+                    updated = true;
+                }
+                if (!userModifiedFdaQty.current.trademark && prev.fdaServiceTrademarkQuantity !== validProductCount) {
+                    next.fdaServiceTrademarkQuantity = validProductCount;
+                    updated = true;
+                }
+                return updated ? next : prev;
+            });
+        }
+    }, [validProductCount, editId, isFda]);
     
     let subTotal = 0;
     if (isFda) {
-        let fdaPrice = 0;
-        if (formData.fdaServiceRegister) fdaPrice += parseFloat(formData.fdaServiceRegisterPrice) || 0;
-        if (formData.fdaServiceTrademark) fdaPrice += parseFloat(formData.fdaServiceTrademarkPrice) || 0;
-        subTotal = fdaPrice * validProductCount;
+        let fdaTotal = 0;
+        if (formData.fdaServiceRegister) {
+            const regQty = (formData.fdaServiceRegisterQuantity !== undefined && formData.fdaServiceRegisterQuantity !== '' && formData.fdaServiceRegisterQuantity !== null)
+                ? Number(formData.fdaServiceRegisterQuantity)
+                : validProductCount;
+            fdaTotal += regQty * (parseFloat(formData.fdaServiceRegisterPrice) || 0);
+        }
+        if (formData.fdaServiceTrademark) {
+            const tmQty = (formData.fdaServiceTrademarkQuantity !== undefined && formData.fdaServiceTrademarkQuantity !== '' && formData.fdaServiceTrademarkQuantity !== null)
+                ? Number(formData.fdaServiceTrademarkQuantity)
+                : validProductCount;
+            fdaTotal += tmQty * (parseFloat(formData.fdaServiceTrademarkPrice) || 0);
+        }
+        subTotal = fdaTotal;
     } else {
         subTotal = items.reduce((sum, item) => {
             if (item.manualTotal !== undefined) {
@@ -1312,8 +1347,17 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
             showDepositInPrint: formData.showDepositInPrint,
             showShippingInPrint: formData.showShippingInPrint,
             designFee: Number(designFee) || 0,
-            showDesignFeeInPrint: formData.showDesignFeeInPrint,
             contractId: formData.contractId || null,
+            fdaCustomerCode: formData.fdaCustomerCode,
+            fdaEmail: formData.fdaEmail,
+            fdaProjectName: formData.fdaProjectName,
+            fdaCreditTerms: formData.fdaCreditTerms,
+            fdaServiceRegister: formData.fdaServiceRegister,
+            fdaServiceRegisterPrice: formData.fdaServiceRegisterPrice,
+            fdaServiceRegisterQuantity: formData.fdaServiceRegisterQuantity,
+            fdaServiceTrademark: formData.fdaServiceTrademark,
+            fdaServiceTrademarkPrice: formData.fdaServiceTrademarkPrice,
+            fdaServiceTrademarkQuantity: formData.fdaServiceTrademarkQuantity,
             status: editId ? undefined : 'พร้อมใช้', // Keep existing status if editing
             items: items.filter(i => i.name).map(i => ({
                 name: i.name,
@@ -1718,37 +1762,63 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 <div style={{ marginBottom: '5px' }}>
                                     <label style={{ fontWeight: 'bold', color: '#334155', display: 'block', marginBottom: '10px' }}>ประเภทบริการ (เลือกได้มากกว่า 1)</label>
                                     
-                                    <div style={{ background: '#fff', borderRadius: '8px', padding: '12px 15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', border: '1px solid #d1d5db' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ background: '#fff', borderRadius: '8px', padding: '12px 15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', border: '1px solid #d1d5db', flexWrap: 'wrap', gap: '10px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '240px' }}>
                                             <input type="checkbox" id="fdaServiceRegister" checked={formData.fdaServiceRegister} onChange={(e) => {
                                                 setFormData(prev => ({...prev, fdaServiceRegister: e.target.checked}));
-                                                setTimeout(() => calculateTotal(items, formData.discountPercent, formData.vatRate, formData.shippingCost, formData.depositPercent, formData.customDepositAmount), 10);
                                             }} style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }} />
-                                            <label htmlFor="fdaServiceRegister" style={{ margin: 0, cursor: 'pointer', fontWeight: 'normal', fontSize: '14px', color: '#1f2937' }}>ค่าดำเนินการขึ้นทะเบียนผลิตภัณฑ์</label>
+                                            <label htmlFor="fdaServiceRegister" style={{ margin: 0, cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', color: '#1f2937' }}>ค่าดำเนินการขึ้นทะเบียนผลิตภัณฑ์</label>
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <input type="number" value={formData.fdaServiceRegisterPrice} onChange={(e) => {
-                                                setFormData(prev => ({...prev, fdaServiceRegisterPrice: parseFloat(e.target.value) || 0}));
-                                                setTimeout(() => calculateTotal(items, formData.discountPercent, formData.vatRate, formData.shippingCost, formData.depositPercent, formData.customDepositAmount), 10);
-                                            }} style={{ width: '120px', padding: '6px 10px', textAlign: 'right', border: '1px solid #d1d5db', borderRadius: '6px' }} />
-                                            <span style={{ fontSize: '14px', color: '#1f2937' }}>บาท</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '13px', color: '#6b7280' }}>จำนวน:</span>
+                                                <input type="number" min="1" value={formData.fdaServiceRegisterQuantity ?? 1} onChange={(e) => {
+                                                    const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                                    userModifiedFdaQty.current.register = true;
+                                                    setFormData(prev => ({...prev, fdaServiceRegisterQuantity: val}));
+                                                }} style={{ width: '65px', padding: '6px 8px', textAlign: 'center', border: '1px solid #d1d5db', borderRadius: '6px', fontWeight: 'bold' }} />
+                                                <span style={{ fontSize: '13px', color: '#6b7280' }}>รายการ</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '13px', color: '#6b7280' }}>ราคาต่อหน่วย:</span>
+                                                <input type="number" value={formData.fdaServiceRegisterPrice} onChange={(e) => {
+                                                    setFormData(prev => ({...prev, fdaServiceRegisterPrice: parseFloat(e.target.value) || 0}));
+                                                }} style={{ width: '100px', padding: '6px 10px', textAlign: 'right', border: '1px solid #d1d5db', borderRadius: '6px' }} />
+                                                <span style={{ fontSize: '13px', color: '#6b7280' }}>บาท</span>
+                                            </div>
+                                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#15803d', minWidth: '110px', textAlign: 'right' }}>
+                                                = {((parseFloat(formData.fdaServiceRegisterQuantity) || 0) * (parseFloat(formData.fdaServiceRegisterPrice) || 0)).toLocaleString('th-TH', {minimumFractionDigits: 2})} บ.
+                                            </div>
                                         </div>
                                     </div>
                                     
-                                    <div style={{ background: '#fff', borderRadius: '8px', padding: '12px 15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #d1d5db' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ background: '#fff', borderRadius: '8px', padding: '12px 15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid #d1d5db', flexWrap: 'wrap', gap: '10px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '240px' }}>
                                             <input type="checkbox" id="fdaServiceTrademark" checked={formData.fdaServiceTrademark} onChange={(e) => {
                                                 setFormData(prev => ({...prev, fdaServiceTrademark: e.target.checked}));
-                                                setTimeout(() => calculateTotal(items, formData.discountPercent, formData.vatRate, formData.shippingCost, formData.depositPercent, formData.customDepositAmount), 10);
                                             }} style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: '#3b82f6' }} />
-                                            <label htmlFor="fdaServiceTrademark" style={{ margin: 0, cursor: 'pointer', fontWeight: 'normal', fontSize: '14px', color: '#1f2937' }}>ค่าดำเนินการยื่นจดเครื่องหมายการค้า</label>
+                                            <label htmlFor="fdaServiceTrademark" style={{ margin: 0, cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', color: '#1f2937' }}>ค่าดำเนินการยื่นจดเครื่องหมายการค้า</label>
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <input type="number" value={formData.fdaServiceTrademarkPrice} onChange={(e) => {
-                                                setFormData(prev => ({...prev, fdaServiceTrademarkPrice: parseFloat(e.target.value) || 0}));
-                                                setTimeout(() => calculateTotal(items, formData.discountPercent, formData.vatRate, formData.shippingCost, formData.depositPercent, formData.customDepositAmount), 10);
-                                            }} style={{ width: '120px', padding: '6px 10px', textAlign: 'right', border: '1px solid #d1d5db', borderRadius: '6px' }} />
-                                            <span style={{ fontSize: '14px', color: '#1f2937' }}>บาท</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '13px', color: '#6b7280' }}>จำนวน:</span>
+                                                <input type="number" min="1" value={formData.fdaServiceTrademarkQuantity ?? 1} onChange={(e) => {
+                                                    const val = e.target.value === '' ? '' : parseInt(e.target.value) || 0;
+                                                    userModifiedFdaQty.current.trademark = true;
+                                                    setFormData(prev => ({...prev, fdaServiceTrademarkQuantity: val}));
+                                                }} style={{ width: '65px', padding: '6px 8px', textAlign: 'center', border: '1px solid #d1d5db', borderRadius: '6px', fontWeight: 'bold' }} />
+                                                <span style={{ fontSize: '13px', color: '#6b7280' }}>รายการ</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ fontSize: '13px', color: '#6b7280' }}>ราคาต่อหน่วย:</span>
+                                                <input type="number" value={formData.fdaServiceTrademarkPrice} onChange={(e) => {
+                                                    setFormData(prev => ({...prev, fdaServiceTrademarkPrice: parseFloat(e.target.value) || 0}));
+                                                }} style={{ width: '100px', padding: '6px 10px', textAlign: 'right', border: '1px solid #d1d5db', borderRadius: '6px' }} />
+                                                <span style={{ fontSize: '13px', color: '#6b7280' }}>บาท</span>
+                                            </div>
+                                            <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#15803d', minWidth: '110px', textAlign: 'right' }}>
+                                                = {((parseFloat(formData.fdaServiceTrademarkQuantity) || 0) * (parseFloat(formData.fdaServiceTrademarkPrice) || 0)).toLocaleString('th-TH', {minimumFractionDigits: 2})} บ.
+                                            </div>
                                         </div>
                                     </div>
                                     
@@ -1885,7 +1955,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                                                 e.stopPropagation();
                                                                 handleItemChange(item.id, 'showDropdown', false);
                                                                 handleItemChange(item.id, 'forceShowAll', false);
-                                                                setAddProductModal({ visible: true, targetItemId: item.id, name: '', image: null });
+                                                                setAddProductModal({ visible: true, targetItemId: item.id, name: '', image: null, price: '' });
                                                             }}
                                                             style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', color: '#f59e0b', backgroundColor: '#fffbeb', fontWeight: 'bold', borderTop: '1px solid #fde68a', textAlign: 'center' }}
                                                             onMouseEnter={(e) => e.target.style.backgroundColor = '#fef3c7'}
@@ -2408,10 +2478,10 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                             ค่าดำเนินการขึ้นทะเบียนผลิตภัณฑ์
                                         </td>
                                         <td style={{ border: '1px solid black', padding: '4px 8px', textAlign: 'center', width: '15%' }}>
-                                            {validProductCount}
+                                            {formData.fdaServiceRegisterQuantity !== undefined && formData.fdaServiceRegisterQuantity !== null ? formData.fdaServiceRegisterQuantity : validProductCount}
                                         </td>
                                         <td style={{ border: '1px solid black', padding: '4px 8px', textAlign: 'right', width: '25%' }}>
-                                            {formatMoney((parseFloat(formData.fdaServiceRegisterPrice) || 0) * validProductCount)}
+                                            {formatMoney((parseFloat(formData.fdaServiceRegisterPrice) || 0) * (formData.fdaServiceRegisterQuantity !== undefined && formData.fdaServiceRegisterQuantity !== null ? Number(formData.fdaServiceRegisterQuantity) : validProductCount))}
                                         </td>
                                     </tr>
                                 )}
@@ -2422,10 +2492,10 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                             ค่าดำเนินการจดเครื่องหมายการค้า
                                         </td>
                                         <td style={{ border: '1px solid black', padding: '4px 8px', textAlign: 'center', width: '15%' }}>
-                                            {validProductCount}
+                                            {formData.fdaServiceTrademarkQuantity !== undefined && formData.fdaServiceTrademarkQuantity !== null ? formData.fdaServiceTrademarkQuantity : validProductCount}
                                         </td>
                                         <td style={{ border: '1px solid black', padding: '4px 8px', textAlign: 'right', width: '25%' }}>
-                                            {formatMoney((parseFloat(formData.fdaServiceTrademarkPrice) || 0) * validProductCount)}
+                                            {formatMoney((parseFloat(formData.fdaServiceTrademarkPrice) || 0) * (formData.fdaServiceTrademarkQuantity !== undefined && formData.fdaServiceTrademarkQuantity !== null ? Number(formData.fdaServiceTrademarkQuantity) : validProductCount))}
                                         </td>
                                     </tr>
                                 )}
@@ -2975,6 +3045,19 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                     style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', outline: 'none' }}
                                 />
                             </div>
+                            
+                            <div className="form-group" style={{ marginBottom: '15px' }}>
+                                <label style={{ fontSize: '13px', color: '#475569', marginBottom: '8px', display: 'block', fontWeight: 'bold' }}>ราคาตั้งต้น (บาท)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={addProductModal.price}
+                                    onChange={(e) => setAddProductModal({ ...addProductModal, price: e.target.value })}
+                                    placeholder="ระบุราคา..."
+                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', outline: 'none' }}
+                                />
+                            </div>
 
                             <div className="form-group">
                                 <label style={{ fontSize: '13px', color: '#475569', marginBottom: '8px', display: 'block', fontWeight: 'bold' }}>รูปภาพสินค้า (ทางเลือก)</label>
@@ -3018,14 +3101,17 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                             showAlert('แจ้งเตือน', 'มีชื่อสินค้านี้อยู่แล้ว', 'warning');
                                             return;
                                         }
-                                        const newProduct = { name: val, image: addProductModal.image };
+                                        const newProduct = { name: val, image: addProductModal.image, price: addProductModal.price ? Number(addProductModal.price) : 0 };
                                         const newCustom = [...customProducts, newProduct];
                                         setCustomProducts(newCustom);
                                         localStorage.setItem('customProducts', JSON.stringify(newCustom));
                                         if (addProductModal.targetItemId) {
                                             handleItemChange(addProductModal.targetItemId, 'name', val);
+                                            if (addProductModal.price) {
+                                                handleItemChange(addProductModal.targetItemId, 'price', Number(addProductModal.price));
+                                            }
                                         }
-                                        setAddProductModal({ visible: false, targetItemId: null, name: '', image: null });
+                                        setAddProductModal({ visible: false, targetItemId: null, name: '', image: null, price: '' });
                                     }
                                 }}
                             >

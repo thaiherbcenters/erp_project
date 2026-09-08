@@ -165,7 +165,10 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                         <button type="button" onMouseDown={tbtn(() => chainWithSelection().setTextAlign('right').run())}
                             style={{ background: editor.isActive({ textAlign: 'right' }) ? '#555' : 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                         ><AlignRight size={13} /></button>
-                        <button type="button" onMouseDown={tbtn(() => chainWithSelection().setHorizontalRule().run())}
+                        <button type="button" onMouseDown={tbtn(() => {
+                            chainWithSelection().setHorizontalRule().run();
+                            editor.commands.insertContent('<p></p>');
+                        })}
                             style={{ background: 'transparent', color: '#fff', border: 'none', padding: '3px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
                             title="เพิ่มเส้นคั่น"
                         ><Minus size={13} /></button>

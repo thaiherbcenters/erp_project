@@ -151,7 +151,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
         designFee, showDesignFeeInPrint,
         fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
-        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceTrademark, fdaServiceTrademarkPrice,
+        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceRegisterQuantity, fdaServiceTrademark, fdaServiceTrademarkPrice, fdaServiceTrademarkQuantity,
         status, contractId, items 
     } = req.body;
 
@@ -205,8 +205,10 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
         request.input('fdaCreditTerms', sql.NVarChar, fdaCreditTerms || null);
         request.input('fdaServiceRegister', sql.Bit, fdaServiceRegister ? 1 : 0);
         request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
+        request.input('fdaServiceRegisterQuantity', sql.Int, fdaServiceRegisterQuantity !== undefined && fdaServiceRegisterQuantity !== null ? parseInt(fdaServiceRegisterQuantity) : null);
         request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
+        request.input('fdaServiceTrademarkQuantity', sql.Int, fdaServiceTrademarkQuantity !== undefined && fdaServiceTrademarkQuantity !== null ? parseInt(fdaServiceTrademarkQuantity) : null);
         request.input('createdBy', sql.Int, req.user ? req.user.id : null);
 
         const headerResult = await request.query(`
@@ -215,7 +217,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
                 CreatedBy
             )
             OUTPUT INSERTED.BillingInvoiceID
@@ -224,7 +226,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
                 @billDate, @validUntil, @subTotal, @discountPercent, @discountAmount, @afterDiscount,
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
                 @remainingAmount, @signer, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
-                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice,
+                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceRegisterQuantity, @fdaServiceTrademark, @fdaServiceTrademarkPrice, @fdaServiceTrademarkQuantity,
                 @createdBy
             )
         `);
@@ -316,7 +318,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createBillingInvoi
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
         designFee, showDesignFeeInPrint,
         fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
-        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceTrademark, fdaServiceTrademarkPrice,
+        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceRegisterQuantity, fdaServiceTrademark, fdaServiceTrademarkPrice, fdaServiceTrademarkQuantity,
         status, contractId, items 
     } = req.body;
 
@@ -368,8 +370,10 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createBillingInvoi
         request.input('fdaCreditTerms', sql.NVarChar, fdaCreditTerms || null);
         request.input('fdaServiceRegister', sql.Bit, fdaServiceRegister ? 1 : 0);
         request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
+        request.input('fdaServiceRegisterQuantity', sql.Int, fdaServiceRegisterQuantity !== undefined && fdaServiceRegisterQuantity !== null ? parseInt(fdaServiceRegisterQuantity) : null);
         request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
+        request.input('fdaServiceTrademarkQuantity', sql.Int, fdaServiceTrademarkQuantity !== undefined && fdaServiceTrademarkQuantity !== null ? parseInt(fdaServiceTrademarkQuantity) : null);
 
         // 1. Backup Current Version to History Table before modifying
         const backupReq = new sql.Request(transaction);
@@ -380,7 +384,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createBillingInvoi
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity
             )
             OUTPUT INSERTED.HistoryID
             SELECT 
@@ -388,7 +392,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createBillingInvoi
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity
             FROM BillingInvoice
             WHERE BillingInvoiceID = @id
         `);
@@ -418,8 +422,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createBillingInvoi
                 Signer = @signer, Notes = @notes, ShowDiscountInPrint = @showDiscount, ShowVatInPrint = @showVat,
                 ShowDepositInPrint = @showDeposit, ShowShippingInPrint = @showShipping, DesignFee = @designFee, ShowDesignFeeInPrint = @showDesignFee, Status = ISNULL(@status, Status),
                 FdaCustomerCode = @fdaCustomerCode, FdaEmail = @fdaEmail, FdaProjectName = @fdaProjectName, FdaCreditTerms = @fdaCreditTerms,
-                FdaServiceRegister = @fdaServiceRegister, FdaServiceRegisterPrice = @fdaServiceRegisterPrice,
-                FdaServiceTrademark = @fdaServiceTrademark, FdaServiceTrademarkPrice = @fdaServiceTrademarkPrice,
+                FdaServiceRegister = @fdaServiceRegister, FdaServiceRegisterPrice = @fdaServiceRegisterPrice, FdaServiceRegisterQuantity = @fdaServiceRegisterQuantity,
+                FdaServiceTrademark = @fdaServiceTrademark, FdaServiceTrademarkPrice = @fdaServiceTrademarkPrice, FdaServiceTrademarkQuantity = @fdaServiceTrademarkQuantity,
                 Revision = Revision + 1,
                 UpdatedAt = GETDATE()
             WHERE BillingInvoiceID = @id

@@ -145,7 +145,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
         designFee, showDesignFeeInPrint,
         fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
-        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceTrademark, fdaServiceTrademarkPrice,
+        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceRegisterQuantity, fdaServiceTrademark, fdaServiceTrademarkPrice, fdaServiceTrademarkQuantity,
         status, contractId, items,
         deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate
     } = req.body;
@@ -207,8 +207,10 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         request.input('fdaCreditTerms', sql.NVarChar, fdaCreditTerms || null);
         request.input('fdaServiceRegister', sql.Bit, fdaServiceRegister ? 1 : 0);
         request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
+        request.input('fdaServiceRegisterQuantity', sql.Int, fdaServiceRegisterQuantity !== undefined && fdaServiceRegisterQuantity !== null ? parseInt(fdaServiceRegisterQuantity) : null);
         request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
+        request.input('fdaServiceTrademarkQuantity', sql.Int, fdaServiceTrademarkQuantity !== undefined && fdaServiceTrademarkQuantity !== null ? parseInt(fdaServiceTrademarkQuantity) : null);
         
         request.input('deliverTo', sql.NVarChar, deliverTo || null);
         request.input('dueDate', sql.Date, dueDate || null);
@@ -225,7 +227,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
                 DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate,
                 CreatedBy
             )
@@ -235,7 +237,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 @billDate, @validUntil, @subTotal, @discountPercent, @discountAmount, @afterDiscount,
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
                 @remainingAmount, @signer, @customerOrder, @purchaseNo, @salesperson, @termOfPayment, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
-                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceTrademark, @fdaServiceTrademarkPrice,
+                @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceRegisterQuantity, @fdaServiceTrademark, @fdaServiceTrademarkPrice, @fdaServiceTrademarkQuantity,
                 @deliverTo, @dueDate, @paymentMethod, @customerBank, @customerBranch, @chequeNo, @chequeDate,
                 @createdBy
             )
@@ -329,7 +331,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
         showDiscountInPrint, showVatInPrint, showDepositInPrint, showShippingInPrint, 
         designFee, showDesignFeeInPrint,
         fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
-        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceTrademark, fdaServiceTrademarkPrice,
+        fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceRegisterQuantity, fdaServiceTrademark, fdaServiceTrademarkPrice, fdaServiceTrademarkQuantity,
         status, contractId, items,
         deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate
     } = req.body;
@@ -404,8 +406,10 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
         request.input('fdaCreditTerms', sql.NVarChar, fdaCreditTerms || null);
         request.input('fdaServiceRegister', sql.Bit, fdaServiceRegister ? 1 : 0);
         request.input('fdaServiceRegisterPrice', sql.Decimal(18,2), fdaServiceRegisterPrice || 0);
+        request.input('fdaServiceRegisterQuantity', sql.Int, fdaServiceRegisterQuantity !== undefined && fdaServiceRegisterQuantity !== null ? parseInt(fdaServiceRegisterQuantity) : null);
         request.input('fdaServiceTrademark', sql.Bit, fdaServiceTrademark ? 1 : 0);
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
+        request.input('fdaServiceTrademarkQuantity', sql.Int, fdaServiceTrademarkQuantity !== undefined && fdaServiceTrademarkQuantity !== null ? parseInt(fdaServiceTrademarkQuantity) : null);
 
         request.input('deliverTo', sql.NVarChar, deliverTo || null);
         request.input('dueDate', sql.Date, dueDate || null);
@@ -424,7 +428,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
                 DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate
             )
             OUTPUT INSERTED.HistoryID
@@ -433,7 +437,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 BillDate, ValidUntil, SubTotal, DiscountPercent, DiscountAmount, AfterDiscount,
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
-                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceTrademark, FdaServiceTrademarkPrice,
+                FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
                 DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate
             FROM Receipt
             WHERE ReceiptID = @id
@@ -464,8 +468,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 Signer = @signer, CustomerOrder = @customerOrder, PurchaseNo = @purchaseNo, Salesperson = @salesperson, TermOfPayment = @termOfPayment, Notes = @notes, ShowDiscountInPrint = @showDiscount, ShowVatInPrint = @showVat,
                 ShowDepositInPrint = @showDeposit, ShowShippingInPrint = @showShipping, DesignFee = @designFee, ShowDesignFeeInPrint = @showDesignFee, Status = ISNULL(@status, Status),
                 FdaCustomerCode = @fdaCustomerCode, FdaEmail = @fdaEmail, FdaProjectName = @fdaProjectName, FdaCreditTerms = @fdaCreditTerms,
-                FdaServiceRegister = @fdaServiceRegister, FdaServiceRegisterPrice = @fdaServiceRegisterPrice,
-                FdaServiceTrademark = @fdaServiceTrademark, FdaServiceTrademarkPrice = @fdaServiceTrademarkPrice,
+                FdaServiceRegister = @fdaServiceRegister, FdaServiceRegisterPrice = @fdaServiceRegisterPrice, FdaServiceRegisterQuantity = @fdaServiceRegisterQuantity,
+                FdaServiceTrademark = @fdaServiceTrademark, FdaServiceTrademarkPrice = @fdaServiceTrademarkPrice, FdaServiceTrademarkQuantity = @fdaServiceTrademarkQuantity,
                 DeliverTo = @deliverTo, DueDate = @dueDate, PaymentMethod = @paymentMethod,
                 CustomerBank = @customerBank, CustomerBranch = @customerBranch, ChequeNo = @chequeNo, ChequeDate = @chequeDate,
                 Revision = Revision + 1,

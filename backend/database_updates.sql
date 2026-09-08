@@ -58,3 +58,41 @@ BEGIN
     ALTER TABLE SalesOrder ADD CONSTRAINT FK_SalesOrder_Users FOREIGN KEY (CreatedBy) REFERENCES Users(user_id);
 END;
 GO
+
+-- -------------------------------------------------------------------------
+-- อัปเดตเมื่อ: 2026-09-08 (เพิ่มฟิลด์จำนวนบริการ อย. FdaServiceRegisterQuantity และ FdaServiceTrademarkQuantity)
+-- -------------------------------------------------------------------------
+DECLARE @tables TABLE (TableName NVARCHAR(100));
+INSERT INTO @tables (TableName) VALUES 
+('Quotation'), ('QuotationHistory'),
+('BillingInvoice'), ('BillingInvoiceHistory'),
+('DeliveryOrder'), ('DeliveryOrderHistory'),
+('TaxInvoice'), ('TaxInvoiceHistory'),
+('Receipt'), ('ReceiptHistory');
+
+DECLARE @tbl NVARCHAR(100);
+DECLARE tbl_cursor CURSOR FOR SELECT TableName FROM @tables;
+OPEN tbl_cursor;
+FETCH NEXT FROM tbl_cursor INTO @tbl;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    -- เพิ่ม FdaServiceRegisterQuantity
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(@tbl) AND name = 'FdaServiceRegisterQuantity')
+    BEGIN
+        EXEC('ALTER TABLE ' + @tbl + ' ADD FdaServiceRegisterQuantity INT NULL;');
+    END;
+
+    -- เพิ่ม FdaServiceTrademarkQuantity
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(@tbl) AND name = 'FdaServiceTrademarkQuantity')
+    BEGIN
+        EXEC('ALTER TABLE ' + @tbl + ' ADD FdaServiceTrademarkQuantity INT NULL;');
+    END;
+
+    FETCH NEXT FROM tbl_cursor INTO @tbl;
+END;
+
+CLOSE tbl_cursor;
+DEALLOCATE tbl_cursor;
+GO
+
