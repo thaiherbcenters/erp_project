@@ -2650,15 +2650,28 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 <tr style={{ backgroundColor: '#e0e0e0' }}>
                                     <th colSpan="5" style={{ border: '1px solid black', padding: '8px', textAlign: 'center', fontWeight: 'bold' }}>
                                         {(() => {
+                                            const regQty = (formData.fdaServiceRegisterQuantity !== undefined && formData.fdaServiceRegisterQuantity !== null && formData.fdaServiceRegisterQuantity !== '')
+                                                ? Number(formData.fdaServiceRegisterQuantity)
+                                                : validProductCount;
+                                            const tmQty = (formData.fdaServiceTrademarkQuantity !== undefined && formData.fdaServiceTrademarkQuantity !== null && formData.fdaServiceTrademarkQuantity !== '')
+                                                ? Number(formData.fdaServiceTrademarkQuantity)
+                                                : validProductCount;
+
                                             let headerText = 'ขั้นตอนการดำเนินงาน';
                                             if (formData.fdaServiceRegister && formData.fdaServiceTrademark) {
-                                                headerText += 'ขึ้นทะเบียนตำรับ อย.(G) และยื่นจดทะเบียนเครื่องหมายการค้า';
+                                                if (regQty === tmQty) {
+                                                    headerText += `ขึ้นทะเบียนตำรับ อย.(G) และยื่นจดทะเบียนเครื่องหมายการค้าในการสั่งผลิต ${regQty} ผลิตภัณฑ์`;
+                                                } else {
+                                                    headerText += `ขึ้นทะเบียนตำรับ อย.(G) ${regQty} ผลิตภัณฑ์ และยื่นจดทะเบียนเครื่องหมายการค้า ${tmQty} ผลิตภัณฑ์`;
+                                                }
                                             } else if (formData.fdaServiceRegister) {
-                                                headerText += 'ขึ้นทะเบียนตำรับ อย.(G)';
+                                                headerText += `ขึ้นทะเบียนตำรับ อย.(G) ในการสั่งผลิต ${regQty} ผลิตภัณฑ์`;
                                             } else if (formData.fdaServiceTrademark) {
-                                                headerText += 'ยื่นจดทะเบียนเครื่องหมายการค้า';
+                                                headerText += `ยื่นจดทะเบียนเครื่องหมายการค้า ในการสั่งผลิต ${tmQty} ผลิตภัณฑ์`;
+                                            } else {
+                                                headerText += `ในการสั่งผลิต ${validProductCount} ผลิตภัณฑ์`;
                                             }
-                                            return `${headerText}ในการสั่งผลิต ${validProductCount} ผลิตภัณฑ์`;
+                                            return headerText;
                                         })()}
                                     </th>
                                 </tr>
