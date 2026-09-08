@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
         const page = Math.max(1, parseInt(req.query.page) || 1);
-        const limit = Math.max(1, parseInt(req.query.limit) || 50);
+        const limit = Math.max(1, parseInt(req.query.limit) || 20);
         const search = req.query.search || '';
         const offset = (page - 1) * limit;
 

@@ -12,11 +12,12 @@ router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
         const page = Math.max(1, parseInt(req.query.page) || 1);
-        const limit = Math.max(1, parseInt(req.query.limit) || 50);
+        const limit = Math.max(1, parseInt(req.query.limit) || 20);
         const search = req.query.search || '';
         const offset = (page - 1) * limit;
 
         const category = req.query.category || '';
+        const subType = req.query.subType || '';
 
         let whereClauses = [];
         const request = pool.request();
@@ -31,6 +32,12 @@ router.get('/', async (req, res) => {
             whereClauses.push("q.DocType NOT LIKE 'quotation_%'");
         }
 
+        if (subType === 'fda') {
+            whereClauses.push("q.DocType LIKE '%fda%'");
+        } else if (subType === 'normal') {
+            whereClauses.push("(q.DocType NOT LIKE '%fda%' OR q.DocType IS NULL)");
+        }
+
         const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
         const countResult = await request.query(`SELECT COUNT(*) as total FROM Quotation q ${whereClause}`);
@@ -41,7 +48,7 @@ router.get('/', async (req, res) => {
 
         const result = await request.query(`
             SELECT 
-                q.QuotationID, q.QuotationNo, q.ContractID, q.CustomerName, q.BillDate, q.ValidUntil, 
+                q.QuotationID, q.QuotationNo, q.DocType, q.ContractID, q.CustomerName, q.BillDate, q.ValidUntil, 
                 q.GrandTotal, q.Status, q.CreatedAt, q.Revision, u.display_name AS CreatedByName
             FROM Quotation q
             LEFT JOIN Users u ON q.CreatedBy = u.user_id

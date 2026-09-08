@@ -96,7 +96,7 @@ export default function Sales() {
     // ── State: การแสดงฟอร์ม ──
     const [showQuotationForm, setShowQuotationForm] = useState(false);
     const [localQuotations, setLocalQuotations] = useState([]);
-    const [quotationPagination, setQuotationPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [quotationPagination, setQuotationPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [appliedQuotationSearch, setAppliedQuotationSearch] = useState('');
     const [editingQuotationId, setEditingQuotationId] = useState(null);
     const [isViewOnly, setIsViewOnly] = useState(false);
@@ -133,7 +133,7 @@ export default function Sales() {
     const [localPOAs, setLocalPOAs] = useState([]);
     const [editingPOAId, setEditingPOAId] = useState(null);
     const [editingPOAType, setEditingPOAType] = useState(null);
-    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
+    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [poaSearch, setPoaSearch] = useState('');
     const [appliedPoaSearch, setAppliedPoaSearch] = useState('');
 
@@ -142,7 +142,7 @@ export default function Sales() {
     const [localBillings, setLocalBillings] = useState([]);
     const [editingBillingId, setEditingBillingId] = useState(null);
     const [previewBillingId, setPreviewBillingId] = useState(null);
-    const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [billingSearch, setBillingSearch] = useState('');
     const [appliedBillingSearch, setAppliedBillingSearch] = useState('');
 
@@ -150,7 +150,7 @@ export default function Sales() {
     const [showTaxInvoiceForm, setShowTaxInvoiceForm] = useState(false);
     const [localTaxInvoices, setLocalTaxInvoices] = useState([]);
     const [editingTaxInvoiceId, setEditingTaxInvoiceId] = useState(null);
-    const [taxInvoicePagination, setTaxInvoicePagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [taxInvoicePagination, setTaxInvoicePagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [taxInvoiceSearch, setTaxInvoiceSearch] = useState('');
     const [appliedTaxInvoiceSearch, setAppliedTaxInvoiceSearch] = useState('');
 
@@ -158,7 +158,7 @@ export default function Sales() {
     const [showDeliveryOrderForm, setShowDeliveryOrderForm] = useState(false);
     const [localDeliveryOrders, setLocalDeliveryOrders] = useState([]);
     const [editingDeliveryOrderId, setEditingDeliveryOrderId] = useState(null);
-    const [deliveryOrderPagination, setDeliveryOrderPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [deliveryOrderPagination, setDeliveryOrderPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [deliveryOrderSearch, setDeliveryOrderSearch] = useState('');
     const [appliedDeliveryOrderSearch, setAppliedDeliveryOrderSearch] = useState('');
 
@@ -166,7 +166,7 @@ export default function Sales() {
     const [showReceiptForm, setShowReceiptForm] = useState(false);
     const [receipts, setReceipts] = useState([]);
     const [editDocId, setEditDocId] = useState(null);
-    const [receiptPagination, setReceiptPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [receiptPagination, setReceiptPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [receiptSearch, setReceiptSearch] = useState('');
     const [appliedReceiptSearch, setAppliedReceiptSearch] = useState('');
 
