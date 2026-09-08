@@ -9,6 +9,7 @@ import ContractSelectorModal from './ContractSelectorModal';
 import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
+import { formatFullAddress } from '../utils/formatters';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -1035,6 +1036,9 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
         }
         setFormData(prev => {
             const nextData = { ...prev, [name]: type === 'checkbox' ? checked : value };
+            if (name.startsWith('addr_')) {
+                nextData.address = formatFullAddress(nextData);
+            }
             
             if (name === 'docType') {
 
@@ -1319,19 +1323,8 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
 
         setStatus('saving');
 
-        let finalAddress = formData.address;
-        if (formData.addr_no) {
-            const parts = [
-                formData.addr_no,
-                formData.addr_soi ? `ซอย ${formData.addr_soi}` : '',
-                formData.addr_road ? `ถนน ${formData.addr_road}` : '',
-                formData.addr_subdistrict ? `ต. ${formData.addr_subdistrict}` : '',
-                formData.addr_district ? `อ. ${formData.addr_district}` : '',
-                formData.addr_province ? `จ. ${formData.addr_province}` : '',
-                formData.addr_zip
-            ].filter(p => p.trim() !== '');
-            finalAddress = parts.join(' ');
-        }
+        const finalAddress = formatFullAddress(formData);
+        setFormData(prev => ({ ...prev, address: finalAddress }));
 
         const payload = {
             taxInvoiceNo: formData.billNo,
@@ -2481,7 +2474,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                                 </tr>
                                 <tr>
                                     <td style={{ border: '1px solid black', padding: '4px 8px', borderTop: 'none', borderBottom: 'none' }}>
-                                        <span style={{ fontWeight: 'bold' }}>ที่อยู่ติดต่อ :</span> {formData.address || '-'}
+                                        <span style={{ fontWeight: 'bold' }}>ที่อยู่ติดต่อ :</span> {formatFullAddress(formData)}
                                     </td>
                                     <td style={{ border: '1px solid black', padding: '4px 8px' }}>
                                         <span style={{ fontWeight: 'bold' }}>E-mail :</span> {formData.email || '-'}
@@ -2807,7 +2800,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                                     <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
                                         ที่อยู่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Address</span>
                                     </td>
-                                    <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}>{formData.address || '-'}</td>
+                                    <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}>{formatFullAddress(formData)}</td>
                                 </tr>
                                 <tr>
                                     <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
