@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
-const { generateSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
+const { generateSequence, peekNextSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
 const validate = require('../middleware/validate');
 const { createDeliveryOrderSchema, updateStatusSchema } = require('../validators/deliveryOrders');
 const { logAction } = require('../services/auditLog');
@@ -74,7 +74,7 @@ router.get('/next-number', async (req, res) => {
         const datePrefix = getDatePrefix();
         const fullPrefix = `${prefix}${datePrefix}`;
         
-        const nextNo = await generateSequence(pool, 'DeliveryOrder', 'DeliveryOrderNo', fullPrefix, 3);
+        const nextNo = await peekNextSequence(pool, 'DeliveryOrder', 'DeliveryOrderNo', fullPrefix, 3);
         
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
@@ -159,7 +159,22 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createDeliveryOrderS
         const request = new sql.Request(transaction);
 
         // Generate DeliveryOrder Number
-        const finalDeliveryOrderNo = deliveryOrderNo || await generateSequence(pool, 'DeliveryOrder', 'DeliveryOrderNo', `BI-${getDatePrefix()}`, 3);
+        let prefix = 'DO-';
+        if (docType && docType.includes('psf')) prefix = 'DO-PSF-';
+        else if (docType && docType.includes('elt')) prefix = 'DO-ELT-';
+        const defaultDoPrefix = `${prefix}${getDatePrefix()}`;
+
+        let finalDeliveryOrderNo = deliveryOrderNo;
+        if (!finalDeliveryOrderNo) {
+            finalDeliveryOrderNo = await peekNextSequence(pool, 'DeliveryOrder', 'DeliveryOrderNo', defaultDoPrefix, 3);
+        } else {
+            const chk = await transaction.request()
+                .input('chkNo', sql.NVarChar, finalDeliveryOrderNo)
+                .query(`SELECT 1 FROM DeliveryOrder WHERE DeliveryOrderNo = @chkNo`);
+            if (chk.recordset.length > 0) {
+                finalDeliveryOrderNo = await peekNextSequence(pool, 'DeliveryOrder', 'DeliveryOrderNo', defaultDoPrefix, 3);
+            }
+        }
 
         // 1. Insert Header
         request.input('deliveryOrderNo', sql.NVarChar, finalDeliveryOrderNo);

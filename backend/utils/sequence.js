@@ -29,6 +29,44 @@ const getMonthPrefix = (date = new Date()) => {
 };
 
 /**
+ * Read-only sequence peeker (does NOT modify Sequences table or burn numbers).
+ * Ideal for previewing the next available document number in GET /next-number endpoints.
+ * @param {Object} pool - The SQL connection pool
+ * @param {string} tableName - The table to query
+ * @param {string} columnName - The column to search
+ * @param {string} prefix - The prefix to match and prepend (e.g., 'QT-20260908')
+ * @param {number} padLength - Number of digits for the sequence (default: 3)
+ * @param {string} separator - Separator between prefix and sequence (default: '-')
+ * @returns {Promise<string>} - The next available ID
+ */
+const peekNextSequence = async (pool, tableName, columnName, prefix, padLength = 3, separator = '-') => {
+    const fullPrefix = prefix.endsWith(separator) ? prefix : `${prefix}${separator}`;
+
+    const result = await pool.request()
+        .input('prefixPattern', sql.NVarChar, `${fullPrefix}%`)
+        .query(`
+            SELECT TOP 1 ${columnName} AS maxNo
+            FROM ${tableName} WITH (NOLOCK)
+            WHERE ${columnName} LIKE @prefixPattern
+            ORDER BY ${columnName} DESC
+        `);
+
+    let maxNum = 0;
+    if (result.recordset.length > 0 && result.recordset[0].maxNo) {
+        const fullVal = String(result.recordset[0].maxNo).trim();
+        const parts = fullVal.split(separator);
+        const lastPart = parts[parts.length - 1];
+        const num = parseInt(lastPart, 10);
+        if (!isNaN(num)) {
+            maxNum = num;
+        }
+    }
+
+    const nextSeq = String(maxNum + 1).padStart(padLength, '0');
+    return `${fullPrefix}${nextSeq}`;
+};
+
+/**
  * Generic sequence generator
  * @param {Object} pool - The SQL connection pool
  * @param {string} tableName - The table to query
@@ -39,7 +77,7 @@ const getMonthPrefix = (date = new Date()) => {
  * @returns {Promise<string>} - The new generated ID
  */
 const generateSequence = async (pool, tableName, columnName, prefix, padLength = 3, separator = '-') => {
-    const fullPrefix = `${prefix}${separator}`;
+    const fullPrefix = prefix.endsWith(separator) ? prefix : `${prefix}${separator}`;
     
     // Atomically get the next number from the Sequences table
     const result = await pool.request()
@@ -78,5 +116,6 @@ module.exports = {
     getDatePrefix,
     getShortDatePrefix,
     getMonthPrefix,
+    peekNextSequence,
     generateSequence
 };

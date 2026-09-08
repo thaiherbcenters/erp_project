@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
-const { generateSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
+const { generateSequence, peekNextSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
 const validate = require('../middleware/validate');
 const { createQuotationSchema, updateStatusSchema } = require('../validators/quotations');
 const { logAction } = require('../services/auditLog');
@@ -80,7 +80,7 @@ router.get('/next-number', async (req, res) => {
         // Wait, the POST route says: `QT-${getDatePrefix()}`
         const fullPrefixForNext = `QT-${getDatePrefix()}`;
         
-        const nextNo = await generateSequence(pool, 'Quotation', 'QuotationNo', fullPrefixForNext, 3);
+        const nextNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', fullPrefixForNext, 3);
         
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
@@ -169,7 +169,17 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
         const request = new sql.Request(transaction);
 
         // Generate Quotation Number
-        const finalQuotationNo = quotationNo || await generateSequence(pool, 'Quotation', 'QuotationNo', `QT-${getDatePrefix()}`, 3);
+        let finalQuotationNo = quotationNo;
+        if (!finalQuotationNo) {
+            finalQuotationNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', `QT-${getDatePrefix()}`, 3);
+        } else {
+            const chk = await transaction.request()
+                .input('chkNo', sql.NVarChar, finalQuotationNo)
+                .query(`SELECT 1 FROM Quotation WHERE QuotationNo = @chkNo`);
+            if (chk.recordset.length > 0) {
+                finalQuotationNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', `QT-${getDatePrefix()}`, 3);
+            }
+        }
 
         // 1. Insert Header
         request.input('customerId', sql.Int, customerId || null);

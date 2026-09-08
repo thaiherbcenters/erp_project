@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
-const { generateSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
+const { generateSequence, peekNextSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
 const validate = require('../middleware/validate');
 const { createBillingInvoiceSchema, updateStatusSchema } = require('../validators/billingInvoices');
 const { logAction } = require('../services/auditLog');
@@ -81,7 +81,7 @@ router.get('/next-number', async (req, res) => {
         // However, the POST route in `billingInvoices.js` says: `BI-${getDatePrefix()}` unconditionally on line 137.
         // Let's use `BI-${getDatePrefix()}` unconditionally to match POST.
         
-        const nextNo = await generateSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', `BI-${getDatePrefix()}`, 3);
+        const nextNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', `BI-${getDatePrefix()}`, 3);
         
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
@@ -166,7 +166,17 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
 
         request.input('customerId', sql.Int, customerId || null);
         // Generate BillingInvoice Number
-        const finalBillingInvoiceNo = billingInvoiceNo || await generateSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', `BI-${getDatePrefix()}`, 3);
+        let finalBillingInvoiceNo = billingInvoiceNo;
+        if (!finalBillingInvoiceNo) {
+            finalBillingInvoiceNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', `BI-${getDatePrefix()}`, 3);
+        } else {
+            const chk = await transaction.request()
+                .input('chkNo', sql.NVarChar, finalBillingInvoiceNo)
+                .query(`SELECT 1 FROM BillingInvoice WHERE BillingInvoiceNo = @chkNo`);
+            if (chk.recordset.length > 0) {
+                finalBillingInvoiceNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', `BI-${getDatePrefix()}`, 3);
+            }
+        }
 
         // 1. Insert Header
         request.input('billingInvoiceNo', sql.NVarChar, finalBillingInvoiceNo);

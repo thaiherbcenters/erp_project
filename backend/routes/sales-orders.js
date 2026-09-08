@@ -12,6 +12,7 @@ const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
 const { authorizeRoles } = require('../middleware/authorize');
+const { peekNextSequence } = require('../utils/sequence');
 
 // ── Helper: Generate SO Number ──
 const generateSONumber = async (pool) => {
@@ -20,13 +21,7 @@ const generateSONumber = async (pool) => {
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
     const prefix = `SO-${yyyy}${mm}${dd}`;
-
-    const result = await pool.request()
-        .input('prefix', sql.NVarChar, `${prefix}%`)
-        .query(`SELECT COUNT(*) AS cnt FROM SalesOrder WHERE SalesOrderNo LIKE @prefix`);
-
-    const seq = String((result.recordset[0].cnt || 0) + 1).padStart(3, '0');
-    return `${prefix}-${seq}`;
+    return await peekNextSequence(pool, 'SalesOrder', 'SalesOrderNo', prefix, 3);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
-const { generateSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
+const { generateSequence, peekNextSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
 const validate = require('../middleware/validate');
 const { createTaxInvoiceSchema, updateStatusSchema } = require('../validators/taxInvoices');
 const { logAction } = require('../services/auditLog');
@@ -74,7 +74,7 @@ router.get('/next-number', async (req, res) => {
         const datePrefix = getDatePrefix();
         const fullPrefix = `${prefix}${datePrefix}`;
         
-        const nextNo = await generateSequence(pool, 'TaxInvoice', 'TaxInvoiceNo', fullPrefix, 3);
+        const nextNo = await peekNextSequence(pool, 'TaxInvoice', 'TaxInvoiceNo', fullPrefix, 3);
         
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
@@ -159,7 +159,22 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createTaxInvoiceSche
         const request = new sql.Request(transaction);
 
         // Generate TaxInvoice Number
-        const finalTaxInvoiceNo = taxInvoiceNo || await generateSequence(pool, 'TaxInvoice', 'TaxInvoiceNo', `BI-${getDatePrefix()}`, 3);
+        let prefix = 'IV';
+        if (docType && docType.includes('psf')) prefix = 'IV-PSF';
+        else if (docType && docType.includes('elt')) prefix = 'IV-ELT';
+        const defaultIvPrefix = `${prefix}${getDatePrefix()}`;
+
+        let finalTaxInvoiceNo = taxInvoiceNo;
+        if (!finalTaxInvoiceNo) {
+            finalTaxInvoiceNo = await peekNextSequence(pool, 'TaxInvoice', 'TaxInvoiceNo', defaultIvPrefix, 3);
+        } else {
+            const chk = await transaction.request()
+                .input('chkNo', sql.NVarChar, finalTaxInvoiceNo)
+                .query(`SELECT 1 FROM TaxInvoice WHERE TaxInvoiceNo = @chkNo`);
+            if (chk.recordset.length > 0) {
+                finalTaxInvoiceNo = await peekNextSequence(pool, 'TaxInvoice', 'TaxInvoiceNo', defaultIvPrefix, 3);
+            }
+        }
 
         // 1. Insert Header
         request.input('taxInvoiceNo', sql.NVarChar, finalTaxInvoiceNo);

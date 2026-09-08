@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
-const { generateSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
+const { generateSequence, peekNextSequence, getDatePrefix, getMonthPrefix } = require('../utils/sequence');
 const validate = require('../middleware/validate');
 const { createReceiptSchema, updateStatusSchema } = require('../validators/receipts');
 const { logAction } = require('../services/auditLog');
@@ -74,7 +74,7 @@ router.get('/next-number', async (req, res) => {
         const datePrefix = getDatePrefix();
         const fullPrefix = `${prefix}${datePrefix}`;
         
-        const nextNo = await generateSequence(pool, 'Receipt', 'ReceiptNo', fullPrefix, 3);
+        const nextNo = await peekNextSequence(pool, 'Receipt', 'ReceiptNo', fullPrefix, 3);
         
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
@@ -163,7 +163,18 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         let prefix = 'RE-';
         if (docType && docType.includes('psf')) prefix = 'RE-PSF-';
         else if (docType && docType.includes('elt')) prefix = 'RE-ELT-';
-        const finalReceiptNo = receiptNo || await generateSequence(pool, 'Receipt', 'ReceiptNo', `${prefix}${getDatePrefix()}`, 3);
+        const defaultRePrefix = `${prefix}${getDatePrefix()}`;
+        let finalReceiptNo = receiptNo;
+        if (!finalReceiptNo) {
+            finalReceiptNo = await peekNextSequence(pool, 'Receipt', 'ReceiptNo', defaultRePrefix, 3);
+        } else {
+            const chk = await transaction.request()
+                .input('chkNo', sql.NVarChar, finalReceiptNo)
+                .query(`SELECT 1 FROM Receipt WHERE ReceiptNo = @chkNo`);
+            if (chk.recordset.length > 0) {
+                finalReceiptNo = await peekNextSequence(pool, 'Receipt', 'ReceiptNo', defaultRePrefix, 3);
+            }
+        }
 
         // 1. Insert Header
         request.input('receiptNo', sql.NVarChar, finalReceiptNo);
