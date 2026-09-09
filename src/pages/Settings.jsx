@@ -1019,40 +1019,157 @@ function AuditLogTab() {
 
     return (
         <>
-            {/* Filters */}
-            <div className="settings-toolbar" style={{ flexWrap: 'wrap', gap: '8px' }}>
-                <div className="settings-search" style={{ minWidth: '160px' }}>
-                    <Search size={16} style={{ color: '#94a3b8' }} />
-                    <input placeholder="ค้นหา username..." value={filters.username}
+            {/* Filters Toolbar */}
+            <div 
+                style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    flexWrap: 'wrap', 
+                    gap: '10px', 
+                    marginBottom: '16px',
+                    background: '#fff',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    border: '1.5px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)'
+                }}
+            >
+                {/* Search Input */}
+                <div 
+                    className="settings-search" 
+                    style={{ 
+                        flex: '1 1 180px', 
+                        minWidth: '160px', 
+                        maxWidth: '260px', 
+                        height: '38px', 
+                        padding: '0 12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        borderRadius: '8px',
+                        border: '1.5px solid #e2e8f0'
+                    }}
+                >
+                    <Search size={15} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                    <input 
+                        placeholder="ค้นหา username..." 
+                        value={filters.username}
                         onChange={e => setFilters({ ...filters, username: e.target.value })}
-                        onKeyDown={e => e.key === 'Enter' && handleFilter()} />
+                        onKeyDown={e => e.key === 'Enter' && handleFilter()} 
+                        style={{ fontSize: '13px', width: '100%', border: 'none', outline: 'none', background: 'transparent' }}
+                    />
+                    {filters.username && (
+                        <button 
+                            type="button" 
+                            onClick={() => setFilters({ ...filters, username: '' })}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0, display: 'flex' }}
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
                 </div>
-                <CustomSelect className="settings-filter-select" value={filters.action}
-                    onChange={e => { setFilters({ ...filters, action: e.target.value }); setPage(1); }}>
-                    <option value="">ทุก Action</option>
-                    <option value="LOGIN">LOGIN</option>
-                    <option value="LOGIN_FAILED">LOGIN_FAILED</option>
-                    <option value="LOGIN_BLOCKED">LOGIN_BLOCKED</option>
-                    <option value="CREATE">CREATE</option>
-                    <option value="UPDATE">UPDATE</option>
-                    <option value="DELETE">DELETE</option>
-                </CustomSelect>
-                <CustomSelect className="settings-filter-select" value={filters.module}
-                    onChange={e => { setFilters({ ...filters, module: e.target.value }); setPage(1); }}>
-                    <option value="">ทุก Module</option>
-                    <option value="auth">auth</option>
-                    <option value="quotations">quotations</option>
-                    <option value="stock">stock</option>
-                    <option value="users">users</option>
-                </CustomSelect>
-                <CustomDatePicker className="settings-filter-date" value={filters.from}
-                    onChange={e => setFilters({ ...filters, from: e.target.value })} />
-                <span style={{ color: '#94a3b8', alignSelf: 'center' }}>ถึง</span>
-                <CustomDatePicker className="settings-filter-date" value={filters.to}
-                    onChange={e => setFilters({ ...filters, to: e.target.value })} />
-                <button className="settings-add-btn" onClick={handleFilter} style={{ padding: '8px 16px' }}>
-                    <Search size={14} /> ค้นหา
-                </button>
+
+                {/* Action Select */}
+                <div style={{ width: '145px', flexShrink: 0 }}>
+                    <CustomSelect 
+                        value={filters.action}
+                        onChange={e => { setFilters({ ...filters, action: e.target.value }); setPage(1); }}
+                        style={{ width: '100%' }}
+                    >
+                        <option value="">ทุก Action</option>
+                        <option value="LOGIN">LOGIN</option>
+                        <option value="LOGIN_FAILED">LOGIN_FAILED</option>
+                        <option value="LOGIN_BLOCKED">LOGIN_BLOCKED</option>
+                        <option value="CREATE">CREATE</option>
+                        <option value="UPDATE">UPDATE</option>
+                        <option value="DELETE">DELETE</option>
+                        <option value="LOGOUT">LOGOUT</option>
+                    </CustomSelect>
+                </div>
+
+                {/* Module Select */}
+                <div style={{ width: '150px', flexShrink: 0 }}>
+                    <CustomSelect 
+                        value={filters.module}
+                        onChange={e => { setFilters({ ...filters, module: e.target.value }); setPage(1); }}
+                        style={{ width: '100%' }}
+                    >
+                        <option value="">ทุก Module</option>
+                        <option value="auth">auth</option>
+                        <option value="quotations">quotations</option>
+                        <option value="sales_order">sales_order</option>
+                        <option value="billing_invoices">billing_invoices</option>
+                        <option value="delivery_orders">delivery_orders</option>
+                        <option value="tax_invoices">tax_invoices</option>
+                        <option value="receipts">receipts</option>
+                        <option value="stock">stock</option>
+                        <option value="users">users</option>
+                    </CustomSelect>
+                </div>
+
+                {/* Date Range: From -> To */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    <div style={{ width: '135px' }}>
+                        <CustomDatePicker 
+                            value={filters.from}
+                            onChange={e => setFilters({ ...filters, from: e.target.value })}
+                            placeholderText="จากวันที่"
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                    <span style={{ color: '#94a3b8', fontSize: '13px', fontWeight: 500 }}>ถึง</span>
+                    <div style={{ width: '135px' }}>
+                        <CustomDatePicker 
+                            value={filters.to}
+                            onChange={e => setFilters({ ...filters, to: e.target.value })}
+                            placeholderText="ถึงวันที่"
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                </div>
+
+                {/* Search & Reset Buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }}>
+                    <button 
+                        className="settings-add-btn" 
+                        onClick={handleFilter} 
+                        style={{ 
+                            height: '38px', 
+                            padding: '0 16px', 
+                            borderRadius: '8px', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '6px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                        }}
+                    >
+                        <Search size={15} /> ค้นหา
+                    </button>
+                    {(filters.username || filters.action || filters.module || filters.from || filters.to) && (
+                        <button 
+                            type="button"
+                            onClick={handleClear}
+                            style={{ 
+                                height: '38px', 
+                                padding: '0 12px', 
+                                borderRadius: '8px', 
+                                background: '#f1f5f9', 
+                                color: '#64748b', 
+                                border: '1.5px solid #cbd5e1', 
+                                cursor: 'pointer',
+                                fontSize: '13px',
+                                fontWeight: 500,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}
+                            title="ล้างตัวกรองทั้งหมด"
+                        >
+                            <X size={14} /> ล้าง
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Summary */}
