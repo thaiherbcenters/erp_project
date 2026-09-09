@@ -959,6 +959,7 @@ function RoleFormModal({ title, departments, role, onClose, onSave }) {
 // Audit Log Tab — ประวัติการใช้งานระบบ (Admin Only)
 // =============================================================================
 function AuditLogTab() {
+    const { canCreate, canUpdate, canDelete } = useAuth();
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
@@ -1049,9 +1050,9 @@ function AuditLogTab() {
                 <span style={{ color: '#94a3b8', alignSelf: 'center' }}>ถึง</span>
                 <CustomDatePicker className="settings-filter-date" value={filters.to}
                     onChange={e => setFilters({ ...filters, to: e.target.value })} />
-                {canCreate('settings') && (<button className="settings-add-btn" onClick={handleFilter} style={{ padding: '8px 16px' }}>
+                <button className="settings-add-btn" onClick={handleFilter} style={{ padding: '8px 16px' }}>
                     <Search size={14} /> ค้นหา
-                </button>)}
+                </button>
             </div>
 
             {/* Summary */}
