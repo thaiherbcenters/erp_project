@@ -670,12 +670,20 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             if (item.id === id) {
                 const newItem = { ...item, [field]: value };
 
+                const isPromoItem = !!(newItem.promoType || newItem.isPromo);
+
                 if (field === 'manualTotal') {
-                    const numTotal = parseFloat(value) || 0;
-                    const qty = parseFloat(newItem.qty) || 0;
-                    newItem.price = qty > 0 ? (numTotal / qty).toFixed(4) : 0;
+                    // For promo items, keep fixed price/unit - do NOT reverse-calculate!
+                    if (!isPromoItem) {
+                        const numTotal = parseFloat(value) || 0;
+                        const qty = parseFloat(newItem.qty) || 0;
+                        newItem.price = qty > 0 ? (numTotal / qty).toFixed(4) : 0;
+                    }
                 } else if (['qty', 'price', 'promoType', 'promoMultiplier', 'name', 'isPromo'].includes(field)) {
-                    newItem.manualTotal = undefined;
+                    // For promo items, do NOT reset manualTotal when editing price or qty
+                    if (!isPromoItem || field === 'promoType' || field === 'name' || field === 'promoMultiplier') {
+                        newItem.manualTotal = undefined;
+                    }
                 }
 
                 if (field === 'name') {
@@ -1433,7 +1441,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                 <div style={{ flex: '1 1 120px' }}>
                                     <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '6px', fontWeight: 500 }}>จำนวน</label>
                                     <div className="qty-group" style={{ margin: 0 }}>
-                                        <input type="number" className="product-qty" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', e.target.value)} placeholder="0" readOnly={!!(item.isPromo || item.promoType)} style={{ flex: 1, minWidth: '60px', paddingRight: '8px', backgroundColor: (item.isPromo || item.promoType) ? '#f1f5f9' : 'white' }} />
+                                        <input type="number" className="product-qty" value={item.qty} onChange={e => handleItemChange(item.id, 'qty', e.target.value)} placeholder="0" style={{ flex: 1, minWidth: '60px', paddingRight: '8px' }} />
                                         <div 
                                             style={{ position: 'relative', flexShrink: 0 }}
                                             onBlur={(e) => {
@@ -1525,7 +1533,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                 <div style={{ flex: '1 1 120px' }}>
                                     <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '6px', fontWeight: 500 }}>ราคา/หน่วย</label>
                                     <div className="price-group" style={{ margin: 0 }}>
-                                        <input type="number" className="product-price" value={item.price} onChange={e => handleItemChange(item.id, 'price', e.target.value)} placeholder="0.00" readOnly={!!(item.isPromo || item.promoType)} style={{ backgroundColor: (item.isPromo || item.promoType) ? '#f1f5f9' : 'white', flex: 1, minWidth: '40px' }} />
+                                        <input type="number" className="product-price" value={item.price} onChange={e => handleItemChange(item.id, 'price', e.target.value)} placeholder="0.00" style={{ flex: 1, minWidth: '40px' }} />
                                         <span className="qty-label">บาท</span>
                                     </div>
                                 </div>
