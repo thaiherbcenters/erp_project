@@ -1028,7 +1028,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                         <tr>
                                             <td rowSpan={visibleRows} style={{ width: '54%', verticalAlign: 'top', padding: '5px 12px', borderRight: '1px solid #1a7a3a', borderTop: 'none', borderBottom: 'none' }}>
                                                 <div style={{ fontSize: '9pt', minHeight: '15px' }}>
-                                                    <b>หมายเหตุ:</b> <div dangerouslySetInnerHTML={{ __html: formData.notes || '-' }} style={{ display: 'inline-block' }} />
+                                                    <b>หมายเหตุ:</b> <div className="print-notes-container" dangerouslySetInnerHTML={{ __html: formData.notes || '-' }} style={{ display: 'inline-block' }} />
                                                 </div>
                                             </td>
                                             <td style={{ width: '33%', fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderTop: 'none', fontSize: '9pt' }}>
@@ -1943,7 +1943,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                     <tr>
                                         <td rowSpan={visibleRows} style={{ width: '54%', verticalAlign: 'top', padding: '5px 12px', borderRight: '1px solid #1a7a3a', borderTop: 'none', borderBottom: 'none' }}>
                                             <div style={{ fontSize: '9pt', minHeight: '15px' }}>
-                                                <b>หมายเหตุ:</b> <div dangerouslySetInnerHTML={{ __html: formData.notes || '-' }} style={{ display: 'inline-block' }} />
+                                                <b>หมายเหตุ:</b> <div className="print-notes-container" dangerouslySetInnerHTML={{ __html: formData.notes || '-' }} style={{ display: 'inline-block' }} />
                                             </div>
                                         </td>
                                         <td style={{ width: '33%', fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderTop: 'none', fontSize: '9pt' }}>

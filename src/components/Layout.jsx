@@ -296,7 +296,12 @@ export default function Layout() {
                                 }}
                             />
                         </div>
-                        <button className="sidebar-toggle" onClick={() => setSidebarOpen(!sidebarOpen)}>
+                        <button 
+                            className="sidebar-toggle" 
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            title={sidebarOpen ? 'ย่อแถบเมนู' : 'ขยายแถบเมนู'}
+                            aria-label={sidebarOpen ? 'ย่อแถบเมนู' : 'ขยายแถบเมนู'}
+                        >
                             {sidebarOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
                         </button>
                     </div>

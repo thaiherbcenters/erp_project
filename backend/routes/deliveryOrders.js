@@ -17,6 +17,11 @@ router.get('/', async (req, res) => {
         const offset = (page - 1) * limit;
 
         const category = req.query.category || '';
+        const subType = req.query.subType || '';
+        const createdBy = req.query.createdBy || '';
+        const status = req.query.status || '';
+        const dateFrom = req.query.dateFrom || '';
+        const dateTo = req.query.dateTo || '';
 
         let whereClauses = [];
         const request = pool.request();
@@ -24,7 +29,35 @@ router.get('/', async (req, res) => {
             whereClauses.push('(d.DeliveryOrderNo LIKE @search OR d.CustomerName LIKE @search OR d.Status LIKE @search)');
             request.input('search', sql.NVarChar, `%${search}%`);
         }
-        // No category filter needed for billing invoice specific table
+
+        if (subType === 'fda') {
+            whereClauses.push("d.DocType LIKE '%fda%'");
+        } else if (subType === 'normal') {
+            whereClauses.push("(d.DocType NOT LIKE '%fda%' OR d.DocType IS NULL)");
+        } else if (subType) {
+            whereClauses.push("d.DocType = @subType");
+            request.input('subType', sql.NVarChar, subType);
+        }
+
+        if (createdBy) {
+            whereClauses.push("d.CreatedBy = @createdBy");
+            request.input('createdBy', sql.Int, parseInt(createdBy, 10));
+        }
+
+        if (status) {
+            whereClauses.push("d.Status = @status");
+            request.input('status', sql.NVarChar, status);
+        }
+
+        if (dateFrom) {
+            whereClauses.push("CAST(COALESCE(d.BillDate, d.CreatedAt) AS DATE) >= @dateFrom");
+            request.input('dateFrom', sql.Date, dateFrom);
+        }
+
+        if (dateTo) {
+            whereClauses.push("CAST(COALESCE(d.BillDate, d.CreatedAt) AS DATE) <= @dateTo");
+            request.input('dateTo', sql.Date, dateTo);
+        }
 
         const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
@@ -36,7 +69,7 @@ router.get('/', async (req, res) => {
 
         const result = await request.query(`
             SELECT 
-                d.CustomerID, d.DeliveryOrderID, d.DeliveryOrderNo, d.ContractID, d.CustomerName, d.BillDate, d.ValidUntil, 
+                d.CustomerID, d.DeliveryOrderID, d.DeliveryOrderNo, d.DocType, d.ContractID, d.CustomerName, d.BillDate, d.ValidUntil, 
                 d.GrandTotal, d.Status, d.CreatedAt, d.Revision, u.display_name AS CreatedByName
             FROM DeliveryOrder d
             LEFT JOIN Users u ON d.CreatedBy = u.user_id

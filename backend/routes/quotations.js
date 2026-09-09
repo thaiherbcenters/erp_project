@@ -18,6 +18,10 @@ router.get('/', async (req, res) => {
 
         const category = req.query.category || '';
         const subType = req.query.subType || '';
+        const createdBy = req.query.createdBy || '';
+        const status = req.query.status || '';
+        const dateFrom = req.query.dateFrom || '';
+        const dateTo = req.query.dateTo || '';
 
         let whereClauses = [];
         const request = pool.request();
@@ -36,6 +40,29 @@ router.get('/', async (req, res) => {
             whereClauses.push("q.DocType LIKE '%fda%'");
         } else if (subType === 'normal') {
             whereClauses.push("(q.DocType NOT LIKE '%fda%' OR q.DocType IS NULL)");
+        } else if (subType) {
+            whereClauses.push("q.DocType = @subType");
+            request.input('subType', sql.NVarChar, subType);
+        }
+
+        if (createdBy) {
+            whereClauses.push("q.CreatedBy = @createdBy");
+            request.input('createdBy', sql.Int, parseInt(createdBy, 10));
+        }
+
+        if (status) {
+            whereClauses.push("q.Status = @status");
+            request.input('status', sql.NVarChar, status);
+        }
+
+        if (dateFrom) {
+            whereClauses.push("CAST(COALESCE(q.BillDate, q.CreatedAt) AS DATE) >= @dateFrom");
+            request.input('dateFrom', sql.Date, dateFrom);
+        }
+
+        if (dateTo) {
+            whereClauses.push("CAST(COALESCE(q.BillDate, q.CreatedAt) AS DATE) <= @dateTo");
+            request.input('dateTo', sql.Date, dateTo);
         }
 
         const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';

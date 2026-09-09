@@ -503,6 +503,25 @@ const styles = `
         box-shadow: inset 0 0 0 1000px #e6e6e6 !important;
     }
     
+    .print-notes-container {
+        word-break: break-word;
+    }
+    .print-notes-container p {
+        margin: 0;
+        white-space: pre-wrap !important;
+        white-space: break-spaces !important;
+    }
+    .print-notes-container span,
+    .print-notes-container div,
+    .print-notes-container strong,
+    .print-notes-container b,
+    .print-notes-container em,
+    .print-notes-container i,
+    .print-notes-container td {
+        white-space: pre-wrap !important;
+        white-space: break-spaces !important;
+    }
+    
     .print-notes-container span[style*="color:red"],
     .print-notes-container span[style*="color: red"],
     .print-notes-container div[style*="color:red"],
@@ -1456,6 +1475,24 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                             #q-print-container .print-color-blue { color: #2980b9 !important; }
                             #q-print-container .print-bg-gray {
                                 background-color: #e6e6e6 !important;
+                            }
+                            #q-print-container .print-notes-container {
+                                word-break: break-word;
+                            }
+                            #q-print-container .print-notes-container p {
+                                margin: 0;
+                                white-space: pre-wrap !important;
+                                white-space: break-spaces !important;
+                            }
+                            #q-print-container .print-notes-container span,
+                            #q-print-container .print-notes-container div,
+                            #q-print-container .print-notes-container strong,
+                            #q-print-container .print-notes-container b,
+                            #q-print-container .print-notes-container em,
+                            #q-print-container .print-notes-container i,
+                            #q-print-container .print-notes-container td {
+                                white-space: pre-wrap !important;
+                                white-space: break-spaces !important;
                             }
                             #q-print-container .print-notes-container span[style*="color:red"],
                             #q-print-container .print-notes-container span[style*="color: red"],
@@ -2809,38 +2846,38 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                                     <td style={{ padding: '2px 0', verticalAlign: 'top' }}>{formData.phone || '-'}</td>
                                 </tr>
                                 <tr>
-                                    <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                    <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                                         เลขประจำตัวผู้เสียภาษี :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>TAX ID</span>
                                     </td>
-                                    <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>
+                                    <td style={{ padding: '2px 0', verticalAlign: 'top' }}>
                                         {formData.taxId || '-'}
                                     </td>
                                 </tr>
                                 {isFda && (
                                     <>
                                         <tr>
-                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                                                 รหัสลูกค้า :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Customer ID</span>
                                             </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.fdaCustomerCode || '-'}</td>
+                                            <td style={{ padding: '2px 0', verticalAlign: 'top' }}>{formData.fdaCustomerCode || '-'}</td>
                                         </tr>
                                         <tr>
-                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                                                 อีเมล :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>E-mail</span>
                                             </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.fdaEmail || '-'}</td>
+                                            <td style={{ padding: '2px 0', verticalAlign: 'top' }}>{formData.fdaEmail || '-'}</td>
                                         </tr>
                                         <tr>
-                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                                                 ชื่อโครงการ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Project Name</span>
                                             </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.fdaProjectName || '-'}</td>
+                                            <td style={{ padding: '2px 0', verticalAlign: 'top' }}>{formData.fdaProjectName || '-'}</td>
                                         </tr>
                                         <tr>
-                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                                            <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top', whiteSpace: 'nowrap' }}>
                                                 เงื่อนไขชำระเงิน :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Credit Term</span>
                                             </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'middle' }}>{formData.fdaCreditTerms || '-'}</td>
+                                            <td style={{ padding: '2px 0', verticalAlign: 'top' }}>{formData.fdaCreditTerms || '-'}</td>
                                         </tr>
                                     </>
                                 )}

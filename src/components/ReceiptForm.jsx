@@ -582,6 +582,24 @@ const styles = `
         box-shadow: inset 0 0 0 1000px #e6e6e6 !important;
     }
     
+    .print-notes-container {
+        word-break: break-word;
+    }
+    .print-notes-container p {
+        margin: 0;
+        white-space: pre-wrap !important;
+        white-space: break-spaces !important;
+    }
+    .print-notes-container span,
+    .print-notes-container div,
+    .print-notes-container strong,
+    .print-notes-container b,
+    .print-notes-container em,
+    .print-notes-container i,
+    .print-notes-container td {
+        white-space: pre-wrap !important;
+        white-space: break-spaces !important;
+    }
     .print-notes-container span[style*="color:red"],
     .print-notes-container span[style*="color: red"],
     .print-notes-container div[style*="color:red"],
@@ -1551,6 +1569,24 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             #q-print-container .print-color-blue { color: #2980b9 !important; }
                             #q-print-container .print-bg-gray {
                                 background-color: #e6e6e6 !important;
+                            }
+                            #q-print-container .print-notes-container {
+                                word-break: break-word;
+                            }
+                            #q-print-container .print-notes-container p {
+                                margin: 0;
+                                white-space: pre-wrap !important;
+                                white-space: break-spaces !important;
+                            }
+                            #q-print-container .print-notes-container span,
+                            #q-print-container .print-notes-container div,
+                            #q-print-container .print-notes-container strong,
+                            #q-print-container .print-notes-container b,
+                            #q-print-container .print-notes-container em,
+                            #q-print-container .print-notes-container i,
+                            #q-print-container .print-notes-container td {
+                                white-space: pre-wrap !important;
+                                white-space: break-spaces !important;
                             }
                             #q-print-container .print-notes-container span[style*="color:red"],
                             #q-print-container .print-notes-container span[style*="color: red"],

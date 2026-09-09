@@ -17,6 +17,11 @@ router.get('/', async (req, res) => {
         const offset = (page - 1) * limit;
 
         const category = req.query.category || '';
+        const subType = req.query.subType || '';
+        const createdBy = req.query.createdBy || '';
+        const status = req.query.status || '';
+        const dateFrom = req.query.dateFrom || '';
+        const dateTo = req.query.dateTo || '';
 
         let whereClauses = [];
         const request = pool.request();
@@ -24,7 +29,37 @@ router.get('/', async (req, res) => {
             whereClauses.push('(r.ReceiptNo LIKE @search OR r.CustomerName LIKE @search OR r.Status LIKE @search)');
             request.input('search', sql.NVarChar, `%${search}%`);
         }
-        // No category filter needed for billing invoice specific table
+
+        if (subType === 'fda') {
+            whereClauses.push("r.DocType LIKE '%fda%'");
+        } else if (subType === 'normal') {
+            whereClauses.push("(r.DocType NOT LIKE '%fda%' OR r.DocType IS NULL)");
+        } else if (subType) {
+            whereClauses.push("(r.DocType = @subType OR r.DocType LIKE '%' + @subTypeClean + '%')");
+            request.input('subType', sql.NVarChar, subType);
+            const clean = subType.replace(/^(receipt_|delivery_order_|tax_invoice_|billing_invoice_|quotation_)/, '');
+            request.input('subTypeClean', sql.NVarChar, clean || subType);
+        }
+
+        if (createdBy) {
+            whereClauses.push("r.CreatedBy = @createdBy");
+            request.input('createdBy', sql.Int, parseInt(createdBy, 10));
+        }
+
+        if (status) {
+            whereClauses.push("r.Status = @status");
+            request.input('status', sql.NVarChar, status);
+        }
+
+        if (dateFrom) {
+            whereClauses.push("CAST(COALESCE(r.BillDate, r.CreatedAt) AS DATE) >= @dateFrom");
+            request.input('dateFrom', sql.Date, dateFrom);
+        }
+
+        if (dateTo) {
+            whereClauses.push("CAST(COALESCE(r.BillDate, r.CreatedAt) AS DATE) <= @dateTo");
+            request.input('dateTo', sql.Date, dateTo);
+        }
 
         const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
@@ -36,7 +71,7 @@ router.get('/', async (req, res) => {
 
         const result = await request.query(`
             SELECT 
-                r.CustomerID, r.ReceiptID, r.ReceiptNo, r.ContractID, r.CustomerName, r.BillDate, r.ValidUntil, 
+                r.CustomerID, r.ReceiptID, r.ReceiptNo, r.DocType, r.ContractID, r.CustomerName, r.BillDate, r.ValidUntil, 
                 r.GrandTotal, r.Status, r.CreatedAt, r.Revision, u.display_name AS CreatedByName
             FROM Receipt r
             LEFT JOIN Users u ON r.CreatedBy = u.user_id

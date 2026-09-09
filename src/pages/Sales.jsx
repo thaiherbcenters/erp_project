@@ -17,7 +17,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
-import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search, Copy, Upload, Download, UploadCloud, RotateCcw } from 'lucide-react';
+import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search, Copy, Upload, Download, UploadCloud, RotateCcw, Filter, Calendar } from 'lucide-react';
 import { MOCK_CUSTOMERS } from '../data/mockData';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
@@ -30,6 +30,8 @@ import RegistrationDocCreator from '../components/RegistrationDocCreator';
 import ContractManagement from '../components/ContractManagement';
 import API_BASE from '../config';
 import CustomSelect from '../components/CustomSelect';
+import CustomDatePicker from '../components/CustomDatePicker';
+import { FilterToggleButton, SalesDocFilterDrawer } from '../components/SalesDocFilter';
 import './PageCommon.css';
 import './DocumentControl.css';
 
@@ -106,6 +108,17 @@ export default function Sales() {
     const [historyList, setHistoryList] = useState([]);
     const [historyItemNo, setHistoryItemNo] = useState('');
     const [historyDocType, setHistoryDocType] = useState('Quotation');
+
+    // ── State: Quotation Filter & Users ──
+    const [usersList, setUsersList] = useState([]);
+    const [quotationFilter, setQuotationFilter] = useState({
+        subType: '',
+        createdBy: '',
+        status: '',
+        dateFrom: '',
+        dateTo: ''
+    });
+    const [showQuotationFilter, setShowQuotationFilter] = useState(false);
     
     // ── States สำหรับ Doc History (POA/Herbal) ──
     const [showDocHistoryModal, setShowDocHistoryModal] = useState(false);
@@ -145,6 +158,8 @@ export default function Sales() {
     const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [billingSearch, setBillingSearch] = useState('');
     const [appliedBillingSearch, setAppliedBillingSearch] = useState('');
+    const [billingFilter, setBillingFilter] = useState({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
+    const [showBillingFilter, setShowBillingFilter] = useState(false);
 
     // ── State: Tax Invoice ──
     const [showTaxInvoiceForm, setShowTaxInvoiceForm] = useState(false);
@@ -153,6 +168,8 @@ export default function Sales() {
     const [taxInvoicePagination, setTaxInvoicePagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [taxInvoiceSearch, setTaxInvoiceSearch] = useState('');
     const [appliedTaxInvoiceSearch, setAppliedTaxInvoiceSearch] = useState('');
+    const [taxInvoiceFilter, setTaxInvoiceFilter] = useState({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
+    const [showTaxInvoiceFilter, setShowTaxInvoiceFilter] = useState(false);
 
     // ── State: Delivery Order ──
     const [showDeliveryOrderForm, setShowDeliveryOrderForm] = useState(false);
@@ -161,6 +178,8 @@ export default function Sales() {
     const [deliveryOrderPagination, setDeliveryOrderPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [deliveryOrderSearch, setDeliveryOrderSearch] = useState('');
     const [appliedDeliveryOrderSearch, setAppliedDeliveryOrderSearch] = useState('');
+    const [deliveryOrderFilter, setDeliveryOrderFilter] = useState({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
+    const [showDeliveryOrderFilter, setShowDeliveryOrderFilter] = useState(false);
 
     // ── State: Receipt ──
     const [showReceiptForm, setShowReceiptForm] = useState(false);
@@ -169,6 +188,8 @@ export default function Sales() {
     const [receiptPagination, setReceiptPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
     const [receiptSearch, setReceiptSearch] = useState('');
     const [appliedReceiptSearch, setAppliedReceiptSearch] = useState('');
+    const [receiptFilter, setReceiptFilter] = useState({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
+    const [showReceiptFilter, setShowReceiptFilter] = useState(false);
 
     const [previewDocModal, setPreviewDocModal] = useState(null);
 
@@ -203,12 +224,43 @@ export default function Sales() {
         return () => clearTimeout(t);
     }, [poaSearch]);
 
-    // ── Fetch ข้อมูล Quotations (with Pagination) ──
+    // ── Fetch ข้อมูล Users สำหรับ Dropdown ตัวกรอง ──
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE}/users`, {
+                    headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                });
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    setUsersList(data);
+                } else if (data.success && Array.isArray(data.users || data.data)) {
+                    setUsersList(data.users || data.data);
+                }
+            } catch (err) {
+                console.error('Failed to fetch users:', err);
+            }
+        };
+        fetchUsers();
+    }, []);
+
+    // ── Fetch ข้อมูล Quotations (with Pagination & Filters) ──
     useEffect(() => {
         const fetchQuotations = async () => {
             if (activeTab !== 'sales_quotation' && activeTab !== 'sales_dashboard') return;
             try {
-                const res = await fetch(`${API_BASE}/quotations?page=${quotationPagination.page}&limit=${quotationPagination.limit}&search=${encodeURIComponent(appliedQuotationSearch)}`);
+                const params = new URLSearchParams();
+                params.append('page', quotationPagination.page);
+                params.append('limit', quotationPagination.limit);
+                if (appliedQuotationSearch) params.append('search', appliedQuotationSearch);
+                if (quotationFilter.subType) params.append('subType', quotationFilter.subType);
+                if (quotationFilter.createdBy) params.append('createdBy', quotationFilter.createdBy);
+                if (quotationFilter.status) params.append('status', quotationFilter.status);
+                if (quotationFilter.dateFrom) params.append('dateFrom', quotationFilter.dateFrom);
+                if (quotationFilter.dateTo) params.append('dateTo', quotationFilter.dateTo);
+
+                const res = await fetch(`${API_BASE}/quotations?${params.toString()}`);
                 const json = await res.json();
                 if (json.success) {
                     setLocalQuotations(json.data || []);
@@ -217,7 +269,7 @@ export default function Sales() {
             } catch (err) { console.error('Error fetching quotations:', err); }
         };
         fetchQuotations();
-    }, [activeTab, quotationPagination.page, appliedQuotationSearch, showQuotationForm]);
+    }, [activeTab, quotationPagination.page, appliedQuotationSearch, quotationFilter, showQuotationForm]);
 
     // ── Fetch ข้อมูล Sales Orders ──
     useEffect(() => {
@@ -236,7 +288,17 @@ export default function Sales() {
         const fetchBillings = async () => {
             if (activeTab !== 'sales_billing_invoice') return;
             try {
-                const res = await fetch(`${API_BASE}/billing-invoices?page=${billingPagination.page}&limit=${billingPagination.limit}&search=${encodeURIComponent(appliedBillingSearch)}`);
+                const params = new URLSearchParams();
+                params.append('page', billingPagination.page);
+                params.append('limit', billingPagination.limit);
+                if (appliedBillingSearch) params.append('search', appliedBillingSearch);
+                if (billingFilter.subType) params.append('subType', billingFilter.subType);
+                if (billingFilter.createdBy) params.append('createdBy', billingFilter.createdBy);
+                if (billingFilter.status) params.append('status', billingFilter.status);
+                if (billingFilter.dateFrom) params.append('dateFrom', billingFilter.dateFrom);
+                if (billingFilter.dateTo) params.append('dateTo', billingFilter.dateTo);
+
+                const res = await fetch(`${API_BASE}/billing-invoices?${params.toString()}`);
                 const json = await res.json();
                 if (json.success) {
                     setLocalBillings(json.data || []);
@@ -245,14 +307,24 @@ export default function Sales() {
             } catch (err) { console.error('Error fetching billings:', err); }
         };
         fetchBillings();
-    }, [activeTab, billingPagination.page, appliedBillingSearch, showBillingForm]);
+    }, [activeTab, billingPagination.page, appliedBillingSearch, billingFilter, showBillingForm]);
 
     // ── Fetch ข้อมูล Tax Invoice ──
     useEffect(() => {
         const fetchTaxInvoices = async () => {
             if (activeTab !== 'sales_tax_invoice') return;
             try {
-                const res = await fetch(`${API_BASE}/tax-invoices?page=${taxInvoicePagination.page}&limit=${taxInvoicePagination.limit}&search=${encodeURIComponent(appliedTaxInvoiceSearch)}`);
+                const params = new URLSearchParams();
+                params.append('page', taxInvoicePagination.page);
+                params.append('limit', taxInvoicePagination.limit);
+                if (appliedTaxInvoiceSearch) params.append('search', appliedTaxInvoiceSearch);
+                if (taxInvoiceFilter.subType) params.append('subType', taxInvoiceFilter.subType);
+                if (taxInvoiceFilter.createdBy) params.append('createdBy', taxInvoiceFilter.createdBy);
+                if (taxInvoiceFilter.status) params.append('status', taxInvoiceFilter.status);
+                if (taxInvoiceFilter.dateFrom) params.append('dateFrom', taxInvoiceFilter.dateFrom);
+                if (taxInvoiceFilter.dateTo) params.append('dateTo', taxInvoiceFilter.dateTo);
+
+                const res = await fetch(`${API_BASE}/tax-invoices?${params.toString()}`);
                 const json = await res.json();
                 if (json.success) {
                     setLocalTaxInvoices(json.data || []);
@@ -261,14 +333,24 @@ export default function Sales() {
             } catch (err) { console.error('Error fetching tax invoices:', err); }
         };
         fetchTaxInvoices();
-    }, [activeTab, taxInvoicePagination.page, appliedTaxInvoiceSearch, showTaxInvoiceForm]);
+    }, [activeTab, taxInvoicePagination.page, appliedTaxInvoiceSearch, taxInvoiceFilter, showTaxInvoiceForm]);
 
     // ── Fetch ข้อมูล Delivery Order ──
     useEffect(() => {
         const fetchDeliveryOrders = async () => {
             if (activeTab !== 'sales_delivery_order') return;
             try {
-                const res = await fetch(`${API_BASE}/delivery-orders?page=${deliveryOrderPagination.page}&limit=${deliveryOrderPagination.limit}&search=${encodeURIComponent(appliedDeliveryOrderSearch)}`);
+                const params = new URLSearchParams();
+                params.append('page', deliveryOrderPagination.page);
+                params.append('limit', deliveryOrderPagination.limit);
+                if (appliedDeliveryOrderSearch) params.append('search', appliedDeliveryOrderSearch);
+                if (deliveryOrderFilter.subType) params.append('subType', deliveryOrderFilter.subType);
+                if (deliveryOrderFilter.createdBy) params.append('createdBy', deliveryOrderFilter.createdBy);
+                if (deliveryOrderFilter.status) params.append('status', deliveryOrderFilter.status);
+                if (deliveryOrderFilter.dateFrom) params.append('dateFrom', deliveryOrderFilter.dateFrom);
+                if (deliveryOrderFilter.dateTo) params.append('dateTo', deliveryOrderFilter.dateTo);
+
+                const res = await fetch(`${API_BASE}/delivery-orders?${params.toString()}`);
                 const json = await res.json();
                 if (json.success) {
                     setLocalDeliveryOrders(json.data || []);
@@ -277,14 +359,24 @@ export default function Sales() {
             } catch (err) { console.error('Error fetching delivery orders:', err); }
         };
         fetchDeliveryOrders();
-    }, [activeTab, deliveryOrderPagination.page, appliedDeliveryOrderSearch, showDeliveryOrderForm]);
+    }, [activeTab, deliveryOrderPagination.page, appliedDeliveryOrderSearch, deliveryOrderFilter, showDeliveryOrderForm]);
 
     // ── Fetch ข้อมูล Receipt ──
     useEffect(() => {
         const fetchReceipts = async () => {
             if (activeTab !== 'sales_receipt') return;
             try {
-                const res = await fetch(`${API_BASE}/receipts?page=${receiptPagination.page}&limit=${receiptPagination.limit}&search=${encodeURIComponent(appliedReceiptSearch)}`);
+                const params = new URLSearchParams();
+                params.append('page', receiptPagination.page);
+                params.append('limit', receiptPagination.limit);
+                if (appliedReceiptSearch) params.append('search', appliedReceiptSearch);
+                if (receiptFilter.subType) params.append('subType', receiptFilter.subType);
+                if (receiptFilter.createdBy) params.append('createdBy', receiptFilter.createdBy);
+                if (receiptFilter.status) params.append('status', receiptFilter.status);
+                if (receiptFilter.dateFrom) params.append('dateFrom', receiptFilter.dateFrom);
+                if (receiptFilter.dateTo) params.append('dateTo', receiptFilter.dateTo);
+
+                const res = await fetch(`${API_BASE}/receipts?${params.toString()}`);
                 const json = await res.json();
                 if (json.success) {
                     setReceipts(json.data || []);
@@ -293,7 +385,7 @@ export default function Sales() {
             } catch (err) { console.error('Error fetching receipts:', err); }
         };
         fetchReceipts();
-    }, [activeTab, receiptPagination.page, appliedReceiptSearch, showReceiptForm]);
+    }, [activeTab, receiptPagination.page, appliedReceiptSearch, receiptFilter, showReceiptForm]);
 
     // ── Fetch ข้อมูล POA ──
     useEffect(() => {
@@ -447,8 +539,156 @@ export default function Sales() {
         }
     };
 
+    // ── Helper ฟังก์ชันสำหรับจัดการตัวกรองใบเสนอราคา ──
+    const handleQuotationFilterChange = (field, value) => {
+        setQuotationPagination(prev => ({ ...prev, page: 1 }));
+        setQuotationFilter(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleResetQuotationFilter = () => {
+        setQuotationPagination(prev => ({ ...prev, page: 1 }));
+        setQuotationFilter({
+            subType: '',
+            createdBy: '',
+            status: '',
+            dateFrom: '',
+            dateTo: ''
+        });
+        setQuotationSearch('');
+        setAppliedQuotationSearch('');
+    };
+
+    const handleQuickDate = (type) => {
+        const now = new Date();
+        const format = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        const todayStr = format(now);
+        setQuotationPagination(prev => ({ ...prev, page: 1 }));
+        if (type === 'today') {
+            setQuotationFilter(prev => ({ ...prev, dateFrom: todayStr, dateTo: todayStr }));
+        } else if (type === '7days') {
+            const d7 = new Date();
+            d7.setDate(d7.getDate() - 6);
+            setQuotationFilter(prev => ({ ...prev, dateFrom: format(d7), dateTo: todayStr }));
+        } else if (type === 'thisMonth') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            setQuotationFilter(prev => ({ ...prev, dateFrom: format(startOfMonth), dateTo: format(endOfMonth) }));
+        }
+    };
+
+    const activeQuotationFilterCount = [
+        Boolean(quotationFilter.subType),
+        Boolean(quotationFilter.createdBy),
+        Boolean(quotationFilter.status),
+        Boolean(quotationFilter.dateFrom || quotationFilter.dateTo)
+    ].filter(Boolean).length;
+
+    const isQuotationFilterActive = activeQuotationFilterCount > 0;
+    const hasActiveQuotationFilter = isQuotationFilterActive || Boolean(appliedQuotationSearch);
+
+    // ── Helper ฟังก์ชันสำหรับสร้าง Filter Handler ทั่วไป ──
+    const createFilterHandlers = (setFilter, setPagination, setSearch, setAppliedSearch) => {
+        const onFilterChange = (field, value) => {
+            setPagination(prev => ({ ...prev, page: 1 }));
+            setFilter(prev => ({ ...prev, [field]: value }));
+        };
+        const onReset = () => {
+            setPagination(prev => ({ ...prev, page: 1 }));
+            setFilter({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
+            if (setSearch) setSearch('');
+            if (setAppliedSearch) setAppliedSearch('');
+        };
+        const onQuickDate = (type) => {
+            const now = new Date();
+            const format = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            const todayStr = format(now);
+            setPagination(prev => ({ ...prev, page: 1 }));
+            if (type === 'today') {
+                setFilter(prev => ({ ...prev, dateFrom: todayStr, dateTo: todayStr }));
+            } else if (type === '7days') {
+                const d7 = new Date();
+                d7.setDate(d7.getDate() - 6);
+                setFilter(prev => ({ ...prev, dateFrom: format(d7), dateTo: todayStr }));
+            } else if (type === 'thisMonth') {
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                setFilter(prev => ({ ...prev, dateFrom: format(startOfMonth), dateTo: format(endOfMonth) }));
+            }
+        };
+        return { onFilterChange, onReset, onQuickDate };
+    };
+
+    const countActiveFilters = (filter) => [
+        Boolean(filter.subType),
+        Boolean(filter.createdBy),
+        Boolean(filter.status),
+        Boolean(filter.dateFrom || filter.dateTo)
+    ].filter(Boolean).length;
+
+    const billingFilterHandlers = createFilterHandlers(setBillingFilter, setBillingPagination, setBillingSearch, setAppliedBillingSearch);
+    const activeBillingFilterCount = countActiveFilters(billingFilter);
+
+    const taxInvoiceFilterHandlers = createFilterHandlers(setTaxInvoiceFilter, setTaxInvoicePagination, setTaxInvoiceSearch, setAppliedTaxInvoiceSearch);
+    const activeTaxInvoiceFilterCount = countActiveFilters(taxInvoiceFilter);
+
+    const deliveryOrderFilterHandlers = createFilterHandlers(setDeliveryOrderFilter, setDeliveryOrderPagination, setDeliveryOrderSearch, setAppliedDeliveryOrderSearch);
+    const activeDeliveryOrderFilterCount = countActiveFilters(deliveryOrderFilter);
+
+    const receiptFilterHandlers = createFilterHandlers(setReceiptFilter, setReceiptPagination, setReceiptSearch, setAppliedReceiptSearch);
+    const activeReceiptFilterCount = countActiveFilters(receiptFilter);
+
     // ── กำหนดสถานะที่เป็นไปได้ของเอกสารฝ่ายขาย ──
     const SALES_DOC_STATUSES = ['ร่าง', 'พร้อมใช้'];
+
+    // ── กำหนดประเภทเอกสารสำหรับตัวกรองแต่ละหน้า ──
+    const QUOTATION_TYPE_OPTIONS = [
+        { value: '', label: 'ประเภททั้งหมด' },
+        { value: 'quotation_thc', label: 'ใบเสนอราคา (Quotation) - THC' },
+        { value: 'quotation_fda_thc', label: 'ใบเสนอราคา อย. (FDA Quotation) - THC' },
+        { value: 'quotation_psf', label: 'ใบเสนอราคา (Quotation) - PSF' },
+        { value: 'quotation_fda_psf', label: 'ใบเสนอราคา อย. (FDA Quotation) - PSF' },
+        { value: 'quotation_elt', label: 'ใบเสนอราคา (Quotation) - ELT' },
+        { value: 'normal', label: 'ใบเสนอราคาปกติ (ทุกบริษัท)' },
+        { value: 'fda', label: 'ใบเสนอราคา อย. (ทุกบริษัท)' }
+    ];
+
+    const BILLING_INVOICE_TYPE_OPTIONS = [
+        { value: '', label: 'ประเภททั้งหมด' },
+        { value: 'billing_invoice_thc', label: 'ใบวางบิล/ใบแจ้งหนี้ (Billing Note/Invoice) - THC' },
+        { value: 'billing_invoice_psf', label: 'ใบวางบิล/ใบแจ้งหนี้ (Billing Note/Invoice) - PSF' },
+        { value: 'billing_invoice_elt', label: 'ใบวางบิล/ใบแจ้งหนี้ (Billing Note/Invoice) - ELT' }
+    ];
+
+    const TAX_INVOICE_TYPE_OPTIONS = [
+        { value: '', label: 'ประเภททั้งหมด' },
+        { value: 'tax_invoice_thc', label: 'ใบแจ้งหนี้/ใบส่งสินค้า (Invoice/Delivery Order) - THC' },
+        { value: 'tax_invoice_psf', label: 'ใบแจ้งหนี้/ใบส่งสินค้า (Invoice/Delivery Order) - PSF' },
+        { value: 'tax_invoice_elt', label: 'ใบแจ้งหนี้/ใบส่งสินค้า (Invoice/Delivery Order) - ELT' }
+    ];
+
+    const DELIVERY_ORDER_TYPE_OPTIONS = [
+        { value: '', label: 'ประเภททั้งหมด' },
+        { value: 'delivery_order_thc', label: 'ใบส่งสินค้า DELIVERY ORDER - THC' },
+        { value: 'delivery_order_psf', label: 'ใบส่งสินค้า DELIVERY ORDER - PSF' },
+        { value: 'delivery_order_elt', label: 'ใบส่งสินค้า DELIVERY ORDER - ELT' }
+    ];
+
+    const RECEIPT_TYPE_OPTIONS = [
+        { value: '', label: 'ประเภททั้งหมด' },
+        { value: 'delivery_order_thc', label: 'ใบเสร็จรับเงิน RECEIPT (ORIGINAL) - THC' },
+        { value: 'delivery_order_psf', label: 'ใบเสร็จรับเงิน RECEIPT (ORIGINAL) - PSF' },
+        { value: 'delivery_order_elt', label: 'ใบเสร็จรับเงิน RECEIPT (ORIGINAL) - ELT' }
+    ];
 
     // ── อัปเดตสถานะแบบด่วนจากหน้าตาราง ──
     const handleUpdateDocStatus = async (id, docType, newStatus) => {
@@ -994,28 +1234,38 @@ export default function Sales() {
                             </div>
                         </div>
                         {hasSectionPermission('sales_quotation_search') && (
-                            <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-                                <div className="search-group">
-                                    <div className="search-input-wrap">
-                                        <Search size={18} />
-                                        <input
-                                            type="text"
-                                            placeholder="พิมพ์เลขที่ใบเสนอราคา..."
-                                            value={quotationSearch}
-                                            onChange={(e) => setQuotationSearch(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    setQuotationPagination(prev => ({ ...prev, page: 1 }));
-                                                    setAppliedQuotationSearch(quotationSearch);
-                                                }
-                                            }}
-                                        />
+                            <div className="toolbar" style={{ justifyContent: 'space-between', gap: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '600px', flexWrap: 'wrap' }}>
+                                    <div className="search-group" style={{ maxWidth: '340px' }}>
+                                        <div className="search-input-wrap">
+                                            <Search size={18} />
+                                            <input
+                                                type="text"
+                                                placeholder="พิมพ์เลขที่ใบเสนอราคา..."
+                                                value={quotationSearch}
+                                                onChange={(e) => setQuotationSearch(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        setQuotationPagination(prev => ({ ...prev, page: 1 }));
+                                                        setAppliedQuotationSearch(quotationSearch);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <button className="search-btn" onClick={() => {
+                                            setQuotationPagination(prev => ({ ...prev, page: 1 }));
+                                            setAppliedQuotationSearch(quotationSearch);
+                                        }}>ค้นหา</button>
                                     </div>
-                                    <button className="search-btn" onClick={() => {
-                                        setQuotationPagination(prev => ({ ...prev, page: 1 }));
-                                        setAppliedQuotationSearch(quotationSearch);
-                                    }}>ค้นหา</button>
+
+                                    {/* ปุ่ม Icon Filter Toggle */}
+                                    <FilterToggleButton
+                                        isOpen={showQuotationFilter}
+                                        onClick={() => setShowQuotationFilter(prev => !prev)}
+                                        activeCount={activeQuotationFilterCount}
+                                    />
                                 </div>
+
                                 {canCreate('sales_quotation') && (
                                     <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
                                         setEditingQuotationId(null);
@@ -1026,6 +1276,21 @@ export default function Sales() {
                                     </button>
                                 )}
                             </div>
+                        )}
+
+                        {/* ── Quotation Advanced Filter Panel ── */}
+                        {hasSectionPermission('sales_quotation_search') && (
+                            <SalesDocFilterDrawer
+                                isOpen={showQuotationFilter}
+                                onClose={() => setShowQuotationFilter(false)}
+                                filter={quotationFilter}
+                                onFilterChange={handleQuotationFilterChange}
+                                onReset={handleResetQuotationFilter}
+                                onQuickDate={handleQuickDate}
+                                usersList={usersList}
+                                docTypeLabel="ใบเสนอราคา"
+                                subTypeOptions={QUOTATION_TYPE_OPTIONS}
+                            />
                         )}
 
                         {hasSectionPermission('sales_quotation_table') && (
@@ -1056,7 +1321,24 @@ export default function Sales() {
                                             <tr key={q.QuotationID || q.id}>
                                                 <td>{idx + 1}</td>
                                                 <td>v.{q.Revision || 0}</td>
-                                                <td className="text-bold">{q.QuotationNo || q.number}</td>
+                                                <td className="text-bold">
+                                                    {q.QuotationNo || q.number}
+                                                    {q.DocType && q.DocType.includes('fda') && (
+                                                        <span style={{
+                                                            fontSize: '11px',
+                                                            fontWeight: 600,
+                                                            background: '#fef3c7',
+                                                            color: '#b45309',
+                                                            border: '1px solid #fde68a',
+                                                            padding: '1px 6px',
+                                                            borderRadius: '4px',
+                                                            marginLeft: '6px',
+                                                            display: 'inline-block'
+                                                        }}>
+                                                            อย.
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td>{q.CustomerName || q.customer}</td>
                                                 <td>{(q.GrandTotal || q.total || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
                                                 <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : q.date}</td>
@@ -1175,27 +1457,34 @@ export default function Sales() {
                         </div>
                         
                         {hasSectionPermission('sales_tax_invoice_search') && (
-                            <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-                                <div className="search-group">
-                                    <div className="search-input-wrap">
-                                        <Search size={18} />
-                                        <input
-                                            type="text"
-                                            placeholder="ค้นหาใบแจ้งหนี้/ใบส่งสินค้า..."
-                                            value={taxInvoiceSearch}
-                                            onChange={(e) => setTaxInvoiceSearch(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    setTaxInvoicePagination(prev => ({ ...prev, page: 1 }));
-                                                    setAppliedTaxInvoiceSearch(taxInvoiceSearch);
-                                                }
-                                            }}
-                                        />
+                            <div className="toolbar" style={{ justifyContent: 'space-between', gap: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '600px', flexWrap: 'wrap' }}>
+                                    <div className="search-group" style={{ maxWidth: '340px' }}>
+                                        <div className="search-input-wrap">
+                                            <Search size={18} />
+                                            <input
+                                                type="text"
+                                                placeholder="ค้นหาใบแจ้งหนี้/ใบส่งสินค้า..."
+                                                value={taxInvoiceSearch}
+                                                onChange={(e) => setTaxInvoiceSearch(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        setTaxInvoicePagination(prev => ({ ...prev, page: 1 }));
+                                                        setAppliedTaxInvoiceSearch(taxInvoiceSearch);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <button className="search-btn" onClick={() => {
+                                            setTaxInvoicePagination(prev => ({ ...prev, page: 1 }));
+                                            setAppliedTaxInvoiceSearch(taxInvoiceSearch);
+                                        }}>ค้นหา</button>
                                     </div>
-                                    <button className="search-btn" onClick={() => {
-                                        setTaxInvoicePagination(prev => ({ ...prev, page: 1 }));
-                                        setAppliedTaxInvoiceSearch(taxInvoiceSearch);
-                                    }}>ค้นหา</button>
+                                    <FilterToggleButton
+                                        isOpen={showTaxInvoiceFilter}
+                                        onClick={() => setShowTaxInvoiceFilter(prev => !prev)}
+                                        activeCount={activeTaxInvoiceFilterCount}
+                                    />
                                 </div>
                                 {canCreate('sales_tax_invoice') && (
                                     <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
@@ -1206,6 +1495,20 @@ export default function Sales() {
                                     </button>
                                 )}
                             </div>
+                        )}
+                        {hasSectionPermission('sales_tax_invoice_search') && (
+                            <SalesDocFilterDrawer
+                                isOpen={showTaxInvoiceFilter}
+                                onClose={() => setShowTaxInvoiceFilter(false)}
+                                filter={taxInvoiceFilter}
+                                onFilterChange={taxInvoiceFilterHandlers.onFilterChange}
+                                onReset={taxInvoiceFilterHandlers.onReset}
+                                onQuickDate={taxInvoiceFilterHandlers.onQuickDate}
+                                usersList={usersList}
+                                docTypeLabel="ใบแจ้งหนี้/ใบส่งสินค้า"
+                                subTypeOptions={TAX_INVOICE_TYPE_OPTIONS}
+                                statusOptions={SALES_DOC_STATUSES}
+                            />
                         )}
                         {hasSectionPermission('sales_tax_invoice_table') && (
                             <div className="table-card card">
@@ -1235,7 +1538,24 @@ export default function Sales() {
                                                 <tr key={q.TaxInvoiceID}>
                                                     <td>{idx + 1}</td>
                                                     <td>v.{q.Revision || 0}</td>
-                                                    <td className="text-bold">{q.TaxInvoiceNo || '-'}</td>
+                                                    <td className="text-bold">
+                                                        {q.TaxInvoiceNo || '-'}
+                                                        {q.DocType && q.DocType.includes('fda') && (
+                                                            <span style={{
+                                                                fontSize: '11px',
+                                                                fontWeight: 600,
+                                                                background: '#fef3c7',
+                                                                color: '#b45309',
+                                                                border: '1px solid #fde68a',
+                                                                padding: '1px 6px',
+                                                                borderRadius: '4px',
+                                                                marginLeft: '6px',
+                                                                display: 'inline-block'
+                                                            }}>
+                                                                อย.
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                     <td>{q.CustomerName}</td>
                                                     <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                                     <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
@@ -1352,27 +1672,34 @@ export default function Sales() {
                         </div>
                         
                         {hasSectionPermission('sales_delivery_order_search') && (
-                            <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-                                <div className="search-group">
-                                    <div className="search-input-wrap">
-                                        <Search size={18} />
-                                        <input
-                                            type="text"
-                                            placeholder="ค้นหาใบส่งสินค้า..."
-                                            value={deliveryOrderSearch}
-                                            onChange={(e) => setDeliveryOrderSearch(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    setDeliveryOrderPagination(prev => ({ ...prev, page: 1 }));
-                                                    setAppliedDeliveryOrderSearch(deliveryOrderSearch);
-                                                }
-                                            }}
-                                        />
+                            <div className="toolbar" style={{ justifyContent: 'space-between', gap: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '600px', flexWrap: 'wrap' }}>
+                                    <div className="search-group" style={{ maxWidth: '340px' }}>
+                                        <div className="search-input-wrap">
+                                            <Search size={18} />
+                                            <input
+                                                type="text"
+                                                placeholder="ค้นหาใบส่งสินค้า..."
+                                                value={deliveryOrderSearch}
+                                                onChange={(e) => setDeliveryOrderSearch(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        setDeliveryOrderPagination(prev => ({ ...prev, page: 1 }));
+                                                        setAppliedDeliveryOrderSearch(deliveryOrderSearch);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <button className="search-btn" onClick={() => {
+                                            setDeliveryOrderPagination(prev => ({ ...prev, page: 1 }));
+                                            setAppliedDeliveryOrderSearch(deliveryOrderSearch);
+                                        }}>ค้นหา</button>
                                     </div>
-                                    <button className="search-btn" onClick={() => {
-                                        setDeliveryOrderPagination(prev => ({ ...prev, page: 1 }));
-                                        setAppliedDeliveryOrderSearch(deliveryOrderSearch);
-                                    }}>ค้นหา</button>
+                                    <FilterToggleButton
+                                        isOpen={showDeliveryOrderFilter}
+                                        onClick={() => setShowDeliveryOrderFilter(prev => !prev)}
+                                        activeCount={activeDeliveryOrderFilterCount}
+                                    />
                                 </div>
                                 {canCreate('sales_delivery_order') && (
                                     <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
@@ -1383,6 +1710,20 @@ export default function Sales() {
                                     </button>
                                 )}
                             </div>
+                        )}
+                        {hasSectionPermission('sales_delivery_order_search') && (
+                            <SalesDocFilterDrawer
+                                isOpen={showDeliveryOrderFilter}
+                                onClose={() => setShowDeliveryOrderFilter(false)}
+                                filter={deliveryOrderFilter}
+                                onFilterChange={deliveryOrderFilterHandlers.onFilterChange}
+                                onReset={deliveryOrderFilterHandlers.onReset}
+                                onQuickDate={deliveryOrderFilterHandlers.onQuickDate}
+                                usersList={usersList}
+                                docTypeLabel="ใบส่งสินค้า"
+                                subTypeOptions={DELIVERY_ORDER_TYPE_OPTIONS}
+                                statusOptions={SALES_DOC_STATUSES}
+                            />
                         )}
                         {hasSectionPermission('sales_delivery_order_table') && (
                             <div className="table-card card">
@@ -1413,7 +1754,24 @@ export default function Sales() {
                                                 <tr key={q.DeliveryOrderID}>
                                                     <td>{idx + 1}</td>
                                                     <td>v.{q.Revision || 0}</td>
-                                                    <td className="text-bold">{q.DeliveryOrderNo || '-'}</td>
+                                                    <td className="text-bold">
+                                                        {q.DeliveryOrderNo || '-'}
+                                                        {q.DocType && q.DocType.includes('fda') && (
+                                                            <span style={{
+                                                                fontSize: '11px',
+                                                                fontWeight: 600,
+                                                                background: '#fef3c7',
+                                                                color: '#b45309',
+                                                                border: '1px solid #fde68a',
+                                                                padding: '1px 6px',
+                                                                borderRadius: '4px',
+                                                                marginLeft: '6px',
+                                                                display: 'inline-block'
+                                                            }}>
+                                                                อย.
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                     <td>{q.ContractID || '-'}</td>
                                                     <td>{q.CustomerName}</td>
                                                     <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
@@ -1528,27 +1886,34 @@ export default function Sales() {
                             </div>
                         </div>
                         
-                        <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-                            <div className="search-group">
-                                <div className="search-input-wrap">
-                                    <Search size={18} />
-                                    <input
-                                        type="text"
-                                        placeholder="ค้นหาใบเสร็จรับเงิน..."
-                                        value={receiptSearch}
-                                        onChange={(e) => setReceiptSearch(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                setReceiptPagination(prev => ({ ...prev, page: 1 }));
-                                                setAppliedReceiptSearch(receiptSearch);
-                                            }
-                                        }}
-                                    />
+                        <div className="toolbar" style={{ justifyContent: 'space-between', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '600px', flexWrap: 'wrap' }}>
+                                <div className="search-group" style={{ maxWidth: '340px' }}>
+                                    <div className="search-input-wrap">
+                                        <Search size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="ค้นหาใบเสร็จรับเงิน..."
+                                            value={receiptSearch}
+                                            onChange={(e) => setReceiptSearch(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    setReceiptPagination(prev => ({ ...prev, page: 1 }));
+                                                    setAppliedReceiptSearch(receiptSearch);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <button className="search-btn" onClick={() => {
+                                        setReceiptPagination(prev => ({ ...prev, page: 1 }));
+                                        setAppliedReceiptSearch(receiptSearch);
+                                    }}>ค้นหา</button>
                                 </div>
-                                <button className="search-btn" onClick={() => {
-                                    setReceiptPagination(prev => ({ ...prev, page: 1 }));
-                                    setAppliedReceiptSearch(receiptSearch);
-                                }}>ค้นหา</button>
+                                <FilterToggleButton
+                                    isOpen={showReceiptFilter}
+                                    onClick={() => setShowReceiptFilter(prev => !prev)}
+                                    activeCount={activeReceiptFilterCount}
+                                />
                             </div>
                             {canCreate('sales_receipt') && (
                                 <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
@@ -1559,6 +1924,19 @@ export default function Sales() {
                                 </button>
                             )}
                         </div>
+
+                        <SalesDocFilterDrawer
+                            isOpen={showReceiptFilter}
+                            onClose={() => setShowReceiptFilter(false)}
+                            filter={receiptFilter}
+                            onFilterChange={receiptFilterHandlers.onFilterChange}
+                            onReset={receiptFilterHandlers.onReset}
+                            onQuickDate={receiptFilterHandlers.onQuickDate}
+                            usersList={usersList}
+                            docTypeLabel="ใบเสร็จรับเงิน"
+                            subTypeOptions={RECEIPT_TYPE_OPTIONS}
+                            statusOptions={SALES_DOC_STATUSES}
+                        />
 
                         <div className="table-card card">
                             <table className="data-table">
@@ -1587,7 +1965,24 @@ export default function Sales() {
                                                 <tr key={q.ReceiptID}>
                                                     <td>{idx + 1}</td>
                                                     <td>v.{q.Revision || 0}</td>
-                                                    <td className="text-bold">{q.ReceiptNo || '-'}</td>
+                                                    <td className="text-bold">
+                                                        {q.ReceiptNo || '-'}
+                                                        {q.DocType && q.DocType.includes('fda') && (
+                                                            <span style={{
+                                                                fontSize: '11px',
+                                                                fontWeight: 600,
+                                                                background: '#fef3c7',
+                                                                color: '#b45309',
+                                                                border: '1px solid #fde68a',
+                                                                padding: '1px 6px',
+                                                                borderRadius: '4px',
+                                                                marginLeft: '6px',
+                                                                display: 'inline-block'
+                                                            }}>
+                                                                อย.
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                     <td>{q.CustomerName}</td>
                                                     <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                                     <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
@@ -1845,27 +2240,34 @@ export default function Sales() {
                                 <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>จัดการใบวางบิลและใบแจ้งหนี้ฝ่ายขาย</p>
                             </div>
                         </div>
-                        <div className="toolbar" style={{ justifyContent: 'space-between' }}>
-                            <div className="search-group">
-                                <div className="search-input-wrap">
-                                    <Search size={18} />
-                                    <input
-                                        type="text"
-                                        placeholder="พิมพ์เลขที่บิล, ลูกค้า..."
-                                        value={billingSearch}
-                                        onChange={(e) => setBillingSearch(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                setBillingPagination(prev => ({ ...prev, page: 1 }));
-                                                setAppliedBillingSearch(billingSearch);
-                                            }
-                                        }}
-                                    />
+                        <div className="toolbar" style={{ justifyContent: 'space-between', gap: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, maxWidth: '600px', flexWrap: 'wrap' }}>
+                                <div className="search-group" style={{ maxWidth: '340px' }}>
+                                    <div className="search-input-wrap">
+                                        <Search size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="พิมพ์เลขที่บิล, ลูกค้า..."
+                                            value={billingSearch}
+                                            onChange={(e) => setBillingSearch(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    setBillingPagination(prev => ({ ...prev, page: 1 }));
+                                                    setAppliedBillingSearch(billingSearch);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <button className="search-btn" onClick={() => {
+                                        setBillingPagination(prev => ({ ...prev, page: 1 }));
+                                        setAppliedBillingSearch(billingSearch);
+                                    }}>ค้นหา</button>
                                 </div>
-                                <button className="search-btn" onClick={() => {
-                                    setBillingPagination(prev => ({ ...prev, page: 1 }));
-                                    setAppliedBillingSearch(billingSearch);
-                                }}>ค้นหา</button>
+                                <FilterToggleButton
+                                    isOpen={showBillingFilter}
+                                    onClick={() => setShowBillingFilter(prev => !prev)}
+                                    activeCount={activeBillingFilterCount}
+                                />
                             </div>
                             {canCreate('sales_billing_invoice') && (
                                 <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => { setEditingBillingId(null); setShowBillingForm(true); }}>
@@ -1873,6 +2275,19 @@ export default function Sales() {
                                 </button>
                             )}
                         </div>
+
+                        <SalesDocFilterDrawer
+                            isOpen={showBillingFilter}
+                            onClose={() => setShowBillingFilter(false)}
+                            filter={billingFilter}
+                            onFilterChange={billingFilterHandlers.onFilterChange}
+                            onReset={billingFilterHandlers.onReset}
+                            onQuickDate={billingFilterHandlers.onQuickDate}
+                            usersList={usersList}
+                            docTypeLabel="ใบวางบิล/ใบแจ้งหนี้"
+                            subTypeOptions={BILLING_INVOICE_TYPE_OPTIONS}
+                            statusOptions={SALES_DOC_STATUSES}
+                        />
 
                         <div className="table-card card">
                             <table className="data-table">
@@ -1896,7 +2311,24 @@ export default function Sales() {
                                         <tr key={b.BillingInvoiceID || b.id}>
                                             <td>{idx + 1}</td>
                                             <td>v.{b.Revision || 0}</td>
-                                            <td className="text-bold">{b.BillingInvoiceNo || '-'}</td>
+                                            <td className="text-bold">
+                                                {b.BillingInvoiceNo || '-'}
+                                                {b.DocType && b.DocType.includes('fda') && (
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: 600,
+                                                        background: '#fef3c7',
+                                                        color: '#b45309',
+                                                        border: '1px solid #fde68a',
+                                                        padding: '1px 6px',
+                                                        borderRadius: '4px',
+                                                        marginLeft: '6px',
+                                                        display: 'inline-block'
+                                                    }}>
+                                                        อย.
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td>{b.CustomerName || '-'}</td>
                                             <td>{((b.GrandTotal) || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
                                             <td>{b.BillDate ? new Date(b.BillDate).toLocaleDateString('th-TH') : '-'}</td>

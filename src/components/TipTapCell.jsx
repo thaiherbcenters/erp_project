@@ -55,6 +55,9 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
             Underline,
             Color,
         ],
+        parseOptions: {
+            preserveWhitespace: 'full',
+        },
         content: value || '',
         editable: !readOnly,
         onUpdate: ({ editor }) => {
@@ -68,7 +71,7 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
         if (!editor) return;
         if (value === lastEmittedHTML.current) return;
         lastEmittedHTML.current = value || '';
-        editor.commands.setContent(value || '', false);
+        editor.commands.setContent(value || '', false, { preserveWhitespace: 'full' });
     }, [value, editor]);
 
     const saveSelection = useCallback(() => {

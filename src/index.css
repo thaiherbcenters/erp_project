@@ -52,6 +52,25 @@
   width: 100%;
 }
 
+.print-notes-container {
+  word-break: break-word;
+}
+.print-notes-container p {
+  margin: 0;
+  white-space: pre-wrap !important;
+  white-space: break-spaces !important;
+}
+.print-notes-container span,
+.print-notes-container div,
+.print-notes-container strong,
+.print-notes-container b,
+.print-notes-container em,
+.print-notes-container i,
+.print-notes-container td {
+  white-space: pre-wrap !important;
+  white-space: break-spaces !important;
+}
+
 
 * {
   margin: 0;
