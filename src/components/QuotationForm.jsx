@@ -10,6 +10,7 @@ import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
 import { formatFullAddress } from '../utils/formatters';
+import FormattedAddress from './FormattedAddress';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -2496,7 +2497,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 </tr>
                                 <tr>
                                     <td style={{ border: '1px solid black', padding: '4px 8px', borderTop: 'none', borderBottom: 'none' }}>
-                                        <span style={{ fontWeight: 'bold' }}>ที่อยู่ติดต่อ :</span> {formatFullAddress(formData)}
+                                        <span style={{ fontWeight: 'bold' }}>ที่อยู่ติดต่อ :</span> <FormattedAddress data={formData} />
                                     </td>
                                     <td style={{ border: '1px solid black', padding: '4px 8px' }}>
                                         <span style={{ fontWeight: 'bold' }}>E-mail :</span> {formData.email || '-'}
@@ -2791,7 +2792,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 <span style={{ fontWeight: 'bold' }}>{isEn ? 'Address :' : 'ที่อยู่ :'}</span>
                             </td>
                             <td style={{ borderRight: '1px solid black', borderTop: 'none', padding: '2px 8px', verticalAlign: 'top' }}>
-                                <span style={{ fontWeight: 'normal' }}>{formatFullAddress(formData)}</span>
+                                <FormattedAddress data={formData} style={{ fontWeight: 'normal' }} />
                             </td>
                             <td style={{ borderTop: 'none', padding: '2px 8px', verticalAlign: 'top' }}>
                                 <span style={{ fontWeight: 'bold' }}>{isEn ? 'Date :' : 'วันที่/Date :'}</span> <span style={{ marginLeft: '5px', fontWeight: 'normal' }}>{formatDate(formData.billDate)}</span>

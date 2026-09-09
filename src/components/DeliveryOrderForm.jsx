@@ -10,6 +10,7 @@ import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
 import { formatFullAddress } from '../utils/formatters';
+import FormattedAddress from './FormattedAddress';
 import BillingPrintContainer from './BillingPrintContainer';
 import '../pages/PageCommon.css';
 
@@ -2515,7 +2516,7 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                                 </tr>
                                 <tr>
                                     <td style={{ border: '1px solid black', padding: '4px 8px', borderTop: 'none', borderBottom: 'none' }}>
-                                        <span style={{ fontWeight: 'bold' }}>ที่อยู่ติดต่อ :</span> {formatFullAddress(formData)}
+                                        <span style={{ fontWeight: 'bold' }}>ที่อยู่ติดต่อ :</span> <FormattedAddress data={formData} />
                                     </td>
                                     <td style={{ border: '1px solid black', padding: '4px 8px' }}>
                                         <span style={{ fontWeight: 'bold' }}>E-mail :</span> {formData.email || '-'}
@@ -2841,7 +2842,7 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                                     <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
                                         ที่อยู่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Address</span>
                                     </td>
-                                    <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}>{formatFullAddress(formData)}</td>
+                                    <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}><FormattedAddress data={formData} /></td>
                                 </tr>
                                 <tr>
                                     <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>

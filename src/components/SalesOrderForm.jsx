@@ -4,6 +4,7 @@ import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import CustomDatePicker from './CustomDatePicker';
 import TaxIdInput from '../components/TaxIdInput';
+import FormattedAddress from './FormattedAddress';
 import CustomSelect from './CustomSelect';
 import ContractSelectorModal from './ContractSelectorModal';
 import QuotationSelectorModal from './QuotationSelectorModal';
@@ -922,7 +923,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                                 <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
                                                     ที่อยู่:<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Address</span>
                                                 </td>
-                                                <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}>{formData.address || '-'}</td>
+                                                <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}><FormattedAddress data={formData} /></td>
                                             </tr>
                                             <tr>
                                                 <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
@@ -1840,7 +1841,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                             <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
                                                 ที่อยู่:<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Address</span>
                                             </td>
-                                            <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}>{formData.address || '-'}</td>
+                                            <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}><FormattedAddress data={formData} /></td>
                                         </tr>
                                         <tr>
                                             <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>

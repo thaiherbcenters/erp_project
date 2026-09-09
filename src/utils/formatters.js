@@ -22,56 +22,124 @@ export const getDynamicBatchSizeValue = (ingredients) => {
     return ingredients.filter(i => i.type !== 'packaging').reduce((sum, ing) => sum + convertToBase(ing.qty, ing.unit), 0);
 };
 
-export const formatFullAddress = (data) => {
-    if (!data) return '-';
-    const no = (data.addr_no || '').trim();
-    const soi = (data.addr_soi || '').trim();
-    const road = (data.addr_road || '').trim();
-    const sub = (data.addr_subdistrict || '').trim();
-    const dist = (data.addr_district || '').trim();
-    const prov = (data.addr_province || '').trim();
-    const zip = (data.addr_zip || '').trim();
+const cleanVal = (v) => {
+    if (!v || typeof v !== 'string') return '';
+    const trimmed = v.trim();
+    if (trimmed === '-' || trimmed === '.-' || trimmed === '.') return '';
+    return trimmed;
+};
 
-    const hasMeaningfulPart = [no, soi, road, sub, dist, prov, zip].some(val => val !== '' && val !== '-');
+export const parseAddressStringToSplit = (fullAddress) => {
+    if (!fullAddress || typeof fullAddress !== 'string') {
+        return { addr_no: '', addr_soi: '', addr_road: '', addr_subdistrict: '', addr_district: '', addr_province: '', addr_zip: '' };
+    }
+    let no = '', soi = '', road = '', sub = '', dist = '', prov = '', zip = '';
+    
+    const zipMatch = fullAddress.match(/\b\d{5}\b/);
+    if (zipMatch) zip = zipMatch[0];
+    let rem = fullAddress.replace(zip, '').trim();
+    
+    const provMatch = rem.match(/(จ\.|จังหวัด)\s*([^\s]+)/);
+    if (provMatch) { prov = provMatch[2]; rem = rem.replace(provMatch[0], ''); }
+    else {
+        const bkkMatch = rem.match(/กรุงเทพมหานคร|กรุงเทพฯ|กทม\./);
+        if (bkkMatch) { prov = 'กรุงเทพมหานคร'; rem = rem.replace(bkkMatch[0], ''); }
+    }
+    
+    const distMatch = rem.match(/(อ\.|อำเภอ|เขต)\s*([^\s]+)/);
+    if (distMatch) { dist = distMatch[2]; rem = rem.replace(distMatch[0], ''); }
+    
+    const subMatch = rem.match(/(ต\.|ตำบล|แขวง)\s*([^\s]+)/);
+    if (subMatch) { sub = subMatch[2]; rem = rem.replace(subMatch[0], ''); }
+    
+    const roadMatch = rem.match(/(ถ\.|ถนน)\s*([^\s]+)/);
+    if (roadMatch) { road = roadMatch[2]; rem = rem.replace(roadMatch[0], ''); }
+    
+    const soiMatch = rem.match(/(ซ\.|ซอย)\s*([^\s]+)/);
+    if (soiMatch) { soi = soiMatch[2]; rem = rem.replace(soiMatch[0], ''); }
+    
+    no = rem.replace(/,/g, '').trim();
+    if (no.endsWith('-')) no = no.slice(0, -1).trim();
+    
+    return { addr_no: no, addr_soi: soi, addr_road: road, addr_subdistrict: sub, addr_district: dist, addr_province: prov, addr_zip: zip };
+};
 
-    if (hasMeaningfulPart) {
-        const isBkk = prov.includes('กรุงเทพ') || prov.includes('กทม');
-        const parts = [];
+export const getAddressParts = (data) => {
+    if (!data) return [];
 
-        if (no && no !== '-') parts.push(no);
-        if (soi && soi !== '-') {
-            parts.push(soi.startsWith('ซอย') ? soi : `ซอย${soi}`);
-        }
-        if (road && road !== '-') {
-            parts.push(road.startsWith('ถนน') ? road : `ถนน${road}`);
-        }
-        if (sub && sub !== '-') {
-            if (isBkk) {
-                parts.push(sub.startsWith('แขวง') ? sub : `แขวง${sub.replace(/^(ต\.|ตำบล)/, '')}`);
-            } else {
-                parts.push(sub.startsWith('ต.') || sub.startsWith('ตำบล') ? sub : `ต.${sub}`);
-            }
-        }
-        if (dist && dist !== '-') {
-            if (isBkk) {
-                parts.push(dist.startsWith('เขต') ? dist : `เขต${dist.replace(/^(อ\.|อำเภอ)/, '')}`);
-            } else {
-                parts.push(dist.startsWith('อ.') || dist.startsWith('อำเภอ') ? dist : `อ.${dist}`);
-            }
-        }
-        if (prov && prov !== '-') {
-            if (isBkk) {
-                parts.push(prov.startsWith('จ.') ? prov.replace(/^จ\./, '') : prov);
-            } else {
-                parts.push(prov.startsWith('จ.') || prov.startsWith('จังหวัด') ? prov : `จ.${prov}`);
-            }
-        }
-        if (zip && zip !== '-') parts.push(zip);
+    let no = cleanVal(data.addr_no);
+    let soi = cleanVal(data.addr_soi);
+    let road = cleanVal(data.addr_road);
+    let sub = cleanVal(data.addr_subdistrict);
+    let dist = cleanVal(data.addr_district);
+    let prov = cleanVal(data.addr_province);
+    let zip = cleanVal(data.addr_zip);
 
-        const joined = parts.join(' ').trim();
-        if (joined) return joined;
+    let hasStructured = [no, soi, road, sub, dist, prov, zip].some(v => v !== '');
+
+    if (!hasStructured) {
+        const raw = typeof data === 'string' ? data.trim() : (data.address || '').trim();
+        if (!raw || raw === '-') return [];
+        const parsed = parseAddressStringToSplit(raw);
+        no = cleanVal(parsed.addr_no);
+        soi = cleanVal(parsed.addr_soi);
+        road = cleanVal(parsed.addr_road);
+        sub = cleanVal(parsed.addr_subdistrict);
+        dist = cleanVal(parsed.addr_district);
+        prov = cleanVal(parsed.addr_province);
+        zip = cleanVal(parsed.addr_zip);
+        hasStructured = [no, soi, road, sub, dist, prov, zip].some(v => v !== '');
+        
+        if (!hasStructured) {
+            return raw.split(/[ \t]+/).filter(p => p && p !== '-');
+        }
     }
 
-    return (data.address || '').trim() || '-';
+    const isBkk = prov.includes('กรุงเทพ') || prov.includes('กทม');
+    const parts = [];
+
+    if (no) {
+        let cleanNo = no.replace(/(ซ\.-|ถ\.-|ต\.-|อ\.-|จ\.-)/g, '').trim();
+        if (cleanNo && cleanNo !== '-') {
+            const noTokens = cleanNo.split(/[ \t]+/).filter(p => p && p !== '-');
+            parts.push(...noTokens);
+        }
+    }
+    if (soi) {
+        let cleanSoi = soi.replace(/^(ซ\.|ซอย)\s*/, '');
+        if (cleanSoi && cleanSoi !== '-') parts.push('ซอย' + cleanSoi);
+    }
+    if (road) {
+        let cleanRoad = road.replace(/^(ถ\.|ถนน)\s*/, '');
+        if (cleanRoad && cleanRoad !== '-') parts.push('ถนน' + cleanRoad);
+    }
+    if (sub) {
+        let cleanSub = sub.replace(/^(ต\.|ตำบล|แขวง)\s*/, '');
+        if (cleanSub && cleanSub !== '-') {
+            parts.push(isBkk ? ('แขวง' + cleanSub) : ('ต.' + cleanSub));
+        }
+    }
+    if (dist) {
+        let cleanDist = dist.replace(/^(อ\.|อำเภอ|เขต)\s*/, '');
+        if (cleanDist && cleanDist !== '-') {
+            parts.push(isBkk ? ('เขต' + cleanDist) : ('อ.' + cleanDist));
+        }
+    }
+    if (prov) {
+        let cleanProv = prov.replace(/^(จ\.|จังหวัด)\s*/, '');
+        if (cleanProv && cleanProv !== '-') {
+            parts.push(isBkk ? cleanProv : ('จ.' + cleanProv));
+        }
+    }
+    if (zip && zip !== '-') parts.push(zip);
+
+    return parts;
+};
+
+export const formatFullAddress = (data) => {
+    if (!data) return '-';
+    if (typeof data === 'string') return data.trim() || '-';
+    const parts = getAddressParts(data);
+    return parts.length > 0 ? parts.join(' ') : (data.address || '').trim() || '-';
 };
 
