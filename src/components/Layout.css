@@ -32,6 +32,8 @@
     padding: 20px 16px;
     border-bottom: 1px solid var(--border-light);
     height: 72px;
+    min-height: 72px;
+    flex-shrink: 0;
     position: relative;
 }
 
@@ -419,13 +421,15 @@
 
 .page-wrapper {
     padding: 24px 40px 80px 40px;
-    flex: 1;
+    flex: 1 0 auto;
     min-width: 0;
 }
 
 /* ===== Top Navbar ===== */
 .top-navbar {
     height: 72px;
+    min-height: 72px;
+    flex-shrink: 0;
     background: #ffffff;
     border-bottom: 1px solid var(--border-light);
     display: flex;

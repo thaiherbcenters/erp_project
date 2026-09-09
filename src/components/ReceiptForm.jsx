@@ -710,7 +710,7 @@ const DEFAULT_FDA_NOTES = DEFAULT_NORMAL_NOTES;
 const PRODUCT_CATALOG = {
     "ยาดมสมุนไพร": { price: 79, promo: { newQty: 40, newPrice: 25, oldQty: 50, oldPrice: 20 } },
     "ยาดมสมุนไพร จัมโบ้": { price: 490, promo: { newQty: 5, newPrice: 200 } },
-    "ยาหม่อง": { price: 59, promo: { newQty: 35, newPrice: 1000/35, oldQty: 40, oldPrice: 25 } },
+    "ยาหม่อง": { price: 59, promo: { newQty: 35, newPrice: 29, oldQty: 40, oldPrice: 25 } },
     "ยาน้ำมัน ขนาด 10 มล.": { price: 129, promo: { newQty: 20, newPrice: 50, oldQty: 17, oldPrice: 59 } },
     "ยาน้ำมัน ขนาด 5 มล.": { price: 69, promo: { newQty: 25, newPrice: 40 } },
     "ยาน้ำมันสมุนไพร สูตรเย็น": { price: 199, promo: { newQty: 14, newPrice: 71 } },
@@ -1262,7 +1262,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         const pData = PRODUCT_CATALOG[baseName].promo;
                         const tQty = (newItem.promoType === 'old' && pData.oldQty) ? pData.oldQty : (pData.newQty || pData.qty);
                         const tPrice = (newItem.promoType === 'old' && pData.oldPrice) ? pData.oldPrice : (pData.newPrice || pData.price);
-                        newItem.qty = tQty * parseInt(value, 10);
+                        const mult = parseInt(value, 10);
+                        newItem.qty = isNaN(mult) || mult < 0 ? '' : tQty * mult;
                         newItem.price = tPrice;
                     }
                 }
@@ -2186,11 +2187,22 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                                         </label>
                                                         
                                                         {(item.promoType || item.isPromo) && (
-                                                            <CustomSelect value={item.promoMultiplier} onChange={(e) => handleItemChange(item.id, 'promoMultiplier', e.target.value)} style={{ padding: '2px 5px', borderRadius: '4px', border: '1px solid #ffb74d', color: '#d35400', width: 'auto' }}>
-                                                                {[1,2,3,4,5,6,7,8,9,10].map(n => (
-                                                                    <option key={n} value={n}>{n} โปร</option>
-                                                                ))}
-                                                            </CustomSelect>
+                                                            <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #ffb74d', borderRadius: '4px', overflow: 'hidden', background: '#fff', height: '26px' }}>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min="1" 
+                                                                    value={item.promoMultiplier === undefined ? 1 : item.promoMultiplier} 
+                                                                    onChange={(e) => handleItemChange(item.id, 'promoMultiplier', e.target.value)}
+                                                                    onBlur={(e) => {
+                                                                        const val = parseInt(e.target.value, 10);
+                                                                        if (isNaN(val) || val < 1) {
+                                                                            handleItemChange(item.id, 'promoMultiplier', 1);
+                                                                        }
+                                                                    }}
+                                                                    style={{ width: '48px', height: '100%', border: 'none', textAlign: 'center', fontWeight: 'bold', color: '#d35400', outline: 'none', padding: '0 4px', fontSize: '13px' }} 
+                                                                />
+                                                                <span style={{ padding: '0 6px', height: '100%', display: 'flex', alignItems: 'center', background: '#fff7ed', color: '#d35400', fontSize: '12px', fontWeight: 'bold', borderLeft: '1px solid #ffb74d', userSelect: 'none' }}>โปร</span>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 );

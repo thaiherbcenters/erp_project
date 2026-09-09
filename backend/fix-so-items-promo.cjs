@@ -4,8 +4,8 @@ const { poolPromise, sql } = require('./config/db');
 const PRODUCT_PROMOS = {
     "ยาดมสมุนไพร": { newQty: 40, newPrice: 25, oldQty: 50, oldPrice: 20 },
     "ยาดมสมุนไพร จัมโบ้": { newQty: 5, newPrice: 200 },
-    "ยาหม่อง": { newQty: 35, newPrice: 1000/35, oldQty: 40, oldPrice: 25 },
-    "ยาหมอง": { newQty: 35, newPrice: 1000/35, oldQty: 40, oldPrice: 25 },
+    "ยาหม่อง": { newQty: 35, newPrice: 29, oldQty: 40, oldPrice: 25 },
+    "ยาหมอง": { newQty: 35, newPrice: 29, oldQty: 40, oldPrice: 25 },
     "ยาน้ำมัน ขนาด 10 มล.": { newQty: 20, newPrice: 50, oldQty: 17, oldPrice: 59 },
     "ยาน้ำมัน ขนาด 5 มล.": { newQty: 25, newPrice: 40 },
     "ยาน้ำมันสมุนไพร สูตรเย็น": { newQty: 14, newPrice: 71 },

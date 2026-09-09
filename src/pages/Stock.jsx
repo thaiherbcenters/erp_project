@@ -1314,33 +1314,6 @@ export default function Stock() {
                                     setAppliedSearchStock(searchStock);
                                 }}>ค้นหา</button>
                             </div>
-                        </div>
-                    )}
-
-                    {hasSectionPermission('stock_data_search') && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                            <div className="sub-tabs-container" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 5, flex: 1 }}>
-                                {['สินค้าสำเร็จรูป', 'สินค้ากึ่งสำเร็จรูป', 'วัตถุดิบ', 'บรรจุภัณฑ์', 'ฉลาก/สิ่งพิมพ์', 'วัสดุสิ้นเปลือง'].map(cat => (
-                                    <button 
-                                        key={cat} 
-                                        className={`sub-tab-btn ${activeCategory === cat ? 'active' : ''}`}
-                                        onClick={() => { setActiveCategory(cat); setStockPagination(p => ({...p, page: 1})); }}
-                                        style={{
-                                            padding: '8px 16px', borderRadius: 20, border: '1px solid #e5e7eb',
-                                            background: activeCategory === cat ? '#eff6ff' : '#fff',
-                                            color: activeCategory === cat ? '#1d4ed8' : '#6b7280',
-                                            fontWeight: activeCategory === cat ? 700 : 500,
-                                            cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s'
-                                        }}
-                                    >
-                                        {cat === 'สินค้าสำเร็จรูป' ? '🟢 สินค้าสำเร็จรูป (FG)' : 
-                                         cat === 'สินค้ากึ่งสำเร็จรูป' ? '🟠 สินค้ากึ่งสำเร็จรูป (WIP)' : 
-                                         cat === 'วัตถุดิบ' ? '🟡 วัตถุดิบ (RM)' : 
-                                         cat === 'บรรจุภัณฑ์' ? '🔵 บรรจุภัณฑ์ (PM)' : 
-                                         cat === 'ฉลาก/สิ่งพิมพ์' ? '🏷️ ฉลาก/สิ่งพิมพ์ (LB)' : '🟤 วัสดุสิ้นเปลือง'}
-                                    </button>
-                                ))}
-                            </div>
                             {canCreate('stock_data') && (
                                 <button 
                                     onClick={() => setShowAddModal(true)}
@@ -1349,6 +1322,31 @@ export default function Stock() {
                                     <Plus size={18} /> เพิ่มสินค้า
                                 </button>
                             )}
+                        </div>
+                    )}
+
+                    {hasSectionPermission('stock_data_search') && (
+                        <div className="sub-tabs-container" style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 5, marginBottom: 20 }}>
+                            {['สินค้าสำเร็จรูป', 'สินค้ากึ่งสำเร็จรูป', 'วัตถุดิบ', 'บรรจุภัณฑ์', 'ฉลาก/สิ่งพิมพ์', 'วัสดุสิ้นเปลือง'].map(cat => (
+                                <button 
+                                    key={cat} 
+                                    className={`sub-tab-btn ${activeCategory === cat ? 'active' : ''}`}
+                                    onClick={() => { setActiveCategory(cat); setStockPagination(p => ({...p, page: 1})); }}
+                                    style={{
+                                        padding: '8px 16px', borderRadius: 20, border: '1px solid #e5e7eb',
+                                        background: activeCategory === cat ? '#eff6ff' : '#fff',
+                                        color: activeCategory === cat ? '#1d4ed8' : '#6b7280',
+                                        fontWeight: activeCategory === cat ? 700 : 500,
+                                        cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {cat === 'สินค้าสำเร็จรูป' ? '🟢 สินค้าสำเร็จรูป (FG)' : 
+                                     cat === 'สินค้ากึ่งสำเร็จรูป' ? '🟠 สินค้ากึ่งสำเร็จรูป (WIP)' : 
+                                     cat === 'วัตถุดิบ' ? '🟡 วัตถุดิบ (RM)' : 
+                                     cat === 'บรรจุภัณฑ์' ? '🔵 บรรจุภัณฑ์ (PM)' : 
+                                     cat === 'ฉลาก/สิ่งพิมพ์' ? '🏷️ ฉลาก/สิ่งพิมพ์ (LB)' : '🟤 วัสดุสิ้นเปลือง'}
+                                </button>
+                            ))}
                         </div>
                     )}
 

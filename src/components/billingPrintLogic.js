@@ -1041,19 +1041,8 @@
                                     <input type="checkbox" id="promoCheckbox_1" onchange="togglePromo(1)"
                                         style="width: 16px; height: 16px; cursor: pointer; padding: 0;">
                                     จัดโปรโมชั่น 1000 บาท
-                                    <select id="promoMultiplier_1" onchange="togglePromo(1); calculateRowAndTotal(1)"
-                                        style="display: none; padding: 2px 5px; border-radius: 4px; border: 1px solid #ffb74d;">
-                                        <option value="1">1 โปร</option>
-                                        <option value="2">2 โปร</option>
-                                        <option value="3">3 โปร</option>
-                                        <option value="4">4 โปร</option>
-                                        <option value="5">5 โปร</option>
-                                        <option value="6">6 โปร</option>
-                                        <option value="7">7 โปร</option>
-                                        <option value="8">8 โปร</option>
-                                        <option value="9">9 โปร</option>
-                                        <option value="10">10 โปร</option>
-                                    </select>
+                                    <input type="number" min="1" id="promoMultiplier_1" value="1" oninput="togglePromo(1); calculateRowAndTotal(1)"
+                                        style="display: none; width: 55px; padding: 2px 5px; border-radius: 4px; border: 1px solid #ffb74d; text-align: center;" title="จำนวนโปร">
                                 </label>
                             </div>
                         </div>
@@ -2631,18 +2620,7 @@
                             <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #d35400; cursor: pointer;">
                                 <input type="checkbox" id="promoCheckbox_${productCounter}" onchange="togglePromo(${productCounter})" style="width: 16px; height: 16px; cursor: pointer; padding: 0;">
                                 จัดโปรโมชั่น 1000 บาท
-                                <select id="promoMultiplier_${productCounter}" onchange="togglePromo(${productCounter}); calculateRowAndTotal(${productCounter})" style="display: none; padding: 2px 5px; border-radius: 4px; border: 1px solid #ffb74d;">
-                                    <option value="1">1 โปร</option>
-                                    <option value="2">2 โปร</option>
-                                    <option value="3">3 โปร</option>
-                                    <option value="4">4 โปร</option>
-                                    <option value="5">5 โปร</option>
-                                    <option value="6">6 โปร</option>
-                                    <option value="7">7 โปร</option>
-                                    <option value="8">8 โปร</option>
-                                    <option value="9">9 โปร</option>
-                                    <option value="10">10 โปร</option>
-                                </select>
+                                <input type="number" min="1" id="promoMultiplier_${productCounter}" value="1" oninput="togglePromo(${productCounter}); calculateRowAndTotal(${productCounter})" style="display: none; width: 55px; padding: 2px 5px; border-radius: 4px; border: 1px solid #ffb74d; text-align: center;" title="จำนวนโปร">
                             </label>
                         </div>
                     </div>
