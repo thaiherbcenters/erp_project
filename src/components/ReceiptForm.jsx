@@ -787,7 +787,7 @@ const PRODUCT_IMAGES = {
 const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม', 'กระปุก', 'ขวด', 'ถุง', 'ซอง', 'หลอด', 'กล่อง', 'แผง', 'ขวด(โหล)', 'โหล'];
 
 export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistory, initialFromQuotation }) {
-    const { signatures: availableSignatures, userSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
+    const { signatures: availableSignatures, userSignatures, bossSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
 
@@ -852,7 +852,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
-        signer: '',
+        signer: 'thawat',
         customerOrder: '',
         purchaseNo: '',
         salesperson: '',
@@ -881,10 +881,11 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
     const userModifiedProjectName = useRef(false);
 
     useEffect(() => {
-        if (!editId && defaultSignerKey) {
-            setFormData(prev => ({ ...prev, signer: defaultSignerKey }));
+        if (!editId) {
+            // ลายเซ็นผู้มีอำนาจลงนามต้องเป็นเจ้านาย (ธวัช จรุงพิรวงศ์)
+            setFormData(prev => ({ ...prev, signer: 'thawat' }));
         }
-    }, [defaultSignerKey, editId]);
+    }, [editId]);
 
 
     useEffect(() => {
@@ -939,7 +940,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                 showDesignFeeInPrint: qData.showDesignFeeInPrint !== undefined ? !!qData.showDesignFeeInPrint : prev.showDesignFeeInPrint,
                 depositPercent: qData.depositPercent !== undefined ? String(qData.depositPercent) : prev.depositPercent,
                 customDepositAmount: Number(qData.depositAmount || 0),
-                showDepositInPrint: Number(qData.depositAmount || 0) > 0
+                showDepositInPrint: Number(qData.depositAmount || 0) > 0,
+                signer: 'thawat'
             }));
 
             if (qData.items && qData.items.length > 0) {
@@ -1107,7 +1109,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             shippingCost: data.ShippingCost || 0,
                             depositPercent: data.DepositPercent || '0',
                             customDepositAmount: data.DepositPercent === 'custom' ? data.DepositAmount : 0,
-                            signer: data.Signer || '',
+                            signer: (data.Signer && !data.Signer.startsWith('sig_')) ? data.Signer : 'thawat',
                             customerOrder: data.CustomerOrder || '',
                             purchaseNo: data.PurchaseNo || '',
                             salesperson: data.Salesperson || '',
@@ -1512,7 +1514,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             depositPercent: formData.depositPercent,
             depositAmount: Number(depositAmount) || 0,
             remainingAmount: Number(remainingAmount) || 0,
-            signer: formData.signer,
+            signer: formData.signer || 'thawat',
             notes: formData.notes,
             showDiscountInPrint: formData.showDiscountInPrint,
             showVatInPrint: formData.showVatInPrint,
@@ -1597,7 +1599,16 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
     else if (validItemsCount === 6) { cellHeight = '40px'; imgSize = '34px'; }
     else { cellHeight = '35px'; imgSize = '30px'; }
 
-    const selectedSignature = availableSignatures.find(s => s.KeyName === formData.signer);
+    const bossSignature = (bossSignatures && bossSignatures.length > 0)
+        ? bossSignatures[0]
+        : (availableSignatures.find(s => s.KeyName === 'thawat' || (s.FullName && s.FullName.includes('ธวัช')))
+           || { KeyName: 'thawat', FullName: 'ธวัช จรุงพิรวงศ์', ImagePath: '/images/signatures/sign-authorized.png' });
+
+    const selectedSignature = (formData.signer === '' || formData.signer === null)
+        ? null
+        : (formData.signer === 'thawat'
+            ? bossSignature
+            : (availableSignatures.find(s => s.KeyName === formData.signer && !s.user_id) || bossSignature));
 
 
     return (
@@ -2388,11 +2399,15 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
 
                         <div className="form-group">
                                 <label>ผู้มีอำนาจลงนาม (ลายเซ็น)</label>
-                                <CustomSelect name="signer" value={formData.signer} onChange={handleFormChange}>
+                                <CustomSelect name="signer" value={formData.signer || 'thawat'} onChange={handleFormChange}>
                                     <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                                    {userSignatures.map(sig => (
-                                        <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
-                                    ))}
+                                    {bossSignatures.length > 0 ? (
+                                        bossSignatures.map(sig => (
+                                            <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
+                                        ))
+                                    ) : (
+                                        <option value="thawat">ธวัช จรุงพิรวงศ์</option>
+                                    )}
                                 </CustomSelect>
                             </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>

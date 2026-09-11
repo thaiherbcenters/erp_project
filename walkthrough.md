@@ -208,5 +208,24 @@ You can now log in using the newly created test accounts to verify the functiona
   - รองรับการกดปุ่มลูกศรขึ้น/ลง (`ArrowUp` / `ArrowDown`) และ `Enter` เพื่อเลือกตัวเลือกที่ต้องการ หรือคลิกเลือกด้วยเมาส์
   - เมื่อเลือกแล้ว ระบบจะแสดงชื่อเต็มของซัพพลายเออร์ที่เลือก พร้อมปุ่ม `✕` สำหรับล้างค่าที่เลือกกลับสู่ "ซัพพลายเออร์ทั้งหมด" ได้ในคลิกเดียว
   - กรณีพิมพ์คำค้นหาที่ไม่ตรงกับรายการใด จะแสดงข้อความแจ้งเตือน "ไม่พบข้อมูล" อย่างชัดเจน
-- **Build Verified**: ผ่านการทดสอบ `npm run build` สำเร็จ 100%
+## Accounts AR Document Preview Modals White Background (`Accounts.jsx`)
+- ปรับเปลี่ยนสีพื้นหลังของกล่องพรีวิวเอกสารขนาด A4 ในหน้า Accounts (ลูกหนี้การค้า AR):
+  - ป๊อปอัปพรีวิวใบเสนอราคา (Quotation Preview Modal)
+  - ป๊อปอัปพรีวิวใบวางบิล/ใบแจ้งหนี้ (Billing Invoice Preview Modal)
+  - ป๊อปอัปพรีวิวใบเสร็จรับเงิน (Receipt Preview Modal)
+  - เปลี่ยนจากสีเทาเข้ม `#525659` เป็นสีขาว `#ffffff` สว่างสะอาดตาตามความต้องการของผู้ใช้
 
+## Default Receipt Signer to คุณธวัช จรุงพิรวงศ์ (`ReceiptForm.jsx`)
+- **กำหนดลายเซ็นผู้มีอำนาจลงนามในใบเสร็จรับเงิน (Receipt) ให้เป็น คุณธวัช จรุงพิรวงศ์ เสมอ**:
+  1. **Initial State**: กำหนดค่าเริ่มต้น `signer: 'thawat'` ใน state `formData`
+  2. **Auto Defaulting**: ใน `useEffect` เมื่อเปิดแบบฟอร์มสร้างใบเสร็จรับเงินใหม่ ไม่ดึงบัญชีผู้ล็อกอิน (`defaultSignerKey`) แต่จะตั้งค่า `signer: 'thawat'` โดยตรง
+  3. **สร้างจาก Quotation / Billing Invoice**: ใน `initialFromQuotation` กำหนดค่า `signer: 'thawat'` เพื่อให้ลายเซ็นในใบเสร็จรับเงินเป็นของคุณธวัช จรุงพิรวงศ์ เสมอ
+  4. **Signer Selection Dropdown**:
+     - สลับจาก `userSignatures` มาใช้ `bossSignatures` (`KeyName === 'thawat'` หรือมีชื่อ `ธวัช`)
+     - มี fallback เป็นตัวเลือก `ธวัช จรุงพิรวงศ์`
+     - แสดงค่า default เป็น `thawat`
+  5. **การดึงข้อมูลและบันทึก**:
+     - `fetchQuotation` เมื่อโหลดข้อมูลเดิม: หากไม่มีหรือเป็น ID เก่า ให้ fallback เป็น `'thawat'`
+     - `handleSave`: ส่ง `formData.signer || 'thawat'`
+     - `selectedSignature`: คำนวณ `bossSignature` อย่างแม่นยำ เพื่อนำไปแสดงรูปภาพลายเซ็นในช่อง "ผู้มีอำนาจลงนาม / Authorized Signature" ของเอกสาร A4 พรีวิวและสั่งพิมพ์ทันที
+- **Build Verified**: ผ่านการทดสอบ `npm run build` สำเร็จ 100%

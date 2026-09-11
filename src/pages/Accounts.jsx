@@ -654,8 +654,8 @@ export default function Accounts() {
                                                                         <Eye size={12} /> QT
                                                                     </button>
 
-                                                                    {/* Connector หรือ สเต็ป 2: RE มัดจำ */}
-                                                                    {depositAmount > 0 ? (
+                                                                    {/* สเต็ป 2: RE มัดจำ (แสดงเฉพาะเมื่อเอกสารมีการเรียกเก็บมัดจำ) */}
+                                                                    {depositAmount > 0 && (
                                                                         <>
                                                                             <ChevronRight size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
                                                                             {row.DepositReceiptID ? (
@@ -707,114 +707,119 @@ export default function Accounts() {
                                                                                     </button>
                                                                                 )
                                                                             )}
-                                                                            <ChevronRight size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
                                                                         </>
-                                                                    ) : (
-                                                                        <ChevronRight size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
                                                                     )}
 
-                                                                    {/* 3. ใบวางบิล (Billing Invoice: BI) */}
-                                                                    {row.BillingInvoiceID ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setPreviewBillingId(row.BillingInvoiceID)}
-                                                                            title={`พรีวิวใบวางบิล: ${row.BillingInvoiceNo}`}
-                                                                            style={{
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '3px',
-                                                                                padding: '4px 8px',
-                                                                                borderRadius: '6px',
-                                                                                fontSize: '11px',
-                                                                                fontWeight: 600,
-                                                                                border: '1px solid #ddd6fe',
-                                                                                background: '#f5f3ff',
-                                                                                color: '#6d28d9',
-                                                                                cursor: 'pointer',
-                                                                                whiteSpace: 'nowrap',
-                                                                                flexShrink: 0
-                                                                            }}
-                                                                        >
-                                                                            <Eye size={12} /> BI
-                                                                        </button>
-                                                                    ) : (
-                                                                        (canCreate('sales_billing_invoice') || canCreate('accounts_ar')) && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleCreateBillingInvoice(row.QuotationID)}
-                                                                                title="สร้างใบวางบิลเรียกเก็บเงินส่วนที่เหลือ"
-                                                                                style={{
-                                                                                    display: 'inline-flex',
-                                                                                    alignItems: 'center',
-                                                                                    gap: '3px',
-                                                                                    padding: '4px 8px',
-                                                                                    borderRadius: '6px',
-                                                                                    fontSize: '11px',
-                                                                                    fontWeight: 600,
-                                                                                    border: '1px dashed #c4b5fd',
-                                                                                    background: '#ffffff',
-                                                                                    color: '#6d28d9',
-                                                                                    cursor: 'pointer',
-                                                                                    whiteSpace: 'nowrap',
-                                                                                    flexShrink: 0
-                                                                                }}
-                                                                            >
-                                                                                <Plus size={12} /> BI
-                                                                            </button>
-                                                                        )
+                                                                    {/* สเต็ป 3: ใบวางบิล (BI) — ปิดไว้ก่อน จะแสดงเมื่อทำสเต็ปมัดจำเสร็จแล้ว (หรือไม่มีมัดจำ) */}
+                                                                    {(depositAmount === 0 || Boolean(row.DepositReceiptID) || Boolean(row.BillingInvoiceID)) && (
+                                                                        <>
+                                                                            <ChevronRight size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                                                                            {row.BillingInvoiceID ? (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setPreviewBillingId(row.BillingInvoiceID)}
+                                                                                    title={`พรีวิวใบวางบิล: ${row.BillingInvoiceNo}`}
+                                                                                    style={{
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '3px',
+                                                                                        padding: '4px 8px',
+                                                                                        borderRadius: '6px',
+                                                                                        fontSize: '11px',
+                                                                                        fontWeight: 600,
+                                                                                        border: '1px solid #ddd6fe',
+                                                                                        background: '#f5f3ff',
+                                                                                        color: '#6d28d9',
+                                                                                        cursor: 'pointer',
+                                                                                        whiteSpace: 'nowrap',
+                                                                                        flexShrink: 0
+                                                                                    }}
+                                                                                >
+                                                                                    <Eye size={12} /> BI
+                                                                                </button>
+                                                                            ) : (
+                                                                                (canCreate('sales_billing_invoice') || canCreate('accounts_ar')) && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleCreateBillingInvoice(row.QuotationID)}
+                                                                                        title="สร้างใบวางบิลเรียกเก็บเงินส่วนที่เหลือ"
+                                                                                        style={{
+                                                                                            display: 'inline-flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: '3px',
+                                                                                            padding: '4px 8px',
+                                                                                            borderRadius: '6px',
+                                                                                            fontSize: '11px',
+                                                                                            fontWeight: 600,
+                                                                                            border: '1px dashed #c4b5fd',
+                                                                                            background: '#ffffff',
+                                                                                            color: '#6d28d9',
+                                                                                            cursor: 'pointer',
+                                                                                            whiteSpace: 'nowrap',
+                                                                                            flexShrink: 0
+                                                                                        }}
+                                                                                    >
+                                                                                        <Plus size={12} /> BI
+                                                                                    </button>
+                                                                                )
+                                                                            )}
+                                                                        </>
                                                                     )}
 
-                                                                    <ChevronRight size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
-
-                                                                    {/* 4. ใบเสร็จรับเงินส่วนที่เหลือ (Final Receipt: RE ปิดยอด) */}
-                                                                    {row.FinalReceiptID ? (
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => setPreviewReceiptId(row.FinalReceiptID)}
-                                                                            title={`พรีวิวใบเสร็จรับเงินปิดยอด: ${row.FinalReceiptNo}`}
-                                                                            style={{
-                                                                                display: 'inline-flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '3px',
-                                                                                padding: '4px 8px',
-                                                                                borderRadius: '6px',
-                                                                                fontSize: '11px',
-                                                                                fontWeight: 600,
-                                                                                border: '1px solid #a7f3d0',
-                                                                                background: '#ecfdf5',
-                                                                                color: '#047857',
-                                                                                cursor: 'pointer',
-                                                                                whiteSpace: 'nowrap',
-                                                                                flexShrink: 0
-                                                                            }}
-                                                                        >
-                                                                            <Eye size={12} /> {depositAmount > 0 ? 'RE ปิดยอด' : 'RE'}
-                                                                        </button>
-                                                                    ) : (
-                                                                        (canCreate('sales_receipt') || canCreate('accounts_ar')) && (
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => handleCreateReceipt(row.QuotationID, 'final')}
-                                                                                title={depositAmount > 0 ? "ออกใบเสร็จรับเงินส่วนที่เหลือ (ปิดยอด)" : "ออกใบเสร็จรับเงิน"}
-                                                                                style={{
-                                                                                    display: 'inline-flex',
-                                                                                    alignItems: 'center',
-                                                                                    gap: '3px',
-                                                                                    padding: '4px 8px',
-                                                                                    borderRadius: '6px',
-                                                                                    fontSize: '11px',
-                                                                                    fontWeight: 600,
-                                                                                    border: '1px dashed #6ee7b7',
-                                                                                    background: '#ffffff',
-                                                                                    color: '#047857',
-                                                                                    cursor: 'pointer',
-                                                                                    whiteSpace: 'nowrap',
-                                                                                    flexShrink: 0
-                                                                                }}
-                                                                            >
-                                                                                <Plus size={12} /> {depositAmount > 0 ? 'RE ปิดยอด' : 'RE'}
-                                                                            </button>
-                                                                        )
+                                                                    {/* สเต็ป 4: ใบเสร็จรับเงินส่วนที่เหลือ (RE ปิดยอด) — ปิดไว้ก่อน จะแสดงเมื่อออกใบวางบิล (BI) เรียบร้อยแล้ว */}
+                                                                    {(Boolean(row.BillingInvoiceID) || Boolean(row.FinalReceiptID)) && (
+                                                                        <>
+                                                                            <ChevronRight size={13} style={{ color: '#94a3b8', flexShrink: 0 }} />
+                                                                            {row.FinalReceiptID ? (
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setPreviewReceiptId(row.FinalReceiptID)}
+                                                                                    title={`พรีวิวใบเสร็จรับเงินปิดยอด: ${row.FinalReceiptNo}`}
+                                                                                    style={{
+                                                                                        display: 'inline-flex',
+                                                                                        alignItems: 'center',
+                                                                                        gap: '3px',
+                                                                                        padding: '4px 8px',
+                                                                                        borderRadius: '6px',
+                                                                                        fontSize: '11px',
+                                                                                        fontWeight: 600,
+                                                                                        border: '1px solid #a7f3d0',
+                                                                                        background: '#ecfdf5',
+                                                                                        color: '#047857',
+                                                                                        cursor: 'pointer',
+                                                                                        whiteSpace: 'nowrap',
+                                                                                        flexShrink: 0
+                                                                                    }}
+                                                                                >
+                                                                                    <Eye size={12} /> {depositAmount > 0 ? 'RE ปิดยอด' : 'RE'}
+                                                                                </button>
+                                                                            ) : (
+                                                                                (canCreate('sales_receipt') || canCreate('accounts_ar')) && (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => handleCreateReceipt(row.QuotationID, 'final')}
+                                                                                        title={depositAmount > 0 ? "ออกใบเสร็จรับเงินส่วนที่เหลือ (ปิดยอด)" : "ออกใบเสร็จรับเงิน"}
+                                                                                        style={{
+                                                                                            display: 'inline-flex',
+                                                                                            alignItems: 'center',
+                                                                                            gap: '3px',
+                                                                                            padding: '4px 8px',
+                                                                                            borderRadius: '6px',
+                                                                                            fontSize: '11px',
+                                                                                            fontWeight: 600,
+                                                                                            border: '1px dashed #6ee7b7',
+                                                                                            background: '#ffffff',
+                                                                                            color: '#047857',
+                                                                                            cursor: 'pointer',
+                                                                                            whiteSpace: 'nowrap',
+                                                                                            flexShrink: 0
+                                                                                        }}
+                                                                                    >
+                                                                                        <Plus size={12} /> {depositAmount > 0 ? 'RE ปิดยอด' : 'RE'}
+                                                                                    </button>
+                                                                                )
+                                                                            )}
+                                                                        </>
                                                                     )}
                                                                 </div>
                                                             </td>
@@ -1199,7 +1204,7 @@ export default function Accounts() {
                         </div>
 
                         {/* พื้นที่แสดงเอกสาร A4 พรีวิว */}
-                        <div style={{ flex: 1, overflow: 'auto', padding: '24px 0', background: '#525659' }}>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '24px 0', background: '#ffffff' }}>
                             <QuotationForm
                                 editId={previewQuotationId}
                                 viewOnly={true}
@@ -1328,7 +1333,7 @@ export default function Accounts() {
                         </div>
 
                         {/* พื้นที่แสดงเอกสาร A4 พรีวิว */}
-                        <div style={{ flex: 1, overflow: 'auto', padding: '24px 0', background: '#525659' }}>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '24px 0', background: '#ffffff' }}>
                             <BillingInvoiceForm
                                 editId={previewBillingId}
                                 viewOnly={true}
@@ -1457,7 +1462,7 @@ export default function Accounts() {
                         </div>
 
                         {/* พื้นที่แสดงเอกสาร A4 พรีวิว */}
-                        <div style={{ flex: 1, overflow: 'auto', padding: '24px 0', background: '#525659' }}>
+                        <div style={{ flex: 1, overflow: 'auto', padding: '24px 0', background: '#ffffff' }}>
                             <ReceiptForm
                                 editId={previewReceiptId}
                                 viewOnly={true}
