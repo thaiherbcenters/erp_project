@@ -176,7 +176,7 @@ export default function DocumentRequest({ hasPermission }) {
             });
 
             if (!response.ok) {
-                alert('ไม่สามารถสร้าง PDF ได้');
+                showAlert('ข้อผิดพลาด', 'ไม่สามารถสร้าง PDF ได้', 'error');
                 return;
             }
 
@@ -185,7 +185,7 @@ export default function DocumentRequest({ hasPermission }) {
             setPreviewUrl(url);
             setPreviewDoc(sub);
         } catch (err) {
-            alert('เกิดข้อผิดพลาด: ' + err.message);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
         } finally {
             setPreviewLoadingId(null);
         }
@@ -207,7 +207,7 @@ export default function DocumentRequest({ hasPermission }) {
                 setHistoryModal(data);
             }
         } catch (err) {
-            alert('เกิดข้อผิดพลาด: ' + err.message);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
         } finally {
             setHistoryLoading(false);
         }
@@ -219,7 +219,7 @@ export default function DocumentRequest({ hasPermission }) {
 
         // บังคับใส่เหตุผลสำหรับ request-revision
         if (actionModal.action === 'request-revision' && (!actionComment || actionComment.trim() === '')) {
-            alert('กรุณาระบุเหตุผลที่ต้องแก้ไข');
+            showAlert('แจ้งเตือน', 'กรุณาระบุเหตุผลที่ต้องแก้ไข', 'warning');
             return;
         }
 
@@ -232,15 +232,15 @@ export default function DocumentRequest({ hasPermission }) {
             });
             const data = await res.json();
             if (res.ok) {
-                alert(`✅ ${data.message}`);
+                showAlert('สำเร็จ', data.message, 'success');
                 setActionModal(null);
                 setActionComment('');
                 loadData();
             } else {
-                alert('❌ ' + data.message);
+                showAlert('ข้อผิดพลาด', data.message, 'error');
             }
         } catch (err) {
-            alert('เกิดข้อผิดพลาด: ' + err.message);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาด: ' + err.message, 'error');
         } finally {
             setActionLoading(false);
         }

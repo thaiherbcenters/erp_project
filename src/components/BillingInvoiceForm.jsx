@@ -9,7 +9,7 @@ import ContractSelectorModal from './ContractSelectorModal';
 import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
-import { formatFullAddress } from '../utils/formatters';
+import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN } from '../utils/formatters';
 import FormattedAddress from './FormattedAddress';
 import '../pages/PageCommon.css';
 
@@ -477,10 +477,50 @@ const styles = `
         print-color-adjust: exact !important;
     }
     #q-print-container, #q-print-container * {
-        visibility: visible;
+        visibility: visible !important;
     }
     .q-form-wrapper > *:not(#q-print-container) {
         display: none !important;
+    }
+    .pdf-preview-overlay {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: block !important;
+        overflow: visible !important;
+        border: none !important;
+        visibility: visible !important;
+        background: transparent !important;
+    }
+    .pdf-preview-overlay * {
+        visibility: visible !important;
+    }
+    .pdf-preview-overlay > div {
+        position: static !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        overflow: visible !important;
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        background: transparent !important;
+    }
+    .pdf-preview-overlay > div > div:first-child {
+        display: none !important;
+    }
+    .pdf-preview-overlay > div > div:last-child {
+        position: static !important;
+        height: auto !important;
+        overflow: visible !important;
+        padding: 0 !important;
+        background: transparent !important;
     }
     #q-print-container {
         position: absolute;
@@ -714,7 +754,7 @@ const PRODUCT_IMAGES = {
 
 const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม', 'กระปุก', 'ขวด', 'ถุง', 'ซอง', 'หลอด', 'กล่อง', 'แผง', 'ขวด(โหล)', 'โหล'];
 
-export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, isHistory }) {
+export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, isHistory, initialFromQuotation }) {
     const { signatures: availableSignatures, userSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
@@ -815,7 +855,9 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
             const isFda = formData.docType && formData.docType.includes('fda');
             const storageKey = `TemplateNotes_BillingInvoice_${isFda ? 'FDA' : 'Normal'}`;
             const defaultNotes = isFda ? DEFAULT_FDA_NOTES : DEFAULT_NORMAL_NOTES;
-            setFormData(prev => ({ ...prev, notes: localStorage.getItem(storageKey) || defaultNotes }));
+            if (!initialFromQuotation) {
+                setFormData(prev => ({ ...prev, notes: localStorage.getItem(storageKey) || defaultNotes }));
+            }
 
             // Fetch next bill number from API
             const fetchNextNo = async () => {
@@ -831,7 +873,69 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
             };
             fetchNextNo();
         }
-    }, [formData.docType, editId]);
+    }, [formData.docType, editId, initialFromQuotation]);
+
+    useEffect(() => {
+        if (!editId && initialFromQuotation) {
+            const qData = initialFromQuotation;
+            const parsedAddr = parseAddressToSplit(qData.address || '');
+
+            // คำนวณการหักเงินมัดจำจากใบเสนอราคา
+            let depPct = qData.depositPercent !== undefined ? String(qData.depositPercent) : '0';
+            const paidDep = Number(qData.paidDepositAmount || 0);
+            const depAmt = Number(qData.depositAmount || 0);
+            const actualDep = paidDep > 0 ? paidDep : depAmt;
+
+            // หากมีเงินมัดจำแต่ไม่ได้ระบุ % เป็น 30/40/50 ให้ตั้งเป็น custom
+            if (actualDep > 0) {
+                if (depPct !== '30' && depPct !== '40' && depPct !== '50') {
+                    depPct = 'custom';
+                }
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                docType: qData.docType || prev.docType,
+                billStatus: qData.bankAccount || prev.billStatus,
+                contractId: qData.contractId || '',
+                customerId: qData.customerId || '',
+                customerName: qData.customerName || '',
+                address: qData.address || '',
+                ...parsedAddr,
+                phone: qData.phone || '',
+                taxId: qData.taxId || '',
+                notes: qData.notes || prev.notes,
+                vatRate: qData.vatRate !== undefined ? String(qData.vatRate) : prev.vatRate,
+                showVatInPrint: qData.showVatInPrint !== undefined ? !!qData.showVatInPrint : prev.showVatInPrint,
+                discountPercent: qData.discountPercent !== undefined ? String(qData.discountPercent) : prev.discountPercent,
+                showDiscountInPrint: qData.showDiscountInPrint !== undefined ? !!qData.showDiscountInPrint : prev.showDiscountInPrint,
+                shippingCost: qData.shippingCost !== undefined ? qData.shippingCost : prev.shippingCost,
+                showShippingInPrint: qData.showShippingInPrint !== undefined ? !!qData.showShippingInPrint : prev.showShippingInPrint,
+                designFee: qData.designFee !== undefined ? qData.designFee : prev.designFee,
+                showDesignFeeInPrint: qData.showDesignFeeInPrint !== undefined ? !!qData.showDesignFeeInPrint : prev.showDesignFeeInPrint,
+                depositPercent: depPct,
+                customDepositAmount: depPct === 'custom' ? actualDep : (actualDep || 0),
+                showDepositInPrint: actualDep > 0 || depPct !== '0'
+            }));
+
+            if (qData.items && qData.items.length > 0) {
+                setItems(qData.items.map((item, idx) => ({
+                    id: idx + 1,
+                    name: item.name || '',
+                    qty: item.qty || 1,
+                    price: item.price || 0,
+                    amount: item.amount || 0,
+                    isPromo: !!item.isPromo,
+                    promoType: item.isPromo ? 'old' : '',
+                    promoMultiplier: item.promoMultiplier || 1,
+                    basePromoName: item.name || '',
+                    image: item.image || null,
+                    unit: item.unit || 'ชิ้น',
+                    showDropdown: false
+                })));
+            }
+        }
+    }, [editId, initialFromQuotation]);
 
     const [contracts, setContracts] = useState([]);
     useEffect(() => {
@@ -1025,7 +1129,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
     }, [editId]);
 
     useEffect(() => {
-        if (editId && customerList.length > 0) {
+        if ((editId || initialFromQuotation) && customerList.length > 0) {
             if (formData.customerId && !formData.customerTypeId) {
                 const matched = customerList.find(c => String(c.CustomerID) === String(formData.customerId));
                 if (matched) {
@@ -1042,7 +1146,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                 }
             }
         }
-    }, [editId, customerList, formData.customerName, formData.customerId, formData.customerTypeId]);
+    }, [editId, initialFromQuotation, customerList, formData.customerName, formData.customerId, formData.customerTypeId]);
 
     const [items, setItems] = useState([
         { id: 1, name: '', basePromoName: '', qty: '', price: '', isPromo: false, promoType: '', promoMultiplier: 1, unit: 'ชิ้น', image: null, showDropdown: false }
@@ -1289,6 +1393,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
         depositAmount = grandTotal * (parseFloat(formData.depositPercent) || 0) / 100;
     }
     const remainingAmount = grandTotal - depositAmount;
+    const finalPayableTotal = (formData.showDepositInPrint && depositAmount > 0) ? remainingAmount : grandTotal;
 
     let compNameTH = '';
     let compNameEN = '';
@@ -1527,11 +1632,11 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                             #q-print-container .print-signature-table { width: 100%; border-collapse: collapse; border: 1px solid black; border-top: none; }
                         }
                     `}</style>
-                    <div className="view-only-controls" style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '20px', padding: '10px', background: '#f8fafc', borderRadius: '8px' }}>
-                        <button className="btn-back-text" type="button" onClick={onBack}>
+                    <div className="view-only-controls" style={{ display: 'flex', gap: '10px', justifyContent: 'center', maxWidth: '210mm', margin: '0 auto 20px auto', padding: '10px 16px', background: '#ffffff', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                        <button className="btn-back-text" type="button" onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#f8fafc', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: '#475569' }}>
                             <ArrowLeft size={16} /> กลับไปหน้ารายการ
                         </button>
-                        <button className="btn-primary" type="button" onClick={handlePrint}>
+                        <button className="btn-primary" type="button" onClick={handlePrint} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 20px', borderRadius: '6px', border: 'none', background: '#10b981', color: '#ffffff', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
                             <Printer size={16} /> พิมพ์ใบวางบิล/ใบแจ้งหนี้
                         </button>
                     </div>
@@ -2273,27 +2378,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                             ))}
                                         </CustomSelect>
                             </div>
-                            <div className="form-group" style={{ flex: 1 }}>
-                                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span>เงื่อนไขการหักมัดจำ</span>
-                                    <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 'normal', color: '#94a3b8', margin: 0 }}>
-                                        <input type="checkbox" name="showDepositInPrint" checked={formData.showDepositInPrint} onChange={handleFormChange} style={{ width: '14px', height: '14px', margin: 0, cursor: 'pointer' }} />
-                                        แสดงในพิมพ์
-                                    </label>
-                                </label>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <CustomSelect name="depositPercent" value={formData.depositPercent} onChange={handleFormChange} style={{ flex: 1 }}>
-                                        <option value="0">-- ไม่มีมัดจำ --</option>
-                                        <option value="30">มัดจำ 30%</option>
-                                        <option value="40">มัดจำ 40%</option>
-                                        <option value="50">มัดจำ 50%</option>
-                                        <option value="custom">ระบุเอง</option>
-                                    </CustomSelect>
-                                    {formData.depositPercent === 'custom' && (
-                                        <input type="number" name="customDepositAmount" placeholder="ระบุเงิน" value={formData.customDepositAmount} onChange={handleFormChange} style={{ flex: 1 }} min="0" />
-                                    )}
-                                </div>
-                            </div>
+                            
                         </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label>หมายเหตุ (ข้อความนี้จะแสดงท้ายบิล สามารถแก้ไขข้อความได้เลย)</label>
@@ -2330,7 +2415,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                             <div className="payment-row">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span className="label">ส่วนลด / Discount</span>
-                                    <CustomSelect name="discountPercent" value={formData.discountPercent} onChange={handleFormChange} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: '#fff' }}>
+                                    <CustomSelect name="discountPercent" usePortal={true} value={formData.discountPercent} onChange={handleFormChange} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: '#fff' }}>
                                         {[...Array(101)].map((_, i) => <option key={i} value={i}>{i}%</option>)}
                                     </CustomSelect>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
@@ -2354,7 +2439,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                         <div className="payment-row">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span className="label">ภาษีมูลค่าเพิ่ม (VAT)</span>
-                                <CustomSelect name="vatRate" value={isFda ? '7' : formData.vatRate} onChange={handleFormChange} disabled={isFda} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: isFda ? '#f1f5f9' : '#fff', cursor: isFda ? 'not-allowed' : 'pointer' }}>
+                                <CustomSelect name="vatRate" usePortal={true} value={isFda ? '7' : formData.vatRate} onChange={handleFormChange} disabled={isFda} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: isFda ? '#f1f5f9' : '#fff', cursor: isFda ? 'not-allowed' : 'pointer' }}>
                                     <option value="0">0%</option>
                                     <option value="7">7%</option>
                                 </CustomSelect>
@@ -2402,24 +2487,53 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                             </div>
                         )}
 
+                        {/* Deposit / หักมัดจำ */}
+                        {!isFda && (
+                            <div className="payment-row">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span className="label">หักมัดจำ / Deposit</span>
+                                    <CustomSelect name="depositPercent" usePortal={true} value={formData.depositPercent} onChange={handleFormChange} style={{ width: formData.depositPercent === 'custom' ? '76px' : '65px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: '#fff' }}>
+                                        <option value="0">0%</option>
+                                        <option value="30">30%</option>
+                                        <option value="40">40%</option>
+                                        <option value="50">50%</option>
+                                        <option value="custom">ระบุเอง</option>
+                                    </CustomSelect>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                        <input type="checkbox" name="showDepositInPrint" checked={formData.showDepositInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0, cursor: 'pointer' }} />
+                                        แสดงในบิล
+                                    </label>
+                                </div>
+                                {formData.depositPercent === 'custom' ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <input type="number" name="customDepositAmount" placeholder="0" value={formData.customDepositAmount} onChange={handleFormChange} style={{ width: '80px', textAlign: 'right', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '13px', background: '#fff' }} min="0" />
+                                        <span className="value" style={{ fontWeight: 'normal' }}>บาท</span>
+                                    </div>
+                                ) : (
+                                    <span className="value" style={{ color: depositAmount > 0 ? '#ef4444' : '#1e293b' }}>
+                                        {depositAmount > 0 ? '-' : ''}{depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         {/* Grand Total */}
                         <div className="grand-total-highlight">
                             <span className="gt-label">ยอดเงินสุทธิ / Grand Total</span>
-                            <span className="gt-value">{grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            <span className="gt-value">{finalPayableTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
                         </div>
+                        {formData.showDepositInPrint && depositAmount > 0 && (
+                            <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'right', marginTop: '-6px', marginBottom: '8px' }}>
+                                (ยอดรวมก่อนหักมัดจำ: {grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท)
+                            </div>
+                        )}
 
-                        {/* Deposit */}
+                        {/* Deposit Breakdown */}
                         {!isFda && depositAmount > 0 && (
-                            <>
-                                <div className="payment-row" style={{ borderTop: '1px dashed #ffb74d', marginTop: '10px' }}>
-                                    <span className="label">ยอดชำระมัดจำ {formData.depositPercent !== 'custom' && formData.depositPercent !== '0' ? `(${formData.depositPercent}%)` : ''}</span>
-                                    <span className="value" style={{ color: '#f59e0b' }}>{depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                                </div>
-                                <div className="payment-row" style={{ borderBottom: 'none' }}>
-                                    <span className="label">ยอดคงเหลือที่ต้องชำระ</span>
-                                    <span className="value" style={{ color: '#10b981' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                                </div>
-                            </>
+                            <div className="payment-row" style={{ borderTop: '1px dashed #ffb74d', marginTop: '6px', borderBottom: 'none' }}>
+                                <span className="label" style={{ color: '#059669', fontWeight: 'bold' }}>ยอดคงเหลือที่ต้องชำระ</span>
+                                <span className="value" style={{ color: '#059669', fontWeight: 'bold' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            </div>
                         )}
                     </div>
 
@@ -2790,7 +2904,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                 <span style={{ fontWeight: 'bold' }}>{isEn ? 'Address :' : 'ที่อยู่ :'}</span>
                             </td>
                             <td style={{ borderRight: '1px solid black', borderTop: 'none', padding: '2px 8px', verticalAlign: 'top' }}>
-                                <FormattedAddress data={formData} style={{ fontWeight: 'normal' }} />
+                                <FormattedAddress data={formData} isEn={isEn} style={{ fontWeight: 'normal' }} />
                             </td>
                             <td style={{ borderTop: 'none', padding: '2px 8px', verticalAlign: 'top' }}>
                                 <span style={{ fontWeight: 'bold' }}>{isEn ? 'Date :' : 'วันที่/Date :'}</span> <span style={{ marginLeft: '5px', fontWeight: 'normal' }}>{formatDate(formData.billDate)}</span>
@@ -2865,10 +2979,10 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                 <td style={{ border: '1px solid black', textAlign: 'center', padding: '2px 4px' }}>
                                     {item.image && <img src={item.image} style={{ maxWidth: imgSize, maxHeight: imgSize, objectFit: 'contain' }} alt="pic" />}
                                 </td>
-                                <td style={{ border: '1px solid black', textAlign: 'left', padding: '2px 8px' }}>{item.name}</td>
+                                <td style={{ border: '1px solid black', textAlign: 'left', padding: '2px 8px' }}>{isEn ? translateProductToEN(item.name) : item.name}</td>
                                 {!isFda && (
                                     <>
-                                        <td style={{ border: '1px solid black', textAlign: 'center', padding: '2px 4px' }}>{item.qty ? `${Number(item.qty).toLocaleString('th-TH')} ${item.unit || 'ชิ้น'}` : ''}</td>
+                                        <td style={{ border: '1px solid black', textAlign: 'center', padding: '2px 4px' }}>{item.qty ? `${Number(item.qty).toLocaleString('th-TH')} ${isEn ? translateUnitToEN(item.unit || 'ชิ้น', item.qty) : (item.unit || 'ชิ้น')}` : ''}</td>
                                         <td style={{ border: '1px solid black', textAlign: 'right', padding: '2px 8px' }}>{(parseFloat(item.price)||0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
                                         <td style={{ border: '1px solid black', textAlign: 'right', padding: '2px 8px' }}>{
                                             ((item.isPromo || item.promoType) 
@@ -3027,8 +3141,8 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                             <>
                             <tr>
                                 <td className="print-color-red" style={{ fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderRight: '1px solid black', borderBottom: '1px solid black', padding: '5px', color: 'red' }}>
-                                    {isEn ? `DEPOSIT ${formData.depositPercent !== 'custom' ? `(${formData.depositPercent}%)` : ''}` : `ยอดชำระมัดจำ ${formData.depositPercent !== 'custom' ? `(${formData.depositPercent}%)` : ''}`}<br/>
-                                    {!isEn && <span className="print-color-red" style={{ fontSize: '10pt', fontWeight: 'normal', color: 'red' }}>DEPOSIT</span>}
+                                    {isEn ? `LESS DEPOSIT ${formData.depositPercent !== 'custom' ? `(${formData.depositPercent}%)` : ''}` : `หักเงินมัดจำ ${formData.depositPercent !== 'custom' ? `(${formData.depositPercent}%)` : ''}`}<br/>
+                                    {!isEn && <span className="print-color-red" style={{ fontSize: '10pt', fontWeight: 'normal', color: 'red' }}>LESS DEPOSIT</span>}
                                 </td>
                                 <td className="print-color-red" style={{ textAlign: 'right', fontWeight: 'normal', borderBottom: '1px solid black', padding: '5px', paddingRight: '10px', color: 'red' }}>
                                     <span className="print-color-red" style={{ fontWeight: 'normal', color: 'red' }}>{depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})}</span>
@@ -3048,14 +3162,14 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
 
                         <tr>
                             <td className="print-bg-gray" style={{ width: '60%', textAlign: 'center', fontWeight: 'bold', fontSize: '13pt', backgroundColor: '#e6e6e6', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', borderBottom: '1px solid black', borderRight: '1px solid black', padding: '5px' }}>
-                                {isEn ? '-' : ThaiBaht(grandTotal)}
+                                {isEn ? numberToEnglishWords(finalPayableTotal) : ThaiBaht(finalPayableTotal)}
                             </td>
                             <td className="print-bg-gray" style={{ width: '26%', fontWeight: 'bold', textAlign: 'right', paddingRight: '10px', borderRight: '1px solid black', borderBottom: '1px solid black', backgroundColor: '#e6e6e6', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', padding: '5px' }}>
                                 {isEn ? 'GRAND TOTAL' : 'จำนวนเงินรวมทั้งสิ้น'}<br/>
                                 {!isEn && <span style={{ fontSize: '10pt', fontWeight: 'normal' }}>GRAND TOTAL</span>}
                             </td>
                             <td className="print-bg-gray" style={{ width: '14%', textAlign: 'right', fontWeight: 'bold', textDecoration: 'underline', backgroundColor: '#e6e6e6', WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact', borderBottom: '1px solid black', padding: '5px', paddingRight: '10px' }}>
-                                {grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})}
+                                {finalPayableTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})}
                             </td>
                         </tr>
                     </tbody>
@@ -3075,7 +3189,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                     <div style={{ textAlign: 'center', fontSize: '10pt' }}>
                         <div style={{ height: '30px' }}></div>
                         <div>(..................................................)</div>
-                        <div style={{ marginTop: '2px' }}>ผู้รับวางบิล/ใบแจ้งหนี้</div>
+                        <div style={{ marginTop: '2px' }}>{isEn ? 'Received By' : 'ผู้รับวางบิล/ใบแจ้งหนี้'}</div>
                     </div>
                     <div style={{ textAlign: 'center', fontSize: '10pt' }}>
                         <div style={{ height: '30px', position: 'relative' }}>

@@ -22,7 +22,7 @@ const createQuotationSchema = z.object({
     customerTypeId: z.union([z.string(), z.number()]).nullable().optional(),
     customerName: z.string({ message: 'กรุณาระบุชื่อลูกค้า' }).min(1, 'กรุณาระบุชื่อลูกค้า'),
     contactPerson: z.string().nullable().optional(),
-    email: z.string().email('รูปแบบ email ไม่ถูกต้อง').nullable().optional(),
+    email: z.string().nullable().optional(),
     address: z.string().nullable().optional(),
     phone: z.string().max(50, 'เบอร์โทรยาวเกินไป').nullable().optional(),
     taxId: z.string().max(20, 'Tax ID ยาวเกินไป').nullable().optional(),

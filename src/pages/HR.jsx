@@ -1047,7 +1047,7 @@ function AttendanceTab({ hasSectionPermission }) {
                 body: JSON.stringify({ status: newStatus, approved_by: 'admin' }),
             });
             if (res.ok) { fetchLeaveRequests(); fetchAttendance(); fetchSummary(); }
-        } catch (err) { alert('เกิดข้อผิดพลาด'); }
+        } catch (err) { showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการอนุมัติใบลา', 'error'); }
     };
 
     // ── Helpers ──

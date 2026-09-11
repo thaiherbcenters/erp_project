@@ -22,6 +22,7 @@ export const formatDate = (dateStr) => {
 };
 
 export default function RevisionFormPage({ parentSub, onBack, currentUser, navigate }) {
+    const { showAlert, showConfirm } = useAlert();
     // Pre-fill form data จากฉบับเดิม
     let initialData = {};
     if (parentSub.form_data) {
@@ -45,11 +46,12 @@ export default function RevisionFormPage({ parentSub, onBack, currentUser, navig
 
     const handleSubmitRevision = async () => {
         if (!formData.applicant_name || !formData.department) {
-            alert('กรุณากรอกชื่อ-นามสกุล และแผนก ก่อนส่งเอกสาร');
+            showAlert('แจ้งเตือน', 'กรุณากรอกชื่อ-นามสกุล และแผนก ก่อนส่งเอกสาร', 'warning');
             return;
         }
 
-        if (!confirm('ยืนยันส่งเอกสารฉบับแก้ไขหรือไม่?')) return;
+        const confirmed = await showConfirm('ยืนยันการส่งเอกสาร', 'ยืนยันส่งเอกสารฉบับแก้ไขหรือไม่?', 'warning');
+        if (!confirmed) return;
 
         setIsSubmitting(true);
         try {
@@ -67,15 +69,15 @@ export default function RevisionFormPage({ parentSub, onBack, currentUser, navig
             });
             if (!response.ok) {
                 const err = await response.json();
-                alert('เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถส่งได้'));
+                showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถส่งได้'), 'error');
                 return;
             }
             const result = await response.json();
             setIsSubmitted(true);
-            alert(`✅ ${result.message}`);
+            await showAlert('สำเร็จ', result.message, 'success');
             onBack();
         } catch (err) {
-            alert('ไม่สามารถเชื่อมต่อกับ Server ได้: ' + err.message);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับ Server ได้: ' + err.message, 'error');
         } finally {
             setIsSubmitting(false);
         }

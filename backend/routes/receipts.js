@@ -352,9 +352,43 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
             }
         }
 
-        // ✅ Audit Log: สร้างใบเสนอราคา
-        await logAction(req, 'CREATE', 'billing-invoices', receiptId, 
-            `สร้างใบเสนอราคา ${finalReceiptNo} — ลูกค้า: ${customerName} — ยอดรวม: ${grandTotal}`);
+        // ✅ Auto-update Quotation deposit status if referencing quotation
+        if (notes) {
+            try {
+                const qtMatch = notes.match(/QT-\d{8}-\d{3}/i);
+                if (qtMatch) {
+                    const quotationNo = qtMatch[0];
+                    if (notes.includes('มัดจำ')) {
+                        await pool.request()
+                            .input('qno', sql.NVarChar, quotationNo)
+                            .input('paid', sql.Decimal(18, 2), grandTotal)
+                            .query(`
+                                UPDATE Quotation 
+                                SET DepositStatus = N'ชำระมัดจำแล้ว', 
+                                    PaidDepositAmount = @paid 
+                                WHERE QuotationNo = @qno
+                            `);
+                        console.log(`✅ Auto-updated Quotation ${quotationNo} DepositStatus to 'ชำระมัดจำแล้ว'`);
+                    } else if (notes.includes('ส่วนที่เหลือ') || notes.includes('ปิดยอด') || notes.includes('BI-')) {
+                        await pool.request()
+                            .input('qno', sql.NVarChar, quotationNo)
+                            .query(`
+                                UPDATE Quotation 
+                                SET DepositStatus = N'ชำระครบถ้วน', 
+                                    PaidDepositAmount = GrandTotal 
+                                WHERE QuotationNo = @qno
+                            `);
+                        console.log(`✅ Auto-updated Quotation ${quotationNo} DepositStatus to 'ชำระครบถ้วน'`);
+                    }
+                }
+            } catch (syncErr) {
+                console.error('⚠️ Warning syncing quotation deposit status:', syncErr.message);
+            }
+        }
+
+        // ✅ Audit Log: สร้างใบเสร็จรับเงิน
+        await logAction(req, 'CREATE', 'receipts', receiptId, 
+            `สร้างใบเสร็จรับเงิน ${finalReceiptNo} — ลูกค้า: ${customerName} — ยอดรวม: ${grandTotal}`);
 
         res.status(201).json({ success: true, message: 'Receipt created successfully', receiptId });
 

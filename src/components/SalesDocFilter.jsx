@@ -335,4 +335,599 @@ export const SalesDocFilterDrawer = ({
     );
 };
 
+export const AccountsARFilterDrawer = ({
+    isOpen,
+    onClose,
+    filter = {},
+    onFilterChange,
+    onReset,
+    onQuickDate,
+    usersList = []
+}) => {
+    if (!isOpen) return null;
+
+    const hasAnyFilter = Boolean(
+        filter.status ||
+        filter.billingStatus ||
+        filter.receiptStatus ||
+        filter.createdBy ||
+        filter.dateFrom ||
+        filter.dateTo
+    );
+
+    const activeCount = [
+        Boolean(filter.status),
+        Boolean(filter.billingStatus),
+        Boolean(filter.receiptStatus),
+        Boolean(filter.createdBy),
+        Boolean(filter.dateFrom || filter.dateTo)
+    ].filter(Boolean).length;
+
+    return (
+        <div className="filter-drawer card" style={{
+            padding: '16px 20px',
+            marginBottom: '18px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.05)',
+            animation: 'fadeIn 0.2s ease-in-out'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid #edf2f7', paddingBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                    <Filter size={16} color="#4f46e5" />
+                    <span>ตัวกรองขั้นสูง</span>
+                    {activeCount > 0 && (
+                        <span style={{
+                            background: '#e0e7ff',
+                            color: '#4338ca',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            padding: '2px 8px',
+                            borderRadius: '12px'
+                        }}>
+                            เลือกอยู่ {activeCount} เงื่อนไข
+                        </span>
+                    )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {hasAnyFilter && (
+                        <button
+                            type="button"
+                            onClick={onReset}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#ef4444',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                borderRadius: '6px'
+                            }}
+                        >
+                            ล้างตัวกรองทั้งหมด
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            width: '26px',
+                            height: '26px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#64748b',
+                            cursor: 'pointer'
+                        }}
+                        title="ปิดแผงตัวกรอง"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                {/* 1. สถานะมัดจำ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>สถานะมัดจำ</label>
+                    <CustomSelect
+                        value={filter.status || ''}
+                        onChange={(e) => onFilterChange('status', e.target.value)}
+                        usePortal={true}
+                        style={{
+                            width: '100%',
+                            minHeight: '38px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1'
+                        }}
+                    >
+                        <option value="">ทุกสถานะมัดจำ</option>
+                        <option value="รอมัดจำ">รอมัดจำ</option>
+                        <option value="ชำระมัดจำแล้ว">ชำระมัดจำแล้ว</option>
+                        <option value="ชำระครบถ้วน">ชำระครบถ้วน</option>
+                    </CustomSelect>
+                </div>
+
+                {/* 2. สถานะใบวางบิล */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>สถานะใบวางบิล</label>
+                    <CustomSelect
+                        value={filter.billingStatus || ''}
+                        onChange={(e) => onFilterChange('billingStatus', e.target.value)}
+                        usePortal={true}
+                        style={{
+                            width: '100%',
+                            minHeight: '38px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1'
+                        }}
+                    >
+                        <option value="">ทุกสถานะใบวางบิล</option>
+                        <option value="pending">รอออกใบวางบิล</option>
+                        <option value="completed">ออกใบวางบิลแล้ว</option>
+                    </CustomSelect>
+                </div>
+
+                {/* 3. สถานะใบเสร็จรับเงิน */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>สถานะใบเสร็จรับเงิน</label>
+                    <CustomSelect
+                        value={filter.receiptStatus || ''}
+                        onChange={(e) => onFilterChange('receiptStatus', e.target.value)}
+                        usePortal={true}
+                        style={{
+                            width: '100%',
+                            minHeight: '38px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1'
+                        }}
+                    >
+                        <option value="">ทุกสถานะใบเสร็จ</option>
+                        <option value="pending">ยังไม่ออกใบเสร็จ</option>
+                        <option value="deposit_paid">ออกใบเสร็จมัดจำแล้ว</option>
+                        <option value="fully_paid">ออกใบเสร็จปิดยอดแล้ว</option>
+                    </CustomSelect>
+                </div>
+
+                {/* 4. ฝ่ายขาย / ผู้สร้างเอกสาร */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>ฝ่ายขาย / ผู้สร้างเอกสาร</label>
+                    <CustomSelect
+                        value={filter.createdBy || ''}
+                        onChange={(e) => onFilterChange('createdBy', e.target.value)}
+                        usePortal={true}
+                        style={{
+                            width: '100%',
+                            minHeight: '38px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1'
+                        }}
+                    >
+                        <option value="">ผู้สร้างทั้งหมด</option>
+                        {usersList.map((u) => {
+                            const uid = String(u.id || u.user_id);
+                            const name = u.displayName || u.display_name || u.username;
+                            const dept = u.department ? ` (${u.department})` : '';
+                            return (
+                                <option key={uid} value={uid}>
+                                    {name}{dept}
+                                </option>
+                            );
+                        })}
+                    </CustomSelect>
+                </div>
+
+                {/* 5. ช่วงวันที่ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Calendar size={13} color="#64748b" />
+                        <span>ช่วงวันที่ (จาก - ถึง)</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CustomDatePicker
+                            value={filter.dateFrom || ''}
+                            onChange={(e) => onFilterChange('dateFrom', e.target.value)}
+                            placeholderText="จากวันที่"
+                            style={{ width: '100%', flex: 1 }}
+                        />
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>-</span>
+                        <CustomDatePicker
+                            value={filter.dateTo || ''}
+                            onChange={(e) => onFilterChange('dateTo', e.target.value)}
+                            placeholderText="ถึงวันที่"
+                            style={{ width: '100%', flex: 1 }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* ปุ่มลัดช่วงวันที่ */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #edf2f7', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>ลัดเลือกวันที่:</span>
+                <button
+                    type="button"
+                    style={{
+                        height: '28px',
+                        padding: '0 10px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#334155'
+                    }}
+                    onClick={() => onQuickDate('today')}
+                >
+                    วันนี้
+                </button>
+                <button
+                    type="button"
+                    style={{
+                        height: '28px',
+                        padding: '0 10px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#334155'
+                    }}
+                    onClick={() => onQuickDate('7days')}
+                >
+                    7 วันล่าสุด
+                </button>
+                <button
+                    type="button"
+                    style={{
+                        height: '28px',
+                        padding: '0 10px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#334155'
+                    }}
+                    onClick={() => onQuickDate('thisMonth')}
+                >
+                    เดือนนี้
+                </button>
+                {(filter.dateFrom || filter.dateTo) && (
+                    <button
+                        type="button"
+                        style={{
+                            height: '28px',
+                            padding: '0 8px',
+                            fontSize: '11px',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#ef4444'
+                        }}
+                        onClick={() => {
+                            onFilterChange('dateFrom', '');
+                            onFilterChange('dateTo', '');
+                        }}
+                    >
+                        ล้างวันที่
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export const ProcurementPOFilterDrawer = ({
+    isOpen,
+    onClose,
+    filter = {},
+    onFilterChange,
+    onReset,
+    onQuickDate,
+    suppliersList = [],
+    usersList = [],
+    statusOptions = [
+        'รออนุมัติ',
+        'อนุมัติแล้ว',
+        'สั่งซื้อแล้ว',
+        'รอเตรียมจัดส่ง',
+        'กำลังจัดส่ง',
+        'รับสินค้าแล้ว',
+        'ยกเลิก'
+    ]
+}) => {
+    if (!isOpen) return null;
+
+    const hasAnyFilter = Boolean(
+        filter.status ||
+        filter.supplierId ||
+        filter.createdBy ||
+        filter.dateFrom ||
+        filter.dateTo
+    );
+
+    const activeCount = [
+        Boolean(filter.status),
+        Boolean(filter.supplierId),
+        Boolean(filter.createdBy),
+        Boolean(filter.dateFrom || filter.dateTo)
+    ].filter(Boolean).length;
+
+    return (
+        <div className="filter-drawer card" style={{
+            padding: '16px 20px',
+            marginBottom: '18px',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px -2px rgba(0, 0, 0, 0.05)',
+            animation: 'fadeIn 0.2s ease-in-out'
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid #edf2f7', paddingBottom: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                    <Filter size={16} color="#4f46e5" />
+                    <span>ตัวกรองขั้นสูง</span>
+                    {activeCount > 0 && (
+                        <span style={{
+                            background: '#e0e7ff',
+                            color: '#4338ca',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            padding: '2px 8px',
+                            borderRadius: '12px'
+                        }}>
+                            เลือกอยู่ {activeCount} เงื่อนไข
+                        </span>
+                    )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {hasAnyFilter && (
+                        <button
+                            type="button"
+                            onClick={onReset}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#ef4444',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                borderRadius: '6px'
+                            }}
+                        >
+                            ล้างตัวกรองทั้งหมด
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            width: '26px',
+                            height: '26px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#64748b',
+                            cursor: 'pointer'
+                        }}
+                        title="ปิดแผงตัวกรอง"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                {/* 1. สถานะใบสั่งซื้อ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>สถานะใบสั่งซื้อ</label>
+                    <CustomSelect
+                        value={filter.status || ''}
+                        onChange={(e) => onFilterChange('status', e.target.value)}
+                        usePortal={true}
+                        style={{
+                            width: '100%',
+                            minHeight: '38px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1'
+                        }}
+                    >
+                        <option value="">ทุกสถานะ</option>
+                        {statusOptions.map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                        ))}
+                    </CustomSelect>
+                </div>
+
+                {/* 2. ซัพพลายเออร์ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>ซัพพลายเออร์</label>
+                    <CustomSelect
+                        value={filter.supplierId || ''}
+                        onChange={(e) => onFilterChange('supplierId', e.target.value)}
+                        usePortal={true}
+                        searchable={true}
+                        placeholder="พิมพ์ค้นหา หรือเลือกซัพพลายเออร์..."
+                        style={{
+                            width: '100%',
+                            minHeight: '38px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1'
+                        }}
+                    >
+                        <option value="">ซัพพลายเออร์ทั้งหมด</option>
+                        {suppliersList.map((s) => (
+                            <option key={s.SupplierID} value={String(s.SupplierID)}>
+                                {s.SupplierName}
+                            </option>
+                        ))}
+                    </CustomSelect>
+                </div>
+
+                {/* 3. ผู้สร้างเอกสาร */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>ผู้สร้างเอกสาร</label>
+                    <CustomSelect
+                        value={filter.createdBy || ''}
+                        onChange={(e) => onFilterChange('createdBy', e.target.value)}
+                        usePortal={true}
+                        searchable={true}
+                        placeholder="พิมพ์ค้นหา หรือเลือกผู้สร้าง..."
+                        style={{
+                            width: '100%',
+                            minHeight: '38px',
+                            borderRadius: '8px',
+                            fontSize: '13px',
+                            background: '#ffffff',
+                            border: '1px solid #cbd5e1'
+                        }}
+                    >
+                        <option value="">ผู้สร้างทั้งหมด</option>
+                        {usersList.map((u) => {
+                            const uid = String(u.id || u.user_id);
+                            const name = u.displayName || u.display_name || u.username;
+                            const dept = u.department ? ` (${u.department})` : '';
+                            return (
+                                <option key={uid} value={uid}>
+                                    {name}{dept}
+                                </option>
+                            );
+                        })}
+                    </CustomSelect>
+                </div>
+
+                {/* 4. ช่วงวันที่สั่งซื้อ */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={{ fontSize: '12px', color: '#475569', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Calendar size={13} color="#64748b" />
+                        <span>ช่วงวันที่สั่งซื้อ (จาก - ถึง)</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CustomDatePicker
+                            value={filter.dateFrom || ''}
+                            onChange={(e) => onFilterChange('dateFrom', e.target.value)}
+                            placeholderText="จากวันที่"
+                            style={{ width: '100%', flex: 1 }}
+                        />
+                        <span style={{ fontSize: '12px', color: '#94a3b8' }}>-</span>
+                        <CustomDatePicker
+                            value={filter.dateTo || ''}
+                            onChange={(e) => onFilterChange('dateTo', e.target.value)}
+                            placeholderText="ถึงวันที่"
+                            style={{ width: '100%', flex: 1 }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* ปุ่มลัดช่วงวันที่ */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #edf2f7', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 500 }}>ลัดเลือกวันที่:</span>
+                <button
+                    type="button"
+                    style={{
+                        height: '28px',
+                        padding: '0 10px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#334155'
+                    }}
+                    onClick={() => onQuickDate('today')}
+                >
+                    วันนี้
+                </button>
+                <button
+                    type="button"
+                    style={{
+                        height: '28px',
+                        padding: '0 10px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#334155'
+                    }}
+                    onClick={() => onQuickDate('7days')}
+                >
+                    7 วันล่าสุด
+                </button>
+                <button
+                    type="button"
+                    style={{
+                        height: '28px',
+                        padding: '0 10px',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        background: '#ffffff',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        color: '#334155'
+                    }}
+                    onClick={() => onQuickDate('thisMonth')}
+                >
+                    เดือนนี้
+                </button>
+                {(filter.dateFrom || filter.dateTo) && (
+                    <button
+                        type="button"
+                        style={{
+                            height: '28px',
+                            padding: '0 8px',
+                            fontSize: '11px',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: '#ef4444'
+                        }}
+                        onClick={() => {
+                            onFilterChange('dateFrom', '');
+                            onFilterChange('dateTo', '');
+                        }}
+                    >
+                        ล้างวันที่
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
 export default SalesDocFilterDrawer;
+

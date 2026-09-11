@@ -99,10 +99,8 @@ router.get('/next-number', async (req, res) => {
         const pool = await poolPromise;
         const docType = req.query.docType || 'delivery_order_thc';
         
-        // Determine prefix based on docType
-        let prefix = 'DO-';
-        if (docType.includes('psf')) prefix = 'DO-PSF-';
-        else if (docType.includes('elt')) prefix = 'DO-ELT-';
+        // Determine prefix based on docType (ใช้ IV แทน DO โดยตรง ไม่ต้องใส่ชื่อบริษัทตามหลัง)
+        const prefix = 'IV';
         
         const datePrefix = getDatePrefix();
         const fullPrefix = `${prefix}${datePrefix}`;
@@ -191,10 +189,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createDeliveryOrderS
 
         const request = new sql.Request(transaction);
 
-        // Generate DeliveryOrder Number
-        let prefix = 'DO-';
-        if (docType && docType.includes('psf')) prefix = 'DO-PSF-';
-        else if (docType && docType.includes('elt')) prefix = 'DO-ELT-';
+        // Generate DeliveryOrder Number (ใช้ IV แทน DO โดยตรง ไม่ต้องใส่ชื่อบริษัทตามหลัง)
+        const prefix = 'IV';
         const defaultDoPrefix = `${prefix}${getDatePrefix()}`;
 
         let finalDeliveryOrderNo = deliveryOrderNo;

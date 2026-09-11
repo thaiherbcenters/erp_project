@@ -304,6 +304,13 @@ export const ALL_PAGES = [
           { id: 'procurement_recv_table', name: 'ตารางรับสินค้าเข้าคลัง' },
         ],
       },
+      {
+        id: 'procurement_supplier', name: 'ทะเบียนผู้ขาย (Suppliers)',
+        sections: [
+          { id: 'procurement_supplier_search', name: 'ค้นหาผู้ขาย' },
+          { id: 'procurement_supplier_table', name: 'ตารางผู้ขาย' },
+        ],
+      },
     ],
   },
 

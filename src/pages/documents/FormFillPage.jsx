@@ -86,11 +86,12 @@ export default function FormFillPage({ doc, onBack }) {
     // ── ฟังก์ชันส่งเอกสาร ──
     const handleSubmit = async () => {
         if (!formData.applicant_name || !formData.department) {
-            alert('กรุณากรอกชื่อ-นามสกุล และแผนก ก่อนส่งเอกสาร');
+            showAlert('แจ้งเตือน', 'กรุณากรอกชื่อ-นามสกุล และแผนก ก่อนส่งเอกสาร', 'warning');
             return;
         }
 
-        if (!confirm('ยืนยันส่งเอกสารเพื่อขออนุมัติหรือไม่?')) return;
+        const confirmed = await showConfirm('ยืนยันการส่งเอกสาร', 'ยืนยันส่งเอกสารเพื่อขออนุมัติหรือไม่?', 'warning');
+        if (!confirmed) return;
 
         setIsSubmitting(true);
         try {
@@ -107,14 +108,14 @@ export default function FormFillPage({ doc, onBack }) {
             });
             if (!response.ok) {
                 const err = await response.json();
-                alert('เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถส่งได้'));
+                showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถส่งได้'), 'error');
                 return;
             }
             setIsSubmitted(true);
-            alert('✅ ส่งเอกสารเรียบร้อยแล้ว! ระบบกำลังพาไปหน้า DAR เพื่อดูสถานะ');
+            await showAlert('สำเร็จ', 'ส่งเอกสารเรียบร้อยแล้ว! ระบบกำลังพาไปหน้า DAR เพื่อดูสถานะ', 'success');
             navigate('?tab=document_request');
         } catch (err) {
-            alert('ไม่สามารถเชื่อมต่อกับ Server ได้: ' + err.message);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับ Server ได้: ' + err.message, 'error');
         } finally {
             setIsSubmitting(false);
         }
@@ -177,7 +178,7 @@ export default function FormFillPage({ doc, onBack }) {
 
             if (!response.ok) {
                 const err = await response.json();
-                alert('เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถสร้าง PDF ได้'));
+                showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาด: ' + (err.message || 'ไม่สามารถสร้าง PDF ได้'), 'error');
                 return;
             }
 
@@ -186,7 +187,7 @@ export default function FormFillPage({ doc, onBack }) {
             setPreviewUrl(url);
             setShowPreview(true);
         } catch (err) {
-            alert('ไม่สามารถเชื่อมต่อกับ Server ได้: ' + err.message);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อกับ Server ได้: ' + err.message, 'error');
         } finally {
             setIsLoadingPreview(false);
         }

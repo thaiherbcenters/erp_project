@@ -51,11 +51,17 @@ export function useSignatures() {
         return signatures.filter(s => s.user_id == currentUser.id);
     }, [currentUser, signatures]);
 
+    // ลายเซ็นผู้มีอำนาจลงนาม / เจ้านาย (ธวัช จรุงพิรวงศ์ หรือที่ไม่มี user_id ผูก)
+    const bossSignatures = useMemo(() => {
+        if (signatures.length === 0) return [];
+        return signatures.filter(s => s.KeyName === 'thawat' || (s.FullName && s.FullName.includes('ธวัช')) || !s.user_id);
+    }, [signatures]);
+
     const defaultSignerKey = useMemo(() => {
         if (!currentUser || signatures.length === 0) return null;
         const userSig = signatures.find(s => s.user_id == currentUser.id);
         return userSig ? userSig.KeyName : null;
     }, [currentUser, signatures]);
 
-    return { signatures, userSignatures, loading, error, getSignatureUrl, defaultSignerKey };
+    return { signatures, userSignatures, bossSignatures, loading, error, getSignatureUrl, defaultSignerKey };
 }

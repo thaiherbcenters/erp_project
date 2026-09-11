@@ -22,6 +22,7 @@ import PermissionManager from './PermissionManager';
 import TemplateUploader from '../components/TemplateUploader';
 import SignatureManager from '../components/SignatureManager';
 import CustomDatePicker from '../components/CustomDatePicker';
+import { useAlert } from '../components/CustomAlert';
 import './Settings.css';
 import API_BASE from '../config';import CustomSelect from '../components/CustomSelect';
 
@@ -120,7 +121,7 @@ export default function Settings() {
 // =============================================================================
 // Users Tab
 // =============================================================================
-function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); 
+function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); const { showConfirm } = useAlert(); 
     const [users, setUsers] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [roles, setRoles] = useState([]);
@@ -167,7 +168,8 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
     };
 
     const handleDelete = async (user) => {
-        if (!confirm(`ต้องการลบ "${user.displayName}" หรือไม่? การลบนี้ไม่สามารถยกเลิกได้`)) return;
+        const confirmed = await showConfirm('ยืนยันการลบผู้ใช้งาน', `ต้องการลบ "${user.displayName}" หรือไม่? การลบนี้ไม่สามารถยกเลิกได้`, 'warning');
+        if (!confirmed) return;
         try {
             const res = await fetch(`${API}/users/${user.id}`, { method: 'DELETE' });
             const data = await res.json();
@@ -340,7 +342,7 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
 // =============================================================================
 // Departments Tab
 // =============================================================================
-function DepartmentsTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); 
+function DepartmentsTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); const { showConfirm } = useAlert(); 
     const [departments, setDepartments] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
@@ -382,7 +384,8 @@ function DepartmentsTab({ showToast }) { const { canCreate, canUpdate, canDelete
     };
 
     const handleDelete = async (dept) => {
-        if (!confirm(`ต้องการลบแผนก "${dept.dept_name}" หรือไม่?`)) return;
+        const confirmed = await showConfirm('ยืนยันการลบแผนก', `ต้องการลบแผนก "${dept.dept_name}" หรือไม่?`, 'warning');
+        if (!confirmed) return;
         try {
             const res = await fetch(`${API}/departments/${dept.dept_id}`, { method: 'DELETE' });
             const data = await res.json();
@@ -524,7 +527,7 @@ function GeneralTab() {
 // =============================================================================
 // Roles Tab
 // =============================================================================
-function RolesTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); 
+function RolesTab({ showToast }) { const { canCreate, canUpdate, canDelete } = useAuth(); const { showConfirm } = useAlert(); 
     const [roles, setRoles] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [search, setSearch] = useState('');
@@ -567,7 +570,8 @@ function RolesTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
     };
 
     const handleDelete = async (role) => {
-        if (!confirm(`ต้องการลบตำแหน่ง "${role.role_name}" หรือไม่?`)) return;
+        const confirmed = await showConfirm('ยืนยันการลบตำแหน่ง', `ต้องการลบตำแหน่ง "${role.role_name}" หรือไม่?`, 'warning');
+        if (!confirmed) return;
         try {
             const res = await fetch(`${API}/roles/${role.role_id}`, { method: 'DELETE' });
             const data = await res.json();

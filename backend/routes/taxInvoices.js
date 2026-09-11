@@ -99,10 +99,8 @@ router.get('/next-number', async (req, res) => {
         const pool = await poolPromise;
         const docType = req.query.docType || 'tax_invoice_thc';
         
-        // Determine prefix based on docType
-        let prefix = 'IV';
-        if (docType.includes('psf')) prefix = 'IV-PSF';
-        else if (docType.includes('elt')) prefix = 'IV-ELT';
+        // Determine prefix based on docType (ใช้ IV โดยตรง ไม่ต้องใส่ชื่อบริษัทตามหลัง)
+        const prefix = 'IV';
         
         const datePrefix = getDatePrefix();
         const fullPrefix = `${prefix}${datePrefix}`;
@@ -191,10 +189,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createTaxInvoiceSche
 
         const request = new sql.Request(transaction);
 
-        // Generate TaxInvoice Number
-        let prefix = 'IV';
-        if (docType && docType.includes('psf')) prefix = 'IV-PSF';
-        else if (docType && docType.includes('elt')) prefix = 'IV-ELT';
+        // Generate TaxInvoice Number (ใช้ IV โดยตรง ไม่ต้องใส่ชื่อบริษัทตามหลัง)
+        const prefix = 'IV';
         const defaultIvPrefix = `${prefix}${getDatePrefix()}`;
 
         let finalTaxInvoiceNo = taxInvoiceNo;

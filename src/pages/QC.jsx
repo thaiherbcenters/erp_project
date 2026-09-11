@@ -43,7 +43,7 @@ const formatDynamicBatchSize = (ingredients) => {
 export default function QC() {
     const { currentUser, canCreate, canUpdate, canDelete, hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
     const { qcRequests, submitQcResult, getPendingQcRequests } = useProduction();
-    const { showAlert } = useAlert();
+    const { showAlert, showConfirm } = useAlert();
     const visibleSubPages = getVisibleSubPages('qc');
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'qc_dashboard';
@@ -286,7 +286,8 @@ export default function QC() {
     };
 
     const handleDeleteCriteriaRow = async (id) => {
-        if(!window.confirm('ต้องการลบหัวข้อตรวจนี้ใช่หรือไม่?')) return;
+        const confirmed = await showConfirm('ยืนยันการลบ', 'ต้องการลบหัวข้อตรวจนี้ใช่หรือไม่?', 'warning');
+        if (!confirmed) return;
         try {
             const res = await fetch(`${API_BASE}/qc/criteria/${id}`, { method: 'DELETE' });
             if (res.ok) {

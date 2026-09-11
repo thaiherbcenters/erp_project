@@ -1,8 +1,8 @@
 import React from 'react';
 import { getAddressParts } from '../utils/formatters';
 
-export default function FormattedAddress({ data, className = '', style = {} }) {
-    const parts = getAddressParts(data);
+export default function FormattedAddress({ data, isEn = false, className = '', style = {} }) {
+    const parts = getAddressParts(data, isEn);
     if (!parts || parts.length === 0) return <span className={className} style={style}>-</span>;
 
     return (

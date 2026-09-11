@@ -5,11 +5,12 @@ import API_BASE from '../config';
 import CustomDatePicker from '../components/CustomDatePicker';
 import TaxIdInput from '../components/TaxIdInput';
 import CustomSelect from './CustomSelect';
+import BankAccountSelect, { getPinnedBankAccount } from './BankAccountSelect';
 import ContractSelectorModal from './ContractSelectorModal';
 import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
-import { formatFullAddress } from '../utils/formatters';
+import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN } from '../utils/formatters';
 import FormattedAddress from './FormattedAddress';
 import '../pages/PageCommon.css';
 
@@ -209,6 +210,10 @@ const styles = `
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 14px;
+}
+
+.form-row > * {
+    min-width: 0;
 }
 
 /* Products Section */
@@ -506,10 +511,10 @@ const styles = `
         display: block !important;
         overflow: visible !important;
         border: none !important;
-        visibility: visible;
+        visibility: visible !important;
     }
     .pdf-preview-overlay * {
-        visibility: visible;
+        visibility: visible !important;
     }
     
     /* Unclip inner containers */
@@ -781,7 +786,7 @@ const PRODUCT_IMAGES = {
 
 const DEFAULT_UNITS = ['ชิ้น', 'กิโลกรัม', 'กรัม', 'กระปุก', 'ขวด', 'ถุง', 'ซอง', 'หลอด', 'กล่อง', 'แผง', 'ขวด(โหล)', 'โหล'];
 
-export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistory }) {
+export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistory, initialFromQuotation }) {
     const { signatures: availableSignatures, userSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
     const { showConfirm, showAlert, showPrompt } = useAlert();
     const [status, setStatus] = useState(null);
@@ -820,7 +825,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
 
     const [formData, setFormData] = useState({
         docType: 'delivery_order_thc', // delivery_order_thc, delivery_order_psf, delivery_order_elt, delivery_order_thc
-        billStatus: 'ktb',
+        billStatus: getPinnedBankAccount('delivery_order_thc'),
         billNo: '',
         billDate: new Date().toISOString().split('T')[0],
         printLanguage: 'TH', // TH or EN
@@ -887,7 +892,9 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             const isFda = formData.docType && formData.docType.includes('fda');
             const storageKey = `TemplateNotes_Receipt_${isFda ? 'FDA' : 'Normal'}`;
             const defaultNotes = isFda ? DEFAULT_FDA_NOTES : DEFAULT_NORMAL_NOTES;
-            setFormData(prev => ({ ...prev, notes: localStorage.getItem(storageKey) || defaultNotes }));
+            if (!initialFromQuotation) {
+                setFormData(prev => ({ ...prev, notes: localStorage.getItem(storageKey) || defaultNotes }));
+            }
 
             // Fetch next bill number from API
             const fetchNextNo = async () => {
@@ -903,7 +910,56 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             };
             fetchNextNo();
         }
-    }, [formData.docType, editId]);
+    }, [formData.docType, editId, initialFromQuotation]);
+
+    useEffect(() => {
+        if (!editId && initialFromQuotation) {
+            const qData = initialFromQuotation;
+            const parsedAddr = parseAddressToSplit(qData.address || '');
+
+            setFormData(prev => ({
+                ...prev,
+                docType: qData.docType || prev.docType,
+                billStatus: qData.bankAccount || prev.billStatus,
+                contractId: qData.contractId || '',
+                customerId: qData.customerId || '',
+                customerName: qData.customerName || '',
+                address: qData.address || '',
+                ...parsedAddr,
+                phone: qData.phone || '',
+                taxId: qData.taxId || '',
+                notes: qData.notes || prev.notes,
+                vatRate: qData.vatRate !== undefined ? Number(qData.vatRate) : prev.vatRate,
+                showVatInPrint: qData.showVatInPrint !== undefined ? !!qData.showVatInPrint : prev.showVatInPrint,
+                discountPercent: qData.discountPercent !== undefined ? Number(qData.discountPercent) : prev.discountPercent,
+                showDiscountInPrint: qData.showDiscountInPrint !== undefined ? !!qData.showDiscountInPrint : prev.showDiscountInPrint,
+                shippingCost: qData.shippingCost !== undefined ? qData.shippingCost : prev.shippingCost,
+                showShippingInPrint: qData.showShippingInPrint !== undefined ? !!qData.showShippingInPrint : prev.showShippingInPrint,
+                designFee: qData.designFee !== undefined ? qData.designFee : prev.designFee,
+                showDesignFeeInPrint: qData.showDesignFeeInPrint !== undefined ? !!qData.showDesignFeeInPrint : prev.showDesignFeeInPrint,
+                depositPercent: qData.depositPercent !== undefined ? String(qData.depositPercent) : prev.depositPercent,
+                customDepositAmount: Number(qData.depositAmount || 0),
+                showDepositInPrint: Number(qData.depositAmount || 0) > 0
+            }));
+
+            if (qData.items && qData.items.length > 0) {
+                setItems(qData.items.map((item, idx) => ({
+                    id: idx + 1,
+                    name: item.name || '',
+                    qty: item.qty || 1,
+                    price: item.price || 0,
+                    amount: item.amount || 0,
+                    isPromo: !!item.isPromo,
+                    promoType: item.isPromo ? 'old' : '',
+                    promoMultiplier: item.promoMultiplier || 1,
+                    basePromoName: item.name || '',
+                    image: item.image || null,
+                    unit: item.unit || 'ชิ้น',
+                    showDropdown: false
+                })));
+            }
+        }
+    }, [editId, initialFromQuotation]);
 
     const [contracts, setContracts] = useState([]);
     useEffect(() => {
@@ -1143,14 +1199,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             }
             
             if (name === 'docType') {
-
-                if (value === 'billing_invoice_psf') {
-                    nextData.billStatus = 'kbank';
-                } else if (value === 'billing_invoice_thc' || value === 'billing_invoice_elt') {
-                    if (prev.billStatus === 'kbank') {
-                        nextData.billStatus = 'ktb';
-                    }
-                }
+                nextData.billStatus = getPinnedBankAccount(value);
             }
             
             return nextData;
@@ -1686,8 +1735,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
 
 
 
-                        <div className="form-row" style={{ backgroundColor: '#fce4ec', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #f8bbd0' }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
+                        <div className="form-row" style={{ backgroundColor: '#fce4ec', padding: '15px', borderRadius: '12px', marginBottom: '20px', border: '1px solid #f8bbd0', boxSizing: 'border-box' }}>
+                            <div className="form-group" style={{ marginBottom: 0, minWidth: 0 }}>
                                 <label>ประเภทเอกสาร <span className="required">*</span></label>
                                 <CustomSelect name="docType" value={formData.docType} onChange={handleFormChange} required>
                                     <option value="delivery_order_thc">ใบเสร็จรับเงิน RECEIPT (ORIGINAL) - THC</option>
@@ -1695,98 +1744,13 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                     <option value="delivery_order_elt">ใบเสร็จรับเงิน RECEIPT (ORIGINAL) - ELT</option>
                                 </CustomSelect>
                             </div>
-                            <div className="form-group" style={{ marginBottom: 0, position: 'relative' }}>
-                                <label>บัญชีธนาคาร (บริษัทรับเงิน) <span className="required">*</span></label>
-                                <div 
-                                    onClick={() => setShowBankDropdown(!showBankDropdown)}
-                                    style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', color: '#1e293b', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                                >
-                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {formData.billStatus === 'ktb' ? 'ธนาคารกรุงไทย (016-074423-7)' :
-                                         formData.billStatus === 'kbank_charan' ? 'ธนาคารกสิกรไทย (235-1-19734-2)' :
-                                         (() => {
-                                             try {
-                                                 const parsed = JSON.parse(formData.billStatus);
-                                                 return `${parsed.bankName} (${parsed.accountNo})`;
-                                             } catch {
-                                                 return 'เลือกบัญชีธนาคาร';
-                                             }
-                                         })()}
-                                    </span>
-                                    <span style={{ fontSize: '10px', color: '#94a3b8' }}>▼</span>
-                                </div>
-                                
-                                {showBankDropdown && (
-                                    <>
-                                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => setShowBankDropdown(false)} />
-                                        <div style={{ position: 'absolute', top: '70px', left: 0, width: '100%', background: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', zIndex: 50, maxHeight: '200px', overflowY: 'auto', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                                            <div 
-                                                onClick={() => { setFormData(prev => ({...prev, billStatus: 'ktb'})); setShowBankDropdown(false); }}
-                                                style={{ padding: '8px 12px', fontSize: '14px', color: '#334155', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
-                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                                            >
-                                                ธนาคารกรุงไทย (016-074423-7)
-                                            </div>
-                                            <div 
-                                                onClick={() => { setFormData(prev => ({...prev, billStatus: 'kbank_charan'})); setShowBankDropdown(false); }}
-                                                style={{ padding: '8px 12px', fontSize: '14px', color: '#334155', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
-                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                                            >
-                                                ธนาคารกสิกรไทย (235-1-19734-2)
-                                            </div>
-                                            {customBanks.map((bank, index) => (
-                                                <div 
-                                                    key={index} 
-                                                    style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                                                >
-                                                    <div
-                                                        onClick={() => { setFormData(prev => ({...prev, billStatus: JSON.stringify(bank)})); setShowBankDropdown(false); }}
-                                                        style={{ padding: '8px 12px', fontSize: '14px', color: '#334155', flex: 1 }}
-                                                    >
-                                                        {bank.bankName} ({bank.accountNo})
-                                                    </div>
-                                                    <div
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            const confirm = await showConfirm('ยืนยันการลบ', `ต้องการลบบัญชี "${bank.bankName}" ออกใช่หรือไม่?`);
-                                                            if (confirm) {
-                                                                const newCustom = customBanks.filter((_, i) => i !== index);
-                                                                setCustomBanks(newCustom);
-                                                                localStorage.setItem('customBanks', JSON.stringify(newCustom));
-                                                                try {
-                                                                    const parsed = JSON.parse(formData.billStatus);
-                                                                    if (parsed.bankName === bank.bankName && parsed.accountNo === bank.accountNo) {
-                                                                        setFormData(prev => ({...prev, billStatus: 'ktb'}));
-                                                                    }
-                                                                } catch {}
-                                                            }
-                                                        }}
-                                                        style={{ padding: '8px 12px', color: '#ef4444', fontSize: '16px', lineHeight: 1 }}
-                                                        title="ลบบัญชีนี้"
-                                                    >
-                                                        &times;
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <div 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowBankDropdown(false);
-                                                    setAddBankModal({ visible: true, bankName: '', accountName: '', accountNo: '', logo: null });
-                                                }}
-                                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', color: '#f59e0b', backgroundColor: '#fffbeb', fontWeight: 'bold', textAlign: 'center' }}
-                                                onMouseEnter={(e) => e.target.style.backgroundColor = '#fef3c7'}
-                                                onMouseLeave={(e) => e.target.style.backgroundColor = '#fffbeb'}
-                                            >
-                                                + เพิ่มบัญชีใหม่
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
+                            <div className="form-group" style={{ marginBottom: 0, minWidth: 0 }}>
+                                <BankAccountSelect 
+                                    docType={formData.docType}
+                                    label="บัญชีธนาคาร (บริษัทรับเงิน)"
+                                    value={formData.billStatus}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, billStatus: val }))}
+                                />
                             </div>
                         </div>
 
@@ -2418,42 +2382,19 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             <div className="q-section-icon"><span style={{ fontSize: '16px' }}>⚙️</span></div>
                             <div>
                                 <div className="q-section-title">ตั้งค่าเอกสาร</div>
-                                <div className="q-section-desc">ลายเซ็น เงื่อนไขมัดจำ และหมายเหตุท้ายเอกสาร</div>
+                                <div className="q-section-desc">ลายเซ็น และหมายเหตุท้ายเอกสาร</div>
                             </div>
                         </div>
 
-                        <div className="form-row">
-                            <div className="form-group" style={{ flex: 1 }}>
+                        <div className="form-group">
                                 <label>ผู้มีอำนาจลงนาม (ลายเซ็น)</label>
                                 <CustomSelect name="signer" value={formData.signer} onChange={handleFormChange}>
                                     <option value="">-- ไม่ระบุ (เว้นว่าง) --</option>
-                                            {userSignatures.map(sig => (
-                                                <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
-                                            ))}
-                                        </CustomSelect>
+                                    {userSignatures.map(sig => (
+                                        <option key={sig.KeyName} value={sig.KeyName}>{sig.FullName}</option>
+                                    ))}
+                                </CustomSelect>
                             </div>
-                            <div className="form-group" style={{ flex: 1 }}>
-                                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span>เงื่อนไขการหักมัดจำ</span>
-                                    <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 'normal', color: '#94a3b8', margin: 0 }}>
-                                        <input type="checkbox" name="showDepositInPrint" checked={formData.showDepositInPrint} onChange={handleFormChange} style={{ width: '14px', height: '14px', margin: 0, cursor: 'pointer' }} />
-                                        แสดงในพิมพ์
-                                    </label>
-                                </label>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <CustomSelect name="depositPercent" value={formData.depositPercent} onChange={handleFormChange} style={{ flex: 1 }}>
-                                        <option value="0">-- ไม่มีมัดจำ --</option>
-                                        <option value="30">มัดจำ 30%</option>
-                                        <option value="40">มัดจำ 40%</option>
-                                        <option value="50">มัดจำ 50%</option>
-                                        <option value="custom">ระบุเอง</option>
-                                    </CustomSelect>
-                                    {formData.depositPercent === 'custom' && (
-                                        <input type="number" name="customDepositAmount" placeholder="ระบุเงิน" value={formData.customDepositAmount} onChange={handleFormChange} style={{ flex: 1 }} min="0" />
-                                    )}
-                                </div>
-                            </div>
-                        </div>
                         <div className="form-group" style={{ marginBottom: 0 }}>
                             <label>หมายเหตุ (ข้อความนี้จะแสดงท้ายบิล สามารถแก้ไขข้อความได้เลย)</label>
                             <TipTapCell
@@ -2489,7 +2430,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             <div className="payment-row">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span className="label">ส่วนลด / Discount</span>
-                                    <CustomSelect name="discountPercent" value={formData.discountPercent} onChange={handleFormChange} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: '#fff' }}>
+                                    <CustomSelect name="discountPercent" usePortal={true} value={formData.discountPercent} onChange={handleFormChange} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: '#fff' }}>
                                         {[...Array(101)].map((_, i) => <option key={i} value={i}>{i}%</option>)}
                                     </CustomSelect>
                                     <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
@@ -2513,7 +2454,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         <div className="payment-row">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span className="label">ภาษีมูลค่าเพิ่ม (VAT)</span>
-                                <CustomSelect name="vatRate" value={isFda ? '7' : formData.vatRate} onChange={handleFormChange} disabled={isFda} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: isFda ? '#f1f5f9' : '#fff', cursor: isFda ? 'not-allowed' : 'pointer' }}>
+                                <CustomSelect name="vatRate" usePortal={true} value={isFda ? '7' : formData.vatRate} onChange={handleFormChange} disabled={isFda} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: isFda ? '#f1f5f9' : '#fff', cursor: isFda ? 'not-allowed' : 'pointer' }}>
                                     <option value="0">0%</option>
                                     <option value="7">7%</option>
                                 </CustomSelect>
@@ -2561,24 +2502,48 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             </div>
                         )}
 
+                                                {/* Deposit / หักมัดจำ */}
+                        {!isFda && (
+                            <div className="payment-row">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span className="label">หักมัดจำ / Deposit</span>
+                                    <CustomSelect name="depositPercent" usePortal={true} value={formData.depositPercent} onChange={handleFormChange} style={{ width: formData.depositPercent === 'custom' ? '76px' : '65px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: '#fff' }}>
+                                        <option value="0">0%</option>
+                                        <option value="30">30%</option>
+                                        <option value="40">40%</option>
+                                        <option value="50">50%</option>
+                                        <option value="custom">ระบุเอง</option>
+                                    </CustomSelect>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                        <input type="checkbox" name="showDepositInPrint" checked={formData.showDepositInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0, cursor: 'pointer' }} />
+                                        แสดงในบิล
+                                    </label>
+                                </div>
+                                {formData.depositPercent === 'custom' ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <input type="number" name="customDepositAmount" placeholder="0" value={formData.customDepositAmount} onChange={handleFormChange} style={{ width: '80px', textAlign: 'right', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px 8px', fontSize: '13px', background: '#fff' }} min="0" />
+                                        <span className="value" style={{ fontWeight: 'normal' }}>บาท</span>
+                                    </div>
+                                ) : (
+                                    <span className="value" style={{ color: depositAmount > 0 ? '#ef4444' : '#1e293b' }}>
+                                        {depositAmount > 0 ? '-' : ''}{depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         {/* Grand Total */}
                         <div className="grand-total-highlight">
                             <span className="gt-label">ยอดเงินสุทธิ / Grand Total</span>
                             <span className="gt-value">{grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
                         </div>
 
-                        {/* Deposit */}
+                        {/* Deposit Breakdown */}
                         {!isFda && depositAmount > 0 && (
-                            <>
-                                <div className="payment-row" style={{ borderTop: '1px dashed #ffb74d', marginTop: '10px' }}>
-                                    <span className="label">ยอดชำระมัดจำ {formData.depositPercent !== 'custom' && formData.depositPercent !== '0' ? `(${formData.depositPercent}%)` : ''}</span>
-                                    <span className="value" style={{ color: '#f59e0b' }}>{depositAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                                </div>
-                                <div className="payment-row" style={{ borderBottom: 'none' }}>
-                                    <span className="label">ยอดคงเหลือที่ต้องชำระ</span>
-                                    <span className="value" style={{ color: '#10b981' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
-                                </div>
-                            </>
+                            <div className="payment-row" style={{ borderTop: '1px dashed #ffb74d', marginTop: '6px', borderBottom: 'none' }}>
+                                <span className="label" style={{ color: '#059669', fontWeight: 'bold' }}>ยอดคงเหลือที่ต้องชำระ</span>
+                                <span className="value" style={{ color: '#10b981', fontWeight: 'bold', fontSize: '14px' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            </div>
                         )}
                     </div>
 
@@ -2656,7 +2621,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 </tr>
                                 <tr>
                                     <td style={{ border: '1px solid black', padding: '4px 8px', borderTop: 'none', borderBottom: 'none' }}>
-                                        <span style={{ fontWeight: 'bold' }}>ที่อยู่ติดต่อ :</span> <FormattedAddress data={formData} />
+                                        <span style={{ fontWeight: 'bold' }}>ที่อยู่ติดต่อ :</span> <FormattedAddress data={formData} isEn={isEn} />
                                     </td>
                                     <td style={{ border: '1px solid black', padding: '4px 8px' }}>
                                         <span style={{ fontWeight: 'bold' }}>E-mail :</span> {formData.email || '-'}
@@ -2984,7 +2949,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                     <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
                                         ที่อยู่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Address</span>
                                     </td>
-                                    <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}><FormattedAddress data={formData} /></td>
+                                    <td style={{ padding: '2px 0', verticalAlign: 'top', height: '35px' }}><FormattedAddress data={formData} isEn={isEn} /></td>
                                 </tr>
                                 <tr>
                                     <td style={{ fontWeight: 'bold', padding: '2px 0', verticalAlign: 'top' }}>
@@ -3114,8 +3079,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             {items.filter(it => it.name).map((item, idx, arr) => (
                                 <tr key={item.id} style={{ height: cellHeight, borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #ccc' }}>
                                     <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>{idx + 1}</td>
-                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'left', padding: '2px 8px' }}>{item.name}</td>
-                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>{item.qty ? `${Number(item.qty).toLocaleString('th-TH')} ${item.unit || 'ชิ้น'}` : ''}</td>
+                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'left', padding: '2px 8px' }}>{isEn ? translateProductToEN(item.name) : item.name}</td>
+                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>{item.qty ? `${Number(item.qty).toLocaleString('th-TH')} ${isEn ? translateUnitToEN(item.unit || 'ชิ้น', item.qty) : (item.unit || 'ชิ้น')}` : ''}</td>
                                     <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'right', padding: '2px 8px' }}>{(parseFloat(item.price) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
                                     <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'right', padding: '2px 8px' }}>0.00</td>
                                     <td style={{ textAlign: 'right', padding: '2px 8px' }}>
@@ -3240,7 +3205,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             )}
                             <tr>
                                 <td colSpan="3" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '12pt', backgroundColor: '#d5f5e3', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', padding: '5px' }}>
-                                    <span style={{ fontStyle: 'italic' }}>{ThaiBaht(grandTotal)}</span>
+                                    <span style={{ fontStyle: 'italic' }}>{isEn ? numberToEnglishWords(grandTotal) : ThaiBaht(grandTotal)}</span>
                                 </td>
                                 <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderRight: '1px solid #1a7a3a', backgroundColor: '#d5f5e3', fontSize: '10pt' }}>
                                     รวมเงินทั้งสิ้น<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>GRAND TOTAL</span>

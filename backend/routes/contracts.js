@@ -180,19 +180,88 @@ router.delete('/:id', async (req, res) => {
     try {
         const pool = await poolPromise;
         const id = req.params.id;
+        const force = req.query.force === 'true';
+
+        // ตรวจสอบเอกสารที่เชื่อมโยงกับสัญญานี้
+        const linkedDocs = [];
+
+        const [soRes, qtRes, biRes, doRes, tiRes, rcRes, legalRes] = await Promise.all([
+            pool.request().input('cid', sql.Int, id).query("SELECT SalesOrderNo FROM SalesOrder WHERE ContractID = @cid"),
+            pool.request().input('cid', sql.Int, id).query("SELECT QuotationNo FROM Quotation WHERE ContractID = @cid"),
+            pool.request().input('cid', sql.Int, id).query("SELECT BillingInvoiceNo FROM BillingInvoice WHERE ContractID = @cid"),
+            pool.request().input('cid', sql.Int, id).query("SELECT DeliveryOrderNo FROM DeliveryOrder WHERE ContractID = @cid"),
+            pool.request().input('cid', sql.Int, id).query("SELECT TaxInvoiceNo FROM TaxInvoice WHERE ContractID = @cid"),
+            pool.request().input('cid', sql.Int, id).query("SELECT ReceiptNo FROM Receipt WHERE ContractID = @cid"),
+            pool.request().input('cid', sql.Int, id).query("SELECT DocumentNo FROM LegalDocuments WHERE ContractID = @cid"),
+        ]);
+
+        if (soRes.recordset.length > 0) {
+            linkedDocs.push(`คำสั่งขาย (Sales Order): ${soRes.recordset.map(r => r.SalesOrderNo).join(', ')}`);
+        }
+        if (qtRes.recordset.length > 0) {
+            linkedDocs.push(`ใบเสนอราคา (Quotation): ${qtRes.recordset.map(r => r.QuotationNo).join(', ')}`);
+        }
+        if (biRes.recordset.length > 0) {
+            linkedDocs.push(`ใบวางบิล/แจ้งหนี้: ${biRes.recordset.map(r => r.BillingInvoiceNo).join(', ')}`);
+        }
+        if (doRes.recordset.length > 0) {
+            linkedDocs.push(`ใบส่งสินค้า: ${doRes.recordset.map(r => r.DeliveryOrderNo).join(', ')}`);
+        }
+        if (tiRes.recordset.length > 0) {
+            linkedDocs.push(`ใบกำกับภาษี: ${tiRes.recordset.map(r => r.TaxInvoiceNo).join(', ')}`);
+        }
+        if (rcRes.recordset.length > 0) {
+            linkedDocs.push(`ใบเสร็จรับเงิน: ${rcRes.recordset.map(r => r.ReceiptNo).join(', ')}`);
+        }
+        if (legalRes.recordset.length > 0) {
+            linkedDocs.push(`เอกสารสัญญา/หนังสือมอบอำนาจ: ${legalRes.recordset.map(r => r.DocumentNo).join(', ')}`);
+        }
+
+        if (linkedDocs.length > 0 && !force) {
+            return res.status(400).json({
+                success: false,
+                hasLinkedDocs: true,
+                linkedDocs: linkedDocs,
+                message: `สัญญานี้มีเอกสารกำลังใช้งานอยู่:\n• ${linkedDocs.join('\n• ')}`
+            });
+        }
+
+        // หากผู้ใช้สั่ง force delete ให้ปลด ContractID ออกจากเอกสารที่เกี่ยวข้อง
+        if (force) {
+            await pool.request().input('cid', sql.Int, id).query(`
+                UPDATE SalesOrder SET ContractID = NULL WHERE ContractID = @cid;
+                UPDATE Quotation SET ContractID = NULL WHERE ContractID = @cid;
+                UPDATE BillingInvoice SET ContractID = NULL WHERE ContractID = @cid;
+                UPDATE DeliveryOrder SET ContractID = NULL WHERE ContractID = @cid;
+                UPDATE TaxInvoice SET ContractID = NULL WHERE ContractID = @cid;
+                UPDATE Receipt SET ContractID = NULL WHERE ContractID = @cid;
+                UPDATE LegalDocuments SET ContractID = NULL WHERE ContractID = @cid;
+            `);
+        }
 
         const result = await pool.request()
             .input('ContractID', sql.Int, id)
             .query(`DELETE FROM Contracts WHERE ContractID = @ContractID`);
 
         if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({ success: false, message: 'Contract not found' });
+            return res.status(404).json({ success: false, message: 'ไม่พบสัญญาที่ต้องการลบในระบบ' });
         }
 
-        res.json({ success: true, message: 'Contract deleted successfully' });
+        res.json({ success: true, message: 'ลบสัญญาเรียบร้อยแล้ว' });
     } catch (err) {
         console.error('Error deleting contract:', err);
-        res.status(500).json({ success: false, message: 'Server error deleting contract', error: err.message });
+        if (err.number === 547) {
+            return res.status(400).json({
+                success: false,
+                message: 'ไม่สามารถลบสัญญาได้ เนื่องจากมีเอกสารอื่นในระบบเชื่อมโยงกับสัญญานี้อยู่ กรุณาตรวจสอบเอกสารที่เกี่ยวข้องก่อน',
+                error: err.message
+            });
+        }
+        res.status(500).json({
+            success: false,
+            message: 'เกิดข้อผิดพลาดในการลบสัญญา: ' + err.message,
+            error: err.message
+        });
     }
 });
 

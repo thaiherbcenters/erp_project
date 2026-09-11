@@ -31,7 +31,7 @@ const getAutoContractStatus = (startDate, endDate) => {
 };
 
 const ContractManagement = ({ onViewDocument }) => {
-    const { showAlert } = useAlert();
+    const { showAlert, showConfirm } = useAlert();
     const { canCreate, canDelete } = useAuth();
     const [contracts, setContracts] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -66,7 +66,7 @@ const ContractManagement = ({ onViewDocument }) => {
             }
         } catch (err) {
             console.error(err);
-            showAlert('error', 'ไม่สามารถดึงข้อมูลสัญญาได้');
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถดึงข้อมูลสัญญาได้', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -80,7 +80,7 @@ const ContractManagement = ({ onViewDocument }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.contractNo || !formData.contractName) {
-            showAlert('error', 'กรุณากรอกเลขที่สัญญาและชื่อโปรเจกต์');
+            showAlert('แจ้งเตือน', 'กรุณากรอกเลขที่สัญญาและชื่อโปรเจกต์', 'warning');
             return;
         }
 
@@ -92,34 +92,51 @@ const ContractManagement = ({ onViewDocument }) => {
             });
             const json = await res.json();
             if (json.success) {
-                showAlert('success', 'เพิ่มสัญญาเรียบร้อยแล้ว');
+                showAlert('สำเร็จ', 'เพิ่มสัญญาเรียบร้อยแล้ว', 'success');
                 setShowForm(false);
                 setFormData({ contractNo: '', contractName: '', startDate: '', endDate: '', status: 'กำลังดำเนินการ' });
                 fetchContracts();
             } else {
-                showAlert('error', 'เกิดข้อผิดพลาด: ' + json.message);
+                showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาด: ' + json.message, 'error');
             }
         } catch (err) {
             console.error(err);
-            showAlert('error', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้');
+            showAlert('ข้อผิดพลาด', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
         }
     };
 
     const handleDelete = async (id, no) => {
-        if (!window.confirm(`ยืนยันการลบสัญญา ${no} ใช่หรือไม่?`)) return;
+        const confirmed = await showConfirm('ยืนยันการลบสัญญา', `คุณต้องการลบสัญญา ${no} ใช่หรือไม่?`, 'warning');
+        if (!confirmed) return;
         
         try {
             const res = await fetch(`${API_BASE}/contracts/${id}`, { method: 'DELETE' });
             const json = await res.json();
             if (json.success) {
-                showAlert('success', 'ลบสัญญาเรียบร้อยแล้ว');
+                showAlert('สำเร็จ', 'ลบสัญญาเรียบร้อยแล้ว', 'success');
                 fetchContracts();
+            } else if (json.hasLinkedDocs) {
+                const forceConfirm = await showConfirm(
+                    'พบเอกสารที่ผูกอยู่กับสัญญา',
+                    `${json.message}\n\nคุณต้องการปลดการผูกสัญญานี้ออกจากเอกสารทั้งหมด แล้วดำเนินการลบสัญญาใช่หรือไม่?`,
+                    'warning'
+                );
+                if (forceConfirm) {
+                    const forceRes = await fetch(`${API_BASE}/contracts/${id}?force=true`, { method: 'DELETE' });
+                    const forceJson = await forceRes.json();
+                    if (forceJson.success) {
+                        showAlert('สำเร็จ', 'ปลดการเชื่อมโยงและลบสัญญาเรียบร้อยแล้ว', 'success');
+                        fetchContracts();
+                    } else {
+                        showAlert('ข้อผิดพลาด', forceJson.message || 'ไม่สามารถลบสัญญาได้', 'error');
+                    }
+                }
             } else {
-                showAlert('error', 'เกิดข้อผิดพลาด: ' + json.message);
+                showAlert('ข้อผิดพลาด', json.message || 'ไม่สามารถลบสัญญาได้', 'error');
             }
         } catch (err) {
             console.error(err);
-            showAlert('error', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้');
+            showAlert('ข้อผิดพลาด', 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้', 'error');
         }
     };
 
@@ -205,7 +222,7 @@ const ContractManagement = ({ onViewDocument }) => {
             if (doc.DocumentType === 'poa' || doc.DocumentType === 'corp_rep') {
                 window.open(`${API_BASE}/legal-documents/${doc.DocumentID}/print`, '_blank');
             } else {
-                showAlert('error', 'ไม่สามารถเปิดเอกสารได้จากหน้านี้');
+                showAlert('แจ้งเตือน', 'ไม่สามารถเปิดเอกสารได้จากหน้านี้', 'warning');
             }
         }
     };

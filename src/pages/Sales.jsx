@@ -17,7 +17,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
-import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search, Copy, Upload, Download, UploadCloud, RotateCcw, Filter, Calendar } from 'lucide-react';
+import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search, Copy, Upload, Download, UploadCloud, RotateCcw, Filter, Calendar, TrendingUp, ArrowRight, ChevronRight, Truck, FileCheck, Layers, DollarSign } from 'lucide-react';
 import { MOCK_CUSTOMERS } from '../data/mockData';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
@@ -34,6 +34,7 @@ import CustomDatePicker from '../components/CustomDatePicker';
 import { FilterToggleButton, SalesDocFilterDrawer } from '../components/SalesDocFilter';
 import './PageCommon.css';
 import './DocumentControl.css';
+import './SalesDashboard.css';
 
 
 const InlineStatusDropdown = ({ value, onChange, options, badgeClassFn, fallbackClass = 'status-badge status-approved' }) => {
@@ -954,6 +955,8 @@ export default function Sales() {
     const totalOrders = localSalesOrders.length;
     const totalCustomers = MOCK_CUSTOMERS.length;
     const totalQuotations = localQuotations.length;
+    const quotationPipelineValue = localQuotations.reduce((sum, q) => sum + (parseFloat(q.GrandTotal) || 0), 0);
+    const plannedOrdersCount = localSalesOrders.filter(o => o.Status === 'วางแผนแล้ว' || o.Status === 'สำเร็จ' || o.Status === 'จัดส่งแล้ว').length;
 
     // ── กรองข้อมูลแต่ละ tab ──
     const filteredCustomers = MOCK_CUSTOMERS.filter((c) =>
@@ -1055,140 +1058,385 @@ export default function Sales() {
 
             {/* ── Tab: Sales Dashboard ── */}
             {(activeTab === 'sales_dashboard' && hasSubPermission('sales_dashboard')) && (
-                <div className="subpage-content" key="sales_dashboard">
-                    <div className="contract-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                        <div>
-                            <h1 className="contract-title" style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '24px', fontWeight: '700', color: '#0f172a', margin: '0 0 4px 0' }}>
-                                <LayoutDashboard size={24} color="#1e40af" />
-                                ภาพรวมยอดขาย
-                            </h1>
-                            <p className="contract-subtitle" style={{ margin: '0', color: '#64748b', fontSize: '14px' }}>ภาพรวมข้อมูลยอดขาย ลูกค้า และเอกสารทั้งหมดของฝ่ายขาย</p>
+                <div className="subpage-content sales-dashboard-container" key="sales_dashboard">
+                    {/* 1. Top Header Banner & Quick Actions */}
+                    <div className="sd-header-card">
+                        <div className="sd-header-left">
+                            <div className="sd-header-icon-box">
+                                <TrendingUp size={24} />
+                            </div>
+                            <div className="sd-header-title-group">
+                                <div className="sd-header-title-row">
+                                    <h1 className="sd-header-title">ภาพรวมฝ่ายขาย</h1>
+                                    <span className="sd-live-badge">
+                                        <span className="sd-live-dot"></span> อัปเดตเรียลไทม์
+                                    </span>
+                                </div>
+                                <p className="sd-header-subtitle">ติดตามผลการดำเนินงาน ยอดขาย เอกสารในกระบวนการ และกิจกรรมล่าสุด</p>
+                            </div>
+                        </div>
+                        <div className="sd-header-actions">
+                            {canCreate('sales_orders') && (
+                                <button 
+                                    className="sd-btn-secondary" 
+                                    onClick={() => {
+                                        setEditingSOId(null);
+                                        setIsSOViewOnly(false);
+                                        setShowSOForm(true);
+                                    }}
+                                >
+                                    <ShoppingCart size={15} color="#2563eb" /> + สร้างคำสั่งขาย (SO)
+                                </button>
+                            )}
+                            {canCreate('sales_quotation') && (
+                                <button 
+                                    className="sd-btn-primary" 
+                                    onClick={() => {
+                                        setEditingQuotationId(null);
+                                        setIsViewOnly(false);
+                                        setShowQuotationForm(true);
+                                    }}
+                                >
+                                    <Plus size={16} /> + สร้างใบเสนอราคา (QT)
+                                </button>
+                            )}
                         </div>
                     </div>
-                    <div className="summary-row">
+
+                    {/* 2. Executive KPI Cards */}
+                    <div className="sd-kpi-grid">
                         {hasSectionPermission('sales_dashboard_revenue') && (
-                            <div className="summary-card card">
-                                <div className="summary-icon" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#16a34a' }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                            <div className="sd-kpi-card sd-kpi-emerald">
+                                <div className="sd-kpi-top">
+                                    <span className="sd-kpi-label">ยอดขายรวมทั้งหมด</span>
+                                    <div className="sd-kpi-icon">
+                                        <DollarSign size={20} />
+                                    </div>
                                 </div>
-                                <div>
-                                    <span className="summary-label">ยอดขายรวม</span>
-                                    <span className="summary-value">฿{totalRevenue.toLocaleString()}</span>
+                                <div className="sd-kpi-body">
+                                    <div className="sd-kpi-value">฿{totalRevenue.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                    <div className="sd-kpi-footer">
+                                        <span>คำนวณจากคำสั่งขายที่ยืนยันแล้ว ({totalOrders} รายการ)</span>
+                                    </div>
                                 </div>
+                                <div className="sd-kpi-indicator"></div>
                             </div>
                         )}
-                        {hasSectionPermission('sales_dashboard_orders') && (
-                            <div className="summary-card card">
-                                <div className="summary-icon" style={{ background: '#eff6ff', borderColor: '#bfdbfe', color: '#2563eb' }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                                </div>
-                                <div>
-                                    <span className="summary-label">คำสั่งขาย</span>
-                                    <span className="summary-value">{totalOrders}</span>
-                                </div>
-                            </div>
-                        )}
-                        {hasSectionPermission('sales_dashboard_customers') && (
-                            <div className="summary-card card">
-                                <div className="summary-icon" style={{ background: '#faf5ff', borderColor: '#e9d5ff', color: '#7c3aed' }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                                </div>
-                                <div>
-                                    <span className="summary-label">ลูกค้า</span>
-                                    <span className="summary-value">{totalCustomers}</span>
-                                </div>
-                            </div>
-                        )}
+
                         {hasSectionPermission('sales_dashboard_quotations') && (
-                            <div className="summary-card card">
-                                <div className="summary-icon" style={{ background: '#fff7ed', borderColor: '#fed7aa', color: '#ea580c' }}>
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <div className="sd-kpi-card sd-kpi-amber">
+                                <div className="sd-kpi-top">
+                                    <span className="sd-kpi-label">มูลค่าใบเสนอราคา</span>
+                                    <div className="sd-kpi-icon">
+                                        <FileText size={20} />
+                                    </div>
                                 </div>
-                                <div>
-                                    <span className="summary-label">ใบเสนอราคา</span>
-                                    <span className="summary-value">{totalQuotations}</span>
+                                <div className="sd-kpi-body">
+                                    <div className="sd-kpi-value">฿{quotationPipelineValue.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                    <div className="sd-kpi-footer">
+                                        <span>รวม {totalQuotations} รายการ (พร้อมส่ง / รออนุมัติ)</span>
+                                    </div>
                                 </div>
+                                <div className="sd-kpi-indicator"></div>
+                            </div>
+                        )}
+
+                        {hasSectionPermission('sales_dashboard_orders') && (
+                            <div className="sd-kpi-card sd-kpi-blue">
+                                <div className="sd-kpi-top">
+                                    <span className="sd-kpi-label">คำสั่งขาย (SO)</span>
+                                    <div className="sd-kpi-icon">
+                                        <ShoppingCart size={20} />
+                                    </div>
+                                </div>
+                                <div className="sd-kpi-body">
+                                    <div className="sd-kpi-value">{totalOrders} <span className="sd-kpi-unit">รายการ</span></div>
+                                    <div className="sd-kpi-footer">
+                                        <span>{plannedOrdersCount} วางแผนแล้ว / รอผลิต</span>
+                                    </div>
+                                </div>
+                                <div className="sd-kpi-indicator"></div>
+                            </div>
+                        )}
+
+                        {hasSectionPermission('sales_dashboard_customers') && (
+                            <div className="sd-kpi-card sd-kpi-purple">
+                                <div className="sd-kpi-top">
+                                    <span className="sd-kpi-label">ฐานข้อมูลลูกค้า</span>
+                                    <div className="sd-kpi-icon">
+                                        <Users size={20} />
+                                    </div>
+                                </div>
+                                <div className="sd-kpi-body">
+                                    <div className="sd-kpi-value">{totalCustomers} <span className="sd-kpi-unit">ราย</span></div>
+                                    <div className="sd-kpi-footer">
+                                        <span>ลูกค้าประจำและตัวแทนจำหน่าย</span>
+                                    </div>
+                                </div>
+                                <div className="sd-kpi-indicator"></div>
                             </div>
                         )}
                     </div>
 
-                    {/* Recent Activity Tables */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                        {/* Recent Sales Orders */}
-                        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>คำสั่งขายล่าสุด</span>
-                                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sales Orders</span>
+                    {/* 3. Sales Pipeline Flow Banner */}
+                    <div className="sd-pipeline-card">
+                        <div className="sd-pipeline-header">
+                            <div className="sd-pipeline-title-group">
+                                <h3 className="sd-pipeline-title">
+                                    <Layers size={18} color="#a5b4fc" />
+                                    ขั้นตอนกระบวนการขาย (Sales Pipeline Flow)
+                                </h3>
+                                <p className="sd-pipeline-subtitle">คลิกที่ขั้นตอนเพื่อเปิดดูเอกสารในหมวดนั้นได้ทันที</p>
                             </div>
-                            <div style={{ padding: '0' }}>
-                                <table className="data-table" style={{ minWidth: 'auto' }}>
+                            <span className="sd-pipeline-tag">ERP Workflow</span>
+                        </div>
+
+                        <div className="sd-pipeline-steps">
+                            <div className="sd-pipeline-step" onClick={() => setSearchParams({ tab: 'sales_quotation' })} title="คลิกเพื่อไปที่ใบเสนอราคา">
+                                <div className="sd-step-top">
+                                    <span>ขั้นที่ 1</span>
+                                    <span className="sd-step-badge" style={{ background: 'rgba(99, 102, 241, 0.3)', color: '#ffffff' }}>{totalQuotations} ใบ</span>
+                                </div>
+                                <div className="sd-step-title">ใบเสนอราคา (QT)</div>
+                                <div className="sd-step-desc">เสนอราคา / นัดคุย</div>
+                            </div>
+
+                            <div className="sd-pipeline-step" onClick={() => setSearchParams({ tab: 'sales_orders' })} title="คลิกเพื่อไปที่คำสั่งขาย">
+                                <div className="sd-step-top">
+                                    <span>ขั้นที่ 2</span>
+                                    <span className="sd-step-badge" style={{ background: 'rgba(59, 130, 246, 0.3)', color: '#ffffff' }}>{totalOrders} ใบ</span>
+                                </div>
+                                <div className="sd-step-title">คำสั่งขาย (SO)</div>
+                                <div className="sd-step-desc">ยืนยันออเดอร์ / สั่งผลิต</div>
+                            </div>
+
+                            <div className="sd-pipeline-step" onClick={() => setSearchParams({ tab: 'sales_billing_invoice' })} title="คลิกเพื่อไปที่ใบวางบิล">
+                                <div className="sd-step-top">
+                                    <span>ขั้นที่ 3</span>
+                                    <span className="sd-step-badge" style={{ background: 'rgba(245, 158, 11, 0.3)', color: '#ffffff' }}>เรียกเก็บ</span>
+                                </div>
+                                <div className="sd-step-title">ใบวางบิล (BN)</div>
+                                <div className="sd-step-desc">แจ้งหนี้ลูกค้า</div>
+                            </div>
+
+                            <div className="sd-pipeline-step" onClick={() => setSearchParams({ tab: 'sales_delivery_order' })} title="คลิกเพื่อไปที่ใบส่งสินค้า">
+                                <div className="sd-step-top">
+                                    <span>ขั้นที่ 4</span>
+                                    <span className="sd-step-badge" style={{ background: 'rgba(20, 184, 166, 0.3)', color: '#ffffff' }}>จัดส่ง</span>
+                                </div>
+                                <div className="sd-step-title">ใบส่งของ (DO)</div>
+                                <div className="sd-step-desc">ส่งมอบสินค้า</div>
+                            </div>
+
+                            <div className="sd-pipeline-step" onClick={() => setSearchParams({ tab: 'sales_receipt' })} title="คลิกเพื่อไปที่ใบเสร็จรับเงิน">
+                                <div className="sd-step-top">
+                                    <span>ขั้นที่ 5</span>
+                                    <span className="sd-step-badge" style={{ background: 'rgba(16, 185, 129, 0.3)', color: '#ffffff' }}>เสร็จสมบูรณ์</span>
+                                </div>
+                                <div className="sd-step-title">ใบเสร็จ / กำกับภาษี</div>
+                                <div className="sd-step-desc">รับชำระเงินครบ</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. Recent Activity Tables Grid */}
+                    <div className="sd-tables-grid">
+                        {/* Recent Sales Orders */}
+                        <div className="sd-table-card">
+                            <div className="sd-table-header">
+                                <div className="sd-table-header-left">
+                                    <div className="sd-table-header-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
+                                        <ShoppingCart size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="sd-table-title">คำสั่งขายล่าสุด</h3>
+                                        <p className="sd-table-subtitle">Recent Sales Orders</p>
+                                    </div>
+                                </div>
+                                <button className="sd-view-all-link sd-view-all-blue" onClick={() => setSearchParams({ tab: 'sales_orders' })}>
+                                    ดูทั้งหมด <ChevronRight size={14} />
+                                </button>
+                            </div>
+                            <div className="sd-table-wrapper">
+                                <table className="sd-data-table">
                                     <thead>
                                         <tr>
                                             <th>เลขที่ SO</th>
                                             <th>ลูกค้า</th>
-                                            <th>ยอดรวม</th>
-                                            <th>สถานะ</th>
+                                            <th style={{ textAlign: 'right' }}>ยอดรวม</th>
+                                            <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                            <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {localSalesOrders.slice(0, 5).map((o) => (
-                                            <tr key={o.SalesOrderNo || o.SalesOrderID}>
-                                                <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{o.SalesOrderNo}</td>
-                                                <td>{o.CustomerName}</td>
-                                                <td>฿{(o.GrandTotal || 0).toLocaleString()}</td>
-                                                <td><span className={`badge ${getOrderStatusClass(o.Status)}`}>{o.Status}</span></td>
+                                            <tr key={o.SalesOrderNo || o.SalesOrderID} className="sd-table-row">
+                                                <td>
+                                                    <span 
+                                                        className="sd-doc-no sd-doc-no-blue" 
+                                                        onClick={() => setPreviewSOId(o.SalesOrderID)}
+                                                        title="คลิกเพื่อดูตัวอย่างคำสั่งขาย"
+                                                    >
+                                                        {o.SalesOrderNo}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="sd-customer-name" title={o.CustomerName}>{o.CustomerName || '-'}</div>
+                                                </td>
+                                                <td className="sd-amount">
+                                                    ฿{(o.GrandTotal || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <span className={`badge ${getOrderStatusClass(o.Status)}`}>{o.Status || 'รอดำเนินการ'}</span>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <button 
+                                                        className="sd-btn-action" 
+                                                        onClick={() => setPreviewSOId(o.SalesOrderID)} 
+                                                        title="ดูตัวอย่างเอกสาร"
+                                                    >
+                                                        <Eye size={15} />
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))}
                                         {localSalesOrders.length === 0 && (
-                                            <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>ยังไม่มีข้อมูล</td></tr>
+                                            <tr>
+                                                <td colSpan={5} className="sd-empty-state">
+                                                    ยังไม่มีคำสั่งขายในระบบ
+                                                </td>
+                                            </tr>
                                         )}
                                     </tbody>
                                 </table>
+                            </div>
+                            <div className="sd-table-footer">
+                                <span>แสดง {Math.min(5, localSalesOrders.length)} จาก {totalOrders} รายการ</span>
+                                <span>คลิกที่รายการเพื่อดูรายละเอียด</span>
                             </div>
                         </div>
 
                         {/* Recent Quotations */}
-                        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>ใบเสนอราคาล่าสุด</span>
-                                <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={() => {
-                                    setEditingQuotationId(null);
-                                    setShowQuotationForm(true);
-                                }}>
-                                    <Plus size={16} /> สร้างใบเสนอราคา
+                        <div className="sd-table-card">
+                            <div className="sd-table-header">
+                                <div className="sd-table-header-left">
+                                    <div className="sd-table-header-icon" style={{ background: '#fffbeb', color: '#d97706' }}>
+                                        <FileText size={18} />
+                                    </div>
+                                    <div>
+                                        <h3 className="sd-table-title">ใบเสนอราคาล่าสุด</h3>
+                                        <p className="sd-table-subtitle">Recent Quotations</p>
+                                    </div>
+                                </div>
+                                <button className="sd-view-all-link sd-view-all-amber" onClick={() => setSearchParams({ tab: 'sales_quotation' })}>
+                                    ดูทั้งหมด <ChevronRight size={14} />
                                 </button>
                             </div>
-                            <div style={{ padding: '0' }}>
-                                <table className="data-table" style={{ minWidth: 'auto' }}>
+                            <div className="sd-table-wrapper">
+                                <table className="sd-data-table">
                                     <thead>
                                         <tr>
                                             <th>เลขที่ QT</th>
                                             <th>ลูกค้า</th>
-                                            <th>ยอดรวม</th>
-                                            <th>สถานะ</th>
+                                            <th style={{ textAlign: 'right' }}>ยอดรวม</th>
+                                            <th style={{ textAlign: 'center' }}>สถานะ</th>
+                                            <th style={{ textAlign: 'center' }}>จัดการ</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {localQuotations.slice(0, 5).map((q) => (
-                                            <tr key={q.QuotationNo || q.QuotationID}>
-                                                <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{q.QuotationNo}</td>
-                                                <td>{q.CustomerName}</td>
-                                                <td>฿{(q.GrandTotal || 0).toLocaleString()}</td>
+                                            <tr key={q.QuotationNo || q.QuotationID} className="sd-table-row">
                                                 <td>
-                                                    <InlineStatusDropdown
-                                                        value={q.Status}
-                                                        options={SALES_DOC_STATUSES}
-                                                        badgeClassFn={getQuotationStatusClass}
-                                                        onChange={(newVal) => handleUpdateDocStatus(q.QuotationID, 'Quotation', newVal)}
-                                                    />
+                                                    <span 
+                                                        className="sd-doc-no sd-doc-no-amber" 
+                                                        onClick={() => setPreviewQuotationId(q.QuotationID)}
+                                                        title="คลิกเพื่อดูตัวอย่างใบเสนอราคา"
+                                                    >
+                                                        {q.QuotationNo}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div className="sd-customer-name" title={q.CustomerName}>{q.CustomerName || '-'}</div>
+                                                </td>
+                                                <td className="sd-amount">
+                                                    ฿{(q.GrandTotal || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <span className={`badge ${getQuotationStatusClass(q.Status)}`}>{q.Status || 'รอดำเนินการ'}</span>
+                                                </td>
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <button 
+                                                        className="sd-btn-action" 
+                                                        onClick={() => setPreviewQuotationId(q.QuotationID)} 
+                                                        title="ดูตัวอย่างเอกสาร"
+                                                    >
+                                                        <Eye size={15} />
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
                                         {localQuotations.length === 0 && (
-                                            <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>ยังไม่มีข้อมูล</td></tr>
+                                            <tr>
+                                                <td colSpan={5} className="sd-empty-state">
+                                                    ยังไม่มีใบเสนอราคาในระบบ
+                                                </td>
+                                            </tr>
                                         )}
                                     </tbody>
                                 </table>
+                            </div>
+                            <div className="sd-table-footer">
+                                <span>แสดง {Math.min(5, localQuotations.length)} จาก {totalQuotations} รายการ</span>
+                                <span>คลิกที่รายการเพื่อดูรายละเอียด</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 5. Quick Shortcuts Bar */}
+                    <div className="sd-shortcuts-card">
+                        <h3 className="sd-shortcuts-title">
+                            <Layers size={16} color="#64748b" />
+                            ทางลัดการจัดการฝ่ายขาย (Quick Shortcuts)
+                        </h3>
+                        <div className="sd-shortcuts-grid">
+                            <div className="sd-shortcut-item" onClick={() => setSearchParams({ tab: 'sales_poa' })}>
+                                <div className="sd-shortcut-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
+                                    <FileCheck size={18} />
+                                </div>
+                                <div className="sd-shortcut-info">
+                                    <span className="sd-shortcut-name">ขึ้นทะเบียนตำรับ</span>
+                                    <span className="sd-shortcut-desc">POA & ยาสมุนไพร</span>
+                                </div>
+                            </div>
+
+                            <div className="sd-shortcut-item" onClick={() => setSearchParams({ tab: 'sales_contracts' })}>
+                                <div className="sd-shortcut-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
+                                    <Briefcase size={18} />
+                                </div>
+                                <div className="sd-shortcut-info">
+                                    <span className="sd-shortcut-name">จัดการสัญญาจ้าง</span>
+                                    <span className="sd-shortcut-desc">สัญญา OEM & ผลิต</span>
+                                </div>
+                            </div>
+
+                            <div className="sd-shortcut-item" onClick={() => setSearchParams({ tab: 'sales_billing_invoice' })}>
+                                <div className="sd-shortcut-icon" style={{ background: '#faf5ff', color: '#7c3aed' }}>
+                                    <Receipt size={18} />
+                                </div>
+                                <div className="sd-shortcut-info">
+                                    <span className="sd-shortcut-name">ใบวางบิล / แจ้งหนี้</span>
+                                    <span className="sd-shortcut-desc">Billing & Invoice</span>
+                                </div>
+                            </div>
+
+                            <div className="sd-shortcut-item" onClick={() => setSearchParams({ tab: 'sales_delivery_order' })}>
+                                <div className="sd-shortcut-icon" style={{ background: '#f0fdfa', color: '#0d9488' }}>
+                                    <Truck size={18} />
+                                </div>
+                                <div className="sd-shortcut-info">
+                                    <span className="sd-shortcut-name">ใบส่งสินค้า (DO)</span>
+                                    <span className="sd-shortcut-desc">Delivery Orders</span>
+                                </div>
                             </div>
                         </div>
                     </div>
