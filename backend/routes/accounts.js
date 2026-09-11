@@ -150,10 +150,15 @@ router.get('/deposits', async (req, res) => {
                     r.Status, 
                     r.GrandTotal
                 FROM Receipt r
-                WHERE (r.Notes LIKE '%' + q.QuotationNo + '%' OR (q.ContractID IS NOT NULL AND r.ContractID = q.ContractID))
+                WHERE (
+                    r.CustomerOrder LIKE '%' + q.QuotationNo + '%' 
+                    OR r.Notes LIKE '%' + q.QuotationNo + '%' 
+                    OR (q.ContractID IS NOT NULL AND r.ContractID = q.ContractID)
+                )
                   AND (
                       r.Notes LIKE '%มัดจำ%' 
-                      OR (bi.BillingInvoiceNo IS NOT NULL AND r.Notes NOT LIKE '%' + bi.BillingInvoiceNo + '%') 
+                      OR EXISTS (SELECT 1 FROM ReceiptItem ri WHERE ri.ReceiptID = r.ReceiptID AND ri.ItemName LIKE '%มัดจำ%')
+                      OR (bi.BillingInvoiceNo IS NOT NULL AND r.Notes NOT LIKE '%' + bi.BillingInvoiceNo + '%' AND (r.CustomerOrder IS NULL OR r.CustomerOrder NOT LIKE '%' + bi.BillingInvoiceNo + '%')) 
                       OR bi.BillingInvoiceNo IS NULL
                   )
                 ORDER BY r.ReceiptID ASC
@@ -166,8 +171,17 @@ router.get('/deposits', async (req, res) => {
                     r.GrandTotal
                 FROM Receipt r
                 WHERE (
-                    (bi.BillingInvoiceNo IS NOT NULL AND r.Notes LIKE '%' + bi.BillingInvoiceNo + '%') 
-                    OR (r.Notes LIKE '%' + q.QuotationNo + '%' AND r.ReceiptID <> ISNULL(re_dep.ReceiptID, 0) AND (r.Notes LIKE '%ส่วนที่เหลือ%' OR r.Notes LIKE '%ปิดยอด%' OR r.Notes NOT LIKE '%มัดจำ%'))
+                    (bi.BillingInvoiceNo IS NOT NULL AND (r.Notes LIKE '%' + bi.BillingInvoiceNo + '%' OR r.CustomerOrder LIKE '%' + bi.BillingInvoiceNo + '%')) 
+                    OR (
+                        (r.CustomerOrder LIKE '%' + q.QuotationNo + '%' OR r.Notes LIKE '%' + q.QuotationNo + '%' OR (q.ContractID IS NOT NULL AND r.ContractID = q.ContractID))
+                        AND r.ReceiptID <> ISNULL(re_dep.ReceiptID, 0)
+                        AND (
+                            r.ShowDepositInPrint = 1
+                            OR r.Notes LIKE '%ส่วนที่เหลือ%' 
+                            OR r.Notes LIKE '%ปิดยอด%' 
+                            OR NOT EXISTS (SELECT 1 FROM ReceiptItem ri WHERE ri.ReceiptID = r.ReceiptID AND ri.ItemName LIKE '%มัดจำ%')
+                        )
+                    )
                 )
                 ORDER BY r.ReceiptID DESC
             ) re_fin
@@ -405,78 +419,39 @@ router.get('/quotation-for-receipt/:id', async (req, res) => {
         const vatRate = q.VatRate !== undefined ? Number(q.VatRate) : 7;
         const hasVat = (q.ShowVatInPrint || vatRate > 0) && vatRate > 0;
 
+        const defaultReceiptNotes = `<p><span style="font-size: 12px;">หมายเหตุ: ใบเสร็จรับเงินฉบับนี้จะถือว่าถูกต้องเเละสมบูรณ์ต่อเมื่อมีลายเซ็นของผู้มีอำนาจเเละเมื่อเรียกเก็บเงินตามบิลได้เรียบร้อย</span></p>`;
+
         if (type === 'deposit' && depositAmount > 0) {
-            // ── 1. กรณีสร้างใบเสร็จรับเงินมัดจำ (Deposit Receipt: RE1) ──
+            // ── 1. กรณีสร้างใบเสร็จรับเงินมัดจำ (Deposit Receipt: RE มัดจำ) ──
             receiptGrandTotal = depositAmount;
+            subTotal = depositAmount;
+            vatAmount = 0;
 
-            if (hasVat) {
-                subTotal = Math.round((depositAmount / (1 + vatRate / 100)) * 100) / 100;
-                vatAmount = Math.round((depositAmount - subTotal) * 100) / 100;
-            } else {
-                subTotal = depositAmount;
-                vatAmount = 0;
-            }
-
-            const depLabel = q.DepositPercent ? `${q.DepositPercent}%` : 'ตามสัญญา';
             items = [
                 {
                     id: 1,
-                    name: `เงินมัดจำค่าสินค้าและบริการ (${depLabel}) ตามใบเสนอราคาเลขที่ ${q.QuotationNo}`,
-                    qty: 1,
-                    unit: 'งวด',
-                    price: subTotal,
-                    amount: subTotal,
+                    name: 'เงินมัดจำสินค้า',
+                    qty: '',
+                    unit: '',
+                    price: '',
+                    discount: '',
+                    amount: depositAmount,
+                    manualTotal: depositAmount,
                     isPromo: false
                 }
             ];
 
-            notes = `<p><strong>อ้างอิงใบเสนอราคาเลขที่ :</strong> ${q.QuotationNo}</p><p><strong>ประเภทการรับชำระ :</strong> ชำระเงินมัดจำ (${depLabel})</p><p>ได้รับชำระเงินมัดจำเรียบร้อยแล้ว</p>`;
+            notes = defaultReceiptNotes;
         } else if (type === 'final' && depositAmount > 0) {
-            // ── 2. กรณีสร้างใบเสร็จรับเงินส่วนที่เหลือ/ปิดยอด (Final Receipt: RE2) ──
-            const targetAmount = remainingAmount > 0 ? remainingAmount : depositAmount;
-            receiptGrandTotal = targetAmount;
-
-            if (hasVat) {
-                subTotal = Math.round((targetAmount / (1 + vatRate / 100)) * 100) / 100;
-                vatAmount = Math.round((targetAmount - subTotal) * 100) / 100;
-            } else {
-                subTotal = targetAmount;
-                vatAmount = 0;
-            }
-
-            let itemName = '';
-            if (q.BillingInvoiceNo) {
-                itemName = `ชำระเงินส่วนที่เหลือตามใบวางบิลเลขที่ ${q.BillingInvoiceNo} (อ้างอิงใบเสนอราคา ${q.QuotationNo})`;
-            } else {
-                itemName = `ชำระเงินส่วนที่เหลือตามใบเสนอราคาเลขที่ ${q.QuotationNo}`;
-            }
-
-            items = [
-                {
-                    id: 1,
-                    name: itemName,
-                    qty: 1,
-                    unit: 'งวด',
-                    price: subTotal,
-                    amount: subTotal,
-                    isPromo: false
-                }
-            ];
-
-            notes = '';
-            if (q.BillingInvoiceNo) {
-                notes += `<p><strong>อ้างอิงใบวางบิลเลขที่ :</strong> ${q.BillingInvoiceNo}</p>`;
-            }
-            notes += `<p><strong>อ้างอิงใบเสนอราคาเลขที่ :</strong> ${q.QuotationNo}</p><p><strong>ประเภทการรับชำระ :</strong> ชำระเงินส่วนที่เหลือ (ปิดยอด)</p><p>ได้รับชำระเงินส่วนที่เหลือครบถ้วนเรียบร้อยแล้ว</p>`;
-        } else {
-            // ── 3. กรณีทั่วไป หรือไม่มีมัดจำ (Full Payment) ──
+            // ── 2. กรณีสร้างใบเสร็จรับเงินส่วนที่เหลือ/ปิดยอด (Final Receipt: RE ปิดยอด) ──
             items = (itemsRes.recordset || []).map((it, idx) => ({
                 id: idx + 1,
                 name: it.ItemName || '',
-                qty: parseFloat(it.Qty) || 1,
+                qty: (it.Qty !== null && it.Qty !== undefined && it.Qty !== '') ? parseFloat(it.Qty) : '',
                 unit: it.Unit || 'ชิ้น',
-                price: parseFloat(it.Price) || 0,
-                amount: parseFloat(it.Amount) || 0,
+                price: (it.Price !== null && it.Price !== undefined && it.Price !== '') ? parseFloat(it.Price) : '',
+                discount: it.Discount || '',
+                amount: (it.Amount !== null && it.Amount !== undefined) ? parseFloat(it.Amount) : 0,
                 image: it.ImageURL || null,
                 isPromo: !!it.IsPromo,
                 promoMultiplier: it.PromoMultiplier || 1
@@ -485,12 +460,26 @@ router.get('/quotation-for-receipt/:id', async (req, res) => {
             subTotal = Number(q.SubTotal || 0);
             vatAmount = Number(q.VatAmount || 0);
             receiptGrandTotal = grandTotal;
+            notes = defaultReceiptNotes;
+        } else {
+            // ── 3. กรณีทั่วไป หรือไม่มีมัดจำ (Full Payment) ──
+            items = (itemsRes.recordset || []).map((it, idx) => ({
+                id: idx + 1,
+                name: it.ItemName || '',
+                qty: (it.Qty !== null && it.Qty !== undefined && it.Qty !== '') ? parseFloat(it.Qty) : '',
+                unit: it.Unit || 'ชิ้น',
+                price: (it.Price !== null && it.Price !== undefined && it.Price !== '') ? parseFloat(it.Price) : '',
+                discount: it.Discount || '',
+                amount: (it.Amount !== null && it.Amount !== undefined) ? parseFloat(it.Amount) : 0,
+                image: it.ImageURL || null,
+                isPromo: !!it.IsPromo,
+                promoMultiplier: it.PromoMultiplier || 1
+            }));
 
-            notes = '';
-            if (q.BillingInvoiceNo) {
-                notes += `<p><strong>อ้างอิงใบวางบิลเลขที่ :</strong> ${q.BillingInvoiceNo}</p>`;
-            }
-            notes += `<p><strong>อ้างอิงใบเสนอราคาเลขที่ :</strong> ${q.QuotationNo}</p><p>ได้รับชำระเงินเรียบร้อยแล้ว</p>`;
+            subTotal = Number(q.SubTotal || 0);
+            vatAmount = Number(q.VatAmount || 0);
+            receiptGrandTotal = grandTotal;
+            notes = defaultReceiptNotes;
         }
 
         res.json({
@@ -510,21 +499,21 @@ router.get('/quotation-for-receipt/:id', async (req, res) => {
                 contractId: q.ContractID,
                 bankAccount: q.BankAccount,
                 subTotal: Number(subTotal || 0),
-                discountPercent: 0,
-                discountAmount: 0,
-                showDiscountInPrint: false,
+                discountPercent: type === 'deposit' ? 0 : Number(q.DiscountPercent || 0),
+                discountAmount: type === 'deposit' ? 0 : Number(q.DiscountAmount || 0),
+                showDiscountInPrint: type === 'deposit' ? false : !!q.ShowDiscountInPrint,
                 vatRate: vatRate,
-                vatAmount: Number(vatAmount || 0),
-                showVatInPrint: hasVat,
-                shippingCost: 0,
-                showShippingInPrint: false,
-                designFee: 0,
-                showDesignFeeInPrint: false,
+                vatAmount: type === 'deposit' ? 0 : Number(vatAmount || 0),
+                showVatInPrint: type === 'deposit' ? false : hasVat,
+                shippingCost: type === 'deposit' ? 0 : Number(q.ShippingCost || 0),
+                showShippingInPrint: type === 'deposit' ? false : !!q.ShowShippingInPrint,
+                designFee: type === 'deposit' ? 0 : Number(q.DesignFee || 0),
+                showDesignFeeInPrint: type === 'deposit' ? false : !!q.ShowDesignFeeInPrint,
                 grandTotal: Number(receiptGrandTotal || 0),
-                depositPercent: '0',
-                depositAmount: 0,
-                remainingAmount: 0,
-                showDepositInPrint: false,
+                depositPercent: type === 'deposit' ? '0' : 'custom',
+                depositAmount: type === 'deposit' ? 0 : (paidDepositAmount > 0 ? paidDepositAmount : depositAmount),
+                remainingAmount: type === 'deposit' ? 0 : remainingAmount,
+                showDepositInPrint: type === 'deposit' ? false : (depositAmount > 0),
                 notes,
                 items
             }

@@ -940,23 +940,29 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                 showDesignFeeInPrint: qData.showDesignFeeInPrint !== undefined ? !!qData.showDesignFeeInPrint : prev.showDesignFeeInPrint,
                 depositPercent: qData.depositPercent !== undefined ? String(qData.depositPercent) : prev.depositPercent,
                 customDepositAmount: Number(qData.depositAmount || 0),
-                showDepositInPrint: Number(qData.depositAmount || 0) > 0,
-                signer: 'thawat'
+                showDepositInPrint: qData.showDepositInPrint !== undefined ? !!qData.showDepositInPrint : Number(qData.depositAmount || 0) > 0,
+                signer: 'thawat',
+                customerOrder: prev.customerOrder || qData.quotationNo || '',
+                quotationNo: qData.quotationNo || '',
+                quotationId: qData.quotationId || null,
+                receiptType: qData.receiptType || ''
             }));
 
             if (qData.items && qData.items.length > 0) {
                 setItems(qData.items.map((item, idx) => ({
                     id: idx + 1,
                     name: item.name || '',
-                    qty: item.qty || 1,
-                    price: item.price || 0,
-                    amount: item.amount || 0,
+                    qty: (item.qty !== undefined && item.qty !== null) ? item.qty : '',
+                    price: (item.price !== undefined && item.price !== null) ? item.price : '',
+                    amount: item.amount !== undefined ? item.amount : 0,
+                    manualTotal: item.manualTotal !== undefined ? item.manualTotal : (item.amount !== undefined ? item.amount : undefined),
                     isPromo: !!item.isPromo,
                     promoType: item.isPromo ? 'old' : '',
                     promoMultiplier: item.promoMultiplier || 1,
                     basePromoName: item.name || '',
                     image: item.image || null,
-                    unit: item.unit || 'ชิ้น',
+                    unit: item.unit || '',
+                    discount: item.discount || '',
                     showDropdown: false
                 })));
             }
@@ -1144,15 +1150,16 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             setItems(data.items.map(item => ({
                                 id: item.ItemID,
                                 name: item.ItemName,
-                                qty: item.Qty,
-                                price: item.Price,
-                                amount: item.Amount,
+                                qty: (item.Qty !== null && item.Qty !== undefined) ? item.Qty : '',
+                                price: (item.Price !== null && item.Price !== undefined) ? item.Price : '',
+                                amount: (item.Amount !== null && item.Amount !== undefined) ? item.Amount : 0,
+                                manualTotal: (item.Qty === null || item.Qty === '' || Number(item.Qty) === 0) && item.Amount ? item.Amount : undefined,
                                 isPromo: item.IsPromo,
                                 promoType: item.IsPromo ? 'old' : '', // default to old for backward compat, or user can change
                                 promoMultiplier: item.PromoMultiplier || 1,
                                 basePromoName: item.ItemName,
                                 image: item.ImageURL || null,
-                                unit: item.Unit || 'ชิ้น',
+                                unit: item.Unit || '',
                                 showDropdown: false
                             })));
                         }
@@ -1229,8 +1236,10 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                     // For promo items, keep fixed price/unit - do NOT reverse-calculate!
                     if (!isPromoItem) {
                         const numTotal = parseFloat(value) || 0;
-                        const qty = parseFloat(newItem.qty) || 1;
-                        newItem.price = qty > 0 ? (numTotal / qty).toFixed(4) : 0;
+                        const qty = parseFloat(newItem.qty) || 0;
+                        if (qty > 0) {
+                            newItem.price = (numTotal / qty).toFixed(4);
+                        }
                     }
                 } else if (['qty', 'price', 'promoType', 'promoMultiplier', 'name', 'isPromo'].includes(field)) {
                     // For promo items, do NOT reset manualTotal when editing price or qty
@@ -1396,13 +1405,17 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         subTotal = fdaTotal;
     } else {
         subTotal = items.reduce((sum, item) => {
-            if (item.manualTotal !== undefined) {
+            if (item.manualTotal !== undefined && item.manualTotal !== null && item.manualTotal !== '') {
                 return sum + (parseFloat(item.manualTotal) || 0);
             }
             if (item.promoType || item.isPromo) {
                 return sum + (1000 * (parseInt(item.promoMultiplier) || 1));
             }
-            return sum + ((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0));
+            const itemCalc = (parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0);
+            if (itemCalc === 0 && item.amount) {
+                return sum + (parseFloat(item.amount) || 0);
+            }
+            return sum + itemCalc;
         }, 0);
     }
     const discountAmount = (!isFda && formData.showDiscountInPrint) ? (subTotal * (parseFloat(formData.discountPercent) || 0) / 100) : 0;
@@ -1423,6 +1436,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         depositAmount = grandTotal * (parseFloat(formData.depositPercent) || 0) / 100;
     }
     const remainingAmount = grandTotal - depositAmount;
+    const finalPayableTotal = (formData.showDepositInPrint && depositAmount > 0) ? remainingAmount : grandTotal;
 
     let compNameTH = '';
     let compNameEN = '';
@@ -1544,15 +1558,19 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             purchaseNo: formData.purchaseNo,
             salesperson: formData.salesperson,
             termOfPayment: formData.termOfPayment,
+            customerOrder: formData.customerOrder || formData.quotationNo || (initialFromQuotation ? initialFromQuotation.quotationNo : null),
+            quotationNo: formData.quotationNo || (initialFromQuotation ? initialFromQuotation.quotationNo : null),
+            quotationId: formData.quotationId || (initialFromQuotation ? initialFromQuotation.quotationId : null),
+            receiptType: formData.receiptType || (initialFromQuotation ? initialFromQuotation.receiptType : null),
             items: items.filter(i => i.name).map(i => ({
                 name: i.name,
-                qty: Number(i.qty) || 0,
-                price: Number(i.price) || 0,
-                amount: (i.manualTotal !== undefined && i.manualTotal !== '')
+                qty: (i.qty !== '' && i.qty !== null && i.qty !== undefined) ? (Number(i.qty) || 0) : null,
+                price: (i.price !== '' && i.price !== null && i.price !== undefined) ? (Number(i.price) || 0) : null,
+                amount: (i.manualTotal !== undefined && i.manualTotal !== null && i.manualTotal !== '')
                     ? (Number(i.manualTotal) || 0)
                     : (i.isPromo || i.promoType)
                         ? 1000 * (Number(i.promoMultiplier) || 1)
-                        : (Number(i.qty) || 0) * (Number(i.price) || 0),
+                        : (Number(i.qty) || 0) * (Number(i.price) || 0) || (Number(i.amount) || 0),
                 isPromo: !!(i.isPromo || i.promoType),
                 promoMultiplier: Number(i.promoMultiplier) || 1,
                 imageURL: i.image || i.imageURL
@@ -2212,7 +2230,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                         <div style={{ flex: '1 1 120px' }}>
                                             <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '6px', fontWeight: 500 }}>จำนวน</label>
                                             <div className="qty-group" style={{ margin: 0 }}>
-                                                <input type="number" className="product-qty" placeholder="0" min="1" value={item.qty} onChange={(e) => handleItemChange(item.id, 'qty', e.target.value)} required style={{ flex: 1, minWidth: '60px', paddingRight: '8px' }} />
+                                                <input type="number" className="product-qty" placeholder="0" value={item.qty !== undefined && item.qty !== null ? item.qty : ''} onChange={(e) => handleItemChange(item.id, 'qty', e.target.value)} style={{ flex: 1, minWidth: '60px', paddingRight: '8px' }} />
                                                 <div 
                                                     style={{ position: 'relative', flexShrink: 0 }}
                                                     onBlur={(e) => {
@@ -2304,7 +2322,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                         <div style={{ flex: '1 1 120px' }}>
                                             <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '6px', fontWeight: 500 }}>ราคา/หน่วย</label>
                                             <div className="price-group" style={{ margin: 0 }}>
-                                                <input type="number" className="product-price" placeholder="0.00" min="0" step="0.01" value={item.price} onChange={(e) => handleItemChange(item.id, 'price', e.target.value)} required style={{ flex: 1, minWidth: '40px' }} />
+                                                <input type="number" className="product-price" placeholder="0.00" min="0" step="0.01" value={item.price !== undefined && item.price !== null ? item.price : ''} onChange={(e) => handleItemChange(item.id, 'price', e.target.value)} style={{ flex: 1, minWidth: '40px' }} />
                                                 <span className="qty-label">บาท</span>
                                             </div>
                                         </div>
@@ -3091,21 +3109,38 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             </tr>
                         </thead>
                         <tbody>
-                            {items.filter(it => it.name).map((item, idx, arr) => (
-                                <tr key={item.id} style={{ height: cellHeight, borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #ccc' }}>
-                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>{idx + 1}</td>
-                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'left', padding: '2px 8px' }}>{isEn ? translateProductToEN(item.name) : item.name}</td>
-                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>{item.qty ? `${Number(item.qty).toLocaleString('th-TH')} ${isEn ? translateUnitToEN(item.unit || 'ชิ้น', item.qty) : (item.unit || 'ชิ้น')}` : ''}</td>
-                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'right', padding: '2px 8px' }}>{(parseFloat(item.price) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                    <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'right', padding: '2px 8px' }}>0.00</td>
-                                    <td style={{ textAlign: 'right', padding: '2px 8px' }}>
-                                        {((item.isPromo || item.promoType)
-                                            ? (1000 * (parseInt(item.promoMultiplier) || 1))
-                                            : ((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0))
-                                        ).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
-                                    </td>
-                                </tr>
-                            ))}
+                            {items.filter(it => it.name).map((item, idx, arr) => {
+                                const hasQty = item.qty !== '' && item.qty !== null && item.qty !== undefined && Number(item.qty) > 0;
+                                const hasPrice = item.price !== '' && item.price !== null && item.price !== undefined && Number(item.price) > 0;
+                                const rowAmount = (item.manualTotal !== undefined && item.manualTotal !== null && item.manualTotal !== '')
+                                    ? (parseFloat(item.manualTotal) || 0)
+                                    : ((item.isPromo || item.promoType)
+                                        ? (1000 * (parseInt(item.promoMultiplier) || 1))
+                                        : (hasQty && hasPrice
+                                            ? ((parseFloat(item.qty) || 0) * (parseFloat(item.price) || 0))
+                                            : (parseFloat(item.amount) || 0)
+                                          )
+                                      );
+
+                                return (
+                                    <tr key={item.id} style={{ height: cellHeight, borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #ccc' }}>
+                                        <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>{idx + 1}</td>
+                                        <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'left', padding: '2px 8px' }}>{isEn ? translateProductToEN(item.name) : item.name}</td>
+                                        <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 4px' }}>
+                                            {hasQty ? `${Number(item.qty).toLocaleString('th-TH')} ${isEn ? translateUnitToEN(item.unit || 'ชิ้น', item.qty) : (item.unit || '')}` : ''}
+                                        </td>
+                                        <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'right', padding: '2px 8px' }}>
+                                            {hasPrice ? (parseFloat(item.price) || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 }) : ''}
+                                        </td>
+                                        <td style={{ borderRight: '1px solid #1a7a3a', textAlign: 'center', padding: '2px 8px' }}>
+                                            {item.discount ? item.discount : (hasPrice ? '-' : '')}
+                                        </td>
+                                        <td style={{ textAlign: 'right', padding: '2px 8px' }}>
+                                            {rowAmount > 0 ? rowAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 }) : ''}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                             {items.filter(it => it.name).length === 0 && (
                                 <tr>
                                     <td colSpan="6" style={{ height: '50px', textAlign: 'center', borderBottom: 'none' }}>ไม่มีรายการสินค้า</td>
@@ -3202,7 +3237,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 <>
                                     <tr>
                                         <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '10pt', color: 'black' }}>
-                                            ยอดชำระมัดจำ<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>DEPOSIT</span>
+                                            หักเงินมัดจำ<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>LESS DEPOSIT</span>
                                         </td>
                                         <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', color: 'black', fontWeight: 'bold' }}>
                                             <span>{depositAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
@@ -3210,7 +3245,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                     </tr>
                                     <tr>
                                         <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '10pt', color: 'black' }}>
-                                            ยอดคงเหลือที่ต้องชำระ<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>REMAINING BALANCE</span>
+                                            ยอดหลังหักมัดจำ<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>AFTER DEPOSIT</span>
                                         </td>
                                         <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', color: 'black', fontWeight: 'bold' }}>
                                             <span>{remainingAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
@@ -3220,13 +3255,13 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             )}
                             <tr>
                                 <td colSpan="3" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '12pt', backgroundColor: '#d5f5e3', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a', padding: '5px' }}>
-                                    <span style={{ fontStyle: 'italic' }}>{isEn ? numberToEnglishWords(grandTotal) : ThaiBaht(grandTotal)}</span>
+                                    <span style={{ fontStyle: 'italic' }}>{isEn ? numberToEnglishWords(finalPayableTotal) : ThaiBaht(finalPayableTotal)}</span>
                                 </td>
                                 <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderRight: '1px solid #1a7a3a', backgroundColor: '#d5f5e3', fontSize: '10pt' }}>
                                     รวมเงินทั้งสิ้น<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>GRAND TOTAL</span>
                                 </td>
                                 <td style={{ textAlign: 'right', fontWeight: 'bold', textDecoration: 'underline', backgroundColor: '#d5f5e3', padding: '5px 10px', fontSize: '11pt' }}>
-                                    <span>{grandTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
+                                    <span>{finalPayableTotal.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
                                 </td>
                             </tr>
                         </tbody>

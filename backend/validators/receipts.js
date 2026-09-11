@@ -5,9 +5,9 @@ const { z } = require('zod');
 
 const ReceiptItemSchema = z.object({
     name: z.string({ message: 'กรุณาระบุชื่อสินค้า' }).min(1, 'กรุณาระบุชื่อสินค้า'),
-    qty: z.number({ message: 'กรุณาระบุจำนวน' }).min(0, 'จำนวนต้องไม่ติดลบ'),
-    price: z.number({ message: 'กรุณาระบุราคา' }).min(0, 'ราคาต้องไม่ติดลบ'),
-    amount: z.number().min(0).default(0),
+    qty: z.union([z.number(), z.string(), z.null()]).optional().nullable().transform(val => (val === '' || val === null || val === undefined) ? null : Number(val)),
+    price: z.union([z.number(), z.string(), z.null()]).optional().nullable().transform(val => (val === '' || val === null || val === undefined) ? null : Number(val)),
+    amount: z.union([z.number(), z.string()]).optional().default(0).transform(val => Number(val) || 0),
     isPromo: z.boolean().optional().default(false),
     promoMultiplier: z.number().int().optional().default(1),
     imageURL: z.string().nullable().optional(),
@@ -68,6 +68,10 @@ const createReceiptSchema = z.object({
     customerBranch: z.string().nullable().optional(),
     chequeNo: z.string().nullable().optional(),
     chequeDate: z.string().nullable().optional(),
+
+    quotationNo: z.string().nullable().optional(),
+    quotationId: z.union([z.string(), z.number()]).nullable().optional(),
+    receiptType: z.string().nullable().optional(),
 
     items: z.array(ReceiptItemSchema).optional().default([]),
 });

@@ -182,7 +182,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
         fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceRegisterQuantity, fdaServiceTrademark, fdaServiceTrademarkPrice, fdaServiceTrademarkQuantity,
         status, contractId, items,
-        deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate
+        deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate,
+        quotationNo, quotationId, receiptType
     } = req.body;
 
     let transaction;
@@ -234,7 +235,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         request.input('depositAmount', sql.Decimal(18,2), depositAmount);
         request.input('remainingAmount', sql.Decimal(18,2), remainingAmount);
         request.input('signer', sql.NVarChar, signer);
-        request.input('customerOrder', sql.NVarChar, customerOrder || null);
+        const finalCustomerOrder = customerOrder || quotationNo || null;
+        request.input('customerOrder', sql.NVarChar, finalCustomerOrder);
         request.input('purchaseNo', sql.NVarChar, purchaseNo || null);
         request.input('salesperson', sql.NVarChar, salesperson || null);
         request.input('termOfPayment', sql.NVarChar, termOfPayment || null);
@@ -299,9 +301,9 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 itemReq.input('qid', sql.Int, receiptId);
                 itemReq.input('order', sql.Int, i + 1);
                 itemReq.input('name', sql.NVarChar, item.name);
-                itemReq.input('qty', sql.Decimal(18,2), item.qty);
-                itemReq.input('price', sql.Decimal(18,2), item.price);
-                itemReq.input('amount', sql.Decimal(18,2), item.amount);
+                itemReq.input('qty', sql.Decimal(18,2), (item.qty !== null && item.qty !== undefined && item.qty !== '') ? item.qty : null);
+                itemReq.input('price', sql.Decimal(18,2), (item.price !== null && item.price !== undefined && item.price !== '') ? item.price : null);
+                itemReq.input('amount', sql.Decimal(18,2), (item.amount !== null && item.amount !== undefined && item.amount !== '') ? item.amount : 0);
                 itemReq.input('isPromo', sql.Bit, item.isPromo ? 1 : 0);
                 itemReq.input('promoMultiplier', sql.Int, item.promoMultiplier || 1);
                 itemReq.input('imageURL', sql.NVarChar(sql.MAX), item.imageURL);
@@ -353,33 +355,33 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         }
 
         // ✅ Auto-update Quotation deposit status if referencing quotation
-        if (notes) {
+        const targetQno = quotationNo || (finalCustomerOrder && finalCustomerOrder.match(/QT-\d{8}-\d{3}/i)?.[0]) || (notes && notes.match(/QT-\d{8}-\d{3}/i)?.[0]);
+        if (targetQno) {
             try {
-                const qtMatch = notes.match(/QT-\d{8}-\d{3}/i);
-                if (qtMatch) {
-                    const quotationNo = qtMatch[0];
-                    if (notes.includes('มัดจำ')) {
-                        await pool.request()
-                            .input('qno', sql.NVarChar, quotationNo)
-                            .input('paid', sql.Decimal(18, 2), grandTotal)
-                            .query(`
-                                UPDATE Quotation 
-                                SET DepositStatus = N'ชำระมัดจำแล้ว', 
-                                    PaidDepositAmount = @paid 
-                                WHERE QuotationNo = @qno
-                            `);
-                        console.log(`✅ Auto-updated Quotation ${quotationNo} DepositStatus to 'ชำระมัดจำแล้ว'`);
-                    } else if (notes.includes('ส่วนที่เหลือ') || notes.includes('ปิดยอด') || notes.includes('BI-')) {
-                        await pool.request()
-                            .input('qno', sql.NVarChar, quotationNo)
-                            .query(`
-                                UPDATE Quotation 
-                                SET DepositStatus = N'ชำระครบถ้วน', 
-                                    PaidDepositAmount = GrandTotal 
-                                WHERE QuotationNo = @qno
-                            `);
-                        console.log(`✅ Auto-updated Quotation ${quotationNo} DepositStatus to 'ชำระครบถ้วน'`);
-                    }
+                const isDeposit = (receiptType === 'deposit') || (items && items.some(it => it.name && it.name.includes('มัดจำ'))) || (notes && notes.includes('มัดจำ'));
+                const isFinal = (receiptType === 'final') || (showDepositInPrint && depositAmount > 0) || (notes && (notes.includes('ส่วนที่เหลือ') || notes.includes('ปิดยอด') || notes.includes('BI-')));
+
+                if (isDeposit) {
+                    await pool.request()
+                        .input('qno', sql.NVarChar, targetQno)
+                        .input('paid', sql.Decimal(18, 2), grandTotal)
+                        .query(`
+                            UPDATE Quotation 
+                            SET DepositStatus = N'ชำระมัดจำแล้ว', 
+                                PaidDepositAmount = @paid 
+                            WHERE QuotationNo = @qno
+                        `);
+                    console.log(`✅ Auto-updated Quotation ${targetQno} DepositStatus to 'ชำระมัดจำแล้ว' (paid: ${grandTotal})`);
+                } else if (isFinal) {
+                    await pool.request()
+                        .input('qno', sql.NVarChar, targetQno)
+                        .query(`
+                            UPDATE Quotation 
+                            SET DepositStatus = N'ชำระครบถ้วน', 
+                                PaidDepositAmount = GrandTotal 
+                            WHERE QuotationNo = @qno
+                        `);
+                    console.log(`✅ Auto-updated Quotation ${targetQno} DepositStatus to 'ชำระครบถ้วน'`);
                 }
             } catch (syncErr) {
                 console.error('⚠️ Warning syncing quotation deposit status:', syncErr.message);
@@ -570,9 +572,9 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 itemReq.input('qid', sql.Int, qid);
                 itemReq.input('order', sql.Int, i + 1);
                 itemReq.input('name', sql.NVarChar, item.name);
-                itemReq.input('qty', sql.Decimal(18,2), item.qty);
-                itemReq.input('price', sql.Decimal(18,2), item.price);
-                itemReq.input('amount', sql.Decimal(18,2), item.amount);
+                itemReq.input('qty', sql.Decimal(18,2), (item.qty !== null && item.qty !== undefined && item.qty !== '') ? item.qty : null);
+                itemReq.input('price', sql.Decimal(18,2), (item.price !== null && item.price !== undefined && item.price !== '') ? item.price : null);
+                itemReq.input('amount', sql.Decimal(18,2), (item.amount !== null && item.amount !== undefined && item.amount !== '') ? item.amount : 0);
                 itemReq.input('isPromo', sql.Bit, item.isPromo ? 1 : 0);
                 itemReq.input('promoMultiplier', sql.Int, item.promoMultiplier || 1);
                 itemReq.input('imageURL', sql.NVarChar(sql.MAX), item.imageURL);
