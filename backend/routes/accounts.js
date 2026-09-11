@@ -419,7 +419,7 @@ router.get('/quotation-for-receipt/:id', async (req, res) => {
         const vatRate = q.VatRate !== undefined ? Number(q.VatRate) : 7;
         const hasVat = (q.ShowVatInPrint || vatRate > 0) && vatRate > 0;
 
-        const defaultReceiptNotes = `<p><span style="font-size: 12px;">หมายเหตุ: ใบเสร็จรับเงินฉบับนี้จะถือว่าถูกต้องเเละสมบูรณ์ต่อเมื่อมีลายเซ็นของผู้มีอำนาจเเละเมื่อเรียกเก็บเงินตามบิลได้เรียบร้อย</span></p>`;
+        const defaultReceiptNotes = `<p><span style="font-size: 12px;"><strong>หมายเหตุ:</strong> ใบเสร็จรับเงินฉบับนี้จะถือว่าถูกต้องและสมบูรณ์ต่อเมื่อมีลายเซ็นของผู้มีอำนาจและเมื่อเรียกเก็บเงินตามบิลได้เรียบร้อย</span></p>`;
 
         if (type === 'deposit' && depositAmount > 0) {
             // ── 1. กรณีสร้างใบเสร็จรับเงินมัดจำ (Deposit Receipt: RE มัดจำ) ──

@@ -598,11 +598,15 @@ const styles = `
     }
     .print-notes-container span,
     .print-notes-container div,
-    .print-notes-container strong,
-    .print-notes-container b,
     .print-notes-container em,
     .print-notes-container i,
     .print-notes-container td {
+        white-space: pre-wrap !important;
+        white-space: break-spaces !important;
+    }
+    .print-notes-container strong,
+    .print-notes-container b {
+        font-weight: bold !important;
         white-space: pre-wrap !important;
         white-space: break-spaces !important;
     }
@@ -708,7 +712,16 @@ function translateNotesToEN(html) {
     return res;
 }
 
-const DEFAULT_NORMAL_NOTES = `<p><span style="font-size: 12px;">หมายเหตุ: ใบเสร็จรับเงินฉบับนี้จะถือว่าถูกต้องและสมบูรณ์ต่อเมื่อมีลายเซ็นของผู้มีอำนาจและเมื่อเรียกเก็บเงินตามบิลได้เรียบร้อย</span></p>`;
+const formatNotesForDisplay = (notesHtml) => {
+    if (!notesHtml) return '';
+    let res = notesHtml;
+    if (res.includes('หมายเหตุ:') && !res.includes('<strong>หมายเหตุ:</strong>') && !res.includes('<b>หมายเหตุ:</b>')) {
+        res = res.replace(/หมายเหตุ:/g, '<strong>หมายเหตุ:</strong>');
+    }
+    return res;
+};
+
+const DEFAULT_NORMAL_NOTES = `<p><span style="font-size: 12px;"><strong>หมายเหตุ:</strong> ใบเสร็จรับเงินฉบับนี้จะถือว่าถูกต้องและสมบูรณ์ต่อเมื่อมีลายเซ็นของผู้มีอำนาจและเมื่อเรียกเก็บเงินตามบิลได้เรียบร้อย</span></p>`;
 
 const DEFAULT_FDA_NOTES = DEFAULT_NORMAL_NOTES;
 
@@ -929,7 +942,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                 ...parsedAddr,
                 phone: qData.phone || '',
                 taxId: qData.taxId || '',
-                notes: qData.notes || prev.notes,
+                notes: formatNotesForDisplay(qData.notes || prev.notes),
                 vatRate: qData.vatRate !== undefined ? Number(qData.vatRate) : prev.vatRate,
                 showVatInPrint: qData.showVatInPrint !== undefined ? !!qData.showVatInPrint : prev.showVatInPrint,
                 discountPercent: qData.discountPercent !== undefined ? Number(qData.discountPercent) : prev.discountPercent,
@@ -1120,7 +1133,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             purchaseNo: data.PurchaseNo || '',
                             salesperson: data.Salesperson || '',
                             termOfPayment: data.TermOfPayment || '30 วัน',
-                            notes: data.Notes || '',
+                            notes: formatNotesForDisplay(data.Notes || ''),
                             showDiscountInPrint: data.ShowDiscountInPrint,
                             showVatInPrint: data.ShowVatInPrint,
                             showDepositInPrint: data.ShowDepositInPrint,
@@ -1672,11 +1685,15 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             }
                             #q-print-container .print-notes-container span,
                             #q-print-container .print-notes-container div,
-                            #q-print-container .print-notes-container strong,
-                            #q-print-container .print-notes-container b,
                             #q-print-container .print-notes-container em,
                             #q-print-container .print-notes-container i,
                             #q-print-container .print-notes-container td {
+                                white-space: pre-wrap !important;
+                                white-space: break-spaces !important;
+                            }
+                            #q-print-container .print-notes-container strong,
+                            #q-print-container .print-notes-container b {
+                                font-weight: bold !important;
                                 white-space: pre-wrap !important;
                                 white-space: break-spaces !important;
                             }
@@ -2876,7 +2893,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             <tbody>
                                 <tr>
                                     <td style={{ border: '1px solid black', padding: '8px', verticalAlign: 'top' }}>
-                                        <div className="print-notes-container" dangerouslySetInnerHTML={{ __html: formData.notes }} />
+                                        <div className="print-notes-container" dangerouslySetInnerHTML={{ __html: formatNotesForDisplay(formData.notes) }} />
                                     </td>
                                 </tr>
                             </tbody>
@@ -3158,7 +3175,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                     (formData.showDesignFeeInPrint && designFee > 0 ? 1 : 0) +
                                     (formData.showDepositInPrint && depositAmount > 0 ? 2 : 0) + 1
                                 } style={{ width: '64%', verticalAlign: 'top', padding: '5px 12px', borderRight: '1px solid #1a7a3a', borderTop: '1px solid #1a7a3a' }}>
-                                    <div className="print-notes-container" dangerouslySetInnerHTML={{ __html: formData.notes }} style={{ fontSize: '9pt', minHeight: '15px' }} />
+                                    <div className="print-notes-container" dangerouslySetInnerHTML={{ __html: formatNotesForDisplay(formData.notes) }} style={{ fontSize: '9pt', minHeight: '15px' }} />
                                     
                                     <div style={{ marginTop: '8px', padding: '5px 0' }}>
                                         <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '10pt', color: '#1a7a3a' }}>
