@@ -1,4 +1,4 @@
-﻿/**
+/**
  * =============================================================================
  * CompanyPortal.jsx — หน้า Company Portal แยกเฉพาะสำหรับแต่ละบริษัท
  * =============================================================================
@@ -137,47 +137,49 @@ export default function CompanyPortal() {
                 </div>
 
                 <div className="cp-nav-actions">
-                    {/* ปุ่มสลับบริษัท */}
-                    <div className="cp-switcher-wrapper">
-                        <button 
-                            className="cp-switcher-btn"
-                            onClick={() => setSwitcherOpen(!switcherOpen)}
-                        >
-                            <span className="cp-switcher-dot" style={{ background: companyColor }} />
-                            <span>{companyShort}</span>
-                            <ChevronsUpDown size={14} className="cp-switcher-icon" />
-                        </button>
+                    {/* ปุ่มสลับบริษัท (แสดงเฉพาะผู้ใช้ที่มีสิทธิ์เข้าถึงมากกว่า 1 บริษัท) */}
+                    {availableCompanies && availableCompanies.length > 1 && (
+                        <div className="cp-switcher-wrapper">
+                            <button 
+                                className="cp-switcher-btn"
+                                onClick={() => setSwitcherOpen(!switcherOpen)}
+                            >
+                                <span className="cp-switcher-dot" style={{ background: companyColor }} />
+                                <span>{companyShort}</span>
+                                <ChevronsUpDown size={14} className="cp-switcher-icon" />
+                            </button>
 
-                        {switcherOpen && (
-                            <div className="cp-switcher-menu">
-                                <div className="cp-switcher-header">สลับบริษัทที่เข้าใช้งาน</div>
-                                {availableCompanies?.map(c => (
-                                    <button
-                                        key={c.CompanyID}
-                                        className={`cp-switcher-item ${c.CompanyID === currentCompany?.CompanyID ? 'active' : ''}`}
-                                        onClick={() => handleSwitch(c.CompanyID)}
-                                    >
-                                        <img 
-                                            src={c.CompanyLogo} 
-                                            alt={c.ShortName} 
-                                            className="cp-switcher-item-logo"
-                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                        />
-                                        <div className="cp-switcher-item-info">
-                                            <strong>{c.ShortName}</strong>
-                                            <small>{c.CompanyNameTH || c.CompanyName}</small>
-                                        </div>
-                                        {c.ShortName === 'THC' && <span className="cp-pill">ERP โรงงาน</span>}
-                                    </button>
-                                ))}
-                                <div className="cp-switcher-footer">
-                                    <button onClick={() => navigate('/select-company')} className="cp-switcher-back-all">
-                                        <ExternalLink size={13} /> หน้าเลือกบริษัททั้งหมด
-                                    </button>
+                            {switcherOpen && (
+                                <div className="cp-switcher-menu">
+                                    <div className="cp-switcher-header">สลับบริษัทที่เข้าใช้งาน</div>
+                                    {availableCompanies?.map(c => (
+                                        <button
+                                            key={c.CompanyID}
+                                            className={`cp-switcher-item ${c.CompanyID === currentCompany?.CompanyID ? 'active' : ''}`}
+                                            onClick={() => handleSwitch(c.CompanyID)}
+                                        >
+                                            <img 
+                                                src={c.CompanyLogo} 
+                                                alt={c.ShortName} 
+                                                className="cp-switcher-item-logo"
+                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                            <div className="cp-switcher-item-info">
+                                                <strong>{c.ShortName}</strong>
+                                                <small>{c.CompanyNameTH || c.CompanyName}</small>
+                                            </div>
+                                            {c.ShortName === 'THC' && <span className="cp-pill">ERP โรงงาน</span>}
+                                        </button>
+                                    ))}
+                                    <div className="cp-switcher-footer">
+                                        <button onClick={() => navigate('/select-company')} className="cp-switcher-back-all">
+                                            <ExternalLink size={13} /> หน้าเลือกบริษัททั้งหมด
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
-                    </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* ผู้ใช้งาน */}
                     <div className="cp-user-tag">

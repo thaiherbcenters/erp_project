@@ -2,8 +2,8 @@
  * Customer.jsx — หน้าจัดการข้อมูลลูกค้า (Real DB)
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { searchAddressByDistrict, searchAddressByAmphoe, searchAddressByZipcode } from 'thai-address-database';
 import { useSearchParams } from 'react-router-dom';
+import { searchThaiAddress } from '../utils/thaiAddress';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
 import { Eye, Edit2, Trash2, X, Search } from 'lucide-react';
@@ -346,47 +346,10 @@ export default function Customer() {
     const [activeAddressField, setActiveAddressField] = useState(null);
 
     const handleAddressChange = (field, value) => {
-        setForm({ ...form, [field]: value });
-        if (value && value.length >= 2) {
-            let res = [];
-            if (field === 'zipCode') res = searchAddressByZipcode(value);
-            else if (field === 'subDistrict') res = searchAddressByDistrict(value);
-            else if (field === 'district') res = searchAddressByAmphoe(value);
-            else if (field === 'province') res = searchAddressByProvince(value);
-
-            // Deduplicate based on the active field
-            let uniqueRes = [];
-            if (field === 'province') {
-                const seen = new Set();
-                res.forEach(item => {
-                    if (!seen.has(item.province)) {
-                        seen.add(item.province);
-                        uniqueRes.push(item);
-                    }
-                });
-            } else if (field === 'district') {
-                const seen = new Set();
-                res.forEach(item => {
-                    const key = `${item.amphoe}-${item.province}`;
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        uniqueRes.push(item);
-                    }
-                });
-            } else if (field === 'zipCode') {
-                const seen = new Set();
-                res.forEach(item => {
-                    const key = `${item.zipcode}-${item.amphoe}-${item.province}`;
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        uniqueRes.push(item);
-                    }
-                });
-            } else {
-                uniqueRes = res;
-            }
-
-            setAddressSuggestions(uniqueRes.slice(0, 50));
+        setForm(prev => ({ ...prev, [field]: value }));
+        if (value && value.trim().length >= 2) {
+            const res = searchThaiAddress(field, value, 40);
+            setAddressSuggestions(res);
             setActiveAddressField(field);
         } else {
             setAddressSuggestions([]);
@@ -395,28 +358,96 @@ export default function Customer() {
     };
 
     const handleSelectAddress = (item, field) => {
-        const nextForm = { ...form };
-        
-        if (field === 'subDistrict') {
-            nextForm.subDistrict = item.district || '';
-            nextForm.district = item.amphoe || '';
-            nextForm.province = item.province || '';
-            nextForm.zipCode = item.zipcode || '';
-        } else if (field === 'district') {
-            nextForm.district = item.amphoe || '';
-            nextForm.province = item.province || '';
-            if (!nextForm.zipCode) nextForm.zipCode = item.zipcode || '';
-        } else if (field === 'province') {
-            nextForm.province = item.province || '';
-        } else if (field === 'zipCode') {
-            nextForm.zipCode = item.zipcode || '';
-            nextForm.province = item.province || '';
-            if (!nextForm.district) nextForm.district = item.amphoe || '';
-        }
-
-        setForm(nextForm);
+        setForm(prev => {
+            const next = { ...prev };
+            if (field === 'subDistrict') {
+                next.subDistrict = item.district || '';
+                next.district = item.amphoe || '';
+                next.province = item.province || '';
+                next.zipCode = item.zipcode || '';
+            } else if (field === 'district') {
+                next.district = item.amphoe || '';
+                next.province = item.province || '';
+                if (!next.zipCode || next.zipCode.trim() === '') next.zipCode = item.zipcode || '';
+            } else if (field === 'province') {
+                next.province = item.province || '';
+            } else if (field === 'zipCode') {
+                next.zipCode = item.zipcode || '';
+                next.province = item.province || '';
+                if (!next.district) next.district = item.amphoe || '';
+                if (!next.subDistrict) next.subDistrict = item.district || '';
+            }
+            return next;
+        });
         setAddressSuggestions([]);
         setActiveAddressField(null);
+    };
+
+    const renderAddressDropdown = (field) => {
+        if (activeAddressField !== field) return null;
+        if (!form[field] || form[field].trim().length < 2) return null;
+
+        return (
+            <ul 
+                onMouseDown={(e) => e.preventDefault()}
+                style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 4px)',
+                    left: 0,
+                    width: '100%',
+                    minWidth: '280px',
+                    maxHeight: '240px',
+                    overflowY: 'auto',
+                    background: '#ffffff',
+                    border: '1.5px solid #cbd5e1',
+                    borderRadius: '8px',
+                    zIndex: 1000,
+                    margin: 0,
+                    padding: '4px',
+                    listStyle: 'none',
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)'
+                }}
+            >
+                {addressSuggestions.length > 0 ? (
+                    addressSuggestions.map((item, i) => (
+                        <li
+                            key={i}
+                            onClick={() => handleSelectAddress(item, activeAddressField)}
+                            style={{
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                borderRadius: '6px',
+                                marginBottom: '2px',
+                                transition: 'background 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = '#f1f5f9'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        >
+                            <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b', marginBottom: '2px' }}>
+                                ต.{item.district} อ.{item.amphoe}
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span>จ.{item.province}</span>
+                                <span style={{ 
+                                    background: '#e2e8f0', 
+                                    color: '#334155', 
+                                    padding: '1px 6px', 
+                                    borderRadius: '4px', 
+                                    fontWeight: 500,
+                                    fontSize: '11px' 
+                                }}>
+                                    {item.zipcode}
+                                </span>
+                            </div>
+                        </li>
+                    ))
+                ) : (
+                    <li style={{ padding: '12px', fontSize: '12px', color: '#94a3b8', textAlign: 'center' }}>
+                        ไม่พบที่อยู่ที่ตรงกับ "{form[field]}"
+                    </li>
+                )}
+            </ul>
+        );
     };
 
     const getStatusClass = (s) => {
@@ -608,57 +639,54 @@ export default function Customer() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '10px' }}>
                                 <div style={{ position: 'relative' }}>
                                     <label style={labelStyle}>ตำบล / แขวง</label>
-                                    <input style={inputStyle} value={form.subDistrict || ''} onChange={e => handleAddressChange('subDistrict', e.target.value)} onFocus={() => { if(form.subDistrict?.length >= 2) handleAddressChange('subDistrict', form.subDistrict); }} onBlur={() => setTimeout(() => setActiveAddressField(null), 200)} placeholder="ตำบล/แขวง" />
-                                    {activeAddressField === 'subDistrict' && addressSuggestions.length > 0 && (
-                                        <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '150px', overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', zIndex: 1000, margin: 0, padding: 0, listStyle: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                                            {addressSuggestions.map((item, i) => (
-                                                <li key={i} onClick={() => handleSelectAddress(item, activeAddressField)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }} onMouseEnter={e => e.target.style.background = '#f5f5f5'} onMouseLeave={e => e.target.style.background = 'transparent'}>
-                                                    ต.{item.district} อ.{item.amphoe} จ.{item.province} {item.zipcode}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                    <input 
+                                        style={inputStyle} 
+                                        value={form.subDistrict || ''} 
+                                        onChange={e => handleAddressChange('subDistrict', e.target.value)} 
+                                        onFocus={() => { if(form.subDistrict?.length >= 2) handleAddressChange('subDistrict', form.subDistrict); }} 
+                                        onBlur={() => setTimeout(() => setActiveAddressField(null), 250)} 
+                                        placeholder="พิมพ์ตำบล หรือแขวง" 
+                                    />
+                                    {renderAddressDropdown('subDistrict')}
                                 </div>
                                 <div style={{ position: 'relative' }}>
                                     <label style={labelStyle}>อำเภอ / เขต</label>
-                                    <input style={inputStyle} value={form.district || ''} onChange={e => handleAddressChange('district', e.target.value)} onFocus={() => { if(form.district?.length >= 2) handleAddressChange('district', form.district); }} onBlur={() => setTimeout(() => setActiveAddressField(null), 200)} placeholder="อำเภอ/เขต" />
-                                    {activeAddressField === 'district' && addressSuggestions.length > 0 && (
-                                        <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '150px', overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', zIndex: 1000, margin: 0, padding: 0, listStyle: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                                            {addressSuggestions.map((item, i) => (
-                                                <li key={i} onClick={() => handleSelectAddress(item, activeAddressField)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }} onMouseEnter={e => e.target.style.background = '#f5f5f5'} onMouseLeave={e => e.target.style.background = 'transparent'}>
-                                                    อ.{item.amphoe} จ.{item.province} {item.zipcode}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                    <input 
+                                        style={inputStyle} 
+                                        value={form.district || ''} 
+                                        onChange={e => handleAddressChange('district', e.target.value)} 
+                                        onFocus={() => { if(form.district?.length >= 2) handleAddressChange('district', form.district); }} 
+                                        onBlur={() => setTimeout(() => setActiveAddressField(null), 250)} 
+                                        placeholder="พิมพ์อำเภอ หรือเขต" 
+                                    />
+                                    {renderAddressDropdown('district')}
                                 </div>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                 <div style={{ position: 'relative' }}>
                                     <label style={labelStyle}>จังหวัด</label>
-                                    <input style={inputStyle} value={form.province || ''} onChange={e => handleAddressChange('province', e.target.value)} onFocus={() => { if(form.province?.length >= 2) handleAddressChange('province', form.province); }} onBlur={() => setTimeout(() => setActiveAddressField(null), 200)} placeholder="จังหวัด" />
-                                    {activeAddressField === 'province' && addressSuggestions.length > 0 && (
-                                        <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '150px', overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', zIndex: 1000, margin: 0, padding: 0, listStyle: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                                            {addressSuggestions.map((item, i) => (
-                                                <li key={i} onClick={() => handleSelectAddress(item, activeAddressField)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }} onMouseEnter={e => e.target.style.background = '#f5f5f5'} onMouseLeave={e => e.target.style.background = 'transparent'}>
-                                                    จ.{item.province} {item.zipcode}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                    <input 
+                                        style={inputStyle} 
+                                        value={form.province || ''} 
+                                        onChange={e => handleAddressChange('province', e.target.value)} 
+                                        onFocus={() => { if(form.province?.length >= 2) handleAddressChange('province', form.province); }} 
+                                        onBlur={() => setTimeout(() => setActiveAddressField(null), 250)} 
+                                        placeholder="พิมพ์จังหวัด" 
+                                    />
+                                    {renderAddressDropdown('province')}
                                 </div>
                                 <div style={{ position: 'relative' }}>
                                     <label style={labelStyle}>รหัสไปรษณีย์</label>
-                                    <input style={inputStyle} value={form.zipCode || ''} onChange={e => handleAddressChange('zipCode', e.target.value)} onFocus={() => { if(form.zipCode?.length >= 2) handleAddressChange('zipCode', form.zipCode); }} onBlur={() => setTimeout(() => setActiveAddressField(null), 200)} placeholder="เช่น 10110" maxLength={5} />
-                                    {activeAddressField === 'zipCode' && addressSuggestions.length > 0 && (
-                                        <ul style={{ position: 'absolute', top: '100%', left: 0, width: '100%', maxHeight: '150px', overflowY: 'auto', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', zIndex: 1000, margin: 0, padding: 0, listStyle: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                                            {addressSuggestions.map((item, i) => (
-                                                <li key={i} onClick={() => handleSelectAddress(item, activeAddressField)} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: '13px' }} onMouseEnter={e => e.target.style.background = '#f5f5f5'} onMouseLeave={e => e.target.style.background = 'transparent'}>
-                                                    {item.zipcode} ต.{item.district} อ.{item.amphoe} จ.{item.province}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                    <input 
+                                        style={inputStyle} 
+                                        value={form.zipCode || ''} 
+                                        onChange={e => handleAddressChange('zipCode', e.target.value)} 
+                                        onFocus={() => { if(form.zipCode?.length >= 2) handleAddressChange('zipCode', form.zipCode); }} 
+                                        onBlur={() => setTimeout(() => setActiveAddressField(null), 250)} 
+                                        placeholder="เช่น 10110, 47110" 
+                                        maxLength={5} 
+                                    />
+                                    {renderAddressDropdown('zipCode')}
                                 </div>
                             </div>
                             <div>

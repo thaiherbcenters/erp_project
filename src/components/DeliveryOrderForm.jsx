@@ -13,6 +13,7 @@ import { TipTapCell } from './TipTapCell';
 import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN } from '../utils/formatters';
 import FormattedAddress from './FormattedAddress';
 import BillingPrintContainer from './BillingPrintContainer';
+import ThaiAddressInputGroup from './ThaiAddressInputGroup';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -1669,26 +1670,12 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                                             <input type="text" name="addr_road" placeholder="ถนน (ถ้ามี)" value={formData.addr_road} onChange={handleFormChange} />
                                         </div>
                                     </div>
-                                    <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: '14px' }}>
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>ตำบล/แขวง</div>
-                                            <input type="text" name="addr_subdistrict" placeholder="ตำบล/แขวง" value={formData.addr_subdistrict} onChange={handleFormChange} required />
-                                        </div>
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>อำเภอ/เขต</div>
-                                            <input type="text" name="addr_district" placeholder="อำเภอ/เขต" value={formData.addr_district} onChange={handleFormChange} required />
-                                        </div>
-                                    </div>
-                                    <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>จังหวัด</div>
-                                            <input type="text" name="addr_province" placeholder="จังหวัด" value={formData.addr_province} onChange={handleFormChange} required />
-                                        </div>
-                                        <div className="form-group" style={{ marginBottom: 0 }}>
-                                            <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>รหัสไปรษณีย์</div>
-                                            <input type="text" name="addr_zip" placeholder="รหัสไปรษณีย์" value={formData.addr_zip} onChange={handleFormChange} required />
-                                        </div>
-                                    </div>
+                                    <ThaiAddressInputGroup
+                                        formData={formData}
+                                        setFormData={setFormData}
+                                        onChange={handleFormChange}
+                                        required={true}
+                                    />
                         </div>
                         <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
                             <div className="form-group" style={{ marginBottom: 0 }}>

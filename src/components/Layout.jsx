@@ -413,12 +413,13 @@ export default function Layout() {
                     </div>
 
                     <div className="top-nav-actions">
-                        {activeCompany && (
+                        {/* แสดงป้ายสลับบริษัทเฉพาะเมื่อมีสิทธิ์เข้าถึงมากกว่า 1 บริษัท (เช่น ผู้บริหาร, Admin) — user ปกติที่มีบริษัทเดียวจะไม่แสดงป้ายนี้ */}
+                        {activeCompany && availableCompanies && availableCompanies.length > 1 && (
                             <div className="top-company-switcher" ref={companySwitcherRef}>
                                 <button
                                     className={`top-company-btn ${companySwitcherOpen ? 'active' : ''}`}
-                                    onClick={() => availableCompanies.length > 1 && setCompanySwitcherOpen(!companySwitcherOpen)}
-                                    title={availableCompanies.length > 1 ? "คลิกเพื่อสลับบริษัท" : activeCompany.CompanyNameTH}
+                                    onClick={() => setCompanySwitcherOpen(!companySwitcherOpen)}
+                                    title="คลิกเพื่อสลับบริษัท"
                                 >
                                     <div className="top-company-logo-box">
                                         {activeCompany.CompanyLogo ? (
