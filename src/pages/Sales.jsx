@@ -12,7 +12,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
@@ -31,6 +31,7 @@ import ContractManagement from '../components/ContractManagement';
 import API_BASE from '../config';
 import CustomSelect from '../components/CustomSelect';
 import CustomDatePicker from '../components/CustomDatePicker';
+import PaginationControl from '../components/PaginationControl';
 import { FilterToggleButton, SalesDocFilterDrawer } from '../components/SalesDocFilter';
 import './PageCommon.css';
 import './DocumentControl.css';
@@ -99,7 +100,7 @@ export default function Sales() {
     // ── State: การแสดงฟอร์ม ──
     const [showQuotationForm, setShowQuotationForm] = useState(false);
     const [localQuotations, setLocalQuotations] = useState([]);
-    const [quotationPagination, setQuotationPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+    const [quotationPagination, setQuotationPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
     const [appliedQuotationSearch, setAppliedQuotationSearch] = useState('');
     const [editingQuotationId, setEditingQuotationId] = useState(null);
     const [isViewOnly, setIsViewOnly] = useState(false);
@@ -141,13 +142,15 @@ export default function Sales() {
     const [editingSOId, setEditingSOId] = useState(null);
     const [isSOViewOnly, setIsSOViewOnly] = useState(false);
     const [previewSOId, setPreviewSOId] = useState(null);
+    const [soPage, setSoPage] = useState(1);
+    const [soPageSize, setSoPageSize] = useState(10);
 
     // ── State: POA ──
     const [showPOAForm, setShowPOAForm] = useState(false);
     const [localPOAs, setLocalPOAs] = useState([]);
     const [editingPOAId, setEditingPOAId] = useState(null);
     const [editingPOAType, setEditingPOAType] = useState(null);
-    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+    const [poaPagination, setPoaPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
     const [poaSearch, setPoaSearch] = useState('');
     const [appliedPoaSearch, setAppliedPoaSearch] = useState('');
 
@@ -156,7 +159,7 @@ export default function Sales() {
     const [localBillings, setLocalBillings] = useState([]);
     const [editingBillingId, setEditingBillingId] = useState(null);
     const [previewBillingId, setPreviewBillingId] = useState(null);
-    const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+    const [billingPagination, setBillingPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
     const [billingSearch, setBillingSearch] = useState('');
     const [appliedBillingSearch, setAppliedBillingSearch] = useState('');
     const [billingFilter, setBillingFilter] = useState({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
@@ -166,7 +169,7 @@ export default function Sales() {
     const [showTaxInvoiceForm, setShowTaxInvoiceForm] = useState(false);
     const [localTaxInvoices, setLocalTaxInvoices] = useState([]);
     const [editingTaxInvoiceId, setEditingTaxInvoiceId] = useState(null);
-    const [taxInvoicePagination, setTaxInvoicePagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+    const [taxInvoicePagination, setTaxInvoicePagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
     const [taxInvoiceSearch, setTaxInvoiceSearch] = useState('');
     const [appliedTaxInvoiceSearch, setAppliedTaxInvoiceSearch] = useState('');
     const [taxInvoiceFilter, setTaxInvoiceFilter] = useState({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
@@ -176,7 +179,7 @@ export default function Sales() {
     const [showDeliveryOrderForm, setShowDeliveryOrderForm] = useState(false);
     const [localDeliveryOrders, setLocalDeliveryOrders] = useState([]);
     const [editingDeliveryOrderId, setEditingDeliveryOrderId] = useState(null);
-    const [deliveryOrderPagination, setDeliveryOrderPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+    const [deliveryOrderPagination, setDeliveryOrderPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
     const [deliveryOrderSearch, setDeliveryOrderSearch] = useState('');
     const [appliedDeliveryOrderSearch, setAppliedDeliveryOrderSearch] = useState('');
     const [deliveryOrderFilter, setDeliveryOrderFilter] = useState({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
@@ -186,7 +189,7 @@ export default function Sales() {
     const [showReceiptForm, setShowReceiptForm] = useState(false);
     const [receipts, setReceipts] = useState([]);
     const [editDocId, setEditDocId] = useState(null);
-    const [receiptPagination, setReceiptPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+    const [receiptPagination, setReceiptPagination] = useState({ page: 1, limit: 10, totalPages: 1, total: 0 });
     const [receiptSearch, setReceiptSearch] = useState('');
     const [appliedReceiptSearch, setAppliedReceiptSearch] = useState('');
     const [receiptFilter, setReceiptFilter] = useState({ subType: '', createdBy: '', status: '', dateFrom: '', dateTo: '' });
@@ -265,7 +268,7 @@ export default function Sales() {
                 const json = await res.json();
                 if (json.success) {
                     setLocalQuotations(json.data || []);
-                    if (json.pagination) setQuotationPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                    if (json.pagination) setQuotationPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages, total: json.pagination.total }));
                 }
             } catch (err) { console.error('Error fetching quotations:', err); }
         };
@@ -303,7 +306,7 @@ export default function Sales() {
                 const json = await res.json();
                 if (json.success) {
                     setLocalBillings(json.data || []);
-                    if (json.pagination) setBillingPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                    if (json.pagination) setBillingPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages, total: json.pagination.total }));
                 }
             } catch (err) { console.error('Error fetching billings:', err); }
         };
@@ -329,7 +332,7 @@ export default function Sales() {
                 const json = await res.json();
                 if (json.success) {
                     setLocalTaxInvoices(json.data || []);
-                    if (json.pagination) setTaxInvoicePagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                    if (json.pagination) setTaxInvoicePagination(prev => ({ ...prev, totalPages: json.pagination.totalPages, total: json.pagination.total }));
                 }
             } catch (err) { console.error('Error fetching tax invoices:', err); }
         };
@@ -355,7 +358,7 @@ export default function Sales() {
                 const json = await res.json();
                 if (json.success) {
                     setLocalDeliveryOrders(json.data || []);
-                    if (json.pagination) setDeliveryOrderPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                    if (json.pagination) setDeliveryOrderPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages, total: json.pagination.total }));
                 }
             } catch (err) { console.error('Error fetching delivery orders:', err); }
         };
@@ -381,7 +384,7 @@ export default function Sales() {
                 const json = await res.json();
                 if (json.success) {
                     setReceipts(json.data || []);
-                    if (json.pagination) setReceiptPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                    if (json.pagination) setReceiptPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages, total: json.pagination.total }));
                 }
             } catch (err) { console.error('Error fetching receipts:', err); }
         };
@@ -430,12 +433,16 @@ export default function Sales() {
                 combined.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt));
                 
                 setLocalPOAs(combined);
-                // Simplify pagination for combined list (just use poa's for now, ideally backend should aggregate)
-                if (poaJson.pagination) setPoaPagination(prev => ({ ...prev, totalPages: Math.max(poaJson.pagination.totalPages, herbalJson.pagination?.totalPages || 1, torbor1Json.pagination?.totalPages || 1) }));
+                const totalCount = (poaJson.pagination?.total || 0) + (herbalJson.pagination?.total || 0) + (torbor1Json.pagination?.total || 0);
+                setPoaPagination(prev => ({ 
+                    ...prev, 
+                    totalPages: Math.max(poaJson.pagination?.totalPages || 1, herbalJson.pagination?.totalPages || 1, torbor1Json.pagination?.totalPages || 1),
+                    total: totalCount || combined.length
+                }));
             } catch (err) { console.error('Error fetching POAs:', err); }
         };
         fetchPOAs();
-    }, [activeTab, poaPagination.page, showPOAForm]);
+    }, [activeTab, poaPagination.page, poaPagination.limit, showPOAForm]);
 
     // ── Delete Registration Doc ──
     const handleDeletePOA = async (id, docType) => {
@@ -975,6 +982,11 @@ export default function Sales() {
                customer.toLowerCase().includes(orderSearch.toLowerCase()) ||
                qtNo.toLowerCase().includes(orderSearch.toLowerCase());
     });
+
+    const paginatedOrders = useMemo(() => {
+        const start = (soPage - 1) * soPageSize;
+        return filteredOrders.slice(start, start + soPageSize);
+    }, [filteredOrders, soPage, soPageSize]);
 
     // ── เลือก badge class ตามสถานะ ──
     const getCustomerStatusClass = (status) => {
@@ -1649,27 +1661,14 @@ export default function Sales() {
                                 </table>
 
                                 {/* Pagination Controls */}
-                                {quotationPagination.totalPages > 1 && (
-                                    <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 20, padding: '10px 0' }}>
-                                        <button 
-                                            className="btn-outline" 
-                                            disabled={quotationPagination.page === 1}
-                                            onClick={() => setQuotationPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                        >
-                                            ก่อนหน้า
-                                        </button>
-                                        <span style={{ fontSize: 13, fontWeight: 600, color: '#4b5563' }}>
-                                            หน้า {quotationPagination.page} จาก {quotationPagination.totalPages}
-                                        </span>
-                                        <button 
-                                            className="btn-outline" 
-                                            disabled={quotationPagination.page === quotationPagination.totalPages}
-                                            onClick={() => setQuotationPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                        >
-                                            ถัดไป
-                                        </button>
-                                    </div>
-                                )}
+                                <PaginationControl
+                                    currentPage={quotationPagination.page}
+                                    totalPages={quotationPagination.totalPages || 1}
+                                    totalItems={quotationPagination.total || localQuotations.length}
+                                    pageSize={quotationPagination.limit}
+                                    onPageChange={(p) => setQuotationPagination(prev => ({ ...prev, page: p }))}
+                                    onPageSizeChange={(size) => setQuotationPagination(prev => ({ ...prev, limit: size, page: 1 }))}
+                                />
                             </div>
                         )}
                     </div>
@@ -1864,29 +1863,14 @@ export default function Sales() {
                                 </table>
                             </div>
                         )}
-                            {taxInvoicePagination.totalPages > 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px', borderTop: '1px solid var(--border)', gap: '12px', alignItems: 'center' }}>
-                                    <button
-                                        className="btn-secondary"
-                                        disabled={taxInvoicePagination.page === 1}
-                                        onClick={() => setTaxInvoicePagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                        style={{ padding: '6px 12px' }}
-                                    >
-                                        ก่อนหน้า
-                                    </button>
-                                    <span style={{ fontSize: '14px', color: 'var(--text-light)' }}>
-                                        หน้า {taxInvoicePagination.page} จาก {taxInvoicePagination.totalPages}
-                                    </span>
-                                    <button
-                                        className="btn-secondary"
-                                        disabled={taxInvoicePagination.page === taxInvoicePagination.totalPages}
-                                        onClick={() => setTaxInvoicePagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                        style={{ padding: '6px 12px' }}
-                                    >
-                                        ถัดไป
-                                    </button>
-                                </div>
-                            )}
+                            <PaginationControl
+                                currentPage={taxInvoicePagination.page}
+                                totalPages={taxInvoicePagination.totalPages || 1}
+                                totalItems={taxInvoicePagination.total || localTaxInvoices.length}
+                                pageSize={taxInvoicePagination.limit}
+                                onPageChange={(p) => setTaxInvoicePagination(prev => ({ ...prev, page: p }))}
+                                onPageSizeChange={(size) => setTaxInvoicePagination(prev => ({ ...prev, limit: size, page: 1 }))}
+                            />
                     </div>
                 )
             )}
@@ -2081,29 +2065,14 @@ export default function Sales() {
                                 </table>
                             </div>
                         )}
-                            {deliveryOrderPagination.totalPages > 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px', borderTop: '1px solid var(--border)', gap: '12px', alignItems: 'center' }}>
-                                    <button
-                                        className="btn-secondary"
-                                        disabled={deliveryOrderPagination.page === 1}
-                                        onClick={() => setDeliveryOrderPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                        style={{ padding: '6px 12px' }}
-                                    >
-                                        ก่อนหน้า
-                                    </button>
-                                    <span style={{ fontSize: '14px', color: 'var(--text-light)' }}>
-                                        หน้า {deliveryOrderPagination.page} จาก {deliveryOrderPagination.totalPages}
-                                    </span>
-                                    <button
-                                        className="btn-secondary"
-                                        disabled={deliveryOrderPagination.page === deliveryOrderPagination.totalPages}
-                                        onClick={() => setDeliveryOrderPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                        style={{ padding: '6px 12px' }}
-                                    >
-                                        ถัดไป
-                                    </button>
-                                </div>
-                            )}
+                            <PaginationControl
+                                currentPage={deliveryOrderPagination.page}
+                                totalPages={deliveryOrderPagination.totalPages || 1}
+                                totalItems={deliveryOrderPagination.total || localDeliveryOrders.length}
+                                pageSize={deliveryOrderPagination.limit}
+                                onPageChange={(p) => setDeliveryOrderPagination(prev => ({ ...prev, page: p }))}
+                                onPageSizeChange={(size) => setDeliveryOrderPagination(prev => ({ ...prev, limit: size, page: 1 }))}
+                            />
                     </div>
                 )
             )}
@@ -2289,29 +2258,14 @@ export default function Sales() {
                                     </tbody>
                                 </table>
                             </div>
-                            {receiptPagination.totalPages > 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '16px', borderTop: '1px solid var(--border)', gap: '12px', alignItems: 'center' }}>
-                                    <button
-                                        className="btn-secondary"
-                                        disabled={receiptPagination.page === 1}
-                                        onClick={() => setReceiptPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                        style={{ padding: '6px 12px' }}
-                                    >
-                                        ก่อนหน้า
-                                    </button>
-                                    <span style={{ fontSize: '14px', color: 'var(--text-light)' }}>
-                                        หน้า {receiptPagination.page} จาก {receiptPagination.totalPages}
-                                    </span>
-                                    <button
-                                        className="btn-secondary"
-                                        disabled={receiptPagination.page === receiptPagination.totalPages}
-                                        onClick={() => setReceiptPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                        style={{ padding: '6px 12px' }}
-                                    >
-                                        ถัดไป
-                                    </button>
-                                </div>
-                            )}
+                            <PaginationControl
+                                currentPage={receiptPagination.page}
+                                totalPages={receiptPagination.totalPages || 1}
+                                totalItems={receiptPagination.total || receipts.length}
+                                pageSize={receiptPagination.limit}
+                                onPageChange={(p) => setReceiptPagination(prev => ({ ...prev, page: p }))}
+                                onPageSizeChange={(size) => setReceiptPagination(prev => ({ ...prev, limit: size, page: 1 }))}
+                            />
                     </div>
                 )
             )}
@@ -2357,7 +2311,7 @@ export default function Sales() {
                                 <div className="search-group">
                                     <div className="search-input-wrap">
                                         <Search size={18} />
-                                        <input type="text" placeholder="พิมพ์เลขที่ SO, ลูกค้า..." value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} />
+                                        <input type="text" placeholder="พิมพ์เลขที่ SO, ลูกค้า..." value={orderSearch} onChange={(e) => { setOrderSearch(e.target.value); setSoPage(1); }} />
                                     </div>
                                     <button className="search-btn">ค้นหา</button>
                                 </div>
@@ -2389,9 +2343,9 @@ export default function Sales() {
                                     <tbody>
                                         {filteredOrders.length === 0 ? (
                                             <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ยังไม่มีรายการ Sales Order</td></tr>
-                                        ) : filteredOrders.map((o, idx) => (
+                                        ) : paginatedOrders.map((o, idx) => (
                                             <tr key={o.SalesOrderID}>
-                                                <td>{idx + 1}</td>
+                                                <td>{(soPage - 1) * soPageSize + idx + 1}</td>
                                                 <td className="text-bold">
                                                     {o.SalesOrderNo}
                                                     {o.Revision > 0 && (
@@ -2451,6 +2405,14 @@ export default function Sales() {
                                         ))}
                                     </tbody>
                                 </table>
+                                <PaginationControl
+                                    currentPage={soPage}
+                                    totalPages={Math.ceil(filteredOrders.length / soPageSize) || 1}
+                                    totalItems={filteredOrders.length}
+                                    pageSize={soPageSize}
+                                    onPageChange={setSoPage}
+                                    onPageSizeChange={(size) => { setSoPageSize(size); setSoPage(1); }}
+                                />
                             </div>
                         )}
                     </div>
@@ -2632,25 +2594,14 @@ export default function Sales() {
                             </table>
                         </div>
                         {/* Pagination Controls */}
-                        {billingPagination.totalPages > 1 && (
-                            <div className="pagination-controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', padding: '15px 0' }}>
-                                <button 
-                                    className="btn-secondary"
-                                    disabled={billingPagination.page === 1}
-                                    onClick={() => setBillingPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                >
-                                    ก่อนหน้า
-                                </button>
-                                <span>หน้า {billingPagination.page} / {billingPagination.totalPages}</span>
-                                <button 
-                                    className="btn-secondary"
-                                    disabled={billingPagination.page === billingPagination.totalPages}
-                                    onClick={() => setBillingPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                >
-                                    ถัดไป
-                                </button>
-                            </div>
-                        )}
+                        <PaginationControl
+                            currentPage={billingPagination.page}
+                            totalPages={billingPagination.totalPages || 1}
+                            totalItems={billingPagination.total || localBillings.length}
+                            pageSize={billingPagination.limit}
+                            onPageChange={(p) => setBillingPagination(prev => ({ ...prev, page: p }))}
+                            onPageSizeChange={(size) => setBillingPagination(prev => ({ ...prev, limit: size, page: 1 }))}
+                        />
                     </div>
                 )
             )}
@@ -2768,25 +2719,14 @@ export default function Sales() {
                             </table>
                         </div>
                         {/* Pagination Controls */}
-                        {poaPagination.totalPages > 1 && (
-                            <div className="pagination-controls" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', padding: '15px 0' }}>
-                                <button 
-                                    className="btn-secondary"
-                                    disabled={poaPagination.page === 1}
-                                    onClick={() => setPoaPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                >
-                                    ก่อนหน้า
-                                </button>
-                                <span>หน้า {poaPagination.page} / {poaPagination.totalPages}</span>
-                                <button 
-                                    className="btn-secondary"
-                                    disabled={poaPagination.page === poaPagination.totalPages}
-                                    onClick={() => setPoaPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                >
-                                    ถัดไป
-                                </button>
-                            </div>
-                        )}
+                        <PaginationControl
+                            currentPage={poaPagination.page}
+                            totalPages={poaPagination.totalPages || 1}
+                            totalItems={poaPagination.total || localPOAs.length}
+                            pageSize={poaPagination.limit}
+                            onPageChange={(p) => setPoaPagination(prev => ({ ...prev, page: p }))}
+                            onPageSizeChange={(size) => setPoaPagination(prev => ({ ...prev, limit: size, page: 1 }))}
+                        />
                     </div>
                 </div>
                 )

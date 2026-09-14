@@ -101,12 +101,12 @@ router.get('/next-number', async (req, res) => {
         const pool = await poolPromise;
         const docType = req.query.docType || 'delivery_order_thc';
         
-        // Determine prefix based on docType
-        let prefix = 'RE-';
-        if (docType.includes('psf')) prefix = 'RE-PSF-';
-        else if (docType.includes('elt')) prefix = 'RE-ELT-';
+        // Determine prefix based on docType (RE20260914-001)
+        let prefix = 'RE';
+        if (docType.includes('psf')) prefix = 'REPSF';
+        else if (docType.includes('elt')) prefix = 'REELT';
         
-        const datePrefix = getDatePrefix();
+        const datePrefix = getDatePrefix(req.query.date);
         const fullPrefix = `${prefix}${datePrefix}`;
         
         const nextNo = await peekNextSequence(pool, 'Receipt', 'ReceiptNo', fullPrefix, 3);
@@ -195,11 +195,11 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
 
         const request = new sql.Request(transaction);
 
-        // Generate Receipt Number
-        let prefix = 'RE-';
-        if (docType && docType.includes('psf')) prefix = 'RE-PSF-';
-        else if (docType && docType.includes('elt')) prefix = 'RE-ELT-';
-        const defaultRePrefix = `${prefix}${getDatePrefix()}`;
+        // Generate Receipt Number (RE20260914-001)
+        let prefix = 'RE';
+        if (docType && docType.includes('psf')) prefix = 'REPSF';
+        else if (docType && docType.includes('elt')) prefix = 'REELT';
+        const defaultRePrefix = `${prefix}${getDatePrefix(billDate)}`;
         let finalReceiptNo = receiptNo;
         if (!finalReceiptNo) {
             finalReceiptNo = await peekNextSequence(pool, 'Receipt', 'ReceiptNo', defaultRePrefix, 3);
@@ -326,14 +326,14 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                     .query(`SELECT CustomerID FROM Customer WHERE CustomerName = @custName`);
 
                 if (custCheck.recordset.length === 0) {
-                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Prospect
+                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Active
                     const typeId = customerTypeId ? parseInt(customerTypeId) : 1;
                     const prefix = typeId === 2 ? 'OEM' : 'CUST';
                     const custCode = await generateSequence(pool, 'Customer', 'CustomerCode', `${prefix}-${getMonthPrefix()}`, 3);
 
                     await pool.request()
                         .input('tid', sql.Int, typeId)           // จาก dropdown หรือ 1 = Retail (default)
-                        .input('sid', sql.Int, 3)           // 3 = Prospect
+                        .input('sid', sql.Int, 1)           // 1 = Active (ใช้งาน)
                         .input('code', sql.NVarChar, custCode)
                         .input('name', sql.NVarChar, customerName.trim())
                         .input('contact', sql.NVarChar, contactPerson || null)
@@ -346,7 +346,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                             INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Email, Phone, Address, TaxID, Source)
                             VALUES (@tid, @sid, @code, @name, @contact, @email, @phone, @address, @tax, @source)
                         `);
-                    console.log(`✅ Auto-created customer "${customerName}" as Prospect from QT`);
+                    console.log(`✅ Auto-created customer "${customerName}" as Active from Receipt`);
                 }
             } catch (custErr) {
                 // ไม่ให้ customer error กระทบ QT response (QT บันทึกสำเร็จแล้ว)
@@ -355,11 +355,11 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         }
 
         // ✅ Auto-update Quotation deposit status if referencing quotation
-        const targetQno = quotationNo || (finalCustomerOrder && finalCustomerOrder.match(/QT-\d{8}-\d{3}/i)?.[0]) || (notes && notes.match(/QT-\d{8}-\d{3}/i)?.[0]);
+        const targetQno = quotationNo || (finalCustomerOrder && finalCustomerOrder.match(/QT-?\d{8}-\d{3}/i)?.[0]) || (notes && notes.match(/QT-?\d{8}-\d{3}/i)?.[0]);
         if (targetQno) {
             try {
                 const isDeposit = (receiptType === 'deposit') || (items && items.some(it => it.name && it.name.includes('มัดจำ'))) || (notes && notes.includes('มัดจำ'));
-                const isFinal = (receiptType === 'final') || (showDepositInPrint && depositAmount > 0) || (notes && (notes.includes('ส่วนที่เหลือ') || notes.includes('ปิดยอด') || notes.includes('BI-')));
+                const isFinal = (receiptType === 'final') || (showDepositInPrint && depositAmount > 0) || (notes && (notes.includes('ส่วนที่เหลือ') || notes.includes('ปิดยอด') || notes.includes('BI-') || notes.includes('BI202')));
 
                 if (isDeposit) {
                     await pool.request()

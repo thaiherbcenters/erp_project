@@ -6,6 +6,7 @@ import { useAlert } from '../components/CustomAlert';
 import { useRnD } from '../context/RnDContext';
 import { useProduction } from '../context/ProductionContext';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 import { getDynamicBatchSizeValue, convertToBase } from '../utils/formatters';
 import './PageCommon.css';
 import './Operator.css';
@@ -70,6 +71,14 @@ const OperatorWIP = () => {
     
     const activeWipTasks = useMemo(() => wipTasks.filter(t => t.status === 'รอเริ่มงาน' || t.status === 'กำลังทำ' || t.status === 'รอเบิกวัตถุดิบ' || t.status === 'พร้อมเริ่มงาน'), [wipTasks]);
     const historyWipTasks = useMemo(() => wipTasks.filter(t => t.status !== 'รอเริ่มงาน' && t.status !== 'กำลังทำ' && t.status !== 'รอเบิกวัตถุดิบ' && t.status !== 'พร้อมเริ่มงาน'), [wipTasks]);
+
+    const [wipPage, setWipPage] = useState(1);
+    const [wipPageSize, setWipPageSize] = useState(10);
+
+    const paginatedHistoryWip = useMemo(() => {
+        const start = (wipPage - 1) * wipPageSize;
+        return historyWipTasks.slice(start, start + wipPageSize);
+    }, [historyWipTasks, wipPage, wipPageSize]);
 
     const [formData, setFormData] = useState({
         formulaName: '',
@@ -739,9 +748,9 @@ const OperatorWIP = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {historyWipTasks.map((t, i) => (
+                                    {paginatedHistoryWip.map((t, i) => (
                                         <tr key={t.id || i} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                            <td style={{ padding: '10px 14px', color: '#64748b', fontSize: 13 }}>{i + 1}</td>
+                                            <td style={{ padding: '10px 14px', color: '#64748b', fontSize: 13 }}>{(wipPage - 1) * wipPageSize + i + 1}</td>
                                             <td style={{ padding: '10px 14px', fontWeight: 700, color: '#0369a1', whiteSpace: 'nowrap', fontSize: 13 }}>{t.batchNo}</td>
                                             <td style={{ padding: '10px 14px', color: '#1e293b', fontWeight: 500, fontSize: 13 }}>{t.productName || t.formulaName}</td>
                                             <td style={{ padding: '10px 14px', color: '#475569', whiteSpace: 'nowrap', fontSize: 13 }}>{(t.expectedQty || 0).toLocaleString()} {t.unit || t.jobUnit || 'กรัม'}</td>
@@ -769,13 +778,13 @@ const OperatorWIP = () => {
                                                                 opacity: loading ? 0.5 : 1,
                                                                 transition: 'all 0.15s ease',
                                                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                boxShadow: '0 1px 2px rgba(34, 197, 94, 0.1)'
+                                                                boxShadow: '0 1px 2px rgba(22, 163, 74, 0.1)'
                                                             }}
-                                                            onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = '#dcfce7'; e.currentTarget.style.borderColor = '#86efac'; }}}
+                                                            onMouseEnter={e => { e.currentTarget.style.background = '#f0fdf4'; e.currentTarget.style.borderColor = '#86efac'; }}
                                                             onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#bbf7d0'; }}
-                                                            title="ส่งเข้าคลัง WIP"
+                                                            title="โอนสต๊อก WIP เพื่อรอแพ็คต่อไป"
                                                         >
-                                                            <Package size={16} />
+                                                            <Warehouse size={16} />
                                                         </button>
                                                     )}
                                                     
@@ -795,7 +804,7 @@ const OperatorWIP = () => {
                                                     <button 
                                                         onClick={() => setDetailModalTask(t)}
                                                         style={{ 
-                                                            padding: '6px', borderRadius: 6, background: '#ffffff', color: '#64748b',
+                                                            padding: '6px', borderRadius: 6, background: '#ffffff', color: '#64748b', 
                                                             border: '1px solid #cbd5e1', cursor: 'pointer', transition: 'all 0.15s ease',
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                             boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
@@ -850,6 +859,14 @@ const OperatorWIP = () => {
                                     ))}
                                 </tbody>
                             </table>
+                            <PaginationControl
+                                currentPage={wipPage}
+                                totalPages={Math.ceil(historyWipTasks.length / wipPageSize) || 1}
+                                totalItems={historyWipTasks.length}
+                                pageSize={wipPageSize}
+                                onPageChange={setWipPage}
+                                onPageSizeChange={(size) => { setWipPageSize(size); setWipPage(1); }}
+                            />
                         </div>
                     )}
                 </div>

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
 import { Search, Plus, Eye, Edit, Trash2, XCircle, Package } from 'lucide-react';
 import API_BASE from '../config';
+import PaginationControl from '../components/PaginationControl';
 import './PageCommon.css';
 import './ProductMaster.css';
 
@@ -18,52 +19,42 @@ const TYPE_CONFIG = {
 const emptyForm = {
     itemType: 'finished_goods', itemName: '', itemNameEN: '', subCategory: '',
     unit: 'ชิ้น', sellingPrice: 0, costPerUnit: 0, currentStock: 0, minStock: 0,
-    netWeight: '', fdaNumber: '', notes: ''
+    maxStock: 0, leadTimeDays: 0, description: '', barcode: '', isBatchTracked: true,
+    storageCondition: 'room_temp', standardPackageSize: 0, safetyStockDays: 0
 };
 
-const ProductMaster = () => {
-    const { token, canCreate, canUpdate, canDelete } = useAuth();
+export default function ProductMaster() {
+    const { canCreate, canUpdate, canDelete } = useAuth();
     const { showAlert, showConfirm } = useAlert();
-
     const [items, setItems] = useState([]);
-    const [summary, setSummary] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [activeType, setActiveType] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [appliedSearch, setAppliedSearch] = useState('');
-    const [selectedItem, setSelectedItem] = useState(null);
+    const [stats, setStats] = useState({ total: 0, lowStock: 0, outOfStock: 0 });
+    const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1, totalItems: 0 });
+
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
-    const [showViewModal, setShowViewModal] = useState(false);
+    const [showDetailModal, setShowDetailModal] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
     const [formData, setFormData] = useState(emptyForm);
-    const [pagination, setPagination] = useState({ page: 1, limit: 20, totalPages: 1 });
+    const [submitting, setSubmitting] = useState(false);
 
-    const getAuthHeaders = useCallback((json = true) => {
-        const h = { 'Authorization': `Bearer ${token || localStorage.getItem('token')}` };
-        if (json) h['Content-Type'] = 'application/json';
-        return h;
-    }, [token]);
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('token');
+        return {
+            'Content-Type': 'application/json',
+            ...(token && { Authorization: `Bearer ${token}` })
+        };
+    };
 
-    const fetchSummary = useCallback(async () => {
-        try {
-            const response = await fetch(`${API_BASE}/api/master-items/summary`, {
-                headers: getAuthHeaders()
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setSummary(data);
-            }
-        } catch (error) {
-            console.error('Failed to fetch summary', error);
-        }
-    }, [getAuthHeaders]);
-
-    const fetchItems = useCallback(async (page = 1) => {
+    const fetchItems = useCallback(async (page = 1, limit = pagination.limit) => {
         setLoading(true);
         try {
             const query = new URLSearchParams({
                 page,
-                limit: pagination.limit,
+                limit,
                 ...(activeType !== 'all' && { type: activeType }),
                 ...(appliedSearch && { search: appliedSearch })
             });
@@ -78,7 +69,9 @@ const ProductMaster = () => {
                 setPagination(prev => ({
                     ...prev,
                     page: data.pagination?.currentPage || 1,
-                    totalPages: data.pagination?.totalPages || 1
+                    totalPages: data.pagination?.totalPages || 1,
+                    totalItems: data.pagination?.total || 0,
+                    limit
                 }));
             } else {
                 const err = await response.json();
@@ -358,27 +351,18 @@ const ProductMaster = () => {
                 </table>
             </div>
 
-            {pagination.totalPages > 1 && (
-                <div className="pagination">
-                    <button 
-                        disabled={pagination.page <= 1}
-                        onClick={() => fetchItems(pagination.page - 1)}
-                        className="btn-secondary"
-                    >
-                        ก่อนหน้า
-                    </button>
-                    <span style={{ fontSize: '14px' }}>
-                        หน้า {pagination.page} จาก {pagination.totalPages}
-                    </span>
-                    <button 
-                        disabled={pagination.page >= pagination.totalPages}
-                        onClick={() => fetchItems(pagination.page + 1)}
-                        className="btn-secondary"
-                    >
-                        ถัดไป
-                    </button>
-                </div>
-            )}
+            <PaginationControl
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages || 1}
+                totalItems={pagination.totalItems || items.length}
+                pageSize={pagination.limit}
+                onPageChange={(p) => {
+                    fetchItems(p, pagination.limit);
+                }}
+                onPageSizeChange={(newSize) => {
+                    fetchItems(1, newSize);
+                }}
+            />
 
             {/* Create / Edit Modal */}
             {(showCreateModal || showEditModal) && (

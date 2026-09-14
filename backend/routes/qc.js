@@ -40,7 +40,7 @@ router.post('/incoming', authorizeRoles('admin', 'executive', 'qc'), async (req,
         const { lotNumber, itemName, supplierName, inspectorId, result_status, notes } = req.body;
         const pool = await poolPromise;
         
-        const finalRequestID = await generateSequence(pool, 'QC_Incoming', 'RequestID', `QCIC-${getDatePrefix()}`, 3);
+        const finalRequestID = await generateSequence(pool, 'QC_Incoming', 'RequestID', `QCIC${getDatePrefix()}`, 3);
 
         const result = await pool.request()
             .input('RequestID', sql.VarChar, finalRequestID)
@@ -110,9 +110,9 @@ router.post('/requests', authorizeRoles('admin', 'executive', 'qc', 'operator', 
         
         let finalRequestID = requestID;
         // Auto-generate proper QC ID if frontend sent a timestamp or none
-        if (!finalRequestID || finalRequestID.includes(Date.now().toString().substring(0,5)) || finalRequestID.startsWith('QCR-')) {
+        if (!finalRequestID || finalRequestID.includes(Date.now().toString().substring(0,5)) || finalRequestID.startsWith('QCR-') || finalRequestID.startsWith('QCR')) {
             const prefix = type === 'qc_inprocess' ? 'QCIP' : 'QCF';
-            finalRequestID = await generateSequence(pool, 'QC_Production', 'RequestID', `${prefix}-${getDatePrefix()}`, 3);
+            finalRequestID = await generateSequence(pool, 'QC_Production', 'RequestID', `${prefix}${getDatePrefix()}`, 3);
         }
         
         const result = await pool.request()
@@ -312,7 +312,7 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                                         VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)`);
                             
                             // Create Shipping Order
-                            const shipId = await generateSequence(pool, 'Shipping_Orders', 'ShipmentID', `SHP-${getDatePrefix()}`, 3);
+                            const shipId = await generateSequence(pool, 'Shipping_Orders', 'ShipmentID', `SHP${getDatePrefix()}`, 3);
                             const custMatch = plannerNotes.match(/ลูกค้า:\s*(.+?)(?:\s*\||$)/);
                             const poMatch = plannerNotes.match(/PO:\s*(.+?)(?:\s*\||$)/);
                             const plannerDetail = await pool.request()
@@ -324,8 +324,8 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                             let shipAddress = '';
                             let shipPhone = '';
                             const custName = custMatch ? custMatch[1].trim() : '';
-                            // Extract SO number from planner notes (format: "OEM — อ้างอิงจาก SO: SO-XXXX | ...")
-                            const soMatch = plannerNotes.match(/SO:\s*(SO-[\w-]+)/);
+                            // Extract SO number from planner notes (format: "OEM — อ้างอิงจาก SO: SO-XXXX | ..." or "SO: SO20260914-001 | ...")
+                            const soMatch = plannerNotes.match(/SO:\s*(SO-?[\w-]+)/);
                             if (soMatch) {
                                 try {
                                     const soLookup = await pool.request()
@@ -378,7 +378,7 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                                     unit = 'กรัม';
                                 }
 
-                                itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK-${getDatePrefix()}`, 3);
+                                itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK${getDatePrefix()}`, 3);
                                 await pool.request()
                                     .input('ItemID', sql.VarChar, itemId)
                                     .input('ProductName', sql.NVarChar, finalProductName)
@@ -399,7 +399,7 @@ router.put('/requests/:id', authorizeRoles('admin', 'executive', 'qc'), async (r
                                         .input('Qty', sql.Int, goodQty)
                                         .query('UPDATE Stock_Items SET Quantity = Quantity + @Qty, UpdatedAt = GETDATE() WHERE ItemID = @ItemID');
                                 } else {
-                                    itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK-${getDatePrefix()}`, 3);
+                                    itemId = await generateSequence(pool, 'Stock_Items', 'ItemID', `STK${getDatePrefix()}`, 3);
                                     await pool.request()
                                         .input('ItemID', sql.VarChar, itemId)
                                         .input('ProductName', sql.NVarChar, productName)

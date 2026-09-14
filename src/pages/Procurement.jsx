@@ -21,6 +21,7 @@ import { MOCK_PR, MOCK_RECV } from '../data/mockData';
 import { Search, Plus, Eye, Edit, Trash2, Building2, X, Clock, Printer, FileText } from 'lucide-react';
 import PurchaseOrderForm from '../components/PurchaseOrderForm';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 import { FilterToggleButton, ProcurementPOFilterDrawer } from '../components/SalesDocFilter';
 import './PageCommon.css';
 
@@ -204,6 +205,32 @@ export default function Procurement() {
             return true;
         });
     }, [poList, poSearch, poFilter]);
+
+    // ── Pagination State for PO ──
+    const [poPage, setPoPage] = useState(1);
+    const [poPageSize, setPoPageSize] = useState(10);
+
+    useEffect(() => {
+        setPoPage(1);
+    }, [poSearch, poFilter, poPageSize]);
+
+    const paginatedPOs = useMemo(() => {
+        const start = (poPage - 1) * poPageSize;
+        return filteredPOs.slice(start, start + poPageSize);
+    }, [filteredPOs, poPage, poPageSize]);
+
+    // ── Pagination State for Suppliers ──
+    const [supPage, setSupPage] = useState(1);
+    const [supPageSize, setSupPageSize] = useState(10);
+
+    useEffect(() => {
+        setSupPage(1);
+    }, [supplierSearch, supPageSize]);
+
+    const paginatedSuppliers = useMemo(() => {
+        const start = (supPage - 1) * supPageSize;
+        return suppliersList.slice(start, start + supPageSize);
+    }, [suppliersList, supPage, supPageSize]);
 
     // ── ฟังก์ชันโหลดรายการ PO จาก API ──
     const fetchPurchaseOrders = useCallback(async () => {
@@ -750,7 +777,7 @@ export default function Procurement() {
                                                 </td>
                                             </tr>
                                         ) : (
-                                            filteredPOs.map((po, idx) => {
+                                            paginatedPOs.map((po, idx) => {
                                                 const currentPoId = po.PurchaseOrderID || po.POID;
                                                 const currentOrderDate = po.PODate || po.OrderDate;
                                                 const currentTotal = Number(po.TotalPayable || po.NetPayable || po.GrandTotal || 0);
@@ -759,7 +786,7 @@ export default function Procurement() {
                                                     : (po.item || '-');
                                                 return (
                                                     <tr key={currentPoId || idx}>
-                                                        <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                                                        <td style={{ textAlign: 'center' }}>{(poPage - 1) * poPageSize + idx + 1}</td>
                                                         <td style={{ textAlign: 'center', fontWeight: 600, color: '#475569' }}>v.{po.Revision || 0}</td>
                                                         <td className="text-bold">{po.PONumber}</td>
                                                         <td>{currentOrderDate ? new Date(currentOrderDate).toLocaleDateString('th-TH') : '-'}</td>
@@ -851,6 +878,14 @@ export default function Procurement() {
                                             }))}
                                         </tbody>
                                     </table>
+                                    <PaginationControl
+                                        currentPage={poPage}
+                                        totalPages={Math.ceil(filteredPOs.length / poPageSize) || 1}
+                                        totalItems={filteredPOs.length}
+                                        pageSize={poPageSize}
+                                        onPageChange={setPoPage}
+                                        onPageSizeChange={setPoPageSize}
+                                    />
                             </div>
                         )}
                     </div>
@@ -1016,9 +1051,9 @@ export default function Procurement() {
                                             </td>
                                         </tr>
                                     ) : (
-                                        suppliersList.map((sup, idx) => (
+                                        paginatedSuppliers.map((sup, idx) => (
                                             <tr key={sup.SupplierID}>
-                                                <td>{idx + 1}</td>
+                                                <td>{(supPage - 1) * supPageSize + idx + 1}</td>
                                                 <td>
                                                     <div className="text-bold" style={{ color: '#0f172a' }}>{sup.SupplierName}</div>
                                                     {sup.SupplierCode && <small className="text-muted">รหัส: {sup.SupplierCode}</small>}
@@ -1036,7 +1071,7 @@ export default function Procurement() {
                                                 <td style={{ textAlign: 'center' }}>
                                                     <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
                                                         {canUpdate('procurement_supplier') && (
-                                                            <button
+                                                             <button
                                                                 className="doc-action-btn"
                                                                 title="แก้ไข"
                                                                 style={{ color: '#059669' }}
@@ -1062,6 +1097,14 @@ export default function Procurement() {
                                     )}
                                 </tbody>
                             </table>
+                            <PaginationControl
+                                currentPage={supPage}
+                                totalPages={Math.ceil(suppliersList.length / supPageSize) || 1}
+                                totalItems={suppliersList.length}
+                                pageSize={supPageSize}
+                                onPageChange={setSupPage}
+                                onPageSizeChange={setSupPageSize}
+                            />
                         </div>
                     )}
                 </div>

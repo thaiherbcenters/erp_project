@@ -1,0 +1,242 @@
+/* =============================================================================
+   CompanySelector.css — หน้าเลือกบริษัท (Multi-Company)
+   ============================================================================= */
+
+.cs-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 1.5rem;
+    background-color: #f1f5f9;
+    font-family: 'Inter', 'Sarabun', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.cs-container {
+    width: 100%;
+    max-width: 680px;
+}
+
+/* ── Header ── */
+.cs-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.cs-header-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: #4f46e5;
+    color: white;
+    margin-bottom: 1.25rem;
+}
+
+.cs-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 0.5rem 0;
+    letter-spacing: -0.01em;
+}
+
+.cs-subtitle {
+    font-size: 0.9rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* ── Company Cards Grid ── */
+.cs-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.cs-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    padding: 1.25rem 1.5rem;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    font-family: inherit;
+}
+
+.cs-card:hover:not(:disabled) {
+    border-color: var(--company-color, #4f46e5);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+.cs-card:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.cs-card:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cs-card-loading {
+    border-color: var(--company-color, #4f46e5);
+    background: #fafbfc;
+}
+
+/* Card Icon / Logo */
+.cs-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: var(--company-color, #4f46e5);
+    flex-shrink: 0;
+    overflow: hidden;
+    padding: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.cs-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 6px;
+}
+
+.cs-card-fallback-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--company-color, #4f46e5);
+}
+
+/* Card Info */
+.cs-card-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.cs-card-short {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+    letter-spacing: 0.02em;
+}
+
+.cs-card-name {
+    font-size: 0.8125rem;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Card Arrow */
+.cs-card-arrow {
+    display: flex;
+    align-items: center;
+    color: #94a3b8;
+    flex-shrink: 0;
+    transition: color 0.2s;
+}
+
+.cs-card:hover .cs-card-arrow {
+    color: var(--company-color, #4f46e5);
+}
+
+/* Spinner */
+.cs-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #e2e8f0;
+    border-radius: 50%;
+    border-top-color: var(--company-color, #4f46e5);
+    animation: cs-spin 0.7s linear infinite;
+}
+
+@keyframes cs-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Footer ── */
+.cs-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.cs-user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+
+.cs-user-avatar {
+    font-size: 1.5rem;
+}
+
+.cs-user-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #334155;
+}
+
+.cs-logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: white;
+    color: #64748b;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.cs-logout-btn:hover {
+    background: #f8fafc;
+    color: #dc2626;
+    border-color: #fecaca;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+    .cs-page {
+        padding: 1rem;
+    }
+
+    .cs-card {
+        padding: 1rem;
+    }
+
+    .cs-card-name {
+        white-space: normal;
+    }
+
+    .cs-title {
+        font-size: 1.25rem;
+    }
+}

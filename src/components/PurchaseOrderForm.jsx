@@ -237,13 +237,29 @@ export default function PurchaseOrderForm({ editId, onBack, onSave, onEdit, view
         { id: 1, name: '', code: '', qty: 1, unit: 'kg', price: 0 }
     ]);
 
-    // ── Fetch Initial Data (Next Number & Suppliers) ──
+    // ── Fetch Initial Suppliers ──
     useEffect(() => {
-        const fetchInitialData = async () => {
+        const fetchSuppliers = async () => {
             try {
-                // Fetch next PO number if creating new
-                if (!editId) {
-                    const resNo = await fetch(`${API_BASE}/purchase-orders/next-number`);
+                const resSup = await fetch(`${API_BASE}/purchase-orders/suppliers`);
+                const jsonSup = await resSup.json();
+                if (jsonSup.success && jsonSup.data) {
+                    setSuppliers(jsonSup.data);
+                }
+            } catch (err) {
+                console.error('Error fetching suppliers:', err);
+            }
+        };
+        fetchSuppliers();
+    }, []);
+
+    // ── Fetch Next PO Number when creating new or changing date ──
+    useEffect(() => {
+        if (!editId) {
+            const fetchNextNo = async () => {
+                try {
+                    const dateParam = formData.poDate ? `?date=${encodeURIComponent(formData.poDate)}` : '';
+                    const resNo = await fetch(`${API_BASE}/purchase-orders/next-number${dateParam}`);
                     const jsonNo = await resNo.json();
                     if (jsonNo.success && jsonNo.nextNumber) {
                         setFormData(prev => ({ ...prev, poNumber: jsonNo.nextNumber }));
@@ -253,21 +269,13 @@ export default function PurchaseOrderForm({ editId, onBack, onSave, onEdit, view
                     if (savedTemplate) {
                         setFormData(prev => ({ ...prev, notes: savedTemplate }));
                     }
+                } catch (err) {
+                    console.error('Error fetching next PO number:', err);
                 }
-
-                // Fetch active suppliers
-                const resSup = await fetch(`${API_BASE}/purchase-orders/suppliers`);
-                const jsonSup = await resSup.json();
-                if (jsonSup.success && jsonSup.data) {
-                    setSuppliers(jsonSup.data);
-                }
-            } catch (err) {
-                console.error('Error fetching initial data:', err);
-            }
-        };
-
-        fetchInitialData();
-    }, [editId]);
+            };
+            fetchNextNo();
+        }
+    }, [editId, formData.poDate]);
 
     // ── Fetch Existing PO for Edit ──
     useEffect(() => {
@@ -953,7 +961,7 @@ export default function PurchaseOrderForm({ editId, onBack, onSave, onEdit, view
                                     className="po-input"
                                     value={formData.poNumber}
                                     onChange={(e) => setFormData(prev => ({ ...prev, poNumber: e.target.value }))}
-                                    placeholder="PO-YYYYMMDD-001"
+                                    placeholder="POYYYYMMDD-001"
                                     readOnly={viewOnly}
                                 />
                             </div>

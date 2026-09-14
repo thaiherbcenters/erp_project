@@ -102,7 +102,7 @@ router.get('/next-number', async (req, res) => {
         // Determine prefix based on docType (ใช้ IV โดยตรง ไม่ต้องใส่ชื่อบริษัทตามหลัง)
         const prefix = 'IV';
         
-        const datePrefix = getDatePrefix();
+        const datePrefix = getDatePrefix(req.query.date);
         const fullPrefix = `${prefix}${datePrefix}`;
         
         const nextNo = await peekNextSequence(pool, 'TaxInvoice', 'TaxInvoiceNo', fullPrefix, 3);
@@ -191,7 +191,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createTaxInvoiceSche
 
         // Generate TaxInvoice Number (ใช้ IV โดยตรง ไม่ต้องใส่ชื่อบริษัทตามหลัง)
         const prefix = 'IV';
-        const defaultIvPrefix = `${prefix}${getDatePrefix()}`;
+        const defaultIvPrefix = `${prefix}${getDatePrefix(billDate)}`;
 
         let finalTaxInvoiceNo = taxInvoiceNo;
         if (!finalTaxInvoiceNo) {
@@ -308,14 +308,14 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createTaxInvoiceSche
                     .query(`SELECT CustomerID FROM Customer WHERE CustomerName = @custName`);
 
                 if (custCheck.recordset.length === 0) {
-                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Prospect
+                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Active
                     const typeId = customerTypeId ? parseInt(customerTypeId) : 1;
                     const prefix = typeId === 2 ? 'OEM' : 'CUST';
                     const custCode = await generateSequence(pool, 'Customer', 'CustomerCode', `${prefix}-${getMonthPrefix()}`, 3);
 
                     await pool.request()
                         .input('tid', sql.Int, typeId)           // จาก dropdown หรือ 1 = Retail (default)
-                        .input('sid', sql.Int, 3)           // 3 = Prospect
+                        .input('sid', sql.Int, 1)           // 1 = Active (ใช้งาน)
                         .input('code', sql.NVarChar, custCode)
                         .input('name', sql.NVarChar, customerName.trim())
                         .input('contact', sql.NVarChar, contactPerson || null)
@@ -328,7 +328,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createTaxInvoiceSche
                             INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Email, Phone, Address, TaxID, Source)
                             VALUES (@tid, @sid, @code, @name, @contact, @email, @phone, @address, @tax, @source)
                         `);
-                    console.log(`✅ Auto-created customer "${customerName}" as Prospect from QT`);
+                    console.log(`✅ Auto-created customer "${customerName}" as Active from TaxInvoice`);
                 }
             } catch (custErr) {
                 // ไม่ให้ customer error กระทบ QT response (QT บันทึกสำเร็จแล้ว)

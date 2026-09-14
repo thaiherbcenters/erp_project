@@ -4,6 +4,7 @@ const { poolPromise } = require('../config/db');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { logAction } = require('../services/auditLog');
+const authMiddleware = require('../middleware/auth');
 
 router.post('/login', async (req, res) => {
     try {
@@ -96,13 +97,34 @@ router.post('/login', async (req, res) => {
             can_delete: hasCrudColumns ? (p.can_delete != null ? p.can_delete : true) : true
         }));
 
+        // Fetch company access
+        let companies = [];
+        try {
+            const companyResult = await pool.request()
+                .input('userId', user.user_id)
+                .query(`
+                    SELECT uca.CompanyID, uca.is_default, uca.role_override,
+                           c.CompanyName, c.ShortName, c.CompanyNameTH, c.CompanyNameEN,
+                           c.CompanyColor, c.CompanyIcon, c.CompanyLogo
+                    FROM UserCompanyAccess uca
+                    JOIN Company c ON uca.CompanyID = c.CompanyID
+                    WHERE uca.user_id = @userId AND c.IsActive = 1
+                    ORDER BY uca.is_default DESC, c.CompanyID
+                `);
+            companies = companyResult.recordset;
+            console.log(`[Login] User ${user.username} has ${companies.length} company access`);
+        } catch (companyErr) {
+            console.error('[Login] Company query failed:', companyErr.message);
+        }
+
         // Log การ Login สำเร็จ
         await logAction(req, 'LOGIN', 'auth', user.user_id, `${username} เข้าสู่ระบบสำเร็จ`);
 
         res.json({
             message: 'เข้าสู่ระบบสำเร็จ',
             user: userData,
-            token
+            token,
+            companies
         });
 
     } catch (err) {
@@ -111,6 +133,62 @@ router.post('/login', async (req, res) => {
             message: 'เกิดข้อผิดพลาด: ' + err.message, 
             error: err.stack 
         });
+    }
+});
+
+router.post('/select-company', authMiddleware, async (req, res) => {
+    try {
+        const { companyId } = req.body;
+        const userId = req.user.id;
+
+        if (!companyId) {
+            return res.status(400).json({ message: 'กรุณาเลือกบริษัท' });
+        }
+
+        const pool = await poolPromise;
+
+        // Verify user has access to this company
+        const accessResult = await pool.request()
+            .input('userId', userId)
+            .input('companyId', companyId)
+            .query(`
+                SELECT uca.CompanyID, uca.role_override,
+                       c.CompanyName, c.ShortName, c.CompanyNameTH, c.CompanyNameEN,
+                       c.CompanyColor, c.CompanyIcon, c.CompanyLogo
+                FROM UserCompanyAccess uca
+                JOIN Company c ON uca.CompanyID = c.CompanyID
+                WHERE uca.user_id = @userId AND uca.CompanyID = @companyId AND c.IsActive = 1
+            `);
+
+        if (accessResult.recordset.length === 0) {
+            return res.status(403).json({ message: 'คุณไม่มีสิทธิ์เข้าถึงบริษัทนี้' });
+        }
+
+        const company = accessResult.recordset[0];
+
+        // Issue new JWT with activeCompanyId
+        const newToken = jwt.sign(
+            {
+                id: req.user.id,
+                username: req.user.username,
+                name: req.user.name,
+                role: company.role_override || req.user.role,
+                avatar: req.user.avatar,
+                departmentId: req.user.departmentId,
+                activeCompanyId: company.CompanyID
+            },
+            process.env.JWT_SECRET || 'THAIHERB_SECRET_KEY_2026_ERP',
+            { expiresIn: '10h' }
+        );
+
+        res.json({
+            message: 'เลือกบริษัทสำเร็จ',
+            token: newToken,
+            company
+        });
+    } catch (err) {
+        console.error('Select company error:', err);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาด: ' + err.message });
     }
 });
 

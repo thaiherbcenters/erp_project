@@ -109,4 +109,34 @@ router.delete('/:id', authorizeRoles('admin'), async (req, res) => {
     }
 });
 
+// ============================================================
+// 7. GET /api/users/:id/companies — ดึงรายการบริษัทที่ user มีสิทธิ์เข้าถึง
+// ============================================================
+router.get('/:id/companies', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const companies = await userService.getUserCompanyAccess(id);
+        res.json(companies);
+    } catch (err) {
+        console.error('Error fetching user company access:', err);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการดึงข้อมูลสิทธิ์บริษัท: ' + err.message });
+    }
+});
+
+// ============================================================
+// 8. PUT /api/users/:id/companies — อัปเดตสิทธิ์เข้าถึงบริษัท (Admin Only)
+// ============================================================
+router.put('/:id/companies', authorizeRoles('admin'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { companyIds, defaultCompanyId } = req.body;
+        const updated = await userService.updateUserCompanyAccess(id, companyIds, defaultCompanyId);
+        res.json({ message: 'อัปเดตสิทธิ์บริษัทสำเร็จ', companies: updated });
+    } catch (err) {
+        console.error('Error updating user company access:', err);
+        res.status(500).json({ message: 'เกิดข้อผิดพลาดในการอัปเดตสิทธิ์บริษัท: ' + err.message });
+    }
+});
+
 module.exports = router;
+

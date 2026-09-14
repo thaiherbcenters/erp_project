@@ -62,7 +62,36 @@ const createUser = async (userData) => {
             VALUES (@username, @password_hash, @display_name, @role, @department, @avatar)
         `);
 
-    return result.recordset[0];
+    const newUser = result.recordset[0];
+
+    // บันทึกสิทธิ์เข้าถึงบริษัท (UserCompanyAccess)
+    let companyIdsToAssign = userData.companyIds;
+    if (!Array.isArray(companyIdsToAssign) || companyIdsToAssign.length === 0) {
+        if (role === 'admin' || role === 'executive') {
+            companyIdsToAssign = [1, 2, 3, 4];
+        } else {
+            companyIdsToAssign = [1]; // default THC
+        }
+    }
+
+    for (let i = 0; i < companyIdsToAssign.length; i++) {
+        const cId = Number(companyIdsToAssign[i]);
+        if (!isNaN(cId)) {
+            await pool.request()
+                .input('userId', sql.Int, newUser.user_id)
+                .input('companyId', sql.Int, cId)
+                .input('isDefault', sql.Bit, i === 0 ? 1 : 0)
+                .query(`
+                    IF NOT EXISTS (SELECT 1 FROM UserCompanyAccess WHERE user_id = @userId AND CompanyID = @companyId)
+                    BEGIN
+                        INSERT INTO UserCompanyAccess (user_id, CompanyID, is_default)
+                        VALUES (@userId, @companyId, @isDefault)
+                    END
+                `);
+        }
+    }
+
+    return newUser;
 };
 
 const updateUser = async (id, updateData) => {
@@ -168,11 +197,58 @@ const deleteUser = async (id) => {
     return true;
 };
 
+// ============================================================
+// Multi-Company Access Management
+// ============================================================
+const getUserCompanyAccess = async (userId) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input('userId', sql.Int, userId)
+        .query(`
+            SELECT uca.CompanyID, uca.is_default, uca.role_override,
+                   c.CompanyName, c.ShortName, c.CompanyNameTH, c.CompanyNameEN,
+                   c.CompanyColor, c.CompanyIcon, c.CompanyLogo
+            FROM UserCompanyAccess uca
+            JOIN Company c ON uca.CompanyID = c.CompanyID
+            WHERE uca.user_id = @userId AND c.IsActive = 1
+            ORDER BY c.CompanyID
+        `);
+    return res.recordset;
+};
+
+const updateUserCompanyAccess = async (userId, companyIds = [], defaultCompanyId = null) => {
+    const pool = await poolPromise;
+    
+    // ลบสิทธิ์เดิมของ user นี้
+    await pool.request()
+        .input('userId', sql.Int, userId)
+        .query(`DELETE FROM UserCompanyAccess WHERE user_id = @userId`);
+
+    // บันทึกสิทธิ์ใหม่
+    const validCompanyIds = (companyIds || []).map(Number).filter(n => !isNaN(n) && n > 0);
+    for (let i = 0; i < validCompanyIds.length; i++) {
+        const cId = validCompanyIds[i];
+        const isDefault = defaultCompanyId ? (cId === Number(defaultCompanyId) ? 1 : 0) : (i === 0 ? 1 : 0);
+        await pool.request()
+            .input('userId', sql.Int, userId)
+            .input('companyId', sql.Int, cId)
+            .input('isDefault', sql.Bit, isDefault)
+            .query(`
+                INSERT INTO UserCompanyAccess (user_id, CompanyID, is_default)
+                VALUES (@userId, @companyId, @isDefault)
+            `);
+    }
+
+    return await getUserCompanyAccess(userId);
+};
+
 module.exports = {
     getAllUsers,
     createUser,
     updateUser,
     resetPassword,
     toggleUserStatus,
-    deleteUser
+    deleteUser,
+    getUserCompanyAccess,
+    updateUserCompanyAccess
 };

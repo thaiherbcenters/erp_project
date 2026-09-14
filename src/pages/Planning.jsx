@@ -29,6 +29,7 @@ import { useProduction } from '../context/ProductionContext';
 import { useAlert } from '../components/CustomAlert';
 import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 import { UNIT_OPTIONS } from '../data/billingData';
 import ProductionOrderPreview from '../components/ProductionOrderPreview';
 import { useSignatures } from '../hooks/useSignatures';
@@ -77,6 +78,13 @@ export default function Planning() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
     const [soFilter, setSOFilter] = useState('');
+    const [jobPage, setJobPage] = useState(1);
+    const [jobPageSize, setJobPageSize] = useState(10);
+
+    useEffect(() => {
+        setJobPage(1);
+    }, [searchTerm, statusFilter, soFilter, jobPageSize]);
+
     const [selectedJob, setSelectedJob] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [previewJob, setPreviewJob] = useState(null);
@@ -966,7 +974,7 @@ export default function Planning() {
         // Extract SO references from job notes
         const extractSO = (notes) => {
             if (!notes) return null;
-            const match = notes.match(/SO:\s*(SO-[\d-]+)/);
+            const match = notes.match(/SO:\s*(SO-?[\d-]+)/);
             return match ? match[1] : null;
         };
 
@@ -979,6 +987,8 @@ export default function Planning() {
             const matchSO = !soFilter || extractSO(j.notes) === soFilter;
             return matchSearch && matchStatus && matchSO;
         });
+
+        const paginatedJobs = filtered.slice((jobPage - 1) * jobPageSize, (jobPage - 1) * jobPageSize + jobPageSize);
 
         return (
             <div className="planning-list">
@@ -1053,7 +1063,7 @@ export default function Planning() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map(job => {
+                                {paginatedJobs.map(job => {
                                     const soRef = extractSO(job.notes);
                                     
                                     // หา QC ล่าสุดของแต่ละ Task ใน Job นี้
@@ -1164,6 +1174,14 @@ export default function Planning() {
                                 )}
                             </tbody>
                         </table>
+                        <PaginationControl
+                            currentPage={jobPage}
+                            totalPages={Math.ceil(filtered.length / jobPageSize) || 1}
+                            totalItems={filtered.length}
+                            pageSize={jobPageSize}
+                            onPageChange={setJobPage}
+                            onPageSizeChange={setJobPageSize}
+                        />
                     </div>
                 )}
             </div>

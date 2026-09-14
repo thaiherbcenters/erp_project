@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, ChevronDown, UploadCloud, Edit2, Loader, Eye, Download, Trash2, XCircle, CheckCircle, AlertCircle, Plus, Send, Clock, Printer, X, History, RotateCcw, Save, ClipboardEdit, FileText, ArrowLeft, CheckSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../components/CustomAlert';
 import { DOCUMENT_PARTS, DOCUMENT_CATEGORIES } from '../documentData';
 import API_BASE from '../../config';
+import PaginationControl from '../../components/PaginationControl';
 
 // Shared Utilities
 export const getCategoryShortName = (catId) => {
@@ -47,6 +48,9 @@ export default function FormDocumentList({ hasPermission, documents, standards, 
         return <FormFillPage doc={selectedForm} onBack={() => setSelectedForm(null)} />;
     }
 
+    const [formPage, setFormPage] = useState(1);
+    const [formPageSize, setFormPageSize] = useState(10);
+
     // กรองเฉพาะเอกสารประเภท Form เท่านั้น
     const FORM_DOCUMENTS = documents.filter(doc => doc.typeTag === 'Form');
 
@@ -58,6 +62,15 @@ export default function FormDocumentList({ hasPermission, documents, standards, 
         const matchStandard = filterStandard === 'all' || (doc.standard && doc.standard.includes(filterStandard));
         return matchSearch && matchCategory && matchStandard;
     });
+
+    useEffect(() => {
+        setFormPage(1);
+    }, [searchTerm, filterCategory, filterStandard]);
+
+    const paginatedDocs = useMemo(() => {
+        const start = (formPage - 1) * formPageSize;
+        return filteredDocs.slice(start, start + formPageSize);
+    }, [filteredDocs, formPage, formPageSize]);
 
     // คำนวณหมวดที่มีแบบฟอร์มอยู่จริง (ไม่แสดงหมวดที่ไม่มี Form)
     const categoriesWithForms = DOCUMENT_CATEGORIES.filter(cat =>
@@ -325,7 +338,7 @@ export default function FormDocumentList({ hasPermission, documents, standards, 
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredDocs.map((doc) => (
+                            {paginatedDocs.map((doc) => (
                                 <tr key={doc.id}>
                                     <td className="text-bold">{doc.id}</td>
                                     <td>{doc.name}</td>
@@ -376,11 +389,19 @@ export default function FormDocumentList({ hasPermission, documents, standards, 
                             ))}
                             {filteredDocs.length === 0 && (
                                 <tr>
-                                    <td colSpan="7" className="doc-empty-row">ไม่พบแบบฟอร์มที่ค้นหา</td>
+                                    <td colSpan="8" className="doc-empty-row">ไม่พบแบบฟอร์มที่ค้นหา</td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
+                    <PaginationControl
+                        currentPage={formPage}
+                        totalPages={Math.ceil(filteredDocs.length / formPageSize) || 1}
+                        totalItems={filteredDocs.length}
+                        pageSize={formPageSize}
+                        onPageChange={setFormPage}
+                        onPageSizeChange={(size) => { setFormPageSize(size); setFormPage(1); }}
+                    />
                 </div>
             )}
         </div>

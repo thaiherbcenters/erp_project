@@ -7,9 +7,11 @@ router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT CompanyID, CompanyName, TaxID, Address, IsActive 
+            SELECT CompanyID, CompanyName, ShortName, CompanyNameTH, CompanyNameEN, 
+                   TaxID, Address, IsActive, CompanyColor, CompanyIcon, CompanyLogo
             FROM Company 
             WHERE IsActive = 1
+            ORDER BY CompanyID
         `);
         res.json(result.recordset);
     } catch (err) {

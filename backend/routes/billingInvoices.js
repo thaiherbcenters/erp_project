@@ -98,23 +98,12 @@ router.get('/next-number', async (req, res) => {
         const pool = await poolPromise;
         const docType = req.query.docType || 'billing_invoice_thc';
         
-        let prefix = 'BI';
-        if (docType.includes('psf')) prefix = 'BI-PSF';
-        else if (docType.includes('elt')) prefix = 'BI-ELT';
+        // Billing Invoice always uses BI prefix (e.g. BI20260914-001)
+        const prefix = 'BI';
+        const datePrefix = getDatePrefix(req.query.date);
+        const fullPrefix = `${prefix}${datePrefix}`;
         
-        const datePrefix = getDatePrefix();
-        
-        // Ensure this matches POST route logic (BI-${getDatePrefix()})
-        const fullPrefixForNext = `BI-${getDatePrefix()}`;
-        // Wait, the POST route is BI-${getDatePrefix()} for all, so the DB sequence has 'BI-' prefix.
-        // We will just use `BI-${getDatePrefix()}` since the backend doesn't differentiate prefix yet.
-        // If they want to, they should update backend POST. Let's just generate `BI-${getDatePrefix()}` for now.
-        // Wait, the frontend code had `prefix = 'BI-PSF'` etc., so I'll try to stick to what the frontend wanted, but since the DB doesn't have it, it might generate `-001` for the other prefixes. 
-        // Oh actually, the `generateSequence` can handle new prefixes easily. 
-        // However, the POST route in `billingInvoices.js` says: `BI-${getDatePrefix()}` unconditionally on line 137.
-        // Let's use `BI-${getDatePrefix()}` unconditionally to match POST.
-        
-        const nextNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', `BI-${getDatePrefix()}`, 3);
+        const nextNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', fullPrefix, 3);
         
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
@@ -198,16 +187,17 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
         const request = new sql.Request(transaction);
 
         request.input('customerId', sql.Int, customerId || null);
-        // Generate BillingInvoice Number
+        // Generate BillingInvoice Number (BI20260914-001)
+        const defaultBiPrefix = `BI${getDatePrefix(billDate)}`;
         let finalBillingInvoiceNo = billingInvoiceNo;
         if (!finalBillingInvoiceNo) {
-            finalBillingInvoiceNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', `BI-${getDatePrefix()}`, 3);
+            finalBillingInvoiceNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', defaultBiPrefix, 3);
         } else {
             const chk = await transaction.request()
                 .input('chkNo', sql.NVarChar, finalBillingInvoiceNo)
                 .query(`SELECT 1 FROM BillingInvoice WHERE BillingInvoiceNo = @chkNo`);
             if (chk.recordset.length > 0) {
-                finalBillingInvoiceNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', `BI-${getDatePrefix()}`, 3);
+                finalBillingInvoiceNo = await peekNextSequence(pool, 'BillingInvoice', 'BillingInvoiceNo', defaultBiPrefix, 3);
             }
         }
 
@@ -309,14 +299,14 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
                     .query(`SELECT CustomerID FROM Customer WHERE CustomerName = @custName`);
 
                 if (custCheck.recordset.length === 0) {
-                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Prospect
+                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Active
                     const typeId = customerTypeId ? parseInt(customerTypeId) : 1;
                     const prefix = typeId === 2 ? 'OEM' : 'CUST';
                     const custCode = await generateSequence(pool, 'Customer', 'CustomerCode', `${prefix}-${getMonthPrefix()}`, 3);
 
                     await pool.request()
                         .input('tid', sql.Int, typeId)           // จาก dropdown หรือ 1 = Retail (default)
-                        .input('sid', sql.Int, 3)           // 3 = Prospect
+                        .input('sid', sql.Int, 1)           // 1 = Active (ใช้งาน)
                         .input('code', sql.NVarChar, custCode)
                         .input('name', sql.NVarChar, customerName.trim())
                         .input('contact', sql.NVarChar, contactPerson || null)
@@ -329,7 +319,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
                             INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Email, Phone, Address, TaxID, Source)
                             VALUES (@tid, @sid, @code, @name, @contact, @email, @phone, @address, @tax, @source)
                         `);
-                    console.log(`✅ Auto-created customer "${customerName}" as Prospect from QT`);
+                    console.log(`✅ Auto-created customer "${customerName}" as Active from BillingInvoice`);
                 }
             } catch (custErr) {
                 // ไม่ให้ customer error กระทบ QT response (QT บันทึกสำเร็จแล้ว)

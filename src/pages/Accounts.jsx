@@ -12,7 +12,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
@@ -34,6 +34,7 @@ import {
     ChevronRight
 } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 import BillingInvoiceForm from '../components/BillingInvoiceForm';
 import ReceiptForm from '../components/ReceiptForm';
 import QuotationForm from '../components/QuotationForm';
@@ -239,6 +240,19 @@ export default function Accounts() {
         return true;
     });
 
+    // ── Pagination State for Deposits ──
+    const [depositPage, setDepositPage] = useState(1);
+    const [depositPageSize, setDepositPageSize] = useState(10);
+
+    useEffect(() => {
+        setDepositPage(1);
+    }, [depositSearch, depositFilter, depositPageSize]);
+
+    const paginatedDeposits = useMemo(() => {
+        const start = (depositPage - 1) * depositPageSize;
+        return filteredDeposits.slice(start, start + depositPageSize);
+    }, [filteredDeposits, depositPage, depositPageSize]);
+
     // ── ฟังก์ชันเปิดฟอร์มสร้างใบวางบิล/ใบแจ้งหนี้จากใบเสนอราคา ──
     const handleCreateBillingInvoice = async (quotationId) => {
         try {
@@ -359,6 +373,19 @@ export default function Accounts() {
         const matchFilter = apFilter === 'all' || d.docType === apFilter;
         return matchSearch && matchFilter;
     });
+
+    // ── Pagination State for AP ──
+    const [apPage, setApPage] = useState(1);
+    const [apPageSize, setApPageSize] = useState(10);
+
+    useEffect(() => {
+        setApPage(1);
+    }, [apSearch, apFilter, apPageSize]);
+
+    const paginatedAP = useMemo(() => {
+        const start = (apPage - 1) * apPageSize;
+        return filteredAP.slice(start, start + apPageSize);
+    }, [filteredAP, apPage, apPageSize]);
 
     // ── Badge class helpers ──
     const getDocStatusClass = (status) => {
@@ -592,7 +619,7 @@ export default function Accounts() {
                                                     </td>
                                                 </tr>
                                             ) : (
-                                                filteredDeposits.map((row, idx) => {
+                                                paginatedDeposits.map((row, idx) => {
                                                     const grandTotal = Number(row.GrandTotal || 0);
                                                     const depositAmount = Number(row.DepositAmount || 0);
                                                     const paid = Number(row.PaidDepositAmount || 0);
@@ -600,7 +627,7 @@ export default function Accounts() {
 
                                                     return (
                                                         <tr key={row.QuotationID}>
-                                                            <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                                                            <td style={{ textAlign: 'center' }}>{(depositPage - 1) * depositPageSize + idx + 1}</td>
                                                             <td className="text-bold" style={{ color: 'var(--primary)' }}>
                                                                 {row.QuotationNo}
                                                             </td>
@@ -830,6 +857,14 @@ export default function Accounts() {
                                         </tbody>
                                     </table>
                                 </div>
+                                <PaginationControl
+                                    currentPage={depositPage}
+                                    totalPages={Math.ceil(filteredDeposits.length / depositPageSize) || 1}
+                                    totalItems={filteredDeposits.length}
+                                    pageSize={depositPageSize}
+                                    onPageChange={setDepositPage}
+                                    onPageSizeChange={setDepositPageSize}
+                                />
                             </div>
                 </div>
             )}
@@ -883,9 +918,9 @@ export default function Accounts() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredAP.map((d) => (
+                                    {paginatedAP.map((d, idx) => (
                                         <tr key={d.id}>
-                                            <td>{d.id}</td>
+                                            <td>{(apPage - 1) * apPageSize + idx + 1}</td>
                                             <td className="text-bold">{d.number}</td>
                                             <td>{d.supplier}</td>
                                             <td>
@@ -905,6 +940,14 @@ export default function Accounts() {
                                     ))}
                                 </tbody>
                             </table>
+                            <PaginationControl
+                                currentPage={apPage}
+                                totalPages={Math.ceil(filteredAP.length / apPageSize) || 1}
+                                totalItems={filteredAP.length}
+                                pageSize={apPageSize}
+                                onPageChange={setApPage}
+                                onPageSizeChange={setApPageSize}
+                            />
                         </div>
                     )}
                 </div>

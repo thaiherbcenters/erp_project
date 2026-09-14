@@ -7,14 +7,46 @@ router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT ContractID, ContractNo, ContractName, CustomerID, StartDate, EndDate, ContractValue, Status, CreatedAt
-            FROM Contracts
-            ORDER BY CreatedAt DESC
+            SELECT c.ContractID, c.ContractNo, c.ContractName, c.CustomerID, c.StartDate, c.EndDate, c.ContractValue, c.Status, c.CreatedAt, cust.CustomerName
+            FROM Contracts c
+            LEFT JOIN Customer cust ON c.CustomerID = cust.CustomerID
+            ORDER BY c.CreatedAt DESC
         `);
         res.json({ success: true, data: result.recordset });
     } catch (err) {
         console.error('Error fetching contracts:', err);
         res.status(500).json({ success: false, message: 'Server error fetching contracts', error: err.message });
+    }
+});
+
+// GET next contract number
+router.get('/next-number', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const today = new Date();
+        const yy = today.getFullYear().toString().slice(-2);
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const prefix = `CT-${yy}${mm}${dd}-`;
+
+        const countRes = await pool.request()
+            .input('prefix', sql.NVarChar, `${prefix}%`)
+            .query('SELECT ContractNo FROM Contracts WHERE ContractNo LIKE @prefix');
+
+        let maxNum = 0;
+        countRes.recordset.forEach(r => {
+            if (r.ContractNo) {
+                const parts = r.ContractNo.split('-');
+                const num = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(num) && num > maxNum) maxNum = num;
+            }
+        });
+
+        const nextNumber = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+        res.json({ success: true, nextNumber });
+    } catch (err) {
+        console.error('Error getting next contract number:', err);
+        res.status(500).json({ success: false, message: 'Server error generating contract number', error: err.message });
     }
 });
 
@@ -26,9 +58,10 @@ router.get('/:id', async (req, res) => {
         const result = await pool.request()
             .input('ContractID', sql.Int, id)
             .query(`
-                SELECT ContractID, ContractNo, ContractName, CustomerID, StartDate, EndDate, ContractValue, Status, CreatedAt
-                FROM Contracts
-                WHERE ContractID = @ContractID
+                SELECT c.ContractID, c.ContractNo, c.ContractName, c.CustomerID, c.StartDate, c.EndDate, c.ContractValue, c.Status, c.CreatedAt, cust.CustomerName
+                FROM Contracts c
+                LEFT JOIN Customer cust ON c.CustomerID = cust.CustomerID
+                WHERE c.ContractID = @ContractID
             `);
         
         if (result.recordset.length === 0) {
@@ -154,8 +187,32 @@ router.post('/', async (req, res) => {
         const pool = await poolPromise;
         const data = req.body;
 
+        let contractNo = data.contractNo?.trim();
+        if (!contractNo) {
+            const today = new Date();
+            const yy = today.getFullYear().toString().slice(-2);
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            const prefix = `CT-${yy}${mm}${dd}-`;
+
+            const countRes = await pool.request()
+                .input('prefix', sql.NVarChar, `${prefix}%`)
+                .query('SELECT ContractNo FROM Contracts WHERE ContractNo LIKE @prefix');
+
+            let maxNum = 0;
+            countRes.recordset.forEach(r => {
+                if (r.ContractNo) {
+                    const parts = r.ContractNo.split('-');
+                    const num = parseInt(parts[parts.length - 1], 10);
+                    if (!isNaN(num) && num > maxNum) maxNum = num;
+                }
+            });
+
+            contractNo = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+        }
+
         const result = await pool.request()
-            .input('ContractNo', sql.NVarChar, data.contractNo)
+            .input('ContractNo', sql.NVarChar, contractNo)
             .input('ContractName', sql.NVarChar, data.contractName)
             .input('CustomerID', sql.Int, data.customerId || null)
             .input('StartDate', sql.Date, data.startDate || null)
@@ -168,7 +225,12 @@ router.post('/', async (req, res) => {
                 VALUES (@ContractNo, @ContractName, @CustomerID, @StartDate, @EndDate, @ContractValue, @Status)
             `);
 
-        res.json({ success: true, message: 'Contract created successfully', contractId: result.recordset[0].ContractID });
+        res.json({
+            success: true,
+            message: 'Contract created successfully',
+            contractId: result.recordset[0].ContractID,
+            contractNo
+        });
     } catch (err) {
         console.error('Error creating contract:', err);
         res.status(500).json({ success: false, message: 'Server error creating contract', error: err.message });

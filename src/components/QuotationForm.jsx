@@ -827,7 +827,8 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
             // Fetch next bill number from API
             const fetchNextNo = async () => {
                 try {
-                    const res = await fetch(`${API_BASE}/quotations/next-number?docType=${formData.docType}`);
+                    const dateParam = formData.billDate ? `&date=${encodeURIComponent(formData.billDate)}` : '';
+                    const res = await fetch(`${API_BASE}/quotations/next-number?docType=${formData.docType}${dateParam}`);
                     const json = await res.json();
                     if (json.success && json.nextNumber) {
                         setFormData(prev => ({ ...prev, billNo: json.nextNumber }));
@@ -838,7 +839,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
             };
             fetchNextNo();
         }
-    }, [formData.docType, editId]);
+    }, [formData.docType, formData.billDate, editId]);
 
     const [contracts, setContracts] = useState([]);
     useEffect(() => {
@@ -2586,7 +2587,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                                                 <span style={{ fontSize: '11pt' }}>
                                                                     {formData.billStatus === 'ktb' ? 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์' : 
                                                                      formData.billStatus === 'kbank' ? 'บจก. พรีเมียร์ สมาร์ท ฟาร์ม' :
-                                                                     formData.billStatus === 'kbank_charan' ? 'นาย จรัญ วาสิกสูตร' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด'}
+                                                                     formData.billStatus === 'kbank_charan' ? 'จรัญ วาสิกสูตร' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด'}
                                                                 </span><br/>
                                                                 <span className={formData.billStatus.includes('kbank') ? 'print-color-green' : 'print-color-blue'} style={{ fontSize: '18pt', color: formData.billStatus.includes('kbank') ? '#138f2d' : '#2980b9' }}>
                                                                     {formData.billStatus === 'ktb' ? '016-074-4237' : 
@@ -2882,7 +2883,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                                                 formData.billStatus === 'kbank_charan' ? 'Charan Wasiksut' :
                                                                 (isElt ? 'Elite Trading 2020 Co., Ltd.' : (isPsf ? 'Premier Smart Farm Co., Ltd.' : 'Thai Herb Centers Community Enterprise'))
                                                             ) : (
-                                                                formData.billStatus === 'kbank_charan' ? 'จรัญ วาสิกศิริ' :
+                                                                formData.billStatus === 'kbank_charan' ? 'จรัญ วาสิกสูตร' :
                                                                 (isElt ? 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด' : (isPsf ? 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด' : 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์'))
                                                             )}
                                                         </span><br/>

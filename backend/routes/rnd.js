@@ -611,7 +611,7 @@ router.post('/formula-tests', authorizeRoles('admin', 'executive', 'rnd', 'qc'),
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
         try {
-            const finalRequestID = await generateSequence(pool, 'RnD_Formula_Tests', 'RequestID', `QCL-${getDatePrefix()}`, 3);
+            const finalRequestID = await generateSequence(pool, 'RnD_Formula_Tests', 'RequestID', `QCL${getDatePrefix()}`, 3);
 
             await new sql.Request(transaction)
                 .input('RequestID', sql.VarChar, finalRequestID)

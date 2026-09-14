@@ -8,6 +8,7 @@ import FormattedAddress from './FormattedAddress';
 import CustomSelect from './CustomSelect';
 import ContractSelectorModal from './ContractSelectorModal';
 import QuotationSelectorModal from './QuotationSelectorModal';
+import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
 import '../pages/PageCommon.css';
@@ -416,7 +417,8 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
         if (!editId) {
             const fetchNextNo = async () => {
                 try {
-                    const res = await fetch(`${API_BASE}/sales-orders/next-number`);
+                    const dateParam = formData.orderDate ? `?date=${encodeURIComponent(formData.orderDate)}` : '';
+                    const res = await fetch(`${API_BASE}/sales-orders/next-number${dateParam}`);
                     const json = await res.json();
                     if (json.success && json.nextNumber) {
                         setFormData(prev => ({ ...prev, salesOrderNo: json.nextNumber }));
@@ -427,11 +429,10 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
             };
             fetchNextNo();
         }
-    }, [editId]);
+    }, [editId, formData.orderDate]);
 
     const [showCustomerModal, setShowCustomerModal] = useState(false);
     const [customerList, setCustomerList] = useState([]);
-    const [customerSearch, setCustomerSearch] = useState('');
 
     const openCustomerModal = async () => {
         try {
@@ -447,8 +448,25 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
     };
 
     const handleSelectCustomer = (cust) => {
+        if (!cust) {
+            setFormData(prev => ({
+                ...prev,
+                customerId: '',
+                customerName: '',
+                contactPerson: '',
+                phone: '',
+                email: '',
+                address: '',
+                taxId: '',
+                taxBranch: 'head_office',
+                branchNo: ''
+            }));
+            setShowCustomerModal(false);
+            return;
+        }
         setFormData(prev => ({
             ...prev,
+            customerId: cust.CustomerID || '',
             customerName: cust.CustomerName || '',
             contactPerson: cust.ContactPerson || '',
             phone: cust.Phone || '',
@@ -460,12 +478,6 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
         }));
         setShowCustomerModal(false);
     };
-
-    const filteredCustomers = customerList.filter(c =>
-        (c.CustomerName || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
-        (c.CustomerCode || '').toLowerCase().includes(customerSearch.toLowerCase()) ||
-        (c.ContactPerson || '').toLowerCase().includes(customerSearch.toLowerCase())
-    );
 
     // Fetch Contracts for Dropdown
     const [contracts, setContracts] = useState([]);
@@ -956,7 +968,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                                 <td style={{ width: '40%', fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
                                                     เลขที่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>No.</span>
                                                 </td>
-                                                <td style={{ width: '60%', padding: '4px 8px', borderBottom: '1px solid #1a7a3a', fontWeight: 'bold' }}>{formData.salesOrderNo || 'SO-YYYY-MMXXX'}</td>
+                                                <td style={{ width: '60%', padding: '4px 8px', borderBottom: '1px solid #1a7a3a', fontWeight: 'bold' }}>{formData.salesOrderNo || 'SOYYYYMMDD-001'}</td>
                                             </tr>
                                             <tr>
                                                 <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
@@ -1250,7 +1262,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                             </div>
 
                             <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 500, color: 'var(--text)' }}>หมายเลขคำสั่งขาย (Sales Order No.)</label>
-                            <input type="text" name="salesOrderNo" value={formData.salesOrderNo || 'SO-YYYY-MMXXX'} readOnly style={{ ...inputStyle, background: '#f8fafc', color: '#64748b', cursor: 'not-allowed' }} />
+                            <input type="text" name="salesOrderNo" value={formData.salesOrderNo || 'SOYYYYMMDD-001'} readOnly style={{ ...inputStyle, background: '#f8fafc', color: '#64748b', cursor: 'not-allowed' }} />
                         </div>
 
                         {/* Contract Selection */}
@@ -1885,7 +1897,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                             <td style={{ width: '40%', fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
                                                 เลขที่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>No.</span>
                                             </td>
-                                            <td style={{ width: '60%', padding: '4px 8px', borderBottom: '1px solid #1a7a3a', fontWeight: 'bold' }}>{formData.salesOrderNo || 'SO-YYYY-MMXXX'}</td>
+                                            <td style={{ width: '60%', padding: '4px 8px', borderBottom: '1px solid #1a7a3a', fontWeight: 'bold' }}>{formData.salesOrderNo || 'SOYYYYMMDD-001'}</td>
                                         </tr>
                                         <tr>
                                             <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
@@ -2129,53 +2141,13 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                 </div>
             )}
             {/* Customer Selection Modal */}
-            {showCustomerModal && (
-                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: '#fff', borderRadius: '10px', width: '700px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h2 style={{ margin: 0, fontSize: '18px' }}>เลือกลูกค้า</h2>
-                            <button onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#888' }}>&times;</button>
-                        </div>
-                        <div style={{ padding: '16px 24px', borderBottom: '1px solid #eee' }}>
-                            <input 
-                                type="text" 
-                                placeholder="ค้นหาชื่อ, รหัส, ผู้ติดต่อ..." 
-                                value={customerSearch}
-                                onChange={(e) => setCustomerSearch(e.target.value)}
-                                style={{ width: '100%', padding: '10px 14px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '14px' }}
-                            />
-                        </div>
-                        <div style={{ overflowY: 'auto', flex: 1, padding: '0' }}>
-                            <table className="data-table" style={{ border: 'none', minWidth: '100%' }}>
-                                <thead>
-                                    <tr>
-                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>รหัสลูกค้า</th>
-                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>ชื่อลูกค้า</th>
-                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1 }}>ผู้ติดต่อ</th>
-                                        <th style={{ position: 'sticky', top: 0, background: '#f8fafc', zIndex: 1, textAlign: 'center' }}>เลือก</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredCustomers.length > 0 ? filteredCustomers.map(c => (
-                                        <tr key={c.CustomerID} className="hover-row">
-                                            <td style={{ color: '#4f46e5', fontWeight: '500' }}>{c.CustomerCode}</td>
-                                            <td style={{ fontWeight: '500' }}>{c.CustomerName}</td>
-                                            <td>{c.ContactPerson || '-'}</td>
-                                            <td style={{ textAlign: 'center' }}>
-                                                <button type="button" onClick={() => handleSelectCustomer(c)} className="btn-primary" style={{ padding: '4px 12px', fontSize: '12px' }}>
-                                                    เลือก
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    )) : (
-                                        <tr><td colSpan="4" style={{ textAlign: 'center', padding: '30px', color: '#999' }}>ไม่พบข้อมูลลูกค้า</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <CustomerSelectorModal 
+                show={showCustomerModal} 
+                onClose={() => setShowCustomerModal(false)} 
+                customers={customerList}
+                selectedCustomerId={formData.customerId}
+                onSelect={handleSelectCustomer}
+            />
             
             <QuotationSelectorModal 
                 show={showQuotationModal}

@@ -258,8 +258,8 @@ router.post('/tasks/wip', authorizeRoles('admin', 'executive', 'planner', 'opera
         // Generate IDs
         const datePrefix = getDatePrefix();
         // Use parent planner's JO ID if provided, otherwise generate a new one
-        const joId = sourceJobOrderId || await generateSequence(pool, 'Production_Tasks', 'JobOrderID', `JO-${datePrefix}`, 3);
-        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `WIP-${datePrefix}`, 3);
+        const joId = sourceJobOrderId || await generateSequence(pool, 'Production_Tasks', 'JobOrderID', `JO${datePrefix}`, 3);
+        const taskId = await generateSequence(pool, 'Production_Tasks', 'TaskID', `WIP${datePrefix}`, 3);
         const batchNo = await generateSequence(pool, 'Production_Tasks', 'BatchNo', `B${datePrefix}-WIP`, 2, '-');
 
         let productName = null;
@@ -424,7 +424,7 @@ router.put('/tasks/:id/advance', authorizeRoles('admin', 'executive', 'planner',
                 
                 if (taskResult2.recordset.length > 0) {
                     const taskData = taskResult2.recordset[0];
-                    const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG-${getDatePrefix()}`, 3);
+                    const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG${getDatePrefix()}`, 3);
                     
                     // Check if already exists by BatchNo OR ProductionTaskID to prevent duplicate
                     const checkPkg = await pool.request()
@@ -523,7 +523,7 @@ router.put('/tasks/:id/route-wip', authorizeRoles('admin', 'executive', 'planner
             
             // Auto-create packaging task immediately to replicate advance step logic
             try {
-                const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG-${getDatePrefix()}`, 3);
+                const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG${getDatePrefix()}`, 3);
                 let pkgDestination = 'คลัง';
                 if (task.JobOrderID) {
                     try {

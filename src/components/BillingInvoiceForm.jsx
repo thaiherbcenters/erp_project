@@ -11,6 +11,7 @@ import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
 import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN } from '../utils/formatters';
 import FormattedAddress from './FormattedAddress';
+import BankAccountSelect from './BankAccountSelect';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -781,16 +782,6 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
     const [showContractModal, setShowContractModal] = useState(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
 
-    const [customBanks, setCustomBanks] = useState(() => {
-        try {
-            return JSON.parse(localStorage.getItem('customBanks')) || [];
-        } catch {
-            return [];
-        }
-    });
-    const [addBankModal, setAddBankModal] = useState({ visible: false, bankName: '', accountName: '', accountNo: '', logo: null });
-    const [showBankDropdown, setShowBankDropdown] = useState(false);
-
     const [formData, setFormData] = useState({
         docType: 'billing_invoice_thc', // billing_invoice_thc, billing_invoice_psf, billing_invoice_elt
         billStatus: 'ktb',
@@ -862,7 +853,8 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
             // Fetch next bill number from API
             const fetchNextNo = async () => {
                 try {
-                    const res = await fetch(`${API_BASE}/billing-invoices/next-number?docType=${formData.docType}`);
+                    const dateParam = formData.billDate ? `&date=${encodeURIComponent(formData.billDate)}` : '';
+                    const res = await fetch(`${API_BASE}/billing-invoices/next-number?docType=${formData.docType}${dateParam}`);
                     const json = await res.json();
                     if (json.success && json.nextNumber) {
                         setFormData(prev => ({ ...prev, billNo: json.nextNumber }));
@@ -873,7 +865,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
             };
             fetchNextNo();
         }
-    }, [formData.docType, editId, initialFromQuotation]);
+    }, [formData.docType, formData.billDate, editId, initialFromQuotation]);
 
     useEffect(() => {
         if (!editId && initialFromQuotation) {
@@ -1704,98 +1696,13 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                     <option value="billing_invoice_elt">ใบวางบิล/ใบแจ้งหนี้ (Billing Note/Invoice) - ELT</option>
                                 </CustomSelect>
                             </div>
-                            <div className="form-group" style={{ marginBottom: 0, position: 'relative' }}>
-                                <label>บัญชีธนาคาร (บริษัทรับเงิน) <span className="required">*</span></label>
-                                <div 
-                                    onClick={() => setShowBankDropdown(!showBankDropdown)}
-                                    style={{ width: '100%', padding: '10px 14px', border: '2px solid #e2e8f0', borderRadius: '10px', fontSize: '14px', background: '#f8fafc', color: '#1e293b', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                                >
-                                    <span>
-                                        {formData.billStatus === 'ktb' ? 'ธนาคารกรุงไทย (016-074423-7)' :
-                                         formData.billStatus === 'kbank_charan' ? 'ธนาคารกสิกรไทย (235-1-19734-2)' :
-                                         (() => {
-                                             try {
-                                                 const parsed = JSON.parse(formData.billStatus);
-                                                 return `${parsed.bankName} (${parsed.accountNo})`;
-                                             } catch {
-                                                 return 'เลือกบัญชีธนาคาร';
-                                             }
-                                         })()}
-                                    </span>
-                                    <span style={{ fontSize: '10px', color: '#94a3b8' }}>▼</span>
-                                </div>
-                                
-                                {showBankDropdown && (
-                                    <>
-                                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 40 }} onClick={() => setShowBankDropdown(false)} />
-                                        <div style={{ position: 'absolute', top: '70px', left: 0, width: '100%', background: 'white', border: '1px solid #cbd5e1', borderRadius: '8px', zIndex: 50, maxHeight: '200px', overflowY: 'auto', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                                            <div 
-                                                onClick={() => { setFormData(prev => ({...prev, billStatus: 'ktb'})); setShowBankDropdown(false); }}
-                                                style={{ padding: '8px 12px', fontSize: '14px', color: '#334155', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
-                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                                            >
-                                                ธนาคารกรุงไทย (016-074423-7)
-                                            </div>
-                                            <div 
-                                                onClick={() => { setFormData(prev => ({...prev, billStatus: 'kbank_charan'})); setShowBankDropdown(false); }}
-                                                style={{ padding: '8px 12px', fontSize: '14px', color: '#334155', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
-                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                                            >
-                                                ธนาคารกสิกรไทย (235-1-19734-2)
-                                            </div>
-                                            {customBanks.map((bank, index) => (
-                                                <div 
-                                                    key={index} 
-                                                    style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', borderBottom: '1px solid #f1f5f9' }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                                                >
-                                                    <div
-                                                        onClick={() => { setFormData(prev => ({...prev, billStatus: JSON.stringify(bank)})); setShowBankDropdown(false); }}
-                                                        style={{ padding: '8px 12px', fontSize: '14px', color: '#334155', flex: 1 }}
-                                                    >
-                                                        {bank.bankName} ({bank.accountNo})
-                                                    </div>
-                                                    <div
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            const confirm = await showConfirm('ยืนยันการลบ', `ต้องการลบบัญชี "${bank.bankName}" ออกใช่หรือไม่?`);
-                                                            if (confirm) {
-                                                                const newCustom = customBanks.filter((_, i) => i !== index);
-                                                                setCustomBanks(newCustom);
-                                                                localStorage.setItem('customBanks', JSON.stringify(newCustom));
-                                                                try {
-                                                                    const parsed = JSON.parse(formData.billStatus);
-                                                                    if (parsed.bankName === bank.bankName && parsed.accountNo === bank.accountNo) {
-                                                                        setFormData(prev => ({...prev, billStatus: 'ktb'}));
-                                                                    }
-                                                                } catch {}
-                                                            }
-                                                        }}
-                                                        style={{ padding: '8px 12px', color: '#ef4444', fontSize: '16px', lineHeight: 1 }}
-                                                        title="ลบบัญชีนี้"
-                                                    >
-                                                        &times;
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <div 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setShowBankDropdown(false);
-                                                    setAddBankModal({ visible: true, bankName: '', accountName: '', accountNo: '', logo: null });
-                                                }}
-                                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: '13px', color: '#f59e0b', backgroundColor: '#fffbeb', fontWeight: 'bold', textAlign: 'center' }}
-                                                onMouseEnter={(e) => e.target.style.backgroundColor = '#fef3c7'}
-                                                onMouseLeave={(e) => e.target.style.backgroundColor = '#fffbeb'}
-                                            >
-                                                + เพิ่มบัญชีใหม่
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
+                            <div className="form-group" style={{ marginBottom: 0, minWidth: 0 }}>
+                                <BankAccountSelect 
+                                    docType={formData.docType}
+                                    label="บัญชีธนาคาร (บริษัทรับเงิน)"
+                                    value={formData.billStatus}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, billStatus: val }))}
+                                />
                             </div>
                         </div>
 
@@ -2760,7 +2667,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                                                 <span style={{ fontSize: '11pt' }}>
                                                                     {formData.billStatus === 'ktb' ? 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์' : 
                                                                      formData.billStatus === 'kbank' ? 'บจก. พรีเมียร์ สมาร์ท ฟาร์ม' :
-                                                                     formData.billStatus === 'kbank_charan' ? 'นาย จรัญ วาสิกสูตร' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด'}
+                                                                     formData.billStatus === 'kbank_charan' ? 'จรัญ วาสิกสูตร' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด'}
                                                                 </span><br/>
                                                                 <span className={formData.billStatus.includes('kbank') ? 'print-color-green' : 'print-color-blue'} style={{ fontSize: '18pt', color: formData.billStatus.includes('kbank') ? '#138f2d' : '#2980b9' }}>
                                                                     {formData.billStatus === 'ktb' ? '016-074-4237' : 
@@ -3056,7 +2963,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                                                 formData.billStatus === 'kbank_charan' ? 'Charan Wasiksut' :
                                                                 (isElt ? 'Elite Trading 2020 Co., Ltd.' : (isPsf ? 'Premier Smart Farm Co., Ltd.' : 'Thai Herb Centers Community Enterprise'))
                                                             ) : (
-                                                                formData.billStatus === 'kbank_charan' ? 'จรัญ วาสิกศิริ' :
+                                                                formData.billStatus === 'kbank_charan' ? 'จรัญ วาสิกสูตร' :
                                                                 (isElt ? 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด' : (isPsf ? 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด' : 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์'))
                                                             )}
                                                         </span><br/>
@@ -3337,111 +3244,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                 </div>
             )}
 
-            {/* Add Custom Bank Modal */}
-            {addBankModal.visible && (
-                <div className="custom-alert-overlay" onClick={() => setAddBankModal({ ...addBankModal, visible: false })}>
-                    <div className="custom-alert-modal custom-alert-info" onClick={(e) => e.stopPropagation()} style={{ width: '400px' }}>
-                        <div className="custom-alert-content" style={{ textAlign: 'left', padding: '10px' }}>
-                            <h3 className="custom-alert-title" style={{ textAlign: 'center', marginBottom: '15px' }}>เพิ่มบัญชีธนาคารใหม่</h3>
-                            
-                            <div className="form-group" style={{ marginBottom: '15px' }}>
-                                <label style={{ fontSize: '13px', color: '#475569', marginBottom: '8px', display: 'block', fontWeight: 'bold' }}>ชื่อธนาคาร <span className="required">*</span></label>
-                                <input
-                                    type="text"
-                                    value={addBankModal.bankName}
-                                    onChange={(e) => setAddBankModal({ ...addBankModal, bankName: e.target.value })}
-                                    autoFocus
-                                    placeholder="เช่น ธนาคารไทยพาณิชย์..."
-                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', outline: 'none' }}
-                                />
-                            </div>
 
-                            <div className="form-group" style={{ marginBottom: '15px' }}>
-                                <label style={{ fontSize: '13px', color: '#475569', marginBottom: '8px', display: 'block', fontWeight: 'bold' }}>ชื่อบัญชี <span className="required">*</span></label>
-                                <input
-                                    type="text"
-                                    value={addBankModal.accountName}
-                                    onChange={(e) => setAddBankModal({ ...addBankModal, accountName: e.target.value })}
-                                    placeholder="เช่น บจก. วิสาหกิจชุมชนไทยเฮิร์บ..."
-                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', outline: 'none' }}
-                                />
-                            </div>
-
-                            <div className="form-group" style={{ marginBottom: '15px' }}>
-                                <label style={{ fontSize: '13px', color: '#475569', marginBottom: '8px', display: 'block', fontWeight: 'bold' }}>เลขที่บัญชี <span className="required">*</span></label>
-                                <input
-                                    type="text"
-                                    value={addBankModal.accountNo}
-                                    onChange={(e) => setAddBankModal({ ...addBankModal, accountNo: e.target.value })}
-                                    placeholder="เช่น 123-4-56789-0..."
-                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '14px', outline: 'none' }}
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label style={{ fontSize: '13px', color: '#475569', marginBottom: '8px', display: 'block', fontWeight: 'bold' }}>โลโก้ธนาคาร (ทางเลือก)</label>
-                                <div style={{ border: '1px dashed #cbd5e1', borderRadius: '6px', padding: '15px', textAlign: 'center', backgroundColor: '#f8fafc' }}>
-                                    <input 
-                                        type="file" 
-                                        accept="image/*" 
-                                        id="newBankLogo"
-                                        onChange={(e) => {
-                                            const file = e.target.files[0];
-                                            if (file) {
-                                                const reader = new FileReader();
-                                                reader.onloadend = () => {
-                                                    setAddBankModal({ ...addBankModal, logo: reader.result });
-                                                };
-                                                reader.readAsDataURL(file);
-                                            }
-                                        }}
-                                        style={{ display: 'none' }}
-                                    />
-                                    <label htmlFor="newBankLogo" style={{ cursor: 'pointer', color: '#3b82f6', fontSize: '13px', display: 'block', marginBottom: addBankModal.logo ? '10px' : '0' }}>
-                                        {addBankModal.logo ? 'เปลี่ยนโลโก้' : 'คลิกเพื่ออัพโหลดโลโก้'}
-                                    </label>
-                                    {addBankModal.logo && (
-                                        <img src={addBankModal.logo} alt="Preview" style={{ maxWidth: '100px', maxHeight: '100px', borderRadius: '8px', border: '1px solid #e2e8f0', objectFit: 'contain' }} />
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="custom-alert-actions" style={{ marginTop: '20px' }}>
-                            <button className="custom-alert-btn custom-alert-btn-cancel" onClick={() => setAddBankModal({ ...addBankModal, visible: false })}>
-                                ยกเลิก
-                            </button>
-                            <button
-                                className="custom-alert-btn custom-alert-btn-info"
-                                onClick={() => {
-                                    const bName = addBankModal.bankName.trim();
-                                    const aName = addBankModal.accountName.trim();
-                                    const aNo = addBankModal.accountNo.trim();
-
-                                    if (bName && aName && aNo) {
-                                        if (customBanks.some(b => b.bankName === bName && b.accountNo === aNo)) {
-                                            showAlert('แจ้งเตือน', 'มีบัญชีนี้อยู่แล้ว', 'warning');
-                                            return;
-                                        }
-                                        const newBank = { bankName: bName, accountName: aName, accountNo: aNo, logo: addBankModal.logo };
-                                        const newCustomBanks = [...customBanks, newBank];
-                                        setCustomBanks(newCustomBanks);
-                                        localStorage.setItem('customBanks', JSON.stringify(newCustomBanks));
-                                        
-                                        setFormData(prev => ({...prev, billStatus: JSON.stringify(newBank)}));
-                                        
-                                        setAddBankModal({ visible: false, bankName: '', accountName: '', accountNo: '', logo: null });
-                                    } else {
-                                        showAlert('แจ้งเตือน', 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน', 'warning');
-                                    }
-                                }}
-                            >
-                                ตกลง
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         
             <ContractSelectorModal 
                 show={showContractModal} 

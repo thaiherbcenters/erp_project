@@ -24,7 +24,9 @@ import SignatureManager from '../components/SignatureManager';
 import CustomDatePicker from '../components/CustomDatePicker';
 import { useAlert } from '../components/CustomAlert';
 import './Settings.css';
-import API_BASE from '../config';import CustomSelect from '../components/CustomSelect';
+import API_BASE from '../config';
+import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 
 const API = API_BASE;
 
@@ -126,6 +128,8 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
     const [departments, setDepartments] = useState([]);
     const [roles, setRoles] = useState([]);
     const [search, setSearch] = useState('');
+    const [userPage, setUserPage] = useState(1);
+    const [userPageSize, setUserPageSize] = useState(10);
     const [loading, setLoading] = useState(true);
     const [modal, setModal] = useState(null);
 
@@ -153,6 +157,8 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
         u.username?.toLowerCase().includes(search.toLowerCase()) ||
         u.department?.toLowerCase().includes(search.toLowerCase())
     );
+
+    const paginatedUsers = filteredUsers.slice((userPage - 1) * userPageSize, userPage * userPageSize);
 
     const handleToggle = async (user) => {
         try {
@@ -242,7 +248,7 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
             <div className="settings-toolbar">
                 <div className="settings-search">
                     <Search size={16} style={{ color: '#94a3b8' }} />
-                    <input placeholder="ค้นหาชื่อ, username, แผนก..." value={search} onChange={e => setSearch(e.target.value)} />
+                    <input placeholder="ค้นหาชื่อ, username, แผนก..." value={search} onChange={e => { setSearch(e.target.value); setUserPage(1); }} />
                 </div>
                 {canCreate('settings') && (<button className="settings-add-btn" onClick={() => setModal({ type: 'create' })}>
                     <UserPlus size={16} /> เพิ่มผู้ใช้ใหม่
@@ -263,7 +269,7 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
                     <tbody>
                         {filteredUsers.length === 0 ? (
                             <tr><td colSpan={5}><div className="settings-empty"><p>ไม่พบผู้ใช้งาน</p></div></td></tr>
-                        ) : filteredUsers.map(user => (
+                        ) : paginatedUsers.map(user => (
                             <tr key={user.id}>
                                 <td>
                                     <div className="settings-user-row">
@@ -305,6 +311,14 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
                         ))}
                     </tbody>
                 </table>
+                <PaginationControl
+                    currentPage={userPage}
+                    totalPages={Math.ceil(filteredUsers.length / userPageSize) || 1}
+                    totalItems={filteredUsers.length}
+                    pageSize={userPageSize}
+                    onPageChange={setUserPage}
+                    onPageSizeChange={(size) => { setUserPageSize(size); setUserPage(1); }}
+                />
             </div>
 
             {/* Modals */}
@@ -967,6 +981,7 @@ function AuditLogTab() {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
     const [filters, setFilters] = useState({ username: '', action: '', module: '', from: '', to: '' });
@@ -975,7 +990,7 @@ function AuditLogTab() {
     const loadLogs = useCallback(async () => {
         setLoading(true);
         try {
-            const params = new URLSearchParams({ page, limit: 30 });
+            const params = new URLSearchParams({ page, limit: pageSize });
             if (filters.username) params.set('username', filters.username);
             if (filters.action) params.set('action', filters.action);
             if (filters.module) params.set('module', filters.module);
@@ -994,7 +1009,7 @@ function AuditLogTab() {
         } finally {
             setLoading(false);
         }
-    }, [page, filters]);
+    }, [page, pageSize, filters]);
 
     useEffect(() => { loadLogs(); }, [loadLogs]);
 
@@ -1237,21 +1252,14 @@ function AuditLogTab() {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px' }}>
-                    <button className="settings-btn-cancel" disabled={page <= 1}
-                        onClick={() => setPage(p => p - 1)} style={{ padding: '6px 14px', fontSize: '13px' }}>
-                        ← ก่อนหน้า
-                    </button>
-                    <span style={{ alignSelf: 'center', fontSize: '13px', color: '#64748b' }}>
-                        {page} / {totalPages}
-                    </span>
-                    <button className="settings-btn-cancel" disabled={page >= totalPages}
-                        onClick={() => setPage(p => p + 1)} style={{ padding: '6px 14px', fontSize: '13px' }}>
-                        ถัดไป →
-                    </button>
-                </div>
-            )}
+            <PaginationControl
+                currentPage={page}
+                totalPages={totalPages || 1}
+                totalItems={total}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+            />
 
             {/* Detail Modal */}
             {detail && (

@@ -99,10 +99,10 @@ router.get('/next-number', async (req, res) => {
         const pool = await poolPromise;
         const docType = req.query.docType || 'delivery_order_thc';
         
-        // Determine prefix based on docType (ใช้ IV แทน DO โดยตรง ไม่ต้องใส่ชื่อบริษัทตามหลัง)
-        const prefix = 'IV';
+        // Determine prefix based on docType (DO20260914-001)
+        const prefix = 'DO';
         
-        const datePrefix = getDatePrefix();
+        const datePrefix = getDatePrefix(req.query.date);
         const fullPrefix = `${prefix}${datePrefix}`;
         
         const nextNo = await peekNextSequence(pool, 'DeliveryOrder', 'DeliveryOrderNo', fullPrefix, 3);
@@ -189,9 +189,9 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createDeliveryOrderS
 
         const request = new sql.Request(transaction);
 
-        // Generate DeliveryOrder Number (ใช้ IV แทน DO โดยตรง ไม่ต้องใส่ชื่อบริษัทตามหลัง)
-        const prefix = 'IV';
-        const defaultDoPrefix = `${prefix}${getDatePrefix()}`;
+        // Generate DeliveryOrder Number (DO20260914-001)
+        const prefix = 'DO';
+        const defaultDoPrefix = `${prefix}${getDatePrefix(billDate)}`;
 
         let finalDeliveryOrderNo = deliveryOrderNo;
         if (!finalDeliveryOrderNo) {
@@ -308,14 +308,14 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createDeliveryOrderS
                     .query(`SELECT CustomerID FROM Customer WHERE CustomerName = @custName`);
 
                 if (custCheck.recordset.length === 0) {
-                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Prospect
+                    // ลูกค้ายังไม่มีในระบบ → สร้างใหม่เป็น Active
                     const typeId = customerTypeId ? parseInt(customerTypeId) : 1;
                     const prefix = typeId === 2 ? 'OEM' : 'CUST';
                     const custCode = await generateSequence(pool, 'Customer', 'CustomerCode', `${prefix}-${getMonthPrefix()}`, 3);
 
                     await pool.request()
                         .input('tid', sql.Int, typeId)           // จาก dropdown หรือ 1 = Retail (default)
-                        .input('sid', sql.Int, 3)           // 3 = Prospect
+                        .input('sid', sql.Int, 1)           // 1 = Active (ใช้งาน)
                         .input('code', sql.NVarChar, custCode)
                         .input('name', sql.NVarChar, customerName.trim())
                         .input('contact', sql.NVarChar, contactPerson || null)
@@ -328,7 +328,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createDeliveryOrderS
                             INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Email, Phone, Address, TaxID, Source)
                             VALUES (@tid, @sid, @code, @name, @contact, @email, @phone, @address, @tax, @source)
                         `);
-                    console.log(`✅ Auto-created customer "${customerName}" as Prospect from QT`);
+                    console.log(`✅ Auto-created customer "${customerName}" as Active from DeliveryOrder`);
                 }
             } catch (custErr) {
                 // ไม่ให้ customer error กระทบ QT response (QT บันทึกสำเร็จแล้ว)

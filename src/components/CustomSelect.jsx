@@ -61,7 +61,7 @@ const CustomSelect = ({
                 const spaceBelow = window.innerHeight - rect.bottom;
                 const neededHeight = Math.min(options.length * 36 + 10, 220);
                 const openUpwards = spaceBelow < neededHeight && rect.top > neededHeight;
-                const dropdownWidth = Math.max(rect.width, 120);
+                const dropdownWidth = Math.max(rect.width, 80);
                 const maxLeft = Math.max(10, window.innerWidth - dropdownWidth - 16);
                 const left = Math.min(Math.max(10, rect.left), maxLeft);
                 
@@ -342,7 +342,7 @@ const CustomSelect = ({
                     maxHeight: '240px',
                     overflowY: 'auto',
                     padding: '4px',
-                    minWidth: '120px'
+                    minWidth: '80px'
                 }}
                 onMouseDown={(e) => e.stopPropagation()}
                 >

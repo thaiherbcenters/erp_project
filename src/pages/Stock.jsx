@@ -12,6 +12,7 @@ import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Ba
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 import './PageCommon.css';
 
 export default function Stock() {
@@ -29,8 +30,8 @@ export default function Stock() {
     const [activeCategory, setActiveCategory] = useState('สินค้าสำเร็จรูป');
     const [stockItems, setStockItems] = useState([]);
     const [stockLogs, setStockLogs] = useState([]);
-    const [stockPagination, setStockPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
-    const [logsPagination, setLogsPagination] = useState({ page: 1, limit: 50, totalPages: 1 });
+    const [stockPagination, setStockPagination] = useState({ page: 1, limit: 10, totalPages: 1, totalItems: 0 });
+    const [logsPagination, setLogsPagination] = useState({ page: 1, limit: 10, totalPages: 1, totalItems: 0 });
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -135,7 +136,7 @@ export default function Stock() {
                     if (res.ok) {
                         const json = await res.json();
                         setStockItems(json.data || json); // Support both old and new formats
-                        if (json.pagination) setStockPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                        if (json.pagination) setStockPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages, totalItems: json.pagination.totalItems }));
                     }
                 }
                 
@@ -145,7 +146,7 @@ export default function Stock() {
                     if (res.ok) {
                         const json = await res.json();
                         setStockLogs(json.data || json);
-                        if (json.pagination) setLogsPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages }));
+                        if (json.pagination) setLogsPagination(prev => ({ ...prev, totalPages: json.pagination.totalPages, totalItems: json.pagination.totalItems }));
                     }
                 }
 
@@ -1437,26 +1438,15 @@ export default function Stock() {
                             )}
 
                             {/* Pagination Controls for Stock Data */}
-                            {!loading && stockPagination.totalPages > 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 20, padding: '10px 0' }}>
-                                    <button 
-                                        className="btn-outline" 
-                                        disabled={stockPagination.page === 1}
-                                        onClick={() => setStockPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                    >
-                                        ก่อนหน้า
-                                    </button>
-                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#4b5563' }}>
-                                        หน้า {stockPagination.page} จาก {stockPagination.totalPages}
-                                    </span>
-                                    <button 
-                                        className="btn-outline" 
-                                        disabled={stockPagination.page === stockPagination.totalPages}
-                                        onClick={() => setStockPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                    >
-                                        ถัดไป
-                                    </button>
-                                </div>
+                            {!loading && (
+                                <PaginationControl
+                                    currentPage={stockPagination.page}
+                                    totalPages={stockPagination.totalPages || 1}
+                                    totalItems={stockPagination.totalItems || stockItems.length}
+                                    pageSize={stockPagination.limit}
+                                    onPageChange={(p) => setStockPagination(prev => ({ ...prev, page: p }))}
+                                    onPageSizeChange={(size) => setStockPagination(prev => ({ ...prev, limit: size, page: 1 }))}
+                                />
                             )}
                         </div>
                     )}
@@ -1553,26 +1543,15 @@ export default function Stock() {
                             )}
 
                             {/* Pagination Controls for Stock Logs */}
-                            {!loading && logsPagination.totalPages > 1 && (
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 20, padding: '10px 0' }}>
-                                    <button 
-                                        className="btn-outline" 
-                                        disabled={logsPagination.page === 1}
-                                        onClick={() => setLogsPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                                    >
-                                        ก่อนหน้า
-                                    </button>
-                                    <span style={{ fontSize: 13, fontWeight: 600, color: '#4b5563' }}>
-                                        หน้า {logsPagination.page} จาก {logsPagination.totalPages}
-                                    </span>
-                                    <button 
-                                        className="btn-outline" 
-                                        disabled={logsPagination.page === logsPagination.totalPages}
-                                        onClick={() => setLogsPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                                    >
-                                        ถัดไป
-                                    </button>
-                                </div>
+                            {!loading && (
+                                <PaginationControl
+                                    currentPage={logsPagination.page}
+                                    totalPages={logsPagination.totalPages || 1}
+                                    totalItems={logsPagination.totalItems || stockLogs.length}
+                                    pageSize={logsPagination.limit}
+                                    onPageChange={(p) => setLogsPagination(prev => ({ ...prev, page: p }))}
+                                    onPageSizeChange={(size) => setLogsPagination(prev => ({ ...prev, limit: size, page: 1 }))}
+                                />
                             )}
                         </div>
                     )}

@@ -22,7 +22,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -51,6 +51,9 @@ import {
     FileText,
     Menu,
     Truck,
+    Building2,
+    ChevronsUpDown,
+    ExternalLink,
 } from 'lucide-react';
 import logoUrl from '../assets/logo.png';
 import logoSmallUrl from '../assets/logo-small.png';
@@ -119,7 +122,7 @@ const SYSTEM_MENU_IDS = ['settings'];
 // Layout Component
 // =============================================================================
 export default function Layout() {
-    const { currentUser, logout, getVisiblePages, getVisibleSubPages, permissions } = useAuth();
+    const { currentUser, logout, getVisiblePages, getVisibleSubPages, permissions, activeCompany, availableCompanies, switchCompany } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -130,6 +133,30 @@ export default function Layout() {
     const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [expandedGroups, setExpandedGroups] = useState({});
+    const [companySwitcherOpen, setCompanySwitcherOpen] = useState(false);
+    const companySwitcherRef = useRef(null);
+
+    // ── ปิด Company Switcher เมื่อคลิกข้างนอก ──
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (companySwitcherRef.current && !companySwitcherRef.current.contains(e.target)) {
+                setCompanySwitcherOpen(false);
+            }
+        };
+        if (companySwitcherOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [companySwitcherOpen]);
+
+    // ── Company Switcher handler ──
+    const handleSwitchCompany = async (companyId) => {
+        setCompanySwitcherOpen(false);
+        const result = await switchCompany(companyId);
+        if (result?.success) {
+            navigate(result.redirectPath || '/home');
+        }
+    };
 
     // ── Auto-expand group ที่ตรงกับ URL ปัจจุบัน ──
     useEffect(() => {
@@ -386,18 +413,106 @@ export default function Layout() {
                     </div>
 
                     <div className="top-nav-actions">
-                        <div className="top-search-box">
-                            <Search size={16} />
-                            <input type="text" placeholder="Search..." />
-                        </div>
-                        <button className="icon-btn">
-                            <MessageSquare size={20} />
-                            <span className="notif-dot"></span>
-                        </button>
-                        <button className="icon-btn">
-                            <Bell size={20} />
-                            <span className="notif-dot"></span>
-                        </button>
+                        {activeCompany && (
+                            <div className="top-company-switcher" ref={companySwitcherRef}>
+                                <button
+                                    className={`top-company-btn ${companySwitcherOpen ? 'active' : ''}`}
+                                    onClick={() => availableCompanies.length > 1 && setCompanySwitcherOpen(!companySwitcherOpen)}
+                                    title={availableCompanies.length > 1 ? "คลิกเพื่อสลับบริษัท" : activeCompany.CompanyNameTH}
+                                >
+                                    <div className="top-company-logo-box">
+                                        {activeCompany.CompanyLogo ? (
+                                            <img 
+                                                src={activeCompany.CompanyLogo} 
+                                                alt={activeCompany.ShortName} 
+                                                className="top-company-logo"
+                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                        ) : (
+                                            <span 
+                                                className="top-company-dot"
+                                                style={{ background: activeCompany.CompanyColor || '#16a34a' }} 
+                                            />
+                                        )}
+                                    </div>
+
+                                    <div className="top-company-info">
+                                        <div className="top-company-title-row">
+                                            <span className="top-company-code">{activeCompany.ShortName || activeCompany.CompanyName}</span>
+                                            {activeCompany.ShortName === 'THC' ? (
+                                                <span className="top-badge top-badge-erp">โรงงาน ERP</span>
+                                            ) : (
+                                                <span className="top-badge top-badge-portal">Portal</span>
+                                            )}
+                                        </div>
+                                        <span className="top-company-name">{activeCompany.CompanyNameTH || activeCompany.CompanyName}</span>
+                                    </div>
+
+                                    {availableCompanies.length > 1 && (
+                                        <div className={`top-company-arrow ${companySwitcherOpen ? 'open' : ''}`}>
+                                            <ChevronsUpDown size={15} />
+                                        </div>
+                                    )}
+                                </button>
+
+                                {/* Dropdown Menu */}
+                                {companySwitcherOpen && availableCompanies.length > 1 && (
+                                    <div className="top-company-dropdown">
+                                        <div className="top-dropdown-header">
+                                            <span>สลับบริษัทที่เข้าใช้งาน</span>
+                                        </div>
+
+                                        <div className="top-dropdown-list">
+                                            {availableCompanies.filter(c => c.CompanyID !== activeCompany.CompanyID).map(company => (
+                                                <button
+                                                    key={company.CompanyID}
+                                                    className="top-dropdown-item"
+                                                    onClick={() => handleSwitchCompany(company.CompanyID)}
+                                                >
+                                                    <div className="top-dropdown-logo-box">
+                                                        {company.CompanyLogo ? (
+                                                            <img 
+                                                                src={company.CompanyLogo} 
+                                                                alt={company.ShortName} 
+                                                                className="top-dropdown-logo"
+                                                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                            />
+                                                        ) : (
+                                                            <span 
+                                                                className="top-company-dot"
+                                                                style={{ background: company.CompanyColor || '#4f46e5' }} 
+                                                            />
+                                                        )}
+                                                    </div>
+                                                    <div className="top-dropdown-info">
+                                                        <span className="top-dropdown-code">{company.ShortName || company.CompanyName}</span>
+                                                        <span className="top-dropdown-name">{company.CompanyNameTH || company.CompanyName}</span>
+                                                    </div>
+                                                    {company.ShortName === 'THC' ? (
+                                                        <span className="top-badge top-badge-erp">ERP</span>
+                                                    ) : (
+                                                        <span className="top-badge top-badge-portal">Portal</span>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="top-dropdown-footer">
+                                            <button 
+                                                className="top-dropdown-all-btn"
+                                                onClick={() => {
+                                                    setCompanySwitcherOpen(false);
+                                                    navigate('/select-company');
+                                                }}
+                                            >
+                                                <ExternalLink size={13} />
+                                                <span>หน้าเลือกบริษัททั้งหมด</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

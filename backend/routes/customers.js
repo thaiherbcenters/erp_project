@@ -40,7 +40,7 @@ router.get('/types', async (req, res) => {
 router.get('/statuses', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const result = await pool.request().query('SELECT * FROM CustomerStatus ORDER BY CustomerStatusID');
+        const result = await pool.request().query('SELECT * FROM CustomerStatus WHERE CustomerStatusID IN (1, 2) ORDER BY CustomerStatusID');
         res.json({ success: true, data: result.recordset });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Failed to fetch statuses' });

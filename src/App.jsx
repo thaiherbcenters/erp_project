@@ -40,6 +40,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
 import Login from './pages/Login';
+import CompanySelector from './pages/CompanySelector';
+const CompanyPortal = lazy(() => import('./pages/CompanyPortal'));
 const Home = lazy(() => import('./pages/Home'));
 const Customer = lazy(() => import('./pages/Customer'));
 const Stock = lazy(() => import('./pages/Stock'));
@@ -75,6 +77,16 @@ function App() {
             <Routes>
               {/* ── หน้า Login (ไม่ต้องล็อกอิน) ── */}
               <Route path="/" element={<Login />} />
+
+              {/* ── หน้าเลือกบริษัท (ต้องล็อกอินแล้ว แต่ไม่ต้องเลือกบริษัท) ── */}
+              <Route path="/select-company" element={<CompanySelector />} />
+
+              {/* ── หน้า Company Portal ประจำแต่ละบริษัท (PSF, ELITE, RIVERVIEW) ── */}
+              <Route path="/company/:companyCode" element={
+                <ProtectedRoute pageId={null}>
+                  <CompanyPortal />
+                </ProtectedRoute>
+              } />
 
               {/* ── หน้าที่ต้องล็อกอิน (มี Layout ครอบ) ── */}
               <Route element={

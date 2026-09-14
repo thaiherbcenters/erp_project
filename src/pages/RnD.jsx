@@ -23,6 +23,7 @@ import { useAlert } from '../components/CustomAlert';
 import { TipTapCell } from '../components/TipTapCell';
 import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 import API_BASE from '../config';
 import './PageCommon.css';
 import './RnD.css';
@@ -73,6 +74,10 @@ export default function RnD() {
     const [selectedFormula, setSelectedFormula] = useState(null);
     const [selectedExperimentForPharm, setSelectedExperimentForPharm] = useState(null);
     const [formulaFilter, setFormulaFilter] = useState('ทั้งหมด');
+    const [formulaPage, setFormulaPage] = useState(1);
+    const [formulaPageSize, setFormulaPageSize] = useState(10);
+    const [projectPage, setProjectPage] = useState(1);
+    const [projectPageSize, setProjectPageSize] = useState(10);
 
     // Modals
     const [showCreateFormula, setShowCreateFormula] = useState(false);
@@ -478,6 +483,8 @@ export default function RnD() {
             return matchSearch && matchFilter;
         });
 
+        const paginatedFormulas = filtered.slice((formulaPage - 1) * formulaPageSize, formulaPage * formulaPageSize);
+
         return (
             <div className="rnd-formulas">
 
@@ -487,14 +494,14 @@ export default function RnD() {
                             <div className="search-group">
                                 <div className="search-input-wrap">
                                     <Search size={16} />
-                                    <input type="text" placeholder="ค้นหาสูตร..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                    <input type="text" placeholder="ค้นหาสูตร..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setFormulaPage(1); }} />
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
                         )}
                         <div className="rnd-filter-group">
                             {statuses.map(s => (
-                                <button key={s} className={`rnd-filter-btn ${formulaFilter === s ? 'active' : ''}`} onClick={() => setFormulaFilter(s)}>
+                                <button key={s} className={`rnd-filter-btn ${formulaFilter === s ? 'active' : ''}`} onClick={() => { setFormulaFilter(s); setFormulaPage(1); }}>
                                     {s} {s !== 'ทั้งหมด' && <span className="rnd-filter-count">{formulas.filter(f => f.status === s).length}</span>}
                                 </button>
                             ))}
@@ -515,7 +522,9 @@ export default function RnD() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map(formula => (
+                                {filtered.length === 0 ? (
+                                    <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบสูตรที่ค้นหา</td></tr>
+                                ) : paginatedFormulas.map(formula => (
                                     <tr key={formula.id}>
                                         <td className="text-bold">{formula.id}</td>
                                         <td>
@@ -563,11 +572,16 @@ export default function RnD() {
                                         </td>
                                     </tr>
                                 ))}
-                                {filtered.length === 0 && (
-                                    <tr><td colSpan="9" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบสูตรที่ค้นหา</td></tr>
-                                )}
                             </tbody>
                         </table>
+                        <PaginationControl
+                            currentPage={formulaPage}
+                            totalPages={Math.ceil(filtered.length / formulaPageSize) || 1}
+                            totalItems={filtered.length}
+                            pageSize={formulaPageSize}
+                            onPageChange={setFormulaPage}
+                            onPageSizeChange={(size) => { setFormulaPageSize(size); setFormulaPage(1); }}
+                        />
                     </div>
                 )}
             </div>
@@ -703,6 +717,8 @@ export default function RnD() {
             p.name.includes(searchTerm) || p.code.includes(searchTerm) || p.category.toLowerCase().includes(searchTerm.toLowerCase())
         );
 
+        const paginatedProjects = filtered.slice((projectPage - 1) * projectPageSize, projectPage * projectPageSize);
+
         return (
             <div className="rnd-projects">
 
@@ -712,7 +728,7 @@ export default function RnD() {
                             <div className="search-group">
                                 <div className="search-input-wrap">
                                     <Search size={16} />
-                                    <input type="text" placeholder="ค้นหาโครงการ..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                    <input type="text" placeholder="ค้นหาโครงการ..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setProjectPage(1); }} />
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
@@ -736,7 +752,9 @@ export default function RnD() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map(project => (
+                                {filtered.length === 0 ? (
+                                    <tr><td colSpan="11" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบโครงการวิจัย</td></tr>
+                                ) : paginatedProjects.map(project => (
                                     <tr key={project.id}>
                                         <td className="text-bold">{project.code}</td>
                                         <td>{project.name}</td>
@@ -781,6 +799,14 @@ export default function RnD() {
                                 ))}
                             </tbody>
                         </table>
+                        <PaginationControl
+                            currentPage={projectPage}
+                            totalPages={Math.ceil(filtered.length / projectPageSize) || 1}
+                            totalItems={filtered.length}
+                            pageSize={projectPageSize}
+                            onPageChange={setProjectPage}
+                            onPageSizeChange={(size) => { setProjectPageSize(size); setProjectPage(1); }}
+                        />
                     </div>
                 )}
             </div>

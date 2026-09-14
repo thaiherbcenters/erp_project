@@ -4,6 +4,7 @@ import { useAlert } from './CustomAlert';
 import { useAuth } from '../context/AuthContext';
 import API_BASE from '../config';
 import CustomDatePicker from './CustomDatePicker';
+import { FilterToggleButton, ContractFilterDrawer } from './SalesDocFilter';
 import './ContractManagement.css';
 
 const getAutoContractStatus = (startDate, endDate) => {
@@ -37,6 +38,12 @@ const ContractManagement = ({ onViewDocument }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     
+    // Filter state
+    const [showFilter, setShowFilter] = useState(false);
+    const [contractFilter, setContractFilter] = useState({
+        status: ''
+    });
+
     // Form state
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({
@@ -52,6 +59,14 @@ const ContractManagement = ({ onViewDocument }) => {
     const [linkedDocs, setLinkedDocs] = useState([]);
     const [isLoadingDocs, setIsLoadingDocs] = useState(false);
 
+    const getAuthHeaders = (extra = {}) => {
+        const token = localStorage.getItem('token');
+        return {
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+            ...extra
+        };
+    };
+
     useEffect(() => {
         fetchContracts();
     }, []);
@@ -59,7 +74,7 @@ const ContractManagement = ({ onViewDocument }) => {
     const fetchContracts = async () => {
         try {
             setIsLoading(true);
-            const res = await fetch(`${API_BASE}/contracts`);
+            const res = await fetch(`${API_BASE}/contracts`, { headers: getAuthHeaders() });
             const json = await res.json();
             if (json.success) {
                 setContracts(json.data);
@@ -87,7 +102,7 @@ const ContractManagement = ({ onViewDocument }) => {
         try {
             const res = await fetch(`${API_BASE}/contracts`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(formData)
             });
             const json = await res.json();
@@ -110,7 +125,10 @@ const ContractManagement = ({ onViewDocument }) => {
         if (!confirmed) return;
         
         try {
-            const res = await fetch(`${API_BASE}/contracts/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE}/contracts/${id}`, { 
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
             const json = await res.json();
             if (json.success) {
                 showAlert('สำเร็จ', 'ลบสัญญาเรียบร้อยแล้ว', 'success');
@@ -122,7 +140,10 @@ const ContractManagement = ({ onViewDocument }) => {
                     'warning'
                 );
                 if (forceConfirm) {
-                    const forceRes = await fetch(`${API_BASE}/contracts/${id}?force=true`, { method: 'DELETE' });
+                    const forceRes = await fetch(`${API_BASE}/contracts/${id}?force=true`, { 
+                        method: 'DELETE',
+                        headers: getAuthHeaders()
+                    });
                     const forceJson = await forceRes.json();
                     if (forceJson.success) {
                         showAlert('สำเร็จ', 'ปลดการเชื่อมโยงและลบสัญญาเรียบร้อยแล้ว', 'success');
@@ -157,7 +178,7 @@ const ContractManagement = ({ onViewDocument }) => {
         setViewModalData(contract);
         setIsLoadingDocs(true);
         try {
-            const res = await fetch(`${API_BASE}/contracts/${contract.ContractID}/documents`);
+            const res = await fetch(`${API_BASE}/contracts/${contract.ContractID}/documents`, { headers: getAuthHeaders() });
             const json = await res.json();
             if (json.success) {
                 // Group by CreatedAt (within 5 seconds)
@@ -256,10 +277,35 @@ const ContractManagement = ({ onViewDocument }) => {
         setShowForm(!showForm);
     };
 
-    const filteredContracts = contracts.filter(c => 
-        c.ContractNo?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        c.ContractName?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleFilterChange = (field, value) => {
+        setContractFilter(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleResetFilter = () => {
+        setContractFilter({
+            status: ''
+        });
+    };
+
+    const activeFilterCount = Boolean(contractFilter.status) ? 1 : 0;
+
+    const filteredContracts = contracts.filter(c => {
+        // 1. Text search
+        const searchLower = searchTerm.toLowerCase();
+        const matchSearch =
+            (c.ContractNo || '').toLowerCase().includes(searchLower) ||
+            (c.ContractName || '').toLowerCase().includes(searchLower) ||
+            (c.CustomerName || '').toLowerCase().includes(searchLower);
+        if (!matchSearch) return false;
+
+        // 2. Status
+        if (contractFilter.status) {
+            const autoStatus = getAutoContractStatus(c.StartDate, c.EndDate);
+            if (autoStatus !== contractFilter.status && c.Status !== contractFilter.status) return false;
+        }
+
+        return true;
+    });
 
     return (
         <div className="contract-mgt-container">
@@ -273,17 +319,24 @@ const ContractManagement = ({ onViewDocument }) => {
                 </div>
             </div>
 
-            <div className="toolbar" style={{ justifyContent: 'space-between', marginBottom: '24px' }}>
-                <div className="search-group">
-                    <div className="search-input-wrap">
-                        <Search size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="ค้นหาเลขที่สัญญา หรือ ชื่อโปรเจกต์..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+            <div className="toolbar" style={{ justifyContent: 'space-between', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, flexWrap: 'wrap' }}>
+                    <div className="search-group">
+                        <div className="search-input-wrap">
+                            <Search size={18} />
+                            <input 
+                                type="text" 
+                                placeholder="ค้นหาเลขที่สัญญา หรือ ชื่อโปรเจกต์..." 
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
                     </div>
+                    <FilterToggleButton
+                        isOpen={showFilter}
+                        onClick={() => setShowFilter(prev => !prev)}
+                        activeCount={activeFilterCount}
+                    />
                 </div>
                 {canCreate('sales_contracts') && (
                     <button className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '8px' }} onClick={handleToggleForm}>
@@ -291,6 +344,14 @@ const ContractManagement = ({ onViewDocument }) => {
                     </button>
                 )}
             </div>
+
+            <ContractFilterDrawer
+                isOpen={showFilter}
+                onClose={() => setShowFilter(false)}
+                filter={contractFilter}
+                onFilterChange={handleFilterChange}
+                onReset={handleResetFilter}
+            />
 
             {showForm && (
                 <form className="contract-form-card" onSubmit={handleSubmit}>
@@ -397,6 +458,9 @@ const ContractManagement = ({ onViewDocument }) => {
                                     })()
                                 }`}>{getAutoContractStatus(viewModalData.StartDate, viewModalData.EndDate)}</span></div>
                                 <div style={{ gridColumn: '1 / -1' }}><span className="info-label">ชื่อโปรเจกต์:</span> {viewModalData.ContractName}</div>
+                                {viewModalData.CustomerName && (
+                                    <div style={{ gridColumn: '1 / -1' }}><span className="info-label">ลูกค้า / บริษัท:</span> <span className="fw-500">{viewModalData.CustomerName}</span></div>
+                                )}
                                 <div><span className="info-label">วันที่เริ่มต้น:</span> {viewModalData.StartDate ? new Date(viewModalData.StartDate).toLocaleDateString('th-TH') : '-'}</div>
                                 <div><span className="info-label">วันที่สิ้นสุด:</span> {viewModalData.EndDate ? new Date(viewModalData.EndDate).toLocaleDateString('th-TH') : '-'}</div>
                             </div>

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { Package, Truck, CheckCircle, Clock, Eye, XCircle, MapPin, Calendar, User, ArrowRight, Printer, Phone, Box, Pencil } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 import { useAlert } from '../components/CustomAlert';
 import './PageCommon.css';
 
@@ -22,6 +23,15 @@ export default function Fulfillment() {
     const [updatingId, setUpdatingId] = useState(null);
     const [isEditingCustomer, setIsEditingCustomer] = useState(false);
     const [editCustomerData, setEditCustomerData] = useState({ CustomerName: '', CustomerPO: '', CustomerPhone: '', ShippingAddress: '' });
+
+    // ── Pagination State ──
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    const paginatedOrders = useMemo(() => {
+        const start = (page - 1) * pageSize;
+        return orders.slice(start, start + pageSize);
+    }, [orders, page, pageSize]);
 
     useEffect(() => {
         fetchData();
@@ -391,73 +401,83 @@ export default function Fulfillment() {
                         <p style={{ fontSize: 13 }}>ระบบจะสร้างรายการอัตโนมัติเมื่อสินค้า OEM ผ่าน QC Final</p>
                     </div>
                 ) : (
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>รหัสจัดส่ง</th>
-                                <th>ใบสั่งผลิต</th>
-                                <th>สินค้า</th>
-                                <th>ลูกค้า</th>
-                                <th>จำนวน</th>
-                                <th>กำหนดส่ง</th>
-                                <th>สถานะ</th>
-                                <th>จัดการ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {orders.map(order => (
-                                <tr key={order.ShipmentID}>
-                                    <td>
-                                        <span style={{ fontWeight: 700, color: '#0d9488' }}>{order.ShipmentID}</span>
-                                    </td>
-                                    <td>
-                                        <span style={{ background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
-                                            {order.JobOrderID}
-                                        </span>
-                                    </td>
-                                    <td className="text-bold">{order.ProductName}</td>
-                                    <td>
-                                        <div style={{ fontSize: 13 }}>{order.CustomerName || '-'}</div>
-                                        {order.CustomerPO && <div style={{ fontSize: 11, color: '#9ca3af' }}>PO: {order.CustomerPO}</div>}
-                                    </td>
-                                    <td>
-                                        <span style={{ fontWeight: 700, fontSize: 15 }}>{order.Quantity?.toLocaleString()}</span>
-                                        <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>ชิ้น</span>
-                                    </td>
-                                    <td>{fmtDateShort(order.DueDate)}</td>
-                                    <td>
-                                        <span className={`badge ${getStatusBadge(order.Status)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                            {getStatusIcon(order.Status)} {order.Status}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ display: 'flex', gap: 6 }}>
-                                            <button className="btn-sm" onClick={() => setSelectedOrder(order)}
-                                                style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                <Eye size={14} />
-                                            </button>
-                                            {order.Status === 'รอจัดส่ง' && (
-                                                <button className="btn-sm btn-primary" 
-                                                    style={{ background: '#0d9488', borderColor: '#0d9488', display: 'flex', alignItems: 'center', gap: 4 }}
-                                                    disabled={updatingId === order.ShipmentID}
-                                                    onClick={() => updateStatus(order.ShipmentID, 'กำลังจัดส่ง')}>
-                                                    <Truck size={14} /> จัดส่ง
-                                                </button>
-                                            )}
-                                            {order.Status === 'กำลังจัดส่ง' && (
-                                                <button className="btn-sm btn-primary"
-                                                    style={{ background: '#059669', borderColor: '#059669', display: 'flex', alignItems: 'center', gap: 4 }}
-                                                    disabled={updatingId === order.ShipmentID}
-                                                    onClick={() => updateStatus(order.ShipmentID, 'ส่งมอบแล้ว')}>
-                                                    <CheckCircle size={14} /> ส่งมอบแล้ว
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
+                    <>
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>รหัสจัดส่ง</th>
+                                    <th>ใบสั่งผลิต</th>
+                                    <th>สินค้า</th>
+                                    <th>ลูกค้า</th>
+                                    <th>จำนวน</th>
+                                    <th>กำหนดส่ง</th>
+                                    <th>สถานะ</th>
+                                    <th>จัดการ</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {paginatedOrders.map(order => (
+                                    <tr key={order.ShipmentID}>
+                                        <td>
+                                            <span style={{ fontWeight: 700, color: '#0d9488' }}>{order.ShipmentID}</span>
+                                        </td>
+                                        <td>
+                                            <span style={{ background: '#e0e7ff', color: '#4338ca', padding: '2px 8px', borderRadius: 6, fontSize: 12, fontWeight: 600 }}>
+                                                {order.JobOrderID}
+                                            </span>
+                                        </td>
+                                        <td className="text-bold">{order.ProductName}</td>
+                                        <td>
+                                            <div style={{ fontSize: 13 }}>{order.CustomerName || '-'}</div>
+                                            {order.CustomerPO && <div style={{ fontSize: 11, color: '#9ca3af' }}>PO: {order.CustomerPO}</div>}
+                                        </td>
+                                        <td>
+                                            <span style={{ fontWeight: 700, fontSize: 15 }}>{order.Quantity?.toLocaleString()}</span>
+                                            <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>ชิ้น</span>
+                                        </td>
+                                        <td>{fmtDateShort(order.DueDate)}</td>
+                                        <td>
+                                            <span className={`badge ${getStatusBadge(order.Status)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                                {getStatusIcon(order.Status)} {order.Status}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div style={{ display: 'flex', gap: 6 }}>
+                                                <button className="btn-sm" onClick={() => setSelectedOrder(order)}
+                                                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                    <Eye size={14} />
+                                                </button>
+                                                {order.Status === 'รอจัดส่ง' && (
+                                                    <button className="btn-sm btn-primary" 
+                                                        style={{ background: '#0d9488', borderColor: '#0d9488', display: 'flex', alignItems: 'center', gap: 4 }}
+                                                        disabled={updatingId === order.ShipmentID}
+                                                        onClick={() => updateStatus(order.ShipmentID, 'กำลังจัดส่ง')}>
+                                                        <Truck size={14} /> จัดส่ง
+                                                    </button>
+                                                )}
+                                                {order.Status === 'กำลังจัดส่ง' && (
+                                                    <button className="btn-sm btn-primary"
+                                                        style={{ background: '#059669', borderColor: '#059669', display: 'flex', alignItems: 'center', gap: 4 }}
+                                                        disabled={updatingId === order.ShipmentID}
+                                                        onClick={() => updateStatus(order.ShipmentID, 'ส่งมอบแล้ว')}>
+                                                        <CheckCircle size={14} /> ส่งมอบแล้ว
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        <PaginationControl
+                            currentPage={page}
+                            totalPages={Math.ceil(orders.length / pageSize) || 1}
+                            totalItems={orders.length}
+                            pageSize={pageSize}
+                            onPageChange={setPage}
+                            onPageSizeChange={setPageSize}
+                        />
+                    </>
                 )}
             </div>
         </div>

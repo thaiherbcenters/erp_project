@@ -29,7 +29,7 @@ export const SYSTEM_BANKS = [
         id: 'kbank_charan',
         bankName: 'ธนาคารกสิกรไทย',
         accountNo: '235-1-19734-2',
-        accountName: 'นาย จรัญ วาสิกสูตร',
+        accountName: 'จรัญ วาสิกสูตร',
         shortCode: 'KBANK',
         badgeClass: 'bank-badge-kbank',
         logo: '/images/banks/bank-kbank.png',

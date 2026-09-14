@@ -53,6 +53,7 @@ const getDestBadge = (dest) => {
 
 import API_BASE from '../config';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 
 const API_URL = API_BASE;
 import { useAlert } from '../components/CustomAlert';
@@ -68,6 +69,8 @@ export default function Packaging() {
 
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
+    const [pkgPage, setPkgPage] = useState(1);
+    const [pkgPageSize, setPkgPageSize] = useState(10);
     const [orders, setOrders] = useState([]);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -248,6 +251,15 @@ export default function Packaging() {
         const matchStatus = statusFilter === 'ทั้งหมด' || o.status === statusFilter;
         return matchSearch && matchStatus;
     });
+
+    useEffect(() => {
+        setPkgPage(1);
+    }, [searchTerm, statusFilter]);
+
+    const paginatedOrders = React.useMemo(() => {
+        const start = (pkgPage - 1) * pkgPageSize;
+        return filtered.slice(start, start + pkgPageSize);
+    }, [filtered, pkgPage, pkgPageSize]);
 
     // ══════════════════════════════════════════════════════════════
     // Helper: แยก packType เป็นรายการวัสดุ + เช็คสต็อก
@@ -880,7 +892,7 @@ export default function Packaging() {
                                 <tbody>
                                     {loading ? (
                                         <tr><td colSpan="10" style={{ textAlign: 'center', padding: '32px' }}>กำลังโหลดข้อมูล...</td></tr>
-                                    ) : filtered.map(order => {
+                                    ) : paginatedOrders.map(order => {
                                         const dest = getDestBadge(order.destination);
                                         return (
                                             <tr key={order.id}>
@@ -1024,6 +1036,14 @@ export default function Packaging() {
                                     )}
                                 </tbody>
                             </table>
+                            <PaginationControl
+                                currentPage={pkgPage}
+                                totalPages={Math.ceil(filtered.length / pkgPageSize) || 1}
+                                totalItems={filtered.length}
+                                pageSize={pkgPageSize}
+                                onPageChange={setPkgPage}
+                                onPageSizeChange={(size) => { setPkgPageSize(size); setPkgPage(1); }}
+                            />
                         </div>
                     </>
                 )}

@@ -19,6 +19,33 @@ import API_BASE from '../config';
 
 const AuthContext = createContext(null);
 
+/** คำนวณหน้าเริ่มต้นของบริษัท (THC -> /home, บริษัทอื่น -> /company/:code) */
+export const getCompanyHomeRoute = (company, user = null, perms = []) => {
+    if (!company) return '/home';
+    const short = (company.ShortName || '').toUpperCase();
+    const id = Number(company.CompanyID);
+
+    // THC คือระบบ ERP โรงงานเดิม
+    if (id === 1 || short === 'THC') {
+        let firstPageId = 'home';
+        if (user && user.role !== 'admin') {
+            const firstAllowedPage = ALL_PAGES.find(p => perms.some(up => up.page_id === p.id));
+            if (firstAllowedPage) {
+                firstPageId = firstAllowedPage.id;
+            }
+        }
+        return `/${firstPageId}`;
+    }
+
+    // บริษัทอื่น: ไปหน้า Portal แยกเฉพาะของบริษัทนั้นๆ
+    if (id === 2 || short === 'ELITE') return '/company/elite';
+    if (id === 3 || short === 'RIVERVIEW') return '/company/riverview';
+    if (id === 4 || short === 'PSF') return '/company/psf';
+
+    // Default fallback
+    return `/company/${short.toLowerCase() || id}`;
+};
+
 // =============================================================================
 // AuthProvider — ครอบ App ทั้งหมด
 // =============================================================================
@@ -38,6 +65,18 @@ export function AuthProvider({ children }) {
     const [permissions, setPermissions] = useState({});
 
     // ──────────────────────────────────────────────────────
+    // State: Multi-Company — บริษัทที่เลือกอยู่ + รายชื่อบริษัททั้งหมด
+    // ──────────────────────────────────────────────────────
+    const [activeCompany, setActiveCompany] = useState(() => {
+        const saved = localStorage.getItem('erp_active_company');
+        return saved ? JSON.parse(saved) : null;
+    });
+    const [availableCompanies, setAvailableCompanies] = useState(() => {
+        const saved = localStorage.getItem('erp_available_companies');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    // ──────────────────────────────────────────────────────
     // Sync currentUser กับ localStorage
     // ──────────────────────────────────────────────────────
     useEffect(() => {
@@ -47,6 +86,24 @@ export function AuthProvider({ children }) {
             localStorage.removeItem('erp_current_user');
         }
     }, [currentUser]);
+
+    // Sync activeCompany กับ localStorage
+    useEffect(() => {
+        if (activeCompany) {
+            localStorage.setItem('erp_active_company', JSON.stringify(activeCompany));
+        } else {
+            localStorage.removeItem('erp_active_company');
+        }
+    }, [activeCompany]);
+
+    // Sync availableCompanies กับ localStorage
+    useEffect(() => {
+        if (availableCompanies.length > 0) {
+            localStorage.setItem('erp_available_companies', JSON.stringify(availableCompanies));
+        } else {
+            localStorage.removeItem('erp_available_companies');
+        }
+    }, [availableCompanies]);
 
     // =================================================================
     // API helpers — อ่าน/เขียนสิทธิ์ผ่าน Backend
@@ -121,15 +178,50 @@ export function AuthProvider({ children }) {
                     [user.id]: perms
                 }));
 
-                // หาหน้าแรกที่ user มีสิทธิ์เข้าถึงเพื่อใช้ Redirect
-                let firstPageId = 'home'; // default
+                // ===== Multi-Company Logic =====
+                const companies = data.companies || [];
+                setAvailableCompanies(companies);
+
+                // กรณีมี 1 บริษัท → auto-select ทันที
+                if (companies.length === 1) {
+                    const company = companies[0];
+                    setActiveCompany(company);
+
+                    // เรียก select-company API เพื่อได้ JWT ที่มี activeCompanyId
+                    try {
+                        const selRes = await fetch(`${API_BASE}/auth/select-company`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${data.token}`
+                            },
+                            body: JSON.stringify({ companyId: company.CompanyID })
+                        });
+                        const selData = await selRes.json();
+                        if (selRes.ok && selData.token) {
+                            localStorage.setItem('erp_token', selData.token);
+                        }
+                    } catch (e) {
+                        console.warn('Auto select-company failed:', e);
+                    }
+
+                    const redirectPath = getCompanyHomeRoute(company, user, perms);
+                    return { success: true, user, redirectPath };
+                }
+
+                // กรณีมีหลายบริษัท → redirect ไปหน้าเลือกบริษัท
+                if (companies.length > 1) {
+                    return { success: true, user, redirectPath: '/select-company' };
+                }
+
+                // กรณีไม่มีบริษัทเลย (fallback) → เข้า dashboard ตรง
+                let firstPageId = 'home';
                 if (user.role !== 'admin') {
                     const firstAllowedPage = ALL_PAGES.find(p => perms.some(userPerm => userPerm.page_id === p.id));
                     if (firstAllowedPage) {
                         firstPageId = firstAllowedPage.id;
                     }
                 }
-
                 return { success: true, user, redirectPath: `/${firstPageId}` };
             } else {
                 return { success: false, message: data.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง' };
@@ -144,7 +236,52 @@ export function AuthProvider({ children }) {
     const logout = () => {
         setCurrentUser(null);
         setPermissions({});
+        setActiveCompany(null);
+        setAvailableCompanies([]);
         localStorage.removeItem('erp_token');
+        localStorage.removeItem('erp_active_company');
+        localStorage.removeItem('erp_available_companies');
+    };
+
+    // =================================================================
+    // Multi-Company — เลือก/สลับบริษัท
+    // =================================================================
+
+    /** เลือกบริษัท (จากหน้า CompanySelector) → ได้ JWT ใหม่ */
+    const selectCompany = async (companyId) => {
+        try {
+            const token = localStorage.getItem('erp_token');
+            const response = await fetch(`${API_BASE}/auth/select-company`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ companyId })
+            });
+            const data = await response.json();
+
+            if (response.ok && data.token) {
+                localStorage.setItem('erp_token', data.token);
+                setActiveCompany(data.company);
+
+                // หาหน้าที่ต้อง redirect ตามบริษัทที่เลือก
+                const userPerms = permissions[currentUser?.id] || [];
+                const redirectPath = getCompanyHomeRoute(data.company, currentUser, userPerms);
+
+                return { success: true, company: data.company, redirectPath };
+            }
+            return { success: false, message: data.message };
+        } catch (err) {
+            console.error('Select company error:', err);
+            return { success: false, message: 'ไม่สามารถเลือกบริษัทได้' };
+        }
+    };
+
+    /** สลับบริษัท (จาก Sidebar) → เปลี่ยน activeCompany แล้ว redirect */
+    const switchCompany = async (companyId) => {
+        const result = await selectCompany(companyId);
+        return result;
     };
 
     // =================================================================
@@ -438,9 +575,18 @@ export function AuthProvider({ children }) {
                 currentUser,
                 permissions,
 
+                // Multi-Company State
+                activeCompany,
+                availableCompanies,
+
                 // Auth
                 login,
                 logout,
+
+                // Multi-Company
+                selectCompany,
+                switchCompany,
+                getCompanyHomeRoute,
 
                 // Permission Updates (สำหรับ PermissionManager)
                 updatePermissions,

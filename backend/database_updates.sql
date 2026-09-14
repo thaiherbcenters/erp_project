@@ -478,8 +478,157 @@ IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'SafetyCer
     ALTER TABLE SafetyCertDocuments ADD DocumentNo NVARCHAR(50) NULL;
 GO
 
+-- =========================================================================
+-- หมวดที่ 13: ตารางสัญญา (Contracts Table) และฟิลด์ ContractID
+-- =========================================================================
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Contracts')
+BEGIN
+    CREATE TABLE Contracts (
+        ContractID      INT IDENTITY(1,1) PRIMARY KEY,
+        ContractNo      NVARCHAR(100) NOT NULL,
+        ContractName    NVARCHAR(300) NOT NULL,
+        CustomerID      INT NULL,
+        StartDate       DATE NULL,
+        EndDate         DATE NULL,
+        ContractValue   DECIMAL(18,2) NULL,
+        Status          NVARCHAR(50) NOT NULL DEFAULT N'กำลังดำเนินการ',
+        CreatedAt       DATETIME NOT NULL DEFAULT GETDATE(),
+        UpdatedAt       DATETIME NOT NULL DEFAULT GETDATE()
+    );
+    PRINT 'Created table: Contracts';
+END;
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'LegalDocuments') AND name = 'ContractID')
+BEGIN
+    ALTER TABLE LegalDocuments ADD ContractID INT NULL;
+    PRINT 'Added column: LegalDocuments.ContractID';
+END;
+GO
+
+-- =========================================================================
+-- หมวดที่ 14: ระบบหลายบริษัท (Multi-Company Architecture & UserCompanyAccess)
+-- =========================================================================
+
+-- 1. เพิ่มคอลัมน์ในตาราง Company
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'Company') AND name = 'CompanyNameTH')
+    ALTER TABLE Company ADD CompanyNameTH NVARCHAR(500) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'Company') AND name = 'CompanyNameEN')
+    ALTER TABLE Company ADD CompanyNameEN NVARCHAR(500) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'Company') AND name = 'CompanyColor')
+    ALTER TABLE Company ADD CompanyColor NVARCHAR(20) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'Company') AND name = 'CompanyIcon')
+    ALTER TABLE Company ADD CompanyIcon NVARCHAR(50) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'Company') AND name = 'ShortName')
+    ALTER TABLE Company ADD ShortName NVARCHAR(20) NULL;
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'Company') AND name = 'CompanyLogo')
+    ALTER TABLE Company ADD CompanyLogo NVARCHAR(255) NULL;
+GO
+
+-- 2. อัปเดตและสร้างข้อมูลบริษัททั้ง 4 บริษัท
+-- CompanyID 1: THC (ไทยเฮิร์บ เซ็นเตอร์)
+UPDATE Company SET 
+    CompanyName = N'Thai Herb Centers',
+    ShortName = N'THC',
+    CompanyNameTH = N'บริษัท ไทยเฮิร์บเซ็นเตอร์ส',
+    CompanyNameEN = N'Thai Herb Centers',
+    CompanyColor = N'#16a34a',
+    CompanyIcon = N'leaf',
+    CompanyLogo = N'/images/logos/logo-thc.png',
+    IsActive = 1
+WHERE CompanyID = 1;
+
+-- CompanyID 2: ELITE (อีลิท บิสซิเนส)
+UPDATE Company SET 
+    CompanyName = N'Elite Trading 2020',
+    ShortName = N'ELITE',
+    CompanyNameTH = N'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด',
+    CompanyNameEN = N'Elite Trading 2020 Co., Ltd.',
+    CompanyColor = N'#2563eb',
+    CompanyIcon = N'diamond',
+    CompanyLogo = N'/images/logos/logo-elite.png',
+    IsActive = 1
+WHERE CompanyID = 2;
+
+-- CompanyID 3: RIVERVIEW (ริเวอร์วิว)
+UPDATE Company SET 
+    CompanyName = N'Riverview Protect & Cleaning',
+    ShortName = N'RIVERVIEW',
+    CompanyNameTH = N'บริษัท ริเว่อร์วิว โพรเทคท์ แอนด์ คลีนนิ่ง จำกัด',
+    CompanyNameEN = N'Riverview Protect & Cleaning Co., Ltd.',
+    CompanyColor = N'#7c3aed',
+    CompanyIcon = N'shield',
+    CompanyLogo = N'/images/logos/logo-riv.png',
+    IsActive = 1
+WHERE CompanyID = 3;
+
+-- CompanyID 4: PSF (เพ็ท ซาฟารี / พรีเมียร์ สมาร์ท ฟาร์ม)
+IF NOT EXISTS (SELECT 1 FROM Company WHERE CompanyID = 4)
+BEGIN
+    SET IDENTITY_INSERT Company ON;
+    INSERT INTO Company (CompanyID, CompanyName, ShortName, CompanyNameTH, CompanyNameEN, TaxID, Address, IsActive, CompanyColor, CompanyIcon, CompanyLogo)
+    VALUES (4, N'Premier Smart Farm', N'PSF', N'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด', N'Premier Smart Farm Co., Ltd.', N'', N'', 1, N'#ea580c', N'sprout', N'/images/logos/logo-psf.png');
+    SET IDENTITY_INSERT Company OFF;
+    PRINT 'Inserted Company 4: PSF';
+END
+ELSE
+BEGIN
+    UPDATE Company SET 
+        CompanyName = N'Premier Smart Farm',
+        ShortName = N'PSF',
+        CompanyNameTH = N'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด',
+        CompanyNameEN = N'Premier Smart Farm Co., Ltd.',
+        CompanyColor = N'#ea580c',
+        CompanyIcon = N'sprout',
+        CompanyLogo = N'/images/logos/logo-psf.png',
+        IsActive = 1
+    WHERE CompanyID = 4;
+END;
+GO
+
+-- 3. ตารางสิทธิ์เข้าถึงบริษัทรายบุคคล (UserCompanyAccess)
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'UserCompanyAccess')
+BEGIN
+    CREATE TABLE UserCompanyAccess (
+        UserCompanyID INT IDENTITY(1,1) PRIMARY KEY,
+        user_id       INT NOT NULL,
+        CompanyID     INT NOT NULL,
+        is_default    BIT DEFAULT 0,
+        role_override NVARCHAR(50) NULL,
+        CONSTRAINT UQ_UserCompany UNIQUE (user_id, CompanyID),
+        CONSTRAINT FK_UCA_User FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
+        CONSTRAINT FK_UCA_Company FOREIGN KEY (CompanyID) REFERENCES Company(CompanyID)
+    );
+    PRINT 'Created table: UserCompanyAccess';
+END;
+GO
+
+-- 4. กำหนดสิทธิ์เริ่มต้นให้ผู้ใช้เดิม
+-- ผู้ดูแลระบบ (admin) และ ผู้บริหาร (executive) ให้เข้าถึงได้ทั้ง 4 บริษัท
+INSERT INTO UserCompanyAccess (user_id, CompanyID, is_default)
+SELECT u.user_id, c.CompanyID, CASE WHEN c.CompanyID = 1 THEN 1 ELSE 0 END
+FROM Users u
+CROSS JOIN (SELECT CompanyID FROM Company WHERE CompanyID IN (1, 2, 3, 4)) c
+WHERE u.role IN ('admin', 'executive')
+  AND NOT EXISTS (
+      SELECT 1 FROM UserCompanyAccess uca 
+      WHERE uca.user_id = u.user_id AND uca.CompanyID = c.CompanyID
+  );
+
+-- ผู้ใช้งานทั่วไป กำหนดให้เข้าถึงเฉพาะ THC (CompanyID = 1) เป็นค่าเริ่มต้น
+INSERT INTO UserCompanyAccess (user_id, CompanyID, is_default)
+SELECT u.user_id, 1, 1
+FROM Users u
+WHERE u.role NOT IN ('admin', 'executive')
+  AND NOT EXISTS (
+      SELECT 1 FROM UserCompanyAccess uca 
+      WHERE uca.user_id = u.user_id AND uca.CompanyID = 1
+  );
+GO
+
 PRINT '=========================================================';
 PRINT 'All Database Updates applied successfully!';
 PRINT '=========================================================';
+
 
 

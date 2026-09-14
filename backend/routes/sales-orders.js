@@ -12,15 +12,12 @@ const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
 const { authorizeRoles } = require('../middleware/authorize');
-const { peekNextSequence } = require('../utils/sequence');
+const { peekNextSequence, getDatePrefix } = require('../utils/sequence');
 
-// ── Helper: Generate SO Number ──
-const generateSONumber = async (pool) => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const prefix = `SO-${yyyy}${mm}${dd}`;
+// ── Helper: Generate SO Number (SOYYYYMMDD-001) ──
+const generateSONumber = async (pool, targetDate) => {
+    const datePrefix = getDatePrefix(targetDate);
+    const prefix = `SO${datePrefix}`;
     return await peekNextSequence(pool, 'SalesOrder', 'SalesOrderNo', prefix, 3);
 };
 
@@ -30,7 +27,7 @@ const generateSONumber = async (pool) => {
 router.get('/next-number', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const nextNo = await generateSONumber(pool);
+        const nextNo = await generateSONumber(pool, req.query.date);
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
         console.error('Error generating next SO number:', err);
@@ -207,7 +204,7 @@ router.get('/:id', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
     const {
-        quotationId, quotationNo, docType,
+        salesOrderNo, quotationId, quotationNo, docType,
         customerName, address, phone, taxId,
         orderDate, deliveryDate,
         subTotal, discountPercent, discountAmount, afterDiscount,
@@ -227,7 +224,17 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
         await transaction.begin();
 
         // Generate SO Number
-        const soNumber = await generateSONumber(pool);
+        let soNumber = salesOrderNo;
+        if (!soNumber) {
+            soNumber = await generateSONumber(pool, orderDate);
+        } else {
+            const chk = await transaction.request()
+                .input('chkNo', sql.NVarChar, soNumber)
+                .query(`SELECT 1 FROM SalesOrder WHERE SalesOrderNo = @chkNo`);
+            if (chk.recordset.length > 0) {
+                soNumber = await generateSONumber(pool, orderDate);
+            }
+        }
 
         const request = new sql.Request(transaction);
         request.input('soNo', sql.NVarChar, soNumber);

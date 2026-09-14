@@ -4,7 +4,7 @@
  * =============================================================================
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -15,6 +15,7 @@ import './Packaging.css';
 import API_BASE from '../config';
 import { useAlert } from '../components/CustomAlert';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 
 const getStatusBadge = (status) => {
     const map = {
@@ -175,6 +176,19 @@ export default function Packaging() {
         const matchStatus = statusFilter === 'ทั้งหมด' ? true : o.Status === statusFilter;
         return matchSearch && matchStatus;
     });
+
+    // ── Pagination State ──
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    useEffect(() => {
+        setPage(1);
+    }, [searchTerm, statusFilter, pageSize]);
+
+    const paginatedOrders = useMemo(() => {
+        const start = (page - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, page, pageSize]);
 
     if (visibleSubPages.length === 0) {
         return <div className="page-container"><p className="no-permission">คุณไม่มีสิทธิ์เข้าถึงหน้านี้</p></div>;
@@ -550,7 +564,7 @@ export default function Packaging() {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map(order => (
+                                paginatedOrders.map(order => (
                                     <tr key={order.ShipmentID} className="clickable-row" onClick={() => setSelectedOrder(order)}>
                                         <td style={{ fontWeight: 600, color: '#334155' }}>{order.ShipmentID}</td>
                                         <td>{order.ProductName}</td>
@@ -589,6 +603,14 @@ export default function Packaging() {
                             )}
                         </tbody>
                     </table>
+                    <PaginationControl
+                        currentPage={page}
+                        totalPages={Math.ceil(filtered.length / pageSize) || 1}
+                        totalItems={filtered.length}
+                        pageSize={pageSize}
+                        onPageChange={setPage}
+                        onPageSizeChange={setPageSize}
+                    />
                 </div>
 
                 {renderDetailModal()}

@@ -913,7 +913,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             // Fetch next bill number from API
             const fetchNextNo = async () => {
                 try {
-                    const res = await fetch(`${API_BASE}/receipts/next-number?docType=${formData.docType}`);
+                    const dateParam = formData.billDate ? `&date=${encodeURIComponent(formData.billDate)}` : '';
+                    const res = await fetch(`${API_BASE}/receipts/next-number?docType=${formData.docType}${dateParam}`);
                     const json = await res.json();
                     if (json.success && json.nextNumber) {
                         setFormData(prev => ({ ...prev, billNo: json.nextNumber }));
@@ -924,7 +925,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             };
             fetchNextNo();
         }
-    }, [formData.docType, editId, initialFromQuotation]);
+    }, [formData.docType, formData.billDate, editId, initialFromQuotation]);
 
     useEffect(() => {
         if (!editId && initialFromQuotation) {
@@ -2854,7 +2855,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                                                 <span style={{ fontSize: '11pt' }}>
                                                                     {formData.billStatus === 'ktb' ? 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์' : 
                                                                      formData.billStatus === 'kbank' ? 'บจก. พรีเมียร์ สมาร์ท ฟาร์ม' :
-                                                                     formData.billStatus === 'kbank_charan' ? 'นาย จรัญ วาสิกสูตร' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด'}
+                                                                     formData.billStatus === 'kbank_charan' ? 'จรัญ วาสิกสูตร' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด'}
                                                                 </span><br/>
                                                                 <span className={formData.billStatus.includes('kbank') ? 'print-color-green' : 'print-color-blue'} style={{ fontSize: '18pt', color: formData.billStatus.includes('kbank') ? '#138f2d' : '#2980b9' }}>
                                                                     {formData.billStatus === 'ktb' ? '016-074-4237' : 

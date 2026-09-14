@@ -114,6 +114,13 @@
     min-width: 0;
 }
 
+.perm-user-name-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
 .perm-user-name {
     font-size: 13px;
     font-weight: 600;
@@ -121,6 +128,28 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.perm-role-tag {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.perm-role-tag.executive {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.perm-role-tag.manager {
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
 }
 
 .perm-user-role {
@@ -828,4 +857,373 @@
 .perm-layout-embed .perm-main {
     border: none;
     box-shadow: none;
+}
+
+/* ============================================================ */
+/* Company Access Section (สิทธิ์การเข้าถึงบริษัท)                   */
+/* ============================================================ */
+.perm-company-section {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.perm-company-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.perm-company-header-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.perm-company-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #eff6ff;
+    color: #2563eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.perm-company-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 2px;
+}
+
+.perm-company-title-row h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.perm-company-count-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: #f1f5f9;
+    color: #475569;
+}
+
+.perm-company-header-info p {
+    margin: 0;
+    font-size: 12px;
+    color: #64748b;
+}
+
+.perm-company-quick-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.perm-comp-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.perm-comp-btn-all {
+    background: #eef2ff;
+    color: #4338ca;
+    border-color: #c7d2fe;
+}
+
+.perm-comp-btn-all:hover {
+    background: #e0e7ff;
+    border-color: #a5b4fc;
+}
+
+.perm-comp-btn-thc {
+    background: #f0fdf4;
+    color: #15803d;
+    border-color: #bbf7d0;
+}
+
+.perm-comp-btn-thc:hover {
+    background: #dcfce7;
+    border-color: #86efac;
+}
+
+/* ── Grid of 4 Companies ── */
+.perm-company-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+@media (max-width: 768px) {
+    .perm-company-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.perm-company-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.perm-company-card:hover {
+    background: #ffffff;
+    border-color: var(--comp-brand, #3b82f6);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.perm-company-card.active {
+    background: #ffffff;
+    border-color: var(--comp-brand, #3b82f6);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.perm-comp-card-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+}
+
+.perm-comp-logo-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    flex-shrink: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.perm-comp-logo-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.perm-comp-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.perm-comp-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.perm-comp-short {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    letter-spacing: 0.02em;
+}
+
+.perm-comp-badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: #15803d;
+    background: #dcfce7;
+    padding: 1px 6px;
+    border-radius: 10px;
+}
+
+.perm-comp-full {
+    font-size: 11.5px;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Toggle Switch (iOS style) ── */
+.perm-toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.perm-toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.perm-toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #cbd5e1;
+    transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 24px;
+}
+
+.perm-toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.perm-toggle-switch input:checked + .perm-toggle-slider {
+    background-color: var(--comp-brand, #22c55e);
+}
+
+.perm-toggle-switch input:checked + .perm-toggle-slider:before {
+    transform: translateX(20px);
+}
+
+/* ── Section Divider ── */
+.perm-section-divider {
+    display: flex;
+    align-items: center;
+    margin: 20px 0 14px 0;
+    padding-bottom: 8px;
+    border-bottom: 1.5px solid #e2e8f0;
+}
+
+.perm-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #334155;
+}
+
+/* ── Modal Company Selector ── */
+.perm-modal {
+    max-width: 500px !important;
+}
+
+.perm-modal-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.perm-modal-subhint {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 1px 7px;
+    border-radius: 10px;
+}
+
+.perm-modal-comp-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.perm-modal-comp-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.perm-modal-comp-item:hover {
+    background: #ffffff;
+    border-color: var(--comp-brand, #3b82f6);
+}
+
+.perm-modal-comp-item.checked {
+    background: #ffffff;
+    border-color: var(--comp-brand, #3b82f6);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.perm-modal-comp-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--comp-brand, #3b82f6);
+    cursor: pointer;
+    margin: 0;
+}
+
+.perm-modal-comp-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--comp-brand, #3b82f6);
+    flex-shrink: 0;
+}
+
+.perm-modal-comp-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.perm-modal-comp-short {
+    font-size: 12px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.2;
+}
+
+.perm-modal-comp-name {
+    font-size: 10.5px;
+    color: #64748b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }

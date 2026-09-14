@@ -9,7 +9,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
@@ -22,6 +22,7 @@ import {
 import API_BASE from '../config';
 import CustomDatePicker from '../components/CustomDatePicker';
 import CustomSelect from '../components/CustomSelect';
+import PaginationControl from '../components/PaginationControl';
 import './PageCommon.css';
 import './HR.css';
 
@@ -163,6 +164,19 @@ function EmployeeProfileTab({ hasSectionPermission }) {
             emp.CompanyName?.toLowerCase().includes(q)
         );
     });
+
+    // ── Pagination State ──
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    useEffect(() => {
+        setPage(1);
+    }, [searchQuery, pageSize]);
+
+    const paginatedEmployees = useMemo(() => {
+        const start = (page - 1) * pageSize;
+        return filtered.slice(start, start + pageSize);
+    }, [filtered, page, pageSize]);
 
     // ── Stats ──
     const totalActive = employees.filter(e => e.status === 'ปฏิบัติงาน').length;
@@ -382,74 +396,68 @@ function EmployeeProfileTab({ hasSectionPermission }) {
                             กำลังโหลดข้อมูล...
                         </div>
                     ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>รหัส</th>
-                                    <th>ชื่อ-สกุล</th>
-                                    <th>ชื่อเล่น</th>
-                                    <th>บริษัท</th>
-                                    <th>แผนก</th>
-                                    <th>ตำแหน่ง</th>
-                                    <th>ประเภท</th>
-                                    <th>สถานะ</th>
-                                    <th style={{ textAlign: 'center' }}>จัดการ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filtered.length === 0 ? (
+                        <>
+                            <table className="data-table">
+                                <thead>
                                     <tr>
-                                        <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '30px' }}>
-                                            {searchQuery ? 'ไม่พบข้อมูลที่ตรงกับการค้นหา' : 'ยังไม่มีข้อมูลพนักงาน'}
-                                        </td>
+                                        <th>รหัส</th>
+                                        <th>ชื่อ-สกุล</th>
+                                        <th>ชื่อเล่น</th>
+                                        <th>บริษัท</th>
+                                        <th>แผนก</th>
+                                        <th>ตำแหน่ง</th>
+                                        <th>ประเภท</th>
+                                        <th>สถานะ</th>
+                                        <th style={{ textAlign: 'center' }}>จัดการ</th>
                                     </tr>
-                                ) : filtered.map(emp => (
-                                    <tr key={emp.employee_id}>
-                                        <td>
-                                            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#6366f1', fontSize: '12px', background: '#eef2ff', padding: '2px 8px', borderRadius: '4px' }}>
-                                                {emp.employee_code}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="hr-employee-info">
-                                                <span className="hr-employee-name">
-                                                    {emp.prefix}{emp.first_name} {emp.last_name}
+                                </thead>
+                                <tbody>
+                                    {filtered.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={8} style={{ textAlign: 'center', color: '#94a3b8', padding: '30px' }}>
+                                                {searchQuery ? 'ไม่พบข้อมูลที่ตรงกับการค้นหา' : 'ยังไม่มีข้อมูลพนักงาน'}
+                                            </td>
+                                        </tr>
+                                    ) : paginatedEmployees.map(emp => (
+                                        <tr key={emp.employee_id}>
+                                            <td>
+                                                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#6366f1', fontSize: '12px', background: '#eef2ff', padding: '2px 8px', borderRadius: '4px' }}>
+                                                    {emp.employee_code}
                                                 </span>
-                                            </div>
-                                        </td>
-                                        <td style={{ color: emp.nickname ? '#475569' : '#cbd5e1' }}>
-                                            {emp.nickname || '—'}
-                                        </td>
-                                        <td>{emp.CompanyName || '—'}</td>
-                                        <td>{emp.department_name || emp.department_code || '—'}</td>
-                                        <td>{emp.position || '—'}</td>
-                                        <td>
-                                            <span className={`badge-employment ${getEmploymentBadge(emp.employment_type)}`}>
-                                                {emp.employment_type || '—'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span className={`badge ${getStatusClass(emp.status)}`}>
-                                                {emp.status}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div className="hr-actions">
-                                                <button className="hr-action-btn view" title="ดูรายละเอียด" onClick={() => openViewModal(emp)}>
-                                                    <Eye size={14} />
-                                                </button>
-                                                <button className="hr-action-btn edit" title="แก้ไข" onClick={() => openEditModal(emp)}>
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button className="hr-action-btn delete" title="ลบ" onClick={() => handleDelete(emp)}>
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                            </td>
+                                            <td style={{ fontWeight: 600 }}>{emp.prefix}{emp.first_name} {emp.last_name}</td>
+                                            <td style={{ color: 'var(--text-secondary)' }}>{emp.nickname || '—'}</td>
+                                            <td><span className={`hr-comp-badge ${getCompClass(emp.company_code)}`}>{emp.company_code}</span></td>
+                                            <td>{emp.department_name || emp.department_code || '—'}</td>
+                                            <td>{emp.position_name || '—'}</td>
+                                            <td><span className="badge badge-info">{emp.employment_type}</span></td>
+                                            <td><span className={`hr-status-badge ${getStatusClass(emp.status)}`}>{emp.status}</span></td>
+                                            <td>
+                                                <div className="hr-actions">
+                                                    <button className="hr-action-btn view" title="ดูรายละเอียด" onClick={() => openViewModal(emp)}>
+                                                        <Eye size={14} />
+                                                    </button>
+                                                    <button className="hr-action-btn edit" title="แก้ไข" onClick={() => openEditModal(emp)}>
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button className="hr-action-btn delete" title="ลบ" onClick={() => handleDelete(emp)}>
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            <PaginationControl
+                                currentPage={page}
+                                totalPages={Math.ceil(filtered.length / pageSize) || 1}
+                                totalItems={filtered.length}
+                                pageSize={pageSize}
+                                onPageChange={setPage}
+                                onPageSizeChange={setPageSize}
+                            />
+                        </>
                     )}
                 </div>
             )}
@@ -856,6 +864,19 @@ function AttendanceTab({ hasSectionPermission }) {
     const [dateFrom, setDateFrom] = useState(() => new Date().toISOString().split('T')[0]);
     const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0]);
 
+    // ── Pagination State ──
+    const [attPage, setAttPage] = useState(1);
+    const [attPageSize, setAttPageSize] = useState(10);
+
+    useEffect(() => {
+        setAttPage(1);
+    }, [searchQuery, filterDept, filterStatus, dateFrom, dateTo, attPageSize]);
+
+    const paginatedRecords = useMemo(() => {
+        const start = (attPage - 1) * attPageSize;
+        return records.slice(start, start + attPageSize);
+    }, [records, attPage, attPageSize]);
+
     // Modal
     const [modalOpen, setModalOpen] = useState(false);
     const [editRecord, setEditRecord] = useState(null);
@@ -1134,63 +1155,73 @@ function AttendanceTab({ hasSectionPermission }) {
                     {loading ? (
                         <div style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>กำลังโหลดข้อมูล...</div>
                     ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>วันที่</th>
-                                    <th>รหัส</th>
-                                    <th>ชื่อ-สกุล</th>
-                                    <th>แผนก</th>
-                                    <th>เวลาเข้า</th>
-                                    <th>เวลาออก</th>
-                                    <th>สถานะ</th>
-                                    <th>สาย (นาที)</th>
-                                    <th>OT (ชม.)</th>
-                                    <th>หมายเหตุ</th>
-                                    <th style={{ textAlign: 'center' }}>จัดการ</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {records.length === 0 ? (
-                                    <tr><td colSpan={11} style={{ textAlign: 'center', color: '#94a3b8', padding: '30px' }}>ไม่พบข้อมูล</td></tr>
-                                ) : records.map(rec => (
-                                    <tr key={rec.attendance_id}>
-                                        <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(rec.date)}</td>
-                                        <td>
-                                            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#6366f1', fontSize: '12px', background: '#eef2ff', padding: '2px 8px', borderRadius: '4px' }}>
-                                                {rec.employee_code}
-                                            </span>
-                                        </td>
-                                        <td style={{ fontWeight: 600 }}>{rec.prefix}{rec.first_name} {rec.last_name}</td>
-                                        <td>{rec.department_name || rec.department_code || '—'}</td>
-                                        <td style={{ color: rec.status === 'สาย' ? '#dc2626' : '#1e293b', fontWeight: rec.status === 'สาย' ? 700 : 400 }}>
-                                            {fmtTime(rec.check_in)}
-                                        </td>
-                                        <td>{fmtTime(rec.check_out)}</td>
-                                        <td><span className={`att-badge ${getAttBadgeClass(rec.status)}`}>{rec.status}</span></td>
-                                        <td style={{ color: rec.late_minutes > 0 ? '#dc2626' : '#94a3b8' }}>
-                                            {rec.late_minutes > 0 ? rec.late_minutes : '—'}
-                                        </td>
-                                        <td style={{ color: rec.ot_hours > 0 ? '#7c3aed' : '#94a3b8' }}>
-                                            {rec.ot_hours > 0 ? rec.ot_hours : '—'}
-                                        </td>
-                                        <td style={{ color: '#64748b', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                            {rec.note || '—'}
-                                        </td>
-                                        <td>
-                                            <div className="hr-actions">
-                                                <button className="hr-action-btn edit" title="แก้ไข" onClick={() => openEditModal(rec)}>
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button className="hr-action-btn delete" title="ลบ" onClick={() => handleDelete(rec)}>
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        </td>
+                        <>
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>วันที่</th>
+                                        <th>รหัส</th>
+                                        <th>ชื่อ-สกุล</th>
+                                        <th>แผนก</th>
+                                        <th>เวลาเข้า</th>
+                                        <th>เวลาออก</th>
+                                        <th>สถานะ</th>
+                                        <th>สาย (นาที)</th>
+                                        <th>OT (ชม.)</th>
+                                        <th>หมายเหตุ</th>
+                                        <th style={{ textAlign: 'center' }}>จัดการ</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {records.length === 0 ? (
+                                        <tr><td colSpan={11} style={{ textAlign: 'center', color: '#94a3b8', padding: '30px' }}>ไม่พบข้อมูล</td></tr>
+                                    ) : paginatedRecords.map(rec => (
+                                        <tr key={rec.attendance_id}>
+                                            <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(rec.date)}</td>
+                                            <td>
+                                                <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#6366f1', fontSize: '12px', background: '#eef2ff', padding: '2px 8px', borderRadius: '4px' }}>
+                                                    {rec.employee_code}
+                                                </span>
+                                            </td>
+                                            <td style={{ fontWeight: 600 }}>{rec.prefix}{rec.first_name} {rec.last_name}</td>
+                                            <td>{rec.department_name || rec.department_code || '—'}</td>
+                                            <td style={{ color: rec.status === 'สาย' ? '#dc2626' : '#1e293b', fontWeight: rec.status === 'สาย' ? 700 : 400 }}>
+                                                {fmtTime(rec.check_in)}
+                                            </td>
+                                            <td>{fmtTime(rec.check_out)}</td>
+                                            <td><span className={`att-badge ${getAttBadgeClass(rec.status)}`}>{rec.status}</span></td>
+                                            <td style={{ color: rec.late_minutes > 0 ? '#dc2626' : '#94a3b8' }}>
+                                                {rec.late_minutes > 0 ? rec.late_minutes : '—'}
+                                            </td>
+                                            <td style={{ color: rec.ot_hours > 0 ? '#7c3aed' : '#94a3b8' }}>
+                                                {rec.ot_hours > 0 ? rec.ot_hours : '—'}
+                                            </td>
+                                            <td style={{ color: '#64748b', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {rec.note || '—'}
+                                            </td>
+                                            <td>
+                                                <div className="hr-actions">
+                                                    <button className="hr-action-btn edit" title="แก้ไข" onClick={() => openEditModal(rec)}>
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button className="hr-action-btn delete" title="ลบ" onClick={() => handleDelete(rec)}>
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            <PaginationControl
+                                currentPage={attPage}
+                                totalPages={Math.ceil(records.length / attPageSize) || 1}
+                                totalItems={records.length}
+                                pageSize={attPageSize}
+                                onPageChange={setAttPage}
+                                onPageSizeChange={setAttPageSize}
+                            />
+                        </>
                     )}
                 </div>
             )}

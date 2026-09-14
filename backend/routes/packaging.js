@@ -200,7 +200,7 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
 
             // 4. Create Labeling Task
             try {
-                const lblId = await generateSequence(pool, 'Labeling_Tasks', 'TaskID', `LBL-${getDatePrefix()}`, 3);
+                const lblId = await generateSequence(pool, 'Labeling_Tasks', 'TaskID', `LBL${getDatePrefix()}`, 3);
                 await pool.request()
                     .input('TaskID', sql.VarChar, lblId)
                     .input('PackagingTaskID', sql.VarChar, taskId)
@@ -380,7 +380,7 @@ router.put('/tasks/:id/status', authorizeRoles('admin', 'executive', 'packaging'
         // บรรจุเสร็จ → Auto-send QC Final + sync production
         if (status === 'บรรจุเสร็จ') {
             // Auto-create QC Final request
-            const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCF-${getDatePrefix()}`, 3);
+            const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCF${getDatePrefix()}`, 3);
             try {
                 await pool.request()
                     .input('RequestID', sql.VarChar, qcRequestId)

@@ -998,7 +998,7 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
                             WHERE BatchNo = @BatchNoCheck OR ProductionTaskID = @ProdTaskIDCheck
                         `);
                     if (checkPkg.recordset[0].cnt === 0) {
-                        const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG-${getDatePrefix()}`, 3);
+                        const pkgId = await generateSequence(pool, 'Packaging_Tasks', 'TaskID', `PKG${getDatePrefix()}`, 3);
                         let pkgDestination = 'คลัง';
                         if (task.JobOrderID) {
                             try {

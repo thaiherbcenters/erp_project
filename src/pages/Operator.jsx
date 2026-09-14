@@ -17,6 +17,7 @@ import { useProduction } from '../context/ProductionContext';
 import { usePlanner } from '../context/PlannerContext';
 import { useRnD } from '../context/RnDContext';
 import { useAlert } from '../components/CustomAlert';
+import PaginationControl from '../components/PaginationControl';
 import API_BASE from '../config';
 import {
     CheckSquare, Play, CheckCircle, Search,
@@ -252,6 +253,8 @@ export default function Operator() {
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [historyPage, setHistoryPage] = useState(1);
+    const [historyPageSize, setHistoryPageSize] = useState(10);
     const [selectedTask, setSelectedTask] = useState(null);
     const [expandedJobOrder, setExpandedJobOrder] = useState(null);
     const [selectedTaskLogs, setSelectedTaskLogs] = useState([]);
@@ -1137,6 +1140,8 @@ export default function Operator() {
         const totalDefects = completed.reduce((sum, t) => sum + t.defectQty, 0);
         const yieldRate = totalYield > 0 ? (((totalYield - totalDefects) / totalYield) * 100).toFixed(1) : 0;
 
+        const paginatedHistory = filtered.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
+
         return (
             <div className="operator-history">
                 <div className="summary-row">
@@ -1158,7 +1163,7 @@ export default function Operator() {
                         <div className="search-group">
                             <div className="search-input-wrap">
                                 <Search size={16} />
-                                <input type="text" placeholder="ค้นหาประวัติ..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                <input type="text" placeholder="ค้นหาประวัติ..." value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setHistoryPage(1); }} />
                             </div>
                             <button className="search-btn">ค้นหา</button>
                         </div>
@@ -1182,7 +1187,7 @@ export default function Operator() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filtered.map(task => {
+                                {paginatedHistory.map(task => {
                                     const rate = task.producedQty > 0 ? ((task.producedQty - task.defectQty) / task.producedQty * 100).toFixed(1) : '0.0';
                                     return (
                                         <tr key={task.id} style={task.status === 'คัดทิ้ง' ? { background: '#fef2f2' } : {}}>
@@ -1209,6 +1214,14 @@ export default function Operator() {
                                 )}
                             </tbody>
                         </table>
+                        <PaginationControl
+                            currentPage={historyPage}
+                            totalPages={Math.ceil(filtered.length / historyPageSize) || 1}
+                            totalItems={filtered.length}
+                            pageSize={historyPageSize}
+                            onPageChange={setHistoryPage}
+                            onPageSizeChange={(size) => { setHistoryPageSize(size); setHistoryPage(1); }}
+                        />
                     </div>
                 )}
             </div>

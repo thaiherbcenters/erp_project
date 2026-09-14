@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
+import PaginationControl from '../components/PaginationControl';
 import { 
   Tag, CheckCircle2, Clock, Activity, Search, 
   Plus, X, ChevronDown, ChevronUp, AlertTriangle, Check, Eye, Calendar, CheckCircle,
@@ -15,6 +16,8 @@ export default function OperatorLabeling() {
 
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState('ทั้งหมด');
+  const [tblPage, setTblPage] = useState(1);
+  const [tblPageSize, setTblPageSize] = useState(10);
   const [loading, setLoading] = useState(false);
   
   const [selectedTask, setSelectedTask] = useState(null);
@@ -311,6 +314,15 @@ export default function OperatorLabeling() {
     return true;
   });
 
+  useEffect(() => {
+    setTblPage(1);
+  }, [filter]);
+
+  const paginatedTasks = useMemo(() => {
+    const start = (tblPage - 1) * tblPageSize;
+    return filteredTasks.slice(start, start + tblPageSize);
+  }, [filteredTasks, tblPage, tblPageSize]);
+
   const getStatusBadgeClass = (status) => {
     if (status?.includes('รอ')) return 'badge-warning';
     if (status?.includes('พร้อม')) return 'badge-info';
@@ -471,7 +483,7 @@ export default function OperatorLabeling() {
               </tr>
             </thead>
             <tbody>
-              {filteredTasks.map(task => {
+              {paginatedTasks.map(task => {
                 const percent = task.Qty ? Math.min(100, (task.LabeledQty / task.Qty) * 100) : 0;
                 return (
                   <tr key={`tbl-${task.TaskID}`}>
@@ -511,6 +523,14 @@ export default function OperatorLabeling() {
               )}
             </tbody>
           </table>
+          <PaginationControl
+            currentPage={tblPage}
+            totalPages={Math.ceil(filteredTasks.length / tblPageSize) || 1}
+            totalItems={filteredTasks.length}
+            pageSize={tblPageSize}
+            onPageChange={setTblPage}
+            onPageSizeChange={(size) => { setTblPageSize(size); setTblPage(1); }}
+          />
         </div>
       </div>
 

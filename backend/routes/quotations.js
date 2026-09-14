@@ -104,17 +104,12 @@ router.get('/next-number', async (req, res) => {
         const pool = await poolPromise;
         const docType = req.query.docType || 'quotation_thc';
         
-        // Quotation always uses QT prefix, but we can keep it dynamic if needed
+        // Quotation always uses QT prefix (e.g. QT20260914-001)
         const prefix = 'QT';
-        const datePrefix = getDatePrefix();
+        const datePrefix = getDatePrefix(req.query.date);
         const fullPrefix = `${prefix}${datePrefix}`;
         
-        // Generate sequence (e.g. QT20260727-001 or QT-2026... if separator is '-')
-        // Note: The POST route uses `QT-${getDatePrefix()}`, so we must match it
-        // Wait, the POST route says: `QT-${getDatePrefix()}`
-        const fullPrefixForNext = `QT-${getDatePrefix()}`;
-        
-        const nextNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', fullPrefixForNext, 3);
+        const nextNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', fullPrefix, 3);
         
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
@@ -202,16 +197,17 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
 
         const request = new sql.Request(transaction);
 
-        // Generate Quotation Number
+        // Generate Quotation Number (QT20260914-001)
+        const defaultQtPrefix = `QT${getDatePrefix(billDate)}`;
         let finalQuotationNo = quotationNo;
         if (!finalQuotationNo) {
-            finalQuotationNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', `QT-${getDatePrefix()}`, 3);
+            finalQuotationNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', defaultQtPrefix, 3);
         } else {
             const chk = await transaction.request()
                 .input('chkNo', sql.NVarChar, finalQuotationNo)
                 .query(`SELECT 1 FROM Quotation WHERE QuotationNo = @chkNo`);
             if (chk.recordset.length > 0) {
-                finalQuotationNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', `QT-${getDatePrefix()}`, 3);
+                finalQuotationNo = await peekNextSequence(pool, 'Quotation', 'QuotationNo', defaultQtPrefix, 3);
             }
         }
 
@@ -324,7 +320,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
 
                     await pool.request()
                         .input('tid', sql.Int, typeId)           // จาก dropdown หรือ 1 = Retail (default)
-                        .input('sid', sql.Int, 3)           // 3 = Prospect
+                        .input('sid', sql.Int, 1)           // 1 = Active (ใช้งาน)
                         .input('code', sql.NVarChar, custCode)
                         .input('name', sql.NVarChar, customerName.trim())
                         .input('contact', sql.NVarChar, contactPerson || null)
@@ -337,7 +333,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createQuotationSchem
                             INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Email, Phone, Address, TaxID, Source)
                             VALUES (@tid, @sid, @code, @name, @contact, @email, @phone, @address, @tax, @source)
                         `);
-                    console.log(`✅ Auto-created customer "${customerName}" as Prospect from QT`);
+                    console.log(`✅ Auto-created customer "${customerName}" as Active from QT`);
                 }
             } catch (custErr) {
                 // ไม่ให้ customer error กระทบ QT response (QT บันทึกสำเร็จแล้ว)

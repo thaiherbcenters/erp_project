@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, ChevronDown, UploadCloud, Edit2, Loader, Eye, Download, Trash2, XCircle, CheckCircle, AlertCircle, Plus, Send, Clock, Printer, X, History, RotateCcw, Save, ClipboardEdit, FileText, ArrowLeft, CheckSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../components/CustomAlert';
 import { DOCUMENT_PARTS, DOCUMENT_CATEGORIES } from '../documentData';
 import API_BASE from '../../config';
+import PaginationControl from '../../components/PaginationControl';
 
 // Shared Utilities
 export const getCategoryShortName = (catId) => {
@@ -81,11 +82,23 @@ export default function DocumentRequest({ hasPermission }) {
         return s.submitted_by === currentUser.id;
     });
 
+    const [reqPage, setReqPage] = useState(1);
+    const [reqPageSize, setReqPageSize] = useState(10);
+
     const filteredSubs = userSubs.filter(s =>
         (s.form_code || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (s.form_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (s.submitted_by_name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    useEffect(() => {
+        setReqPage(1);
+    }, [searchTerm]);
+
+    const paginatedSubs = useMemo(() => {
+        const start = (reqPage - 1) * reqPageSize;
+        return filteredSubs.slice(start, start + reqPageSize);
+    }, [filteredSubs, reqPage, reqPageSize]);
 
     const getBadgeClass = (status) => {
         if (status === 'อนุมัติแล้ว') return 'badge-success';
@@ -324,145 +337,155 @@ export default function DocumentRequest({ hasPermission }) {
                     {loading ? (
                         <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>กำลังโหลดข้อมูล...</div>
                     ) : (
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>รหัสฟอร์ม</th>
-                                    <th>ชื่อเอกสาร</th>
-                                    <th>ผู้ส่ง</th>
-                                    <th>วันที่ส่ง</th>
-                                    <th style={{ textAlign: 'center' }}>Rev.</th>
-                                    <th>สถานะ</th>
-                                    <th style={{ textAlign: 'center' }}>ต้นฉบับ/ประวัติ</th>
-                                    {showActionsColumn && <th style={{ textAlign: 'center' }}>จัดการ</th>}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredSubs.map((sub) => (
-                                    <tr key={sub.submission_id}>
-                                        <td className="text-bold" data-label="#">{sub.submission_id}</td>
-                                        <td data-label="รหัสฟอร์ม">
-                                            <span className="doc-type-tag">
-                                                <FileText size={14} />
-                                                {sub.form_code}
-                                            </span>
-                                        </td>
-                                        <td data-label="ชื่อเอกสาร">{sub.form_name || '-'}</td>
-                                        <td data-label="ผู้ส่ง">{sub.submitted_by_name}</td>
-                                        <td data-label="วันที่ส่ง">{formatDate(sub.submitted_at)}</td>
-                                        <td data-label="Rev." style={{ textAlign: 'center' }}>
-                                            {(sub.revision_number || 0) > 0 ? (
-                                                <span className="badge badge-info" style={{ fontSize: '10px', padding: '1px 6px' }}>
-                                                    Rev.{sub.revision_number}
+                        <>
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>รหัสฟอร์ม</th>
+                                        <th>ชื่อเอกสาร</th>
+                                        <th>ผู้ส่ง</th>
+                                        <th>วันที่ส่ง</th>
+                                        <th style={{ textAlign: 'center' }}>Rev.</th>
+                                        <th>สถานะ</th>
+                                        <th style={{ textAlign: 'center' }}>ต้นฉบับ/ประวัติ</th>
+                                        {showActionsColumn && <th style={{ textAlign: 'center' }}>จัดการ</th>}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paginatedSubs.map((sub) => (
+                                        <tr key={sub.submission_id}>
+                                            <td className="text-bold" data-label="#">{sub.submission_id}</td>
+                                            <td data-label="รหัสฟอร์ม">
+                                                <span className="doc-type-tag">
+                                                    <FileText size={14} />
+                                                    {sub.form_code}
                                                 </span>
-                                            ) : (
-                                                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
-                                            )}
-                                        </td>
-                                        <td data-label="สถานะ">
-                                            <span className={`badge ${getBadgeClass(sub.overall_status)}`}>
-                                                {sub.overall_status}
-                                            </span>
-                                        </td>
-                                        {/* คอลัมน์ ต้นฉบับ/ประวัติ */}
-                                        <td data-label="เอกสาร" style={{ textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
-                                                {/* ดูเอกสาร */}
-                                                <button
-                                                    className="doc-action-btn"
-                                                    title="ดูเอกสาร"
-                                                    style={{ background: '#e0f2fe', color: '#0284c7' }}
-                                                    onClick={() => handlePreviewSubmission(sub)}
-                                                    disabled={previewLoadingId === sub.submission_id}
-                                                >
-                                                    {previewLoadingId === sub.submission_id ? (
-                                                        <Loader size={14} className="spin-animation" />
-                                                    ) : (
-                                                        <Eye size={14} />
-                                                    )}
-                                                </button>
-
-                                                {/* ดูประวัติ (ถ้ามี revision) */}
-                                                {(sub.revision_number > 0 || sub.parent_submission_id) && (
+                                            </td>
+                                            <td data-label="ชื่อเอกสาร">{sub.form_name || '-'}</td>
+                                            <td data-label="ผู้ส่ง">{sub.submitted_by_name}</td>
+                                            <td data-label="วันที่ส่ง">{formatDate(sub.submitted_at)}</td>
+                                            <td data-label="Rev." style={{ textAlign: 'center' }}>
+                                                {(sub.revision_number || 0) > 0 ? (
+                                                    <span className="badge badge-info" style={{ fontSize: '10px', padding: '1px 6px' }}>
+                                                        Rev.{sub.revision_number}
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
+                                                )}
+                                            </td>
+                                            <td data-label="สถานะ">
+                                                <span className={`badge ${getBadgeClass(sub.overall_status)}`}>
+                                                    {sub.overall_status}
+                                                </span>
+                                            </td>
+                                            {/* คอลัมน์ ต้นฉบับ/ประวัติ */}
+                                            <td data-label="เอกสาร" style={{ textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                    {/* ดูเอกสาร */}
                                                     <button
                                                         className="doc-action-btn"
-                                                        title="ดูประวัติแก้ไข"
-                                                        style={{ background: '#ede9fe', color: '#7c3aed' }}
-                                                        onClick={() => handleViewHistory(sub)}
+                                                        title="ดูเอกสาร"
+                                                        style={{ background: '#e0f2fe', color: '#0284c7' }}
+                                                        onClick={() => handlePreviewSubmission(sub)}
+                                                        disabled={previewLoadingId === sub.submission_id}
                                                     >
-                                                        <History size={14} />
+                                                        {previewLoadingId === sub.submission_id ? (
+                                                            <Loader size={14} className="spin-animation" />
+                                                        ) : (
+                                                            <Eye size={14} />
+                                                        )}
                                                     </button>
-                                                )}
-                                            </div>
-                                        </td>
 
-                                        {/* คอลัมน์ จัดการ */}
-                                        {showActionsColumn && (
-                                            <td data-label="จัดการ" style={{ textAlign: 'center' }}>
-                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
-                                                    {/* Approver actions: อนุมัติ / ส่งกลับแก้ไข / ไม่อนุมัติ */}
-                                                    {canApprove(sub) && (
-                                                        <>
-                                                            <button
-                                                                className="doc-action-btn"
-                                                                title="อนุมัติ"
-                                                                style={{ background: '#dcfce7', color: '#16a34a' }}
-                                                                onClick={() => setActionModal({ id: sub.submission_id, action: 'approve' })}
-                                                            >
-                                                                <CheckCircle size={14} />
-                                                            </button>
-                                                            <button
-                                                                className="doc-action-btn"
-                                                                title="ส่งกลับแก้ไข"
-                                                                style={{ background: '#fef3c7', color: '#d97706' }}
-                                                                onClick={() => setActionModal({ id: sub.submission_id, action: 'request-revision' })}
-                                                            >
-                                                                <Edit2 size={14} />
-                                                            </button>
-                                                            <button
-                                                                className="doc-action-btn"
-                                                                title="ไม่อนุมัติ"
-                                                                style={{ background: '#fee2e2', color: '#dc2626' }}
-                                                                onClick={() => setActionModal({ id: sub.submission_id, action: 'reject' })}
-                                                            >
-                                                                <XCircle size={14} />
-                                                            </button>
-                                                        </>
-                                                    )}
-
-                                                    {/* ผู้ส่ง: แก้ไขและส่งใหม่ */}
-                                                    {canRevise(sub) && (
+                                                    {/* ดูประวัติ (ถ้ามี revision) */}
+                                                    {(sub.revision_number > 0 || sub.parent_submission_id) && (
                                                         <button
                                                             className="doc-action-btn"
-                                                            title="แก้ไขและส่งใหม่"
-                                                            style={{ background: '#fef3c7', color: '#d97706' }}
-                                                            onClick={() => setRevisionEditSub(sub)}
+                                                            title="ดูประวัติแก้ไข"
+                                                            style={{ background: '#ede9fe', color: '#7c3aed' }}
+                                                            onClick={() => handleViewHistory(sub)}
                                                         >
-                                                            <RefreshCw size={14} />
+                                                            <History size={14} />
                                                         </button>
                                                     )}
                                                 </div>
-
-                                                {/* แสดงเหตุผลที่ต้องแก้ไข */}
-                                                {sub.overall_status === 'ส่งกลับแก้ไข' && sub.revision_comment && (
-                                                    <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px', textAlign: 'left', maxWidth: '200px' }}>
-                                                        💬 {sub.revision_comment}
-                                                    </div>
-                                                )}
                                             </td>
-                                        )}
-                                    </tr>
-                                ))}
-                                {filteredSubs.length === 0 && (
-                                    <tr>
-                                        <td colSpan={showActionsColumn ? 9 : 8} className="doc-empty-row">
-                                            {loading ? 'กำลังโหลด...' : 'ยังไม่มีรายการเอกสารที่ส่ง'}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+
+                                            {/* คอลัมน์ จัดการ */}
+                                            {showActionsColumn && (
+                                                <td data-label="จัดการ" style={{ textAlign: 'center' }}>
+                                                    <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                        {/* Approver actions: อนุมัติ / ส่งกลับแก้ไข / ไม่อนุมัติ */}
+                                                        {canApprove(sub) && (
+                                                            <>
+                                                                <button
+                                                                    className="doc-action-btn"
+                                                                    title="อนุมัติ"
+                                                                    style={{ background: '#dcfce7', color: '#16a34a' }}
+                                                                    onClick={() => setActionModal({ id: sub.submission_id, action: 'approve' })}
+                                                                >
+                                                                    <CheckCircle size={14} />
+                                                                </button>
+                                                                <button
+                                                                    className="doc-action-btn"
+                                                                    title="ส่งกลับแก้ไข"
+                                                                    style={{ background: '#fef3c7', color: '#d97706' }}
+                                                                    onClick={() => setActionModal({ id: sub.submission_id, action: 'request-revision' })}
+                                                                >
+                                                                    <Edit2 size={14} />
+                                                                </button>
+                                                                <button
+                                                                    className="doc-action-btn"
+                                                                    title="ไม่อนุมัติ"
+                                                                    style={{ background: '#fee2e2', color: '#dc2626' }}
+                                                                    onClick={() => setActionModal({ id: sub.submission_id, action: 'reject' })}
+                                                                >
+                                                                    <XCircle size={14} />
+                                                                </button>
+                                                            </>
+                                                        )}
+
+                                                        {/* ผู้ส่ง: แก้ไขและส่งใหม่ */}
+                                                        {canRevise(sub) && (
+                                                            <button
+                                                                className="doc-action-btn"
+                                                                title="แก้ไขและส่งใหม่"
+                                                                style={{ background: '#fef3c7', color: '#d97706' }}
+                                                                onClick={() => setRevisionEditSub(sub)}
+                                                            >
+                                                                <RefreshCw size={14} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+
+                                                    {/* แสดงเหตุผลที่ต้องแก้ไข */}
+                                                    {sub.overall_status === 'ส่งกลับแก้ไข' && sub.revision_comment && (
+                                                        <div style={{ fontSize: '11px', color: '#d97706', marginTop: '4px', textAlign: 'left', maxWidth: '200px' }}>
+                                                            💬 {sub.revision_comment}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))}
+                                    {filteredSubs.length === 0 && (
+                                        <tr>
+                                            <td colSpan={showActionsColumn ? 9 : 8} className="doc-empty-row">
+                                                {loading ? 'กำลังโหลด...' : 'ยังไม่มีรายการเอกสารที่ส่ง'}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                            <PaginationControl
+                                currentPage={reqPage}
+                                totalPages={Math.ceil(filteredSubs.length / reqPageSize) || 1}
+                                totalItems={filteredSubs.length}
+                                pageSize={reqPageSize}
+                                onPageChange={setReqPage}
+                                onPageSizeChange={(size) => { setReqPageSize(size); setReqPage(1); }}
+                            />
+                        </>
                     )}
                 </div>
             )}

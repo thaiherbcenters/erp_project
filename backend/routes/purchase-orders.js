@@ -17,15 +17,12 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
-const { peekNextSequence } = require('../utils/sequence');
+const { peekNextSequence, getDatePrefix } = require('../utils/sequence');
 
-// ── Helper: Generate PO Number (PO-YYYYMMDD-001) ──
-const generatePONumber = async (pool) => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    const prefix = `PO-${yyyy}${mm}${dd}`;
+// ── Helper: Generate PO Number (POYYYYMMDD-001) ──
+const generatePONumber = async (pool, targetDate) => {
+    const datePrefix = getDatePrefix(targetDate);
+    const prefix = `PO${datePrefix}`;
     return await peekNextSequence(pool, 'PurchaseOrder', 'PONumber', prefix, 3, '-');
 };
 
@@ -35,7 +32,7 @@ const generatePONumber = async (pool) => {
 router.get('/next-number', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const nextNo = await generatePONumber(pool);
+        const nextNo = await generatePONumber(pool, req.query.date);
         res.json({ success: true, nextNumber: nextNo });
     } catch (err) {
         console.error('Error generating next PO number:', err);
@@ -210,7 +207,7 @@ router.post('/', async (req, res) => {
         // Check or generate PO number
         let finalPONumber = poNumber;
         if (!finalPONumber || !finalPONumber.trim()) {
-            finalPONumber = await generatePONumber(pool);
+            finalPONumber = await generatePONumber(pool, poDate);
         }
 
         // Auto-resolve or auto-create supplier in Supplier table

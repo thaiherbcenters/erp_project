@@ -162,9 +162,9 @@ router.post('/', authorizeRoles('admin', 'executive', 'planner'), async (req, re
         
         const pool = await poolPromise;
         
-        // Generate new ID (JO-YYYYMMDD-XXX) using Sequences table
+        // Generate new ID (JOYYYYMMDD-XXX) using Sequences table
         const dateStr = getDatePrefix();
-        const newId = await generateSequence(pool, 'Planner', 'PlannerID', `JO-${dateStr}`, 3);
+        const newId = await generateSequence(pool, 'Planner', 'PlannerID', `JO${dateStr}`, 3);
         
         const result = await pool.request()
             .input('PlannerID', sql.VarChar, newId)
@@ -235,7 +235,7 @@ router.post('/:id/release', authorizeRoles('admin', 'executive', 'planner'), asy
         const fullDate = getDatePrefix();
         
         const bPrefix = `B${shortDate}-${formulaCode}`;
-        const ptPrefix = `PT-${fullDate}`;
+        const ptPrefix = `PT${fullDate}`;
         
         const transaction = new sql.Transaction(pool);
         await transaction.begin();

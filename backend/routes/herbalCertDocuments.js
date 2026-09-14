@@ -107,7 +107,7 @@ router.post('/', async (req, res) => {
             if (data.status === 'พรีวิว') {
                 finalDocumentNo = `PREV-HBC-${Date.now()}`;
             } else {
-                finalDocumentNo = await generateSequence(pool, 'HerbalCertDocuments', 'DocumentNo', `HBC-${getDatePrefix()}`, 3);
+                finalDocumentNo = await generateSequence(pool, 'HerbalCertDocuments', 'DocumentNo', `HBC${getDatePrefix()}`, 3);
             }
         }
 
@@ -237,7 +237,7 @@ router.put('/:id', async (req, res) => {
 
         let finalDocumentNo = data.documentNo !== undefined ? (data.documentNo || null) : (oldDoc.DocumentNo || null);
         if (oldDoc.Status === 'พรีวิว' && data.status !== 'พรีวิว' && (!finalDocumentNo || finalDocumentNo.startsWith('PREV-'))) {
-            finalDocumentNo = await generateSequence(pool, 'HerbalCertDocuments', 'DocumentNo', `HBC-${getDatePrefix()}`, 3);
+            finalDocumentNo = await generateSequence(pool, 'HerbalCertDocuments', 'DocumentNo', `HBC${getDatePrefix()}`, 3);
         }
 
         const sqlReq = pool.request()

@@ -17,6 +17,7 @@ import API_BASE from '../config';
 import { Search, Plus, FileText, Trash2, Save, Eye, ListChecks } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
 import { useAlert } from '../components/CustomAlert';
+import PaginationControl from '../components/PaginationControl';
 import './PageCommon.css';
 import './QC.css';
 
@@ -52,6 +53,12 @@ export default function QC() {
     const [searchInprocess, setSearchInprocess] = useState('');
     const [searchFinal, setSearchFinal] = useState('');
     const [searchDefect, setSearchDefect] = useState('');
+    const [incomingPage, setIncomingPage] = useState(1);
+    const [incomingPageSize, setIncomingPageSize] = useState(10);
+    const [defectPage, setDefectPage] = useState(1);
+    const [defectPageSize, setDefectPageSize] = useState(10);
+    const [formulaTestPage, setFormulaTestPage] = useState(1);
+    const [formulaTestPageSize, setFormulaTestPageSize] = useState(10);
     const [inspectingRequest, setInspectingRequest] = useState(null);
     const [inspectNotes, setInspectNotes] = useState('');
     const [rejectDialog, setRejectDialog] = useState({ open: false, request: null });
@@ -149,6 +156,10 @@ export default function QC() {
         item.ncrNumber?.toLowerCase().includes(searchDefect.toLowerCase()) ||
         item.item?.toLowerCase().includes(searchDefect.toLowerCase())
     );
+
+    const paginatedIncoming = filteredIncoming.slice((incomingPage - 1) * incomingPageSize, incomingPage * incomingPageSize);
+    const paginatedDefect = filteredDefect.slice((defectPage - 1) * defectPageSize, defectPage * defectPageSize);
+    const paginatedFormulaTests = formulaTests.slice((formulaTestPage - 1) * formulaTestPageSize, formulaTestPage * formulaTestPageSize);
 
     // ── QC Requests from Production ──
     const qcInprocessRequests = qcRequests.filter(r => r.type === 'qc_inprocess');
@@ -732,7 +743,7 @@ export default function QC() {
                             <div className="search-group">
                                 <div className="search-input-wrap">
                                     <Search size={16} />
-                                    <input type="text" placeholder="พิมพ์ Lot No., วัตถุดิบ..." value={searchIncoming} onChange={(e) => setSearchIncoming(e.target.value)} />
+                                    <input type="text" placeholder="พิมพ์ Lot No., วัตถุดิบ..." value={searchIncoming} onChange={(e) => { setSearchIncoming(e.target.value); setIncomingPage(1); }} />
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
@@ -746,7 +757,9 @@ export default function QC() {
                                     <tr><th>รหัสอ้างอิง</th><th>วันที่</th><th>Lot Number</th><th>วัตถุดิบ</th><th>Supplier</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
                                 </thead>
                                 <tbody>
-                                    {filteredIncoming.map(item => (
+                                    {filteredIncoming.length === 0 ? (
+                                        <tr><td colSpan="8" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบข้อมูลการตรวจรับวัตถุดิบ</td></tr>
+                                    ) : paginatedIncoming.map(item => (
                                         <tr key={item.id}>
                                             <td className="text-bold" style={{ color: '#475569' }}>{item.requestId}</td>
                                             <td>{item.date}</td>
@@ -760,6 +773,14 @@ export default function QC() {
                                     ))}
                                 </tbody>
                             </table>
+                            <PaginationControl
+                                currentPage={incomingPage}
+                                totalPages={Math.ceil(filteredIncoming.length / incomingPageSize) || 1}
+                                totalItems={filteredIncoming.length}
+                                pageSize={incomingPageSize}
+                                onPageChange={setIncomingPage}
+                                onPageSizeChange={(size) => { setIncomingPageSize(size); setIncomingPage(1); }}
+                            />
                         </div>
                     )}
                 </div>
@@ -814,7 +835,7 @@ export default function QC() {
                             <div className="search-group">
                                 <div className="search-input-wrap">
                                     <Search size={16} />
-                                    <input type="text" placeholder="พิมพ์ NCR No., สินค้า..." value={searchDefect} onChange={(e) => setSearchDefect(e.target.value)} />
+                                    <input type="text" placeholder="พิมพ์ NCR No., สินค้า..." value={searchDefect} onChange={(e) => { setSearchDefect(e.target.value); setDefectPage(1); }} />
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
@@ -828,7 +849,9 @@ export default function QC() {
                                     <tr><th>เลขที่ NCR</th><th>Lot อ้างอิง</th><th>สินค้า</th><th>ปัญหา</th><th>การจัดการ</th><th>สถานะ</th></tr>
                                 </thead>
                                 <tbody>
-                                    {filteredDefect.map(item => (
+                                    {filteredDefect.length === 0 ? (
+                                        <tr><td colSpan="6" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบข้อมูล NCR / ของเสีย</td></tr>
+                                    ) : paginatedDefect.map(item => (
                                         <tr key={item.id}>
                                             <td className="text-bold text-danger">{item.ncrNumber}</td>
                                             <td>{item.refLot}</td>
@@ -840,6 +863,14 @@ export default function QC() {
                                     ))}
                                 </tbody>
                             </table>
+                            <PaginationControl
+                                currentPage={defectPage}
+                                totalPages={Math.ceil(filteredDefect.length / defectPageSize) || 1}
+                                totalItems={filteredDefect.length}
+                                pageSize={defectPageSize}
+                                onPageChange={setDefectPage}
+                                onPageSizeChange={(size) => { setDefectPageSize(size); setDefectPage(1); }}
+                            />
                         </div>
                     )}
                 </div>
@@ -1064,7 +1095,9 @@ export default function QC() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {formulaTests.map(t => (
+                                {formulaTests.length === 0 ? (
+                                    <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ยังไม่มีผลทดสอบ</td></tr>
+                                ) : paginatedFormulaTests.map(t => (
                                     <tr key={t.id}>
                                         <td className="text-bold">{t.formulaId}</td>
                                         <td>{t.productName || t.formulaName}</td>
@@ -1082,11 +1115,16 @@ export default function QC() {
                                         </td>
                                     </tr>
                                 ))}
-                                {formulaTests.length === 0 && (
-                                    <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ยังไม่มีผลทดสอบ</td></tr>
-                                )}
                             </tbody>
                         </table>
+                        <PaginationControl
+                            currentPage={formulaTestPage}
+                            totalPages={Math.ceil(formulaTests.length / formulaTestPageSize) || 1}
+                            totalItems={formulaTests.length}
+                            pageSize={formulaTestPageSize}
+                            onPageChange={setFormulaTestPage}
+                            onPageSizeChange={(size) => { setFormulaTestPageSize(size); setFormulaTestPage(1); }}
+                        />
                     </div>
                 </div>
             )}

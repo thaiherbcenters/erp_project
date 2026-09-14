@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Search, ChevronDown, UploadCloud, Edit2, Loader, Eye, Download, Trash2, XCircle, CheckCircle, AlertCircle, Plus, Send, Clock, Printer, X, History, RotateCcw, Save, ClipboardEdit, FileText, ArrowLeft, CheckSquare } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +6,7 @@ import { useAlert } from '../../components/CustomAlert';
 import { DOCUMENT_PARTS, DOCUMENT_CATEGORIES } from '../documentData';
 import API_BASE from '../../config';
 import CustomSelect from '../../components/CustomSelect';
+import PaginationControl from '../../components/PaginationControl';
 
 
 // Shared Utilities
@@ -61,6 +62,9 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
         return <div className="doc-no-access">เกิดข้อผิดพลาดในการโหลดข้อมูลเอกสาร: {error}</div>;
     }
 
+    const [docPage, setDocPage] = useState(1);
+    const [docPageSize, setDocPageSize] = useState(10);
+
     const filteredDocs = documents.filter(doc => {
         const matchSearch =
             doc.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -72,6 +76,15 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
         const matchStandard = filterStandard === 'all' || (doc.standard && doc.standard.includes(filterStandard));
         return matchSearch && matchType && matchPart && matchCategory && matchStandard;
     });
+
+    useEffect(() => {
+        setDocPage(1);
+    }, [searchTerm, filterType, filterPart, filterCategory, filterStandard]);
+
+    const paginatedDocs = useMemo(() => {
+        const start = (docPage - 1) * docPageSize;
+        return filteredDocs.slice(start, start + docPageSize);
+    }, [filteredDocs, docPage, docPageSize]);
 
     // คำนวณประเภทเอกสารที่มีในหมวด/ส่วน นั้นๆ
     const availableDocsForTypeFilter = documents.filter(doc => {
@@ -366,7 +379,7 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredDocs.map((doc) => (
+                            {paginatedDocs.map((doc) => (
                                 <tr key={doc.id}>
                                     <td className="text-bold">{doc.id}</td>
                                     <td>{doc.name}</td>
@@ -431,11 +444,19 @@ export default function DocumentList({ hasPermission, documents, standards, isLo
                             ))}
                             {filteredDocs.length === 0 && (
                                 <tr>
-                                    <td colSpan="8" className="doc-empty-row">ไม่พบข้อมูลเอกสารที่ค้นหา</td>
+                                    <td colSpan="9" className="doc-empty-row">ไม่พบข้อมูลเอกสารที่ค้นหา</td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
+                    <PaginationControl
+                        currentPage={docPage}
+                        totalPages={Math.ceil(filteredDocs.length / docPageSize) || 1}
+                        totalItems={filteredDocs.length}
+                        pageSize={docPageSize}
+                        onPageChange={setDocPage}
+                        onPageSizeChange={(size) => { setDocPageSize(size); setDocPage(1); }}
+                    />
                 </div>
             )}
 

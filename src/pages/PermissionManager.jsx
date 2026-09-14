@@ -85,10 +85,21 @@ export default function PermissionManager({ isEmbed = false }) {
     const [expandedPages, setExpandedPages] = useState({});
     const [expandedSubPages, setExpandedSubPages] = useState({});
 
+    // ── Company Access State ──
+    const [companies, setCompanies] = useState([
+        { CompanyID: 1, ShortName: 'THC', CompanyNameTH: 'บริษัท ไทยเฮิร์บเซ็นเตอร์ส', CompanyColor: '#16a34a', CompanyLogo: '/images/logos/logo-thc.png' },
+        { CompanyID: 2, ShortName: 'ELITE', CompanyNameTH: 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด', CompanyColor: '#2563eb', CompanyLogo: '/images/logos/logo-elite.png' },
+        { CompanyID: 3, ShortName: 'RIVERVIEW', CompanyNameTH: 'บริษัท ริเว่อร์วิว โพรเทคท์ แอนด์ คลีนนิ่ง จำกัด', CompanyColor: '#7c3aed', CompanyLogo: '/images/logos/logo-riv.png' },
+        { CompanyID: 4, ShortName: 'PSF', CompanyNameTH: 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด', CompanyColor: '#ea580c', CompanyLogo: '/images/logos/logo-psf.png' },
+    ]);
+    const [userCompanyIds, setUserCompanyIds] = useState([]);
+    const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
+    const [isSavingCompany, setIsSavingCompany] = useState(null);
+
     // ── Modal State ──
     const [showModal, setShowModal] = useState(false);
     const [newUserForm, setNewUserForm] = useState({
-        username: '', password: '', displayName: '', role: 'user', department: ''
+        username: '', password: '', displayName: '', role: 'user', department: '', companyIds: [1]
     });
     const [isCreating, setIsCreating] = useState(false);
     const [createError, setCreateError] = useState('');
@@ -120,7 +131,125 @@ export default function PermissionManager({ isEmbed = false }) {
             .then(res => res.ok ? res.json() : [])
             .then(data => setDepartments(data))
             .catch(() => setDepartments([]));
+
+        // Fetch companies from DB
+        fetch(`${API_BASE}/companies`)
+            .then(res => res.ok ? res.json() : [])
+            .then(data => {
+                if (data && data.length > 0) setCompanies(data);
+            })
+            .catch(err => console.error('Failed to fetch companies:', err));
     }, []);
+
+    // ── Load Company Access for Active User ──
+    const loadUserCompanies = async (userId) => {
+        if (!userId) return;
+        setIsLoadingCompanies(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/users/${userId}/companies`, {
+                headers: {
+                    'Authorization': token ? `Bearer ${token}` : ''
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setUserCompanyIds(data.map(c => c.CompanyID));
+            } else {
+                setUserCompanyIds([1]);
+            }
+        } catch (err) {
+            console.error('Failed to load user companies:', err);
+            setUserCompanyIds([1]);
+        } finally {
+            setIsLoadingCompanies(false);
+        }
+    };
+
+    // ── Toggle Single Company Access ──
+    const handleToggleCompany = async (companyId) => {
+        if (!activeUserId) return;
+        const current = [...userCompanyIds];
+        let updated;
+        if (current.includes(companyId)) {
+            if (current.length === 1) {
+                showAlert('แจ้งเตือน', 'ผู้ใช้งานต้องมีสิทธิ์เข้าถึงอย่างน้อย 1 บริษัท', 'warning');
+                return;
+            }
+            updated = current.filter(id => id !== companyId);
+        } else {
+            updated = [...current, companyId];
+        }
+
+        setUserCompanyIds(updated);
+        setIsSavingCompany(companyId);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/users/${activeUserId}/companies`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({ companyIds: updated })
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                showAlert('เกิดข้อผิดพลาด', errData.message || 'ไม่สามารถบันทึกสิทธิ์บริษัทได้', 'error');
+                setUserCompanyIds(current);
+            } else {
+                const comp = companies.find(c => c.CompanyID === companyId);
+                const action = updated.includes(companyId) ? 'เปิดสิทธิ์' : 'ปิดสิทธิ์';
+                showAlert('สำเร็จ', `${action}บริษัท ${comp?.ShortName || ''} เรียบร้อยแล้ว`, 'success');
+            }
+        } catch (err) {
+            console.error('Failed to update company access:', err);
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            setUserCompanyIds(current);
+        } finally {
+            setIsSavingCompany(null);
+        }
+    };
+
+    // ── Quick Set Company Access (All or THC only) ──
+    const handleQuickSetCompanies = async (targetCompanyIds, label) => {
+        if (!activeUserId) return;
+        const current = [...userCompanyIds];
+        setUserCompanyIds(targetCompanyIds);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/users/${activeUserId}/companies`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({ companyIds: targetCompanyIds })
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                showAlert('เกิดข้อผิดพลาด', errData.message || 'ไม่สามารถบันทึกสิทธิ์บริษัทได้', 'error');
+                setUserCompanyIds(current);
+            } else {
+                showAlert('สำเร็จ', `ตั้งค่าสิทธิ์: ${label} เรียบร้อยแล้ว`, 'success');
+            }
+        } catch (err) {
+            console.error('Failed to quick set company access:', err);
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            setUserCompanyIds(current);
+        }
+    };
+
+    // ── Handle Modal Role Change ──
+    const handleModalRoleChange = (newRole) => {
+        let compIds = newUserForm.companyIds || [1];
+        if (newRole === 'executive' || newRole === 'admin') {
+            compIds = [1, 2, 3, 4];
+        } else if (compIds.length === 4) {
+            compIds = [1];
+        }
+        setNewUserForm(prev => ({ ...prev, role: newRole, companyIds: compIds }));
+    };
 
     // ── Handle Create User ──
     const handleCreateUser = async (e) => {
@@ -129,9 +258,13 @@ export default function PermissionManager({ isEmbed = false }) {
         setIsCreating(true);
 
         try {
+            const token = localStorage.getItem('token');
             const res = await fetch(`${API_BASE}/users`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': token ? `Bearer ${token}` : ''
+                },
                 body: JSON.stringify(newUserForm),
             });
             const data = await res.json();
@@ -139,7 +272,8 @@ export default function PermissionManager({ isEmbed = false }) {
             if (res.ok) {
                 await fetchUsers();
                 setShowModal(false);
-                setNewUserForm({ username: '', password: '', displayName: '', role: 'user', department: '' });
+                setNewUserForm({ username: '', password: '', displayName: '', role: 'user', department: '', companyIds: [1] });
+                showAlert('สำเร็จ', 'สร้างผู้ใช้งานและตั้งค่าสิทธิ์เรียบร้อยแล้ว', 'success');
             } else {
                 setCreateError(data.message || 'เกิดข้อผิดพลาดในการสร้างผู้ใช้งาน');
             }
@@ -183,12 +317,13 @@ export default function PermissionManager({ isEmbed = false }) {
     const activeUser = nonAdminUsers.find((u) => u.id === activeUserId);
     const userPerms = activeUserId ? getUserPermissions(activeUserId) : [];
 
-    // ── โหลดสิทธิ์ของ user เริ่มต้น (คนแรกในรายการ) เมื่อหน้า mount ──
+    // ── โหลดสิทธิ์ของ user (หน้า + บริษัท) เมื่อ activeUserId เปลี่ยน ──
     useEffect(() => {
-        if (activeUserId && !selectedUserId) {
+        if (activeUserId) {
             loadUserPermissions(activeUserId);
+            loadUserCompanies(activeUserId);
         }
-    }, [activeUserId, selectedUserId]);
+    }, [activeUserId]);
 
     // =================================================================
     // Toggle handlers
@@ -320,12 +455,19 @@ export default function PermissionManager({ isEmbed = false }) {
                                     setExpandedPages({});
                                     setExpandedSubPages({});
                                     // ดึงสิทธิ์จาก DB เมื่อเลือก user
-                                    await loadUserPermissions(user.id);
+                                    await Promise.all([
+                                        loadUserPermissions(user.id),
+                                        loadUserCompanies(user.id)
+                                    ]);
                                 }}
                             >
                                 <span className="perm-avatar">{user.avatar}</span>
                                 <div className="perm-user-meta">
-                                    <span className="perm-user-name">{user.displayName}</span>
+                                    <div className="perm-user-name-line">
+                                        <span className="perm-user-name">{user.displayName}</span>
+                                        {user.role === 'executive' && <span className="perm-role-tag executive">ผู้บริหาร</span>}
+                                        {user.role === 'manager' && <span className="perm-role-tag manager">ผู้จัดการ</span>}
+                                    </div>
                                     <span className="perm-user-role">@{user.username} {user.department && `(${user.department})`}</span>
                                 </div>
                                 <span className="perm-user-badge">{pageCount}/{ALL_PAGES.length}</span>
@@ -361,6 +503,97 @@ export default function PermissionManager({ isEmbed = false }) {
                                     <ToggleLeft size={16} />
                                     ปิดทั้งหมด
                                 </button>
+                            </div>
+                        </div>
+
+                        {/* ============================================================ */}
+                        {/* 1. สิทธิ์การเข้าถึงบริษัท (Multi-Company Access) */}
+                        {/* ============================================================ */}
+                        <div className="perm-company-section">
+                            <div className="perm-company-header">
+                                <div className="perm-company-header-info">
+                                    <div className="perm-company-icon">
+                                        <Building2 size={20} />
+                                    </div>
+                                    <div>
+                                        <div className="perm-company-title-row">
+                                            <h3>สิทธิ์การเข้าถึงบริษัท (Multi-Company Access)</h3>
+                                            <span className="perm-company-count-badge">
+                                                เข้าถึงได้ {userCompanyIds.length} จาก {companies.length} บริษัท
+                                            </span>
+                                        </div>
+                                        <p>กำหนดว่าผู้ใช้งานนี้สามารถมองเห็นและสลับเข้าทำงานในบริษัทใดได้บ้าง (สำหรับผู้บริหารและพนักงาน)</p>
+                                    </div>
+                                </div>
+                                <div className="perm-company-quick-actions">
+                                    <button 
+                                        type="button" 
+                                        className="perm-comp-btn perm-comp-btn-all"
+                                        onClick={() => handleQuickSetCompanies([1, 2, 3, 4], 'ทุกบริษัท (สำหรับผู้บริหาร)')}
+                                        title="เปิดสิทธิ์ให้เข้าถึงได้ครบทั้ง 4 บริษัท"
+                                    >
+                                        ⚡ เปิดทุกบริษัท (ผู้บริหาร)
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="perm-comp-btn perm-comp-btn-thc"
+                                        onClick={() => handleQuickSetCompanies([1], 'เฉพาะ THC (พนักงานทั่วไป)')}
+                                        title="กำหนดสิทธิ์เฉพาะบริษัท THC"
+                                    >
+                                        🌿 เฉพาะ THC
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="perm-company-grid">
+                                {companies.map((comp) => {
+                                    const isChecked = userCompanyIds.includes(comp.CompanyID);
+                                    const isSaving = isSavingCompany === comp.CompanyID;
+                                    return (
+                                        <div 
+                                            key={comp.CompanyID} 
+                                            className={`perm-company-card ${isChecked ? 'active' : ''}`}
+                                            style={{ '--comp-brand': comp.CompanyColor || '#4f46e5' }}
+                                            onClick={() => !isSaving && handleToggleCompany(comp.CompanyID)}
+                                        >
+                                            <div className="perm-comp-card-left">
+                                                <div className="perm-comp-logo-wrap">
+                                                    {comp.CompanyLogo ? (
+                                                        <img src={comp.CompanyLogo} alt={comp.ShortName} className="perm-comp-logo-img" />
+                                                    ) : (
+                                                        <Building2 size={22} style={{ color: comp.CompanyColor }} />
+                                                    )}
+                                                </div>
+                                                <div className="perm-comp-details">
+                                                    <div className="perm-comp-name-row">
+                                                        <span className="perm-comp-short">{comp.ShortName}</span>
+                                                        {isChecked && <span className="perm-comp-badge">เปิดใช้งาน</span>}
+                                                    </div>
+                                                    <span className="perm-comp-full">{comp.CompanyNameTH || comp.CompanyName}</span>
+                                                </div>
+                                            </div>
+                                            <div className="perm-comp-card-right">
+                                                <label className="perm-toggle-switch" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        disabled={isSaving}
+                                                        onChange={() => handleToggleCompany(comp.CompanyID)}
+                                                    />
+                                                    <span className="perm-toggle-slider"></span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Section Divider & Title */}
+                        <div className="perm-section-divider">
+                            <div className="perm-section-title">
+                                <ShieldCheck size={18} />
+                                <span>สิทธิ์การเข้าถึงหน้าระบบและฟังก์ชันงาน (Page Permissions)</span>
                             </div>
                         </div>
 
@@ -658,12 +891,58 @@ export default function PermissionManager({ isEmbed = false }) {
                                 <label>Role (ตำแหน่ง/กลุ่มสิทธิ์ประจำ)</label>
                                 <CustomSelect
                                     value={newUserForm.role}
-                                    onChange={e => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                                    onChange={e => handleModalRoleChange(e.target.value)}
                                 >
-                                    <option value="user">User (ผู้ใช้งานทั่วไป)</option>
+                                    <option value="user">User (พนักงานทั่วไป)</option>
                                     <option value="manager">Manager (ผู้จัดการ)</option>
+                                    <option value="executive">Executive (ผู้บริหาร)</option>
                                     <option value="admin">Admin (ผู้ดูแลระบบ)</option>
                                 </CustomSelect>
+                            </div>
+
+                            <div className="perm-form-group">
+                                <div className="perm-modal-label-row">
+                                    <label>สิทธิ์การเข้าถึงบริษัท</label>
+                                    <span className="perm-modal-subhint">
+                                        {(newUserForm.companyIds || []).length} / {companies.length} บริษัท
+                                    </span>
+                                </div>
+                                <div className="perm-modal-comp-grid">
+                                    {companies.map((comp) => {
+                                        const isChecked = (newUserForm.companyIds || []).includes(comp.CompanyID);
+                                        return (
+                                            <label 
+                                                key={comp.CompanyID} 
+                                                className={`perm-modal-comp-item ${isChecked ? 'checked' : ''}`}
+                                                style={{ '--comp-brand': comp.CompanyColor || '#4f46e5' }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {
+                                                        const current = newUserForm.companyIds || [];
+                                                        let updated;
+                                                        if (current.includes(comp.CompanyID)) {
+                                                            if (current.length > 1) {
+                                                                updated = current.filter(id => id !== comp.CompanyID);
+                                                            } else {
+                                                                updated = current;
+                                                            }
+                                                        } else {
+                                                            updated = [...current, comp.CompanyID];
+                                                        }
+                                                        setNewUserForm(prev => ({ ...prev, companyIds: updated }));
+                                                    }}
+                                                />
+                                                <span className="perm-modal-comp-dot"></span>
+                                                <div className="perm-modal-comp-info">
+                                                    <span className="perm-modal-comp-short">{comp.ShortName}</span>
+                                                    <span className="perm-modal-comp-name">{comp.CompanyNameTH || comp.CompanyName}</span>
+                                                </div>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             <div className="perm-modal-footer">

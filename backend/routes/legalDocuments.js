@@ -133,12 +133,12 @@ router.post('/', async (req, res) => {
 
         let finalDocumentNo = data.documentNo;
         if (!finalDocumentNo) {
-            let prefix = 'DOC-';
-            if (data.documentType === 'poa') prefix = 'POA-';
-            else if (data.documentType === 'corp_rep') prefix = 'CRP-';
+            let prefix = 'DOC';
+            if (data.documentType === 'poa') prefix = 'POA';
+            else if (data.documentType === 'corp_rep') prefix = 'CRP';
             
             if (data.status === 'พรีวิว') {
-                finalDocumentNo = `PREV-${prefix}${Date.now()}`;
+                finalDocumentNo = `PREV-${prefix}-${Date.now()}`;
             } else {
                 finalDocumentNo = await generateSequence(pool, 'LegalDocuments', 'DocumentNo', `${prefix}${getDatePrefix()}`, 3);
             }
@@ -293,9 +293,9 @@ router.put('/:id', async (req, res) => {
         
         let finalDocumentNo = data.documentNo !== undefined ? (data.documentNo || null) : (oldDoc.DocumentNo || null);
         if (oldDoc.Status === 'พรีวิว' && data.status !== 'พรีวิว' && (!finalDocumentNo || finalDocumentNo.startsWith('PREV-'))) {
-            let prefix = 'DOC-';
-            if (data.documentType === 'poa') prefix = 'POA-';
-            else if (data.documentType === 'corp_rep') prefix = 'CRP-';
+            let prefix = 'DOC';
+            if (data.documentType === 'poa') prefix = 'POA';
+            else if (data.documentType === 'corp_rep') prefix = 'CRP';
             finalDocumentNo = await generateSequence(pool, 'LegalDocuments', 'DocumentNo', `${prefix}${getDatePrefix()}`, 3);
         }
 

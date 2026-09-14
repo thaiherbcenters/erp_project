@@ -193,7 +193,7 @@ router.put('/tasks/:id/complete', authorizeRoles('admin','executive','planner','
         }
 
         // 5. Auto-create QC Final
-        const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCF-${getDatePrefix()}`, 3);
+        const qcRequestId = await generateSequence(pool, 'QC_Production', 'RequestID', `QCF${getDatePrefix()}`, 3);
         try {
             await pool.request()
                 .input('RequestID', sql.VarChar, qcRequestId)

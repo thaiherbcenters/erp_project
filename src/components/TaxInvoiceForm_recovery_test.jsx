@@ -2532,7 +2532,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                                                                 <span style={{ fontSize: '11pt' }}>
                                                                     {formData.billStatus === 'ktb' ? 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์' : 
                                                                      formData.billStatus === 'kbank' ? 'บจก. พรีเมียร์ สมาร์ท ฟาร์ม' :
-                                                                     formData.billStatus === 'kbank_charan' ? 'นาย จรัญ วาสิกสูตร' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด'}
+                                                                     formData.billStatus === 'kbank_charan' ? 'จรัญ วาสิกสูตร' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด'}
                                                                 </span><br/>
                                                                 <span className={formData.billStatus.includes('kbank') ? 'print-color-green' : 'print-color-blue'} style={{ fontSize: '18pt', color: formData.billStatus.includes('kbank') ? '#138f2d' : '#2980b9' }}>
                                                                     {formData.billStatus === 'ktb' ? '016-074-4237' : 

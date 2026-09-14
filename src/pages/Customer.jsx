@@ -1,7 +1,7 @@
 /**
  * Customer.jsx — หน้าจัดการข้อมูลลูกค้า (Real DB)
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { searchAddressByDistrict, searchAddressByAmphoe, searchAddressByZipcode } from 'thai-address-database';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,9 @@ import { useAlert } from '../components/CustomAlert';
 import { Eye, Edit2, Trash2, X, Search } from 'lucide-react';
 import API_BASE from '../config';
 import CustomSelect from '../components/CustomSelect';
+import CustomDatePicker from '../components/CustomDatePicker';
+import PaginationControl from '../components/PaginationControl';
+import { FilterToggleButton, CustomerFilterDrawer } from '../components/SalesDocFilter';
 import './PageCommon.css';
 
 export default function Customer() {
@@ -26,7 +29,14 @@ export default function Customer() {
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [viewCustomer, setViewCustomer] = useState(null);
     const [viewOrders, setViewOrders] = useState([]);
-    const [form, setForm] = useState({ name: '', contactPerson: '', phone: '', email: '', address: '', taxId: '', typeId: 1, statusId: 1 });
+    const [form, setForm] = useState({
+        name: '', contactPerson: '', phone: '', email: '', address: '',
+        houseNo: '', soi: '', road: '', subDistrict: '', district: '',
+        province: '', zipCode: '', taxId: '', taxBranch: 'head_office',
+        branchNo: '', typeId: 1, statusId: 1, projectName: '',
+        createContract: false, contractName: '', contractStartDate: '', contractEndDate: '',
+        contractNameManuallyEdited: false
+    });
 
     // Fetch data
     useEffect(() => {
@@ -55,16 +65,118 @@ export default function Customer() {
         } catch (err) { console.error('Error:', err); }
     };
 
-    const filtered = customers.filter(c =>
-        (c.CustomerName || '').toLowerCase().includes(search.toLowerCase()) ||
-        (c.CustomerCode || '').toLowerCase().includes(search.toLowerCase()) ||
-        (c.ContactPerson || '').toLowerCase().includes(search.toLowerCase()) ||
-        (c.CustomerTypeName || '').toLowerCase().includes(search.toLowerCase())
-    );
+    // ── Filter State ──
+    const [showFilter, setShowFilter] = useState(false);
+    const [customerFilter, setCustomerFilter] = useState({
+        customerType: '',
+        status: '',
+        dateFrom: '',
+        dateTo: ''
+    });
+
+    const handleFilterChange = (field, value) => {
+        setCustomerFilter(prev => ({ ...prev, [field]: value }));
+    };
+
+    const handleResetFilter = () => {
+        setCustomerFilter({
+            customerType: '',
+            status: '',
+            dateFrom: '',
+            dateTo: ''
+        });
+    };
+
+    const handleQuickDate = (type) => {
+        const now = new Date();
+        const format = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        const todayStr = format(now);
+        if (type === 'today') {
+            setCustomerFilter(prev => ({ ...prev, dateFrom: todayStr, dateTo: todayStr }));
+        } else if (type === '7days') {
+            const d7 = new Date();
+            d7.setDate(d7.getDate() - 6);
+            setCustomerFilter(prev => ({ ...prev, dateFrom: format(d7), dateTo: todayStr }));
+        } else if (type === 'thisMonth') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            setCustomerFilter(prev => ({ ...prev, dateFrom: format(startOfMonth), dateTo: format(endOfMonth) }));
+        }
+    };
+
+    const activeFilterCount = [
+        Boolean(customerFilter.customerType),
+        Boolean(customerFilter.status),
+        Boolean(customerFilter.dateFrom || customerFilter.dateTo)
+    ].filter(Boolean).length;
+
+    const filtered = customers.filter(c => {
+        // 1. Text search
+        const matchSearch =
+            (c.CustomerName || '').toLowerCase().includes(search.toLowerCase()) ||
+            (c.CustomerCode || '').toLowerCase().includes(search.toLowerCase()) ||
+            (c.ContactPerson || '').toLowerCase().includes(search.toLowerCase()) ||
+            (c.Phone || '').toLowerCase().includes(search.toLowerCase()) ||
+            (c.CustomerTypeName || '').toLowerCase().includes(search.toLowerCase());
+        if (!matchSearch) return false;
+
+        // 2. Customer Type
+        if (customerFilter.customerType) {
+            if (String(c.CustomerTypeID) !== String(customerFilter.customerType)) return false;
+        }
+
+        // 3. Status
+        if (customerFilter.status) {
+            if (String(c.CustomerStatusID) !== String(customerFilter.status)) return false;
+        }
+
+        // 4. Date range (CreatedDate)
+        if (customerFilter.dateFrom || customerFilter.dateTo) {
+            const created = c.CreatedDate ? c.CreatedDate.split('T')[0] : '';
+            if (customerFilter.dateFrom && created && created < customerFilter.dateFrom) return false;
+            if (customerFilter.dateTo && created && created > customerFilter.dateTo) return false;
+        }
+
+        return true;
+    });
+
+    // ── Pagination State ──
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, pageSize, customerFilter]);
+
+    const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, filtered.length);
+    const paginatedCustomers = filtered.slice(startIndex, endIndex);
 
     const openCreate = () => {
         setEditingCustomer(null);
-        setForm({ name: '', contactPerson: '', phone: '', email: '', address: '', houseNo: '', soi: '', road: '', subDistrict: '', district: '', province: '', zipCode: '', taxId: '', taxBranch: 'head_office', branchNo: '', typeId: 1, statusId: 1, projectName: '' });
+        const today = new Date();
+        const nextYear = new Date(today);
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        const todayStr = today.toISOString().split('T')[0];
+        const nextYearStr = nextYear.toISOString().split('T')[0];
+
+        setForm({
+            name: '', contactPerson: '', phone: '', email: '', address: '',
+            houseNo: '', soi: '', road: '', subDistrict: '', district: '',
+            province: '', zipCode: '', taxId: '', taxBranch: 'head_office',
+            branchNo: '', typeId: 1, statusId: 1, projectName: '',
+            createContract: false,
+            contractName: '',
+            contractStartDate: todayStr,
+            contractEndDate: nextYearStr,
+            contractNameManuallyEdited: false
+        });
         setShowModal(true);
     };
 
@@ -106,6 +218,12 @@ export default function Customer() {
     const openEdit = (c) => {
         setEditingCustomer(c);
         const parsed = parseThaiAddress(c.Address || '');
+        const today = new Date();
+        const nextYear = new Date(today);
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        const todayStr = today.toISOString().split('T')[0];
+        const nextYearStr = nextYear.toISOString().split('T')[0];
+
         setForm({
             name: c.CustomerName || '', contactPerson: c.ContactPerson || '',
             phone: c.Phone || '', email: c.Email || '', address: c.Address || '',
@@ -114,7 +232,12 @@ export default function Customer() {
             province: parsed.province, zipCode: parsed.zipCode,
             taxId: c.TaxID || '', taxBranch: c.TaxBranch || 'head_office', branchNo: c.BranchNo || '', 
             typeId: c.CustomerTypeID || 1, statusId: c.CustomerStatusID || 1,
-            projectName: c.ProjectName || ''
+            projectName: c.ProjectName || '',
+            createContract: false,
+            contractName: '',
+            contractStartDate: todayStr,
+            contractEndDate: nextYearStr,
+            contractNameManuallyEdited: false
         });
         setShowModal(true);
     };
@@ -132,6 +255,14 @@ export default function Customer() {
 
     const handleSave = async () => {
         if (!form.name.trim()) return showAlert('ข้อผิดพลาด', 'กรุณากรอกชื่อลูกค้า', 'error');
+
+        // หากเลือกสร้างสัญญา ตรวจสอบชื่อสัญญา
+        if (form.createContract) {
+            const cName = (form.contractName?.trim()) || (form.name?.trim()) || (form.projectName?.trim());
+            if (!cName) {
+                return showAlert('ข้อผิดพลาด', 'กรุณาระบุชื่อบริษัท/ลูกค้า หรือชื่อสัญญา', 'warning');
+            }
+        }
         
         let finalAddress = form.address;
         if (form.houseNo || form.soi || form.road || form.subDistrict || form.district || form.province || form.zipCode) {
@@ -157,41 +288,37 @@ export default function Customer() {
             });
             const json = await res.json();
             if (json.success) {
-                // ถ้าเป็นการเพิ่มลูกค้าใหม่ + ประเภท OEM/ขึ้นทะเบียน → สร้างสัญญาอัตโนมัติ
-                if (!editingCustomer && [2, 3, 4].includes(form.typeId) && form.projectName?.trim()) {
+                const targetCustomerId = editingCustomer ? editingCustomer.CustomerID : (json.data?.CustomerID || json.id || json.CustomerID);
+
+                // ถ้าเลือกสร้างสัญญา
+                if (form.createContract) {
                     try {
-                        const newCustomerId = json.data?.CustomerID;
-                        const today = new Date();
-                        const nextYear = new Date(today);
-                        nextYear.setFullYear(nextYear.getFullYear() + 1);
-
-                        // สร้างเลขสัญญา CT-YYMMDD-XXX
-                        const yy = today.getFullYear().toString().slice(-2);
-                        const mm = String(today.getMonth() + 1).padStart(2, '0');
-                        const dd = String(today.getDate()).padStart(2, '0');
-                        const contractNo = `CT-${yy}${mm}${dd}-001`;
-
+                        const cName = (form.contractName?.trim()) || (form.name?.trim()) || (form.projectName?.trim()) || 'สัญญาจ้างผลิต';
                         const contractRes = await fetch(`${API_BASE}/contracts`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            },
                             body: JSON.stringify({
-                                contractNo,
-                                contractName: form.projectName.trim(),
-                                customerId: newCustomerId,
-                                startDate: today.toISOString().split('T')[0],
-                                endDate: nextYear.toISOString().split('T')[0],
+                                contractName: cName,
+                                customerId: targetCustomerId,
+                                startDate: form.contractStartDate || null,
+                                endDate: form.contractEndDate || null,
                                 status: 'กำลังดำเนินการ'
                             })
                         });
                         const contractJson = await contractRes.json();
+                        const actionText = editingCustomer ? 'แก้ไขข้อมูลลูกค้า' : 'เพิ่มลูกค้าใหม่';
                         if (contractJson.success) {
-                            showAlert('สำเร็จ', `เพิ่มลูกค้าใหม่และสร้างสัญญา "${form.projectName.trim()}" ให้อัตโนมัติเรียบร้อย`, 'success');
+                            showAlert('สำเร็จ', `${actionText}และสร้างสัญญา "${cName}" (${contractJson.contractNo || 'เรียบร้อย'}) ให้พร้อมกันแล้ว`, 'success');
                         } else {
-                            showAlert('สำเร็จ', 'เพิ่มลูกค้าใหม่เรียบร้อย แต่ไม่สามารถสร้างสัญญาอัตโนมัติได้', 'warning');
+                            showAlert('สำเร็จ', `${actionText}เรียบร้อย แต่ไม่สามารถสร้างสัญญาได้: ` + contractJson.message, 'warning');
                         }
                     } catch (contractErr) {
-                        console.error('Auto-create contract error:', contractErr);
-                        showAlert('สำเร็จ', 'เพิ่มลูกค้าใหม่เรียบร้อย แต่ไม่สามารถสร้างสัญญาอัตโนมัติได้', 'warning');
+                        console.error('Create contract error:', contractErr);
+                        const actionText = editingCustomer ? 'แก้ไขข้อมูลลูกค้า' : 'เพิ่มลูกค้าใหม่';
+                        showAlert('สำเร็จ', `${actionText}เรียบร้อย แต่เกิดข้อผิดพลาดในการสร้างสัญญา`, 'warning');
                     }
                 } else {
                     showAlert('สำเร็จ', editingCustomer ? 'แก้ไขข้อมูลลูกค้าเรียบร้อย' : 'เพิ่มลูกค้าใหม่เรียบร้อย', 'success');
@@ -294,14 +421,12 @@ export default function Customer() {
 
     const getStatusClass = (s) => {
         if (s === 'Active') return 'badge-success';
-        if (s === 'Inactive' || s === 'Suspended' || s === 'Blacklist') return 'badge-danger';
-        if (s === 'Prospect') return 'badge-warning';
-        return 'badge-neutral';
+        return 'badge-danger';
     };
 
     const getStatusThai = (s) => {
-        const map = { Active: 'ใช้งาน', Inactive: 'ไม่ใช้งาน', Prospect: 'ผู้สนใจ', Suspended: 'ระงับ', Blacklist: 'ขึ้นบัญชีดำ' };
-        return map[s] || s;
+        const map = { Active: 'ใช้งาน', Inactive: 'ไม่ใช้งาน' };
+        return map[s] || (s === 'Active' ? 'ใช้งาน' : 'ไม่ใช้งาน');
     };
 
     const getSourceThai = (s) => {
@@ -330,18 +455,38 @@ export default function Customer() {
             {(activeTab === 'customer_list' && hasSubPermission('customer_list')) && (
                 <div className="subpage-content" key="customer_list">
                     {hasSectionPermission('customer_list_search') && (
-                        <div className="toolbar">
-                            <div className="search-group">
-                                <div className="search-input-wrap">
-                                    <Search size={16} />
-                                    <input type="text" placeholder="พิมพ์ชื่อ รหัส หรือประเภทลูกค้า..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <>
+                            <div className="toolbar">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, flexWrap: 'wrap' }}>
+                                    <div className="search-group">
+                                        <div className="search-input-wrap">
+                                            <Search size={16} />
+                                            <input type="text" placeholder="พิมพ์ชื่อ รหัส หรือประเภทลูกค้า..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                                        </div>
+                                        <button className="search-btn">ค้นหา</button>
+                                    </div>
+                                    <FilterToggleButton
+                                        isOpen={showFilter}
+                                        onClick={() => setShowFilter(prev => !prev)}
+                                        activeCount={activeFilterCount}
+                                    />
                                 </div>
-                                <button className="search-btn">ค้นหา</button>
+                                {canCreate('customer_list') && (
+                                    <button className="btn-primary" onClick={openCreate}>+ เพิ่มลูกค้าใหม่</button>
+                                )}
                             </div>
-                            {canCreate('customer_list') && (
-                                <button className="btn-primary" onClick={openCreate}>+ เพิ่มลูกค้าใหม่</button>
-                            )}
-                        </div>
+
+                            <CustomerFilterDrawer
+                                isOpen={showFilter}
+                                onClose={() => setShowFilter(false)}
+                                filter={customerFilter}
+                                onFilterChange={handleFilterChange}
+                                onReset={handleResetFilter}
+                                onQuickDate={handleQuickDate}
+                                types={types}
+                                statuses={statuses}
+                            />
+                        </>
                     )}
 
                     {hasSectionPermission('customer_list_table') && (
@@ -361,7 +506,7 @@ export default function Customer() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filtered.map((c) => (
+                                    {paginatedCustomers.map((c) => (
                                         <tr key={c.CustomerID}>
                                             <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{c.CustomerCode}</td>
                                             <td className="text-bold">{c.CustomerName}</td>
@@ -389,6 +534,16 @@ export default function Customer() {
                                     )}
                                 </tbody>
                             </table>
+
+                            {/* Pagination Controls */}
+                            <PaginationControl 
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                totalItems={filtered.length}
+                                pageSize={pageSize}
+                                onPageChange={setCurrentPage}
+                                onPageSizeChange={setPageSize}
+                            />
                         </div>
                     )}
                 </div>
@@ -407,7 +562,19 @@ export default function Customer() {
                         <div style={{ display: 'grid', gap: '14px' }}>
                             <div>
                                 <label style={labelStyle}>ชื่อบริษัท/ลูกค้า *</label>
-                                <input style={inputStyle} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="เช่น บริษัท ABC จำกัด" />
+                                <input
+                                    style={inputStyle}
+                                    value={form.name}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setForm(prev => ({
+                                            ...prev,
+                                            name: val,
+                                            contractName: !prev.contractNameManuallyEdited ? val : prev.contractName
+                                        }));
+                                    }}
+                                    placeholder="เช่น บริษัท ABC จำกัด"
+                                />
                             </div>
                             <div>
                                 <label style={labelStyle}>ผู้ติดต่อ</label>
@@ -518,8 +685,99 @@ export default function Customer() {
                             <div>
                                 <label style={labelStyle}>สถานะ</label>
                                 <CustomSelect style={inputStyle} value={form.statusId} onChange={e => setForm({ ...form, statusId: parseInt(e.target.value) })}>
-                                    {statuses.filter(s => s.StatusName === 'Active' || s.StatusName === 'Suspended').map(s => <option key={s.CustomerStatusID} value={s.CustomerStatusID}>{getStatusThai(s.StatusName)} ({s.StatusName})</option>)}
+                                    <option value={1}>ใช้งาน (Active)</option>
+                                    <option value={2}>ไม่ใช้งาน (Inactive)</option>
                                 </CustomSelect>
+                            </div>
+
+                            {/* ตัวเลือกสร้างสัญญา (Contract) */}
+                            <div style={{
+                                marginTop: '6px',
+                                padding: '12px 14px',
+                                background: form.createContract ? '#f0fdf4' : '#f8fafc',
+                                border: `1.5px solid ${form.createContract ? '#86efac' : '#e2e8f0'}`,
+                                borderRadius: '8px',
+                                transition: 'all 0.2s ease'
+                            }}>
+                                <label style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px',
+                                    cursor: 'pointer',
+                                    fontWeight: 600,
+                                    color: form.createContract ? '#15803d' : '#334155',
+                                    fontSize: '13px',
+                                    userSelect: 'none'
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={form.createContract || false}
+                                        onChange={e => {
+                                            const checked = e.target.checked;
+                                            setForm(prev => ({
+                                                ...prev,
+                                                createContract: checked,
+                                                // นำชื่อบริษัท/ลูกค้าด้านบนมาใส่ให้อัตโนมัติ (หากยังไม่ได้พิมพ์แก้ชื่อสัญญาเอง)
+                                                contractName: prev.contractNameManuallyEdited && prev.contractName
+                                                    ? prev.contractName
+                                                    : (prev.name?.trim() || prev.projectName?.trim() || '')
+                                            }));
+                                        }}
+                                        style={{ width: '17px', height: '17px', accentColor: '#16a34a', cursor: 'pointer' }}
+                                    />
+                                    <span>สร้างสัญญา (Contract) สำหรับลูกค้านี้ทันที</span>
+                                </label>
+
+                                {form.createContract && (
+                                    <div style={{
+                                        marginTop: '12px',
+                                        paddingTop: '12px',
+                                        borderTop: '1px dashed #bbf7d0',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '10px'
+                                    }}>
+                                        <div>
+                                            <label style={{ ...labelStyle, fontSize: '12px', color: '#166534' }}>
+                                                ชื่อสัญญา / โปรเจกต์ <span style={{ color: '#dc2626' }}>*</span>
+                                            </label>
+                                            <input
+                                                style={inputStyle}
+                                                value={form.contractName || ''}
+                                                onChange={e => {
+                                                    const val = e.target.value;
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        contractName: val,
+                                                        contractNameManuallyEdited: val.trim() !== ''
+                                                    }));
+                                                }}
+                                                placeholder={form.name ? form.name : "เช่น บริษัท ABC จำกัด หรือ ชื่อโปรเจกต์"}
+                                            />
+                                        </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                            <div>
+                                                <label style={{ ...labelStyle, fontSize: '12px', color: '#166534' }}>วันที่เริ่มต้นสัญญา</label>
+                                                <CustomDatePicker
+                                                    name="contractStartDate"
+                                                    value={form.contractStartDate}
+                                                    onChange={e => setForm({ ...form, contractStartDate: e.target.value })}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ ...labelStyle, fontSize: '12px', color: '#166534' }}>วันที่สิ้นสุดสัญญา (1 ปี)</label>
+                                                <CustomDatePicker
+                                                    name="contractEndDate"
+                                                    value={form.contractEndDate}
+                                                    onChange={e => setForm({ ...form, contractEndDate: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <span>ℹ️</span> เลขที่สัญญาจะถูกออกให้อัตโนมัติ (เช่น CT-YYMMDD-xxx) และแสดงในระบบ "จัดการสัญญา" ทันที
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>

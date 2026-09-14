@@ -7,7 +7,7 @@
  * =============================================================================
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     Save, User, Building, Building2, Phone, Mail, FileText, CheckCircle,
     XCircle, Users, Plus, ArrowLeft, Search, Eye, Edit2, MapPin,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
+import PaginationControl from '../components/PaginationControl';
 import './PageCommon.css';
 import './CustomerDocument.css';
 
@@ -94,6 +95,19 @@ export default function CustomerDocument({ hasPermission }) {
         c.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // ── Pagination State ──
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+
+    useEffect(() => {
+        setPage(1);
+    }, [searchTerm, pageSize]);
+
+    const paginatedCustomers = useMemo(() => {
+        const start = (page - 1) * pageSize;
+        return filteredCustomers.slice(start, start + pageSize);
+    }, [filteredCustomers, page, pageSize]);
+
     // ==========================================
     // Render: หน้ารายการ (List View)
     // ==========================================
@@ -128,7 +142,7 @@ export default function CustomerDocument({ hasPermission }) {
                             <th style={{ textAlign: 'center' }}>จัดการ</th>
                         </tr></thead>
                         <tbody>
-                            {filteredCustomers.map((cust) => (
+                            {paginatedCustomers.map((cust) => (
                                 <tr key={cust.id}>
                                     <td className="text-bold">{cust.id}</td>
                                     <td>{cust.name}</td>
@@ -147,6 +161,14 @@ export default function CustomerDocument({ hasPermission }) {
                             )}
                         </tbody>
                     </table>
+                    <PaginationControl
+                        currentPage={page}
+                        totalPages={Math.ceil(filteredCustomers.length / pageSize) || 1}
+                        totalItems={filteredCustomers.length}
+                        pageSize={pageSize}
+                        onPageChange={setPage}
+                        onPageSizeChange={setPageSize}
+                    />
                 </div>
             </div>
         );

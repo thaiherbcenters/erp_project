@@ -66,7 +66,7 @@ const parseJobNotes = (notes) => {
     if (!notes) return result;
 
     // Extract SO reference
-    const soMatch = notes.match(/SO:\s*(SO-[\d-]+)/);
+    const soMatch = notes.match(/SO:\s*(SO-?[\d-]+)/);
     if (soMatch) result.soRef = soMatch[1];
 
     // Extract item name
