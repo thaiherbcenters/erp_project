@@ -6,10 +6,14 @@ const { poolPromise, sql } = require('../config/db');
 router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const result = await pool.request().query(`
+        const companyId = parseInt(req.headers['x-company-id'] || req.query.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        const result = await pool.request()
+            .input('companyId', sql.Int, companyId)
+            .query(`
             SELECT c.ContractID, c.ContractNo, c.ContractName, c.CustomerID, c.StartDate, c.EndDate, c.ContractValue, c.Status, c.CreatedAt, cust.CustomerName
             FROM Contracts c
             LEFT JOIN Customer cust ON c.CustomerID = cust.CustomerID
+            WHERE (c.CompanyID = @companyId OR (c.CompanyID IS NULL AND @companyId = 1))
             ORDER BY c.CreatedAt DESC
         `);
         res.json({ success: true, data: result.recordset });
@@ -211,6 +215,7 @@ router.post('/', async (req, res) => {
             contractNo = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
         }
 
+        const companyId = parseInt(req.headers['x-company-id'] || data.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
         const result = await pool.request()
             .input('ContractNo', sql.NVarChar, contractNo)
             .input('ContractName', sql.NVarChar, data.contractName)
@@ -219,10 +224,11 @@ router.post('/', async (req, res) => {
             .input('EndDate', sql.Date, data.endDate || null)
             .input('ContractValue', sql.Decimal(18, 2), data.contractValue || null)
             .input('Status', sql.NVarChar, data.status || 'กำลังดำเนินการ')
+            .input('CompanyID', sql.Int, companyId)
             .query(`
-                INSERT INTO Contracts (ContractNo, ContractName, CustomerID, StartDate, EndDate, ContractValue, Status)
+                INSERT INTO Contracts (ContractNo, ContractName, CustomerID, StartDate, EndDate, ContractValue, Status, CompanyID)
                 OUTPUT INSERTED.ContractID
-                VALUES (@ContractNo, @ContractName, @CustomerID, @StartDate, @EndDate, @ContractValue, @Status)
+                VALUES (@ContractNo, @ContractName, @CustomerID, @StartDate, @EndDate, @ContractValue, @Status, @CompanyID)
             `);
 
         res.json({

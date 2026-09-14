@@ -27,6 +27,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     LayoutDashboard,
+    CreditCard,
     Package,
     ShoppingCart,
     FileBarChart,
@@ -109,9 +110,24 @@ const ROLE_LABELS = {
 const getRoleLabel = (role) => ROLE_LABELS[role] || 'ผู้ใช้งาน';
 
 // =============================================================================
+// Company Theme Color Palettes (Multi-Company ERP)
+// =============================================================================
+const COMPANY_THEMES = {
+    1: { primary: '#4f46e5', dark: '#3730a3', light: '#818cf8', bg: '#eef2f6', accent: '#4338ca' },
+    THC: { primary: '#4f46e5', dark: '#3730a3', light: '#818cf8', bg: '#eef2f6', accent: '#4338ca' },
+    2: { primary: '#2563eb', dark: '#1d4ed8', light: '#3b82f6', bg: '#eff6ff', accent: '#1d4ed8' },
+    ELITE: { primary: '#2563eb', dark: '#1d4ed8', light: '#3b82f6', bg: '#eff6ff', accent: '#1d4ed8' },
+    3: { primary: '#7c3aed', dark: '#6d28d9', light: '#8b5cf6', bg: '#faf5ff', accent: '#6d28d9' },
+    RIVERVIEW: { primary: '#7c3aed', dark: '#6d28d9', light: '#8b5cf6', bg: '#faf5ff', accent: '#6d28d9' },
+    4: { primary: '#ea580c', dark: '#c2410c', light: '#f97316', bg: '#fff7ed', accent: '#c2410c' },
+    PSF: { primary: '#ea580c', dark: '#c2410c', light: '#f97316', bg: '#fff7ed', accent: '#c2410c' },
+};
+
+// =============================================================================
 // กำหนดว่า page ใดอยู่ในกลุ่มเมนูไหน
 // =============================================================================
 const CORE_MENU_IDS = ['home', 'customer', 'stock', 'sales', 'accounts', 'procurement', 'reports', 'qc'];
+const NON_MANUFACTURING_CORE_IDS = ['home', 'customer', 'sales', 'accounts', 'reports'];
 const LOGISTICS_MENU_IDS = ['fulfillment'];
 const PRODUCT_MENU_IDS = ['planning', 'operator', 'rnd', 'packaging'];
 const DOC_MENU_IDS = ['document'];
@@ -135,6 +151,35 @@ export default function Layout() {
     const [expandedGroups, setExpandedGroups] = useState({});
     const [companySwitcherOpen, setCompanySwitcherOpen] = useState(false);
     const companySwitcherRef = useRef(null);
+
+    // ── ตรวจสอบว่าเป็นบริษัทผลิต (THC) หรือไม่ ──
+    const isManufacturing = !activeCompany || activeCompany.CompanyID === 1 || activeCompany.ShortName === 'THC';
+    const isElite = activeCompany?.CompanyID === 2 || activeCompany?.ShortName === 'ELITE';
+
+    // ── Dynamic Theme: ปรับสีหลักตามบริษัทที่เลือก (THC ใช้สีเดิมแท้ 100% ไม่ยุ่ง) ──
+    useEffect(() => {
+        if (!activeCompany || activeCompany.CompanyID === 1 || activeCompany.ShortName === 'THC') {
+            // THC: ลบ inline style เพื่อใช้สีเดิมแท้จาก index.css 100%
+            document.documentElement.style.removeProperty('--primary');
+            document.documentElement.style.removeProperty('--primary-dark');
+            document.documentElement.style.removeProperty('--primary-light');
+            document.documentElement.style.removeProperty('--primary-bg');
+            document.documentElement.style.removeProperty('--accent');
+        } else {
+            const theme = COMPANY_THEMES[activeCompany.CompanyID] || COMPANY_THEMES[activeCompany.ShortName] || {
+                primary: activeCompany.CompanyColor || '#2563eb',
+                dark: '#1d4ed8',
+                light: '#3b82f6',
+                bg: '#eff6ff',
+                accent: '#1d4ed8'
+            };
+            document.documentElement.style.setProperty('--primary', theme.primary);
+            document.documentElement.style.setProperty('--primary-dark', theme.dark);
+            document.documentElement.style.setProperty('--primary-light', theme.light);
+            document.documentElement.style.setProperty('--primary-bg', theme.bg);
+            document.documentElement.style.setProperty('--accent', theme.accent);
+        }
+    }, [activeCompany]);
 
     // ── ปิด Company Switcher เมื่อคลิกข้างนอก ──
     useEffect(() => {
@@ -203,6 +248,8 @@ export default function Layout() {
         const hasSubPages = subPages && subPages.length > 0;
         const isActive = location.pathname.startsWith(page.path);
         const isExpanded = expandedGroups[page.id];
+        const pageLabel = (isElite && page.id === 'home') ? 'ระบบทะเบียนเช็ค' : page.name;
+        const pageIcon = (isElite && page.id === 'home') ? <CreditCard size={20} /> : getPageIcon(page.id);
 
         const handleClick = (e) => {
             if (hasSubPages && isActive) {
@@ -222,11 +269,11 @@ export default function Layout() {
                     to={page.path}
                     end
                     className={() => `nav-item ${isActive ? 'active' : ''}`}
-                    title={!sidebarOpen ? page.name : ''}
+                    title={!sidebarOpen ? pageLabel : ''}
                     onClick={handleClick}
                 >
-                    <span className="nav-icon-wrapper">{getPageIcon(page.id)}</span>
-                    <span className="nav-label">{page.name}</span>
+                    <span className="nav-icon-wrapper">{pageIcon}</span>
+                    <span className="nav-label">{pageLabel}</span>
                     {hasSubPages && sidebarOpen && (
                         <span className={`nav-chevron ${isExpanded ? 'expanded' : ''}`}>
                             <ChevronDown size={16} />
@@ -294,7 +341,7 @@ export default function Layout() {
                     <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
                         <Menu size={22} />
                     </button>
-                    <span className="mobile-title">THAI HERB</span>
+                    <span className="mobile-title">{activeCompany?.ShortName || 'THAI HERB'}</span>
                     <span className="mobile-user">{currentUser?.avatar}</span>
                 </header>
             )}
@@ -313,10 +360,11 @@ export default function Layout() {
                             style={{ cursor: !sidebarOpen ? 'pointer' : 'default' }}
                         >
                             <img
-                                src={sidebarOpen ? logoUrl : logoSmallUrl}
-                                alt="Thai Herb Centers"
+                                src={activeCompany?.CompanyLogo || (sidebarOpen ? logoUrl : logoSmallUrl)}
+                                alt={activeCompany?.CompanyName || 'Thai Herb Centers'}
                                 style={{
-                                    height: sidebarOpen ? '32px' : '40px',
+                                    height: sidebarOpen ? '36px' : '36px',
+                                    maxWidth: sidebarOpen ? '150px' : '40px',
                                     width: 'auto',
                                     objectFit: 'contain',
                                     transition: 'all 0.3s ease',
@@ -338,7 +386,11 @@ export default function Layout() {
                 {isMobile && (
                     <div className="sidebar-header">
                         <div className="sidebar-logo">
-                            <img src={logoUrl} alt="Thai Herb Centers" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
+                            <img 
+                                src={activeCompany?.CompanyLogo || logoUrl} 
+                                alt={activeCompany?.CompanyName || 'Thai Herb Centers'} 
+                                style={{ height: '32px', width: 'auto', objectFit: 'contain' }} 
+                            />
                         </div>
                         <button className="sidebar-toggle" onClick={() => setSidebarOpen(false)}>
                             ✕
@@ -348,11 +400,11 @@ export default function Layout() {
 
                 {/* ── Navigation Menu ── */}
                 <nav className="sidebar-nav">
-                    {renderMenuSection('เมนูหลัก', CORE_MENU_IDS)}
-                    {renderMenuSection('การผลิต', PRODUCT_MENU_IDS, { marginTop: '16px' })}
-                    {renderMenuSection('จัดส่ง', LOGISTICS_MENU_IDS, { marginTop: '16px' })}
+                    {renderMenuSection('เมนูหลัก', isManufacturing ? CORE_MENU_IDS : NON_MANUFACTURING_CORE_IDS)}
+                    {isManufacturing && renderMenuSection('การผลิต', PRODUCT_MENU_IDS, { marginTop: '16px' })}
+                    {isManufacturing && renderMenuSection('จัดส่ง', LOGISTICS_MENU_IDS, { marginTop: '16px' })}
                     {renderMenuSection('ระบบเอกสาร', DOC_MENU_IDS, { marginTop: '16px' })}
-                    {renderMenuSection('บุคลากร', HR_MENU_IDS, { marginTop: '16px' })}
+                    {isManufacturing && renderMenuSection('บุคลากร', HR_MENU_IDS, { marginTop: '16px' })}
                     {renderMenuSection('ระบบ', SYSTEM_MENU_IDS, { marginTop: '16px' })}
                 </nav>
 
@@ -393,7 +445,7 @@ export default function Layout() {
 
                                 return (
                                     <>
-                                        {matchedPage.name}
+                                        {(isElite && matchedPage.id === 'home') ? 'ระบบทะเบียนเช็ค' : matchedPage.name}
                                         {activeSub && (
                                             <>
                                                 <span style={{ margin: '0 8px', color: 'var(--text-muted)' }}>/</span>

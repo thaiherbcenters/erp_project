@@ -12,31 +12,53 @@
  */
 
 import { useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';import CustomSelect from '../components/CustomSelect';
+import { useAuth } from '../context/AuthContext';
+import CustomSelect from '../components/CustomSelect';
+import ChequeManagement from '../components/ChequeManagement';
 
 import './Home.css';
 
 export default function Home() {
-    const { hasSubPermission, hasSectionPermission, getVisibleSubPages } = useAuth();
+    const { hasSubPermission, hasSectionPermission, getVisibleSubPages, activeCompany } = useAuth();
+
+    // ── สำหรับ ELITE: หน้า Home คือระบบทะเบียนเช็คทั้งหมดตามที่ผู้ใช้สั่ง ──
+    const isElite = activeCompany?.CompanyID === 2 || activeCompany?.ShortName === 'ELITE';
+    if (isElite) {
+        return <ChequeManagement />;
+    }
+
     const visibleSubPages = getVisibleSubPages('home');
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'home_stats';
 
+    const isTHC = !activeCompany || activeCompany.CompanyID === 1 || activeCompany.ShortName === 'THC';
+
     // ── ข้อมูลสถิติภาพรวม ──
-    const stats = [
+    const stats = isTHC ? [
         { id: 'home_stats_revenue', label: 'ยอดขายรวม (เดือนนี้)', value: '฿1,250,000', change: '+15.5%', positive: true },
         { id: 'home_stats_orders', label: 'คำสั่งขาย OEM', value: '128', change: '+5.2%', positive: true },
         { id: 'home_stats_products', label: 'สินค้าคงคลัง (รายการ)', value: '450', change: '-1.1%', positive: false },
         { id: 'home_stats_customers', label: 'ตัวแทนจำหน่าย', value: '85', change: '+12.0%', positive: true },
+    ] : [
+        { id: 'home_stats_revenue', label: 'ยอดขายรวม (เดือนนี้)', value: '฿420,000', change: '+8.4%', positive: true },
+        { id: 'home_stats_orders', label: 'ใบสั่งขาย / สัญญา', value: '34', change: '+12.5%', positive: true },
+        { id: 'home_stats_products', label: 'เอกสารรอดำเนินการ', value: '12', change: '-5.0%', positive: true },
+        { id: 'home_stats_customers', label: 'ลูกค้าทั้งหมด', value: '42', change: '+6.1%', positive: true },
     ];
 
     // ── ข้อมูลกิจกรรมล่าสุด ──
-    const recentActivities = [
+    const recentActivities = isTHC ? [
         { action: 'คำสั่งขาย OEM ใหม่', detail: '#OEM-2024-089 (สมุนไพรอัดเม็ด)', time: '10 นาทีที่แล้ว' },
         { action: 'อัปเดตสต็อก', detail: 'ฟ้าทะลายโจรแคปซูล (+500 ขวด)', time: '45 นาทีที่แล้ว' },
         { action: 'ส่งมอบงานผลิต', detail: 'Lot: L-2401 (ชาสมุนไพร)', time: '2 ชั่วโมงที่แล้ว' },
         { action: 'อนุมัติสูตรใหม่', detail: 'เซรั่มบำรุงผิวสูตรขมิ้นชัน', time: '3 ชั่วโมงที่แล้ว' },
         { action: 'รายงานประจำสัปดาห์', detail: 'สรุปยอดขายและสต็อก', time: '1 วันที่แล้ว' },
+    ] : [
+        { action: 'ใบเสนอราคาใหม่', detail: '#QT-2024-015 ออกให้ลูกค้า บจก. พัฒนาการ', time: '15 นาทีที่แล้ว' },
+        { action: 'อนุมัติใบสั่งขาย', detail: '#SO-2024-008 ได้รับการยืนยันคำสั่งซื้อ', time: '1 ชั่วโมงที่แล้ว' },
+        { action: 'ออกใบแจ้งหนี้', detail: '#INV-2024-032 ส่งเรียบร้อย', time: '3 ชั่วโมงที่แล้ว' },
+        { action: 'ลงทะเบียนลูกค้าใหม่', detail: 'หจก. สยามบริการคอนซัลติ้ง', time: '5 ชั่วโมงที่แล้ว' },
+        { action: 'รับชำระเงิน', detail: '#RC-2024-019 บันทึกรับชำระเงินแล้ว', time: '1 วันที่แล้ว' },
     ];
 
     // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
@@ -51,12 +73,16 @@ export default function Home() {
 
     const getPageDesc = () => {
         switch (activeTab) {
-            case 'home_stats': return 'สรุปข้อมูลสถิติ ยอดขาย คำสั่งขาย และสินค้าคงคลัง';
+            case 'home_stats': return isTHC ? 'สรุปข้อมูลสถิติ ยอดขาย คำสั่งขาย และสินค้าคงคลัง' : 'สรุปข้อมูลสถิติ ยอดขาย คำสั่งขาย และเอกสารการค้า';
             case 'home_activity': return 'ประวัติการทำรายการต่างๆ ภายในระบบ ERP';
             case 'home_actions': return 'ปุ่มทางลัดสำหรับเข้าถึงฟังก์ชันที่ใช้งานบ่อย';
             default: return 'สรุปข้อมูลภาพรวมของระบบ';
         }
     };
+
+    const quickActions = isTHC
+        ? ['เพิ่มสินค้า', 'สร้างคำสั่งขาย', 'สร้างรายงาน', 'เพิ่มพนักงาน']
+        : ['สร้างใบเสนอราคา', 'สร้างคำสั่งขาย', 'เพิ่มลูกค้า', 'ออกใบแจ้งหนี้'];
 
     return (
         <div className="page-container home-page page-enter">
@@ -112,9 +138,19 @@ export default function Home() {
                             <div className="mock-pie-container">
                                 <div className="mock-pie-chart"></div>
                                 <div className="mock-pie-legend">
-                                    <div className="legend-item"><span className="dot" style={{ background: 'var(--primary)' }}></span>OEM (55%)</div>
-                                    <div className="legend-item"><span className="dot" style={{ background: 'var(--primary-light)' }}></span>ขายปลีก (30%)</div>
-                                    <div className="legend-item"><span className="dot" style={{ background: '#ff9800' }}></span>ตัวแทนจำหน่าย (15%)</div>
+                                    {isTHC ? (
+                                        <>
+                                            <div className="legend-item"><span className="dot" style={{ background: 'var(--primary)' }}></span>OEM (55%)</div>
+                                            <div className="legend-item"><span className="dot" style={{ background: 'var(--primary-light)' }}></span>ขายปลีก (30%)</div>
+                                            <div className="legend-item"><span className="dot" style={{ background: '#ff9800' }}></span>ตัวแทนจำหน่าย (15%)</div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="legend-item"><span className="dot" style={{ background: 'var(--primary)' }}></span>สินค้า/บริการ (60%)</div>
+                                            <div className="legend-item"><span className="dot" style={{ background: 'var(--primary-light)' }}></span>ที่ปรึกษา/โครงการ (25%)</div>
+                                            <div className="legend-item"><span className="dot" style={{ background: '#ff9800' }}></span>อื่นๆ (15%)</div>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -151,7 +187,7 @@ export default function Home() {
                         <div className="quick-actions card">
                             <h2>ดำเนินการด่วน</h2>
                             <div className="actions-grid">
-                                {['เพิ่มสินค้า', 'สร้างคำสั่งขาย', 'สร้างรายงาน', 'เพิ่มพนักงาน'].map((action, i) => (
+                                {quickActions.map((action, i) => (
                                     <button className="action-btn" key={i}>{action}</button>
                                 ))}
                             </div>

@@ -25,6 +25,10 @@ router.get('/', async (req, res) => {
 
         let whereClauses = [];
         const request = pool.request();
+        const companyId = parseInt(req.headers['x-company-id'] || req.query.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        whereClauses.push('(r.CompanyID = @companyId OR (r.CompanyID IS NULL AND @companyId = 1))');
+        request.input('companyId', sql.Int, companyId);
+
         if (search) {
             whereClauses.push('(r.ReceiptNo LIKE @search OR r.CustomerName LIKE @search OR r.Status LIKE @search)');
             request.input('search', sql.NVarChar, `%${search}%`);
@@ -268,6 +272,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         request.input('chequeNo', sql.NVarChar, chequeNo || null);
         request.input('chequeDate', sql.Date, chequeDate || null);
         request.input('createdBy', sql.Int, req.user ? req.user.id : null);
+        const companyId = parseInt(req.headers['x-company-id'] || req.body.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        request.input('companyId', sql.Int, companyId);
 
         const headerResult = await request.query(`
             INSERT INTO Receipt (
@@ -277,7 +283,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
                 FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
                 DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate,
-                CreatedBy
+                CreatedBy, CompanyID
             )
             OUTPUT INSERTED.ReceiptID
             VALUES (
@@ -287,7 +293,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 @remainingAmount, @signer, @customerOrder, @purchaseNo, @salesperson, @termOfPayment, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
                 @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceRegisterQuantity, @fdaServiceTrademark, @fdaServiceTrademarkPrice, @fdaServiceTrademarkQuantity,
                 @deliverTo, @dueDate, @paymentMethod, @customerBank, @customerBranch, @chequeNo, @chequeDate,
-                @createdBy
+                @createdBy, @companyId
             )
         `);
 

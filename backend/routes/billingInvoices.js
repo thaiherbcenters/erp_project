@@ -25,6 +25,10 @@ router.get('/', async (req, res) => {
 
         let whereClauses = [];
         const request = pool.request();
+        const companyId = parseInt(req.headers['x-company-id'] || req.query.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        whereClauses.push('(bi.CompanyID = @companyId OR (bi.CompanyID IS NULL AND @companyId = 1))');
+        request.input('companyId', sql.Int, companyId);
+
         if (search) {
             whereClauses.push('(bi.BillingInvoiceNo LIKE @search OR bi.CustomerName LIKE @search OR bi.Status LIKE @search)');
             request.input('search', sql.NVarChar, `%${search}%`);
@@ -243,6 +247,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
         request.input('fdaServiceTrademarkPrice', sql.Decimal(18,2), fdaServiceTrademarkPrice || 0);
         request.input('fdaServiceTrademarkQuantity', sql.Int, fdaServiceTrademarkQuantity !== undefined && fdaServiceTrademarkQuantity !== null ? parseInt(fdaServiceTrademarkQuantity) : null);
         request.input('createdBy', sql.Int, req.user ? req.user.id : null);
+        const companyId = parseInt(req.headers['x-company-id'] || req.body.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        request.input('companyId', sql.Int, companyId);
 
         const headerResult = await request.query(`
             INSERT INTO BillingInvoice (
@@ -251,7 +257,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
                 FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
-                CreatedBy
+                CreatedBy, CompanyID
             )
             OUTPUT INSERTED.BillingInvoiceID
             VALUES (
@@ -260,7 +266,7 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createBillingInvoice
                 @vatRate, @vatAmount, @shippingCost, @grandTotal, @depositPercent, @depositAmount,
                 @remainingAmount, @signer, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
                 @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceRegisterQuantity, @fdaServiceTrademark, @fdaServiceTrademarkPrice, @fdaServiceTrademarkQuantity,
-                @createdBy
+                @createdBy, @companyId
             )
         `);
 

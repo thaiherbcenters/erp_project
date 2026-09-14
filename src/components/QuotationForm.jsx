@@ -2394,7 +2394,7 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
                                 </tr>
                                 <tr>
                                     <td style={{ border: '1px solid black', padding: '4px 8px', whiteSpace: 'nowrap' }}>
-                                        <span>รหัสลูกค้า:</span> {customerList.find(c => String(c.CustomerID) === String(formData.customerId))?.CustomerCode || '-'}
+                                        <span>รหัสลูกค้า:</span>
                                     </td>
                                 </tr>
                                 <tr>

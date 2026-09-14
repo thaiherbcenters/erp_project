@@ -25,18 +25,30 @@ const API_BASE = '/api';
  */
 const originalFetch = window.fetch;
 window.fetch = async (resource, config = {}) => {
-    // อ่าน Token ปัจจุบันจาก localStorage
+    // อ่าน Token และ Active Company ปัจจุบันจาก localStorage
     const token = localStorage.getItem('erp_token');
+    let activeCompanyId = '1';
+    try {
+        const comp = localStorage.getItem('erp_active_company');
+        if (comp) {
+            const parsed = JSON.parse(comp);
+            if (parsed && parsed.CompanyID) {
+                activeCompanyId = String(parsed.CompanyID);
+            }
+        }
+    } catch (e) {}
     
-    // ตรวจสอบว่าเป็นการยิง API และมี Token ไหม
-    if (token && typeof resource === 'string' && resource.includes('/api')) {
+    // ตรวจสอบว่าเป็นการยิง API
+    if (typeof resource === 'string' && resource.includes('/api')) {
         // จัดการกรณี config.headers เป็น Header object หรือ Object ธรรมดา
         if (config.headers instanceof Headers) {
-            config.headers.set('Authorization', `Bearer ${token}`);
+            if (token) config.headers.set('Authorization', `Bearer ${token}`);
+            config.headers.set('x-company-id', activeCompanyId);
         } else {
             config.headers = {
                 ...config.headers,
-                'Authorization': `Bearer ${token}`
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                'x-company-id': activeCompanyId
             };
         }
     }

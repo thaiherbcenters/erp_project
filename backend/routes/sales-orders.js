@@ -138,13 +138,17 @@ router.get('/:id/history', async (req, res) => {
 router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const result = await pool.request().query(`
+        const companyId = parseInt(req.headers['x-company-id'] || req.query.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        const result = await pool.request()
+            .input('companyId', sql.Int, companyId)
+            .query(`
             SELECT 
                 so.SalesOrderID, so.SalesOrderNo, so.QuotationNo, so.ContractID, so.CustomerName, 
                 so.OrderDate, so.DeliveryDate, so.GrandTotal, so.CustomerPONumber,
                 so.Status, so.CreatedBy, so.CreatedAt, so.Revision, u.display_name AS CreatedByName
             FROM SalesOrder so
             LEFT JOIN Users u ON so.CreatedBy = u.user_id
+            WHERE (so.CompanyID = @companyId OR (so.CompanyID IS NULL AND @companyId = 1))
             ORDER BY so.SalesOrderID DESC
         `);
         res.json({ success: true, count: result.recordset.length, data: result.recordset });
@@ -259,6 +263,8 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
         request.input('notes', sql.NVarChar, notes || '');
         request.input('createdBy', sql.Int, req.user ? req.user.id : null);
         request.input('contractId', sql.Int, contractId || null);
+        const companyId = parseInt(req.headers['x-company-id'] || req.body.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        request.input('companyId', sql.Int, companyId);
 
         request.input('showDiscountInPrint', sql.Bit, showDiscountInPrint ? 1 : 0);
         request.input('showVatInPrint', sql.Bit, showVatInPrint ? 1 : 0);
@@ -282,7 +288,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
                 CustomerPONumber, Notes, Status, CreatedBy,
                 ShowDiscountInPrint, ShowVatInPrint, ShowShippingInPrint,
                 DesignFee, ShowDesignFeeInPrint, DepositPercent, DepositAmount, ShowDepositInPrint,
-                PreparedBy, SalesManager, ProductionManager
+                PreparedBy, SalesManager, ProductionManager, CompanyID
             )
             OUTPUT INSERTED.SalesOrderID
             VALUES (
@@ -294,7 +300,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
                 @customerPO, @notes, N'ร่าง', @createdBy,
                 @showDiscountInPrint, @showVatInPrint, @showShippingInPrint,
                 @designFee, @showDesignFeeInPrint, @depositPercent, @depositAmount, @showDepositInPrint,
-                @preparedBy, @salesManager, @productionManager
+                @preparedBy, @salesManager, @productionManager, @companyId
             )
         `);
 

@@ -8,14 +8,18 @@ const { authorizeRoles } = require('../middleware/authorize');
 router.get('/', async (req, res) => {
     try {
         const pool = await poolPromise;
-        const result = await pool.request().query(`
+        const companyId = parseInt(req.headers['x-company-id'] || req.query.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        const result = await pool.request()
+            .input('companyId', sql.Int, companyId)
+            .query(`
             SELECT 
-                c.CustomerID, c.CustomerCode, c.CustomerName, c.ContactPerson, c.Phone, c.Email, c.Address, c.TaxID, c.TaxBranch, c.BranchNo, c.Source, c.ProjectName, c.CreatedDate,
+                c.CustomerID, c.CompanyID, c.CustomerCode, c.CustomerName, c.ContactPerson, c.Phone, c.Email, c.Address, c.TaxID, c.TaxBranch, c.BranchNo, c.Source, c.ProjectName, c.CreatedDate,
                 t.CustomerTypeID, t.CustomerTypeName,
                 s.CustomerStatusID, s.StatusName
             FROM Customer c
             LEFT JOIN CustomerType t ON c.CustomerTypeID = t.CustomerTypeID
             LEFT JOIN CustomerStatus s ON c.CustomerStatusID = s.CustomerStatusID
+            WHERE (c.CompanyID = @companyId OR (c.CompanyID IS NULL AND @companyId = 1))
             ORDER BY c.CustomerID DESC
         `);
         res.json({ success: true, count: result.recordset.length, data: result.recordset });
@@ -85,13 +89,14 @@ router.get('/:id', async (req, res) => {
 
 // 5. Create new customer
 router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res) => {
-    const { typeId, statusId, code, name, contactPerson, phone, email, address, taxId, taxBranch, branchNo, source, projectName } = req.body;
+    const { typeId, statusId, code, name, contactPerson, phone, email, address, taxId, taxBranch, branchNo, source, projectName, companyId: bodyCompanyId } = req.body;
     try {
         if (!name || !typeId) {
             return res.status(400).json({ success: false, message: 'Missing required fields (name, typeId)' });
         }
 
         const pool = await poolPromise;
+        const companyId = parseInt(req.headers['x-company-id'] || bodyCompanyId || (req.user && req.user.activeCompanyId) || 1, 10);
         const prefix = parseInt(typeId) === 2 ? 'OEM' : 'CUST';
         const finalCode = code || await generateSequence(pool, 'Customer', 'CustomerCode', `${prefix}-${getMonthPrefix()}`, 3);
 
@@ -109,10 +114,11 @@ router.post('/', authorizeRoles('admin', 'executive', 'sales'), async (req, res)
             .input('branchNo', sql.NVarChar, branchNo || null)
             .input('source', sql.NVarChar, source || 'manual')
             .input('projectName', sql.NVarChar, projectName || null)
+            .input('companyId', sql.Int, companyId)
             .query(`
-                INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Phone, Email, Address, TaxID, TaxBranch, BranchNo, Source, ProjectName)
+                INSERT INTO Customer (CustomerTypeID, CustomerStatusID, CustomerCode, CustomerName, ContactPerson, Phone, Email, Address, TaxID, TaxBranch, BranchNo, Source, ProjectName, CompanyID)
                 OUTPUT INSERTED.*
-                VALUES (@tid, @sid, @code, @name, @contact, @phone, @email, @address, @tax, @taxBranch, @branchNo, @source, @projectName)
+                VALUES (@tid, @sid, @code, @name, @contact, @phone, @email, @address, @tax, @taxBranch, @branchNo, @source, @projectName, @companyId)
             `);
         
         res.status(201).json({ success: true, message: 'Customer created successfully', data: result.recordset[0] });

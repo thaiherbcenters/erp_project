@@ -19,31 +19,16 @@ import API_BASE from '../config';
 
 const AuthContext = createContext(null);
 
-/** คำนวณหน้าเริ่มต้นของบริษัท (THC -> /home, บริษัทอื่น -> /company/:code) */
+/** คำนวณหน้าเริ่มต้นของบริษัท (ทุกบริษัทเข้าสู่ระบบ ERP ที่หน้า /home หรือหน้าที่ได้รับสิทธิ์) */
 export const getCompanyHomeRoute = (company, user = null, perms = []) => {
-    if (!company) return '/home';
-    const short = (company.ShortName || '').toUpperCase();
-    const id = Number(company.CompanyID);
-
-    // THC คือระบบ ERP โรงงานเดิม
-    if (id === 1 || short === 'THC') {
-        let firstPageId = 'home';
-        if (user && user.role !== 'admin') {
-            const firstAllowedPage = ALL_PAGES.find(p => perms.some(up => up.page_id === p.id));
-            if (firstAllowedPage) {
-                firstPageId = firstAllowedPage.id;
-            }
+    let firstPageId = 'home';
+    if (user && user.role !== 'admin' && perms && perms.length > 0) {
+        const firstAllowedPage = ALL_PAGES.find(p => perms.some(up => up.page_id === p.id));
+        if (firstAllowedPage) {
+            firstPageId = firstAllowedPage.id;
         }
-        return `/${firstPageId}`;
     }
-
-    // บริษัทอื่น: ไปหน้า Portal แยกเฉพาะของบริษัทนั้นๆ
-    if (id === 2 || short === 'ELITE') return '/company/elite';
-    if (id === 3 || short === 'RIVERVIEW') return '/company/riverview';
-    if (id === 4 || short === 'PSF') return '/company/psf';
-
-    // Default fallback
-    return `/company/${short.toLowerCase() || id}`;
+    return `/${firstPageId}`;
 };
 
 // =============================================================================
@@ -516,6 +501,15 @@ export function AuthProvider({ children }) {
 
     /** ดึง subPages ที่ user มีสิทธิ์เห็นภายใน page ที่ระบุ */
     const getVisibleSubPages = (pageId) => {
+        // สำหรับ ELITE: หน้า home แสดงระบบทะเบียนเช็ค
+        if ((activeCompany?.CompanyID === 2 || activeCompany?.ShortName === 'ELITE') && pageId === 'home') {
+            return [
+                { id: 'cheques_overview', name: 'ภาพรวมเช็ค' },
+                { id: 'cheques_received', name: 'ทะเบียนเช็ครับ' },
+                { id: 'cheques_issued', name: 'ทะเบียนเช็คจ่าย' },
+            ];
+        }
+
         const page = ALL_PAGES.find((p) => p.id === pageId);
         if (!page || !page.subPages) return [];
         if (!currentUser) return [];
