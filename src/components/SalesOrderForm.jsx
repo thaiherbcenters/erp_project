@@ -1064,7 +1064,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                             <>
                                                 <tr>
                                                     <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '9pt', color: 'red' }}>
-                                                        หักส่วนลด {formData.discountPercent > 0 ? `(${formData.discountPercent}%)` : ''}<br /><span style={{ fontSize: '8pt', fontWeight: 'normal', color: 'red' }}>DISCOUNT</span>
+                                                        หักส่วนลด {formData.discountPercent > 0 ? `${formData.discountPercent}%` : ''}<br /><span style={{ fontSize: '8pt', fontWeight: 'normal', color: 'red' }}>DISCOUNT</span>
                                                     </td>
                                                     <td style={{ textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', color: 'red' }}>
                                                         {discountAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
@@ -1990,7 +1990,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                         <>
                                             <tr>
                                                 <td style={{ fontWeight: 'bold', textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', fontSize: '9pt', color: 'red' }}>
-                                                    หักส่วนลด {formData.discountPercent > 0 ? `(${formData.discountPercent}%)` : ''}<br /><span style={{ fontSize: '8pt', fontWeight: 'normal', color: 'red' }}>DISCOUNT</span>
+                                                    หักส่วนลด {formData.discountPercent > 0 ? `${formData.discountPercent}%` : ''}<br /><span style={{ fontSize: '8pt', fontWeight: 'normal', color: 'red' }}>DISCOUNT</span>
                                                 </td>
                                                 <td style={{ textAlign: 'right', padding: '3px 10px', borderBottom: '1px solid #ccc', fontSize: '10pt', color: 'red' }}>
                                                     {discountAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}

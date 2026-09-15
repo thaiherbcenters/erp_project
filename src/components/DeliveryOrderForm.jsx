@@ -2969,7 +2969,7 @@ export default function DeliveryOrderForm({ editId, onBack, onSave, viewOnly, is
                                 <>
                                     <tr>
                                         <td colSpan="2" style={{ fontWeight: 'bold', textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderRight: '1px solid #1a7a3a', borderLeft: '1px solid #1a7a3a', color: 'red', fontSize: '10pt' }}>
-                                            หักส่วนลด<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>DISCOUNT</span>
+                                            หักส่วนลด {formData.discountPercent > 0 ? `${formData.discountPercent}%` : ''}<br /><span style={{ fontSize: '9pt', fontWeight: 'normal' }}>DISCOUNT</span>
                                         </td>
                                         <td style={{ textAlign: 'right', padding: '4px 10px', borderBottom: '1px solid #ccc', borderLeft: '1px solid #1a7a3a', color: 'red', fontSize: '10pt' }}>
                                             <span style={{ fontWeight: 'normal' }}>{discountAmount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}</span>
