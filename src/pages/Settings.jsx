@@ -273,7 +273,22 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
                             <tr key={user.id}>
                                 <td>
                                     <div className="settings-user-row">
-                                        <div className="settings-avatar">{user.avatar || '??'}</div>
+                                        <div style={{ position: 'relative', display: 'inline-block' }}>
+                                            <div className="settings-avatar">{user.avatar || '??'}</div>
+                                            {user.is_online && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    bottom: '-2px',
+                                                    right: '-2px',
+                                                    width: '12px',
+                                                    height: '12px',
+                                                    backgroundColor: '#10b981',
+                                                    border: '2px solid white',
+                                                    borderRadius: '50%',
+                                                    zIndex: 2
+                                                }} title="Online (กำลังใช้งาน)" />
+                                            )}
+                                        </div>
                                         <div className="settings-user-info">
                                             <span className="settings-user-name">{user.displayName}</span>
                                             <span className="settings-user-username">@{user.username}</span>

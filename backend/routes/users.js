@@ -9,7 +9,15 @@ const { authorizeRoles, authorizeAction } = require('../middleware/authorize');
 router.get('/', async (req, res) => {
     try {
         const users = await userService.getAllUsers();
-        res.json(users);
+        
+        // Inject online status
+        const { isUserOnline } = require('../services/onlineTracker');
+        const usersWithOnlineStatus = users.map(u => ({
+            ...u,
+            is_online: isUserOnline(u.id)
+        }));
+        
+        res.json(usersWithOnlineStatus);
     } catch (err) {
         console.error('Error fetching users:', err);
         res.status(500).json({ message: 'Error fetching users list' });

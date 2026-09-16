@@ -27,6 +27,15 @@ const authMiddleware = (req, res, next) => {
         
         // Attach user info to the request object
         req.user = decoded;
+        
+        // Track online status
+        try {
+            const { touchUser } = require('../services/onlineTracker');
+            if (decoded.id) touchUser(decoded.id);
+        } catch (e) {
+            // Ignore if tracker is not loaded
+        }
+        
         next();
     } catch (err) {
         console.error('JWT Verification Error:', err.message);

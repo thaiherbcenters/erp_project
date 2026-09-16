@@ -5,7 +5,19 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { logAction } = require('../services/auditLog');
 const authMiddleware = require('../middleware/auth');
+const { authorizeRoles } = require('../middleware/authorize');
 
+// ============================================================
+// Ping Route for Online Tracking
+// ============================================================
+router.post('/ping', authMiddleware, (req, res) => {
+    // authMiddleware already calls touchUser
+    res.json({ success: true, message: 'pong' });
+});
+
+// ============================================================
+// 1. POST /api/auth/login — User Login
+// ============================================================
 router.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
