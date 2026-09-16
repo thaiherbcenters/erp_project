@@ -19,8 +19,16 @@ import API_BASE from '../config';
 
 const AuthContext = createContext(null);
 
-/** คำนวณหน้าเริ่มต้นของบริษัท (ทุกบริษัทเข้าสู่ระบบ ERP ที่หน้า /home หรือหน้าที่ได้รับสิทธิ์) */
+/** คำนวณหน้าเริ่มต้นของบริษัท (แยก URL ตามแต่ละบริษัทโดยอิสระ) */
 export const getCompanyHomeRoute = (company, user = null, perms = []) => {
+    const short = (company?.ShortName || '').toUpperCase();
+    const id = company?.CompanyID;
+
+    if (short === 'ELITE' || id === 2) return '/elite';
+    if (short === 'RIVERVIEW' || id === 3) return '/riverview';
+    if (short === 'PSF' || id === 4) return '/psf';
+
+    // THC (CompanyID 1) หรือ Default ERP โรงงาน
     let firstPageId = 'home';
     if (user && user.role !== 'admin' && perms && perms.length > 0) {
         const firstAllowedPage = ALL_PAGES.find(p => perms.some(up => up.page_id === p.id));
@@ -217,15 +225,28 @@ export function AuthProvider({ children }) {
         }
     };
 
-    /** ล้าง user ปัจจุบัน (Logout) */
-    const logout = () => {
+    /** ล้างค่า user ทั้งระบบ (Logout) */
+    const logout = async () => {
+        try {
+            const token = localStorage.getItem('erp_token');
+            if (token) {
+                await fetch(`${API_BASE}/auth/logout`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+            }
+        } catch (e) {
+            // ignore network errors on logout
+        }
         setCurrentUser(null);
         setPermissions({});
         setActiveCompany(null);
         setAvailableCompanies([]);
         localStorage.removeItem('erp_token');
+        localStorage.removeItem('erp_current_user');
         localStorage.removeItem('erp_active_company');
         localStorage.removeItem('erp_available_companies');
+        localStorage.removeItem('token');
     };
 
     // =================================================================
@@ -456,9 +477,20 @@ export function AuthProvider({ children }) {
     // Permission Checks — ตรวจสอบสิทธิ์ของ user ปัจจุบัน
     // =================================================================
 
-    /** ตรวจสิทธิ์ระดับ page — admin มีสิทธิ์ทุก page */
+    /** ตรวจสิทธิ์ระดับ page */
     const hasPermission = (pageId) => {
         if (!currentUser) return false;
+
+        const isTHC = !activeCompany || activeCompany.CompanyID === 1 || (activeCompany.ShortName || '').toUpperCase() === 'THC';
+
+        // สำหรับบริษัทที่ไม่ใช่ THC (ELITE, RIVERVIEW, PSF)
+        if (!isTHC) {
+            const isElite = activeCompany?.CompanyID === 2 || (activeCompany?.ShortName || '').toUpperCase() === 'ELITE';
+            if (isElite && pageId === 'elite') return true;
+            return pageId === null;
+        }
+
+        // สำหรับ THC: ตรวจสอบสิทธิ์ตามปกติ (admin มีสิทธิ์ทุก page)
         if (currentUser.role === 'admin') return true;
         const userPerms = permissions[currentUser.id] || [];
         return userPerms.some(p => p.page_id === pageId);
@@ -467,6 +499,8 @@ export function AuthProvider({ children }) {
     /** ตรวจสิทธิ์ระดับ subPage */
     const hasSubPermission = (subId) => {
         if (!currentUser) return false;
+        const isElite = activeCompany?.CompanyID === 2 || (activeCompany?.ShortName || '').toUpperCase() === 'ELITE';
+        if (isElite) return true;
         if (currentUser.role === 'admin') return true;
         const userPerms = permissions[currentUser.id] || [];
         return userPerms.some(p => p.page_id === subId);
@@ -475,6 +509,8 @@ export function AuthProvider({ children }) {
     /** ตรวจสิทธิ์ระดับ section */
     const hasSectionPermission = (sectionId) => {
         if (!currentUser) return false;
+        const isElite = activeCompany?.CompanyID === 2 || (activeCompany?.ShortName || '').toUpperCase() === 'ELITE';
+        if (isElite) return true;
         if (currentUser.role === 'admin') return true;
         const userPerms = permissions[currentUser.id] || [];
         return userPerms.some(p => p.page_id === sectionId);
@@ -483,6 +519,8 @@ export function AuthProvider({ children }) {
     /** ตรวจสิทธิ์ CRUD */
     const _checkCrud = (pageId, action) => {
         if (!currentUser) return false;
+        const isElite = activeCompany?.CompanyID === 2 || (activeCompany?.ShortName || '').toUpperCase() === 'ELITE';
+        if (isElite && pageId === 'elite') return true;
         if (currentUser.role === 'admin') return true;
         const userPerms = permissions[currentUser.id] || [];
         const perm = userPerms.find(p => p.page_id === pageId);
@@ -501,13 +539,8 @@ export function AuthProvider({ children }) {
 
     /** ดึง subPages ที่ user มีสิทธิ์เห็นภายใน page ที่ระบุ */
     const getVisibleSubPages = (pageId) => {
-        // สำหรับ ELITE: หน้า home แสดงระบบทะเบียนเช็ค
-        if ((activeCompany?.CompanyID === 2 || activeCompany?.ShortName === 'ELITE') && pageId === 'home') {
-            return [
-                { id: 'cheques_overview', name: 'ภาพรวมเช็ค' },
-                { id: 'cheques_received', name: 'ทะเบียนเช็ครับ' },
-                { id: 'cheques_issued', name: 'ทะเบียนเช็คจ่าย' },
-            ];
+        if (pageId === 'elite') {
+            return [];
         }
 
         const page = ALL_PAGES.find((p) => p.id === pageId);
@@ -543,6 +576,27 @@ export function AuthProvider({ children }) {
      */
     const getVisiblePages = () => {
         if (!currentUser) return [];
+
+        const isTHC = !activeCompany || activeCompany.CompanyID === 1 || (activeCompany.ShortName || '').toUpperCase() === 'THC';
+        const isElite = activeCompany?.CompanyID === 2 || (activeCompany?.ShortName || '').toUpperCase() === 'ELITE';
+
+        // สำหรับ ELITE: แสดงเมนูสั่งจ่ายเช็คธนาคาร
+        if (isElite) {
+            return [
+                {
+                    id: 'elite',
+                    name: 'เช็คธนาคาร',
+                    path: '/elite',
+                }
+            ];
+        }
+
+        // สำหรับบริษัทอื่นๆ ที่ไม่ใช่ THC: ปิดเมนู ERP ทั้งหมด
+        if (!isTHC) {
+            return [];
+        }
+
+        // สำหรับ THC: แสดงทุกเมนูตามปกติ
         if (currentUser.role === 'admin') {
             return [...ALL_PAGES]; // permissions is now inside settings
         }
@@ -558,6 +612,31 @@ export function AuthProvider({ children }) {
             fetchPermissionsFromAPI(currentUser.id);
         }
     }, [currentUser, fetchPermissionsFromAPI]);
+
+    // =================================================================
+    // Ping Server to update "Online" status
+    // =================================================================
+    useEffect(() => {
+        if (!currentUser) return;
+        
+        const pingServer = async () => {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    await fetch(`${API_BASE}/auth/ping`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } catch (e) {
+                    // ignore ping errors
+                }
+            }
+        };
+
+        pingServer();
+        const interval = setInterval(pingServer, 60000); // every 1 minute
+        return () => clearInterval(interval);
+    }, [currentUser]);
 
     // =================================================================
     // Provider — ส่งค่าทั้งหมดให้ children

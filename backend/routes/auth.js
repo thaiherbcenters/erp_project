@@ -16,6 +16,21 @@ router.post('/ping', authMiddleware, (req, res) => {
 });
 
 // ============================================================
+// Logout Route
+// ============================================================
+router.post('/logout', authMiddleware, (req, res) => {
+    try {
+        const { removeUser } = require('../services/onlineTracker');
+        if (req.user && req.user.id) {
+            removeUser(req.user.id);
+        }
+    } catch (e) {
+        // ignore
+    }
+    res.json({ success: true, message: 'Logged out' });
+});
+
+// ============================================================
 // 1. POST /api/auth/login — User Login
 // ============================================================
 router.post('/login', async (req, res) => {

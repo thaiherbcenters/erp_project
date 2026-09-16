@@ -34,8 +34,16 @@ const isUserOnline = (userId) => {
     return (now - lastActive <= activeThreshold);
 };
 
+// Remove user (for logout)
+const removeUser = (userId) => {
+    if (userId) {
+        activeUsers.delete(userId);
+    }
+};
+
 module.exports = {
     touchUser,
     getOnlineUsers,
-    isUserOnline
+    isUserOnline,
+    removeUser
 };

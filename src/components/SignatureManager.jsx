@@ -67,11 +67,22 @@ const SignatureManager = ({ onSignaturesChange, currentSignatures, isInline = fa
         }
     }, [isOpen, isInline]);
 
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         const file = e.target.files[0];
         if (file) {
-            setNewImage(file);
-            setPreviewUrl(URL.createObjectURL(file));
+            setLoading(true);
+            try {
+                // Auto-crop white/transparent space
+                const { autoCropSignature } = await import('../utils/imageCrop');
+                const croppedFile = await autoCropSignature(file);
+                setNewImage(croppedFile);
+                setPreviewUrl(URL.createObjectURL(croppedFile));
+            } catch (err) {
+                console.error("Failed to crop image", err);
+                setNewImage(file);
+                setPreviewUrl(URL.createObjectURL(file));
+            }
+            setLoading(false);
         }
     };
 
