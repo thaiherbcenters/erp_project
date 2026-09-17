@@ -501,8 +501,8 @@ export default function ChequeForm() {
             {currentTab === 'history' && (
                 <div className="page-container page-enter no-print" style={{ padding: '0', background: 'transparent', minHeight: 'auto' }}>
                     <div className="page-title" style={{ padding: '0 0 20px 0' }}>
-                        <h1>ประวัติการสั่งจ่ายเช็คทั้งหมด — บริษัท อิลิท เทรดดิ้ง 2020 จำกัด</h1>
-                        <p>จัดการประวัติและรายการสั่งจ่ายเช็คของบริษัท</p>
+                        <h1>ประวัติการสั่งจ่ายเช็ค</h1>
+                        <p>จัดการรายการและประวัติการสั่งจ่ายเช็คธนาคาร</p>
                     </div>
 
                     <div className="subpage-content" style={{ margin: 0, padding: 0 }}>
@@ -590,14 +590,16 @@ export default function ChequeForm() {
                                                             >
                                                                 <Pencil size={15} />
                                                             </button>
-                                                            <button 
-                                                                className="doc-action-btn" 
-                                                                style={{ margin: 0, color: '#8b5cf6' }}
-                                                                onClick={() => handleViewChequeHistory(item.ChequeID)}
-                                                                title="ดูประวัติแก้ไข"
-                                                            >
-                                                                <History size={15} />
-                                                            </button>
+                                                            {((item.HistoryCount || 0) > 0 || (item.Revision || 1) > 1) && (
+                                                                <button 
+                                                                    className="doc-action-btn" 
+                                                                    style={{ margin: 0, color: '#8b5cf6' }}
+                                                                    onClick={() => handleViewChequeHistory(item.ChequeID)}
+                                                                    title="ดูประวัติแก้ไข"
+                                                                >
+                                                                    <History size={15} />
+                                                                </button>
+                                                            )}
                                                             <button 
                                                                 className="doc-action-btn doc-action-btn-danger" 
                                                                 style={{ margin: 0 }}

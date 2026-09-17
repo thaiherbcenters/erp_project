@@ -22,6 +22,8 @@ router.get('/', authMiddleware, async (req, res) => {
                 c.AccountNo, c.PayeeOrPayer, c.Amount, c.IssueDate, c.DueDate,
                 c.DepositDate, c.ClearedDate, c.Status, c.RefDocNo, c.Notes,
                 c.CompanyID, c.CreatedAt, c.UpdatedAt,
+                ISNULL(c.Revision, 1) AS Revision,
+                (SELECT COUNT(*) FROM ChequesHistory h WHERE h.ChequeID = c.ChequeID) AS HistoryCount,
                 u.display_name AS CreatedByName
             FROM Cheques c
             LEFT JOIN Users u ON c.CreatedBy = u.user_id
