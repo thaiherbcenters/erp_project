@@ -772,14 +772,6 @@ export default function ChequeForm() {
                                     <Eye size={18} />
                                     <span>พรีวิวหน้าเช็ค</span>
                                 </button>
-                                <button 
-                                    className="cq-btn" 
-                                    onClick={() => setShowVoucherModal(true)}
-                                    style={{ width: '100%', justifyContent: 'center', padding: '0.75rem', background: '#f5f3ff', color: '#7c3aed', borderColor: '#ddd6fe' }}
-                                >
-                                    <FileSpreadsheet size={18} />
-                                    <span>ใบสำคัญจ่าย A4 (Voucher)</span>
-                                </button>
                                 
 
                                 
@@ -833,12 +825,6 @@ export default function ChequeForm() {
                                             style={{ background: '#059669', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}
                                         >
                                             <Printer size={15} /> พิมพ์ใบเช็ค
-                                        </button>
-                                        <button 
-                                            onClick={() => { setShowPreviewModal(false); setShowVoucherModal(true); }}
-                                            style={{ background: '#7c3aed', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}
-                                        >
-                                            <FileSpreadsheet size={15} /> ใบสำคัญจ่าย A4
                                         </button>
                                         <button className="cq-modal-close" onClick={() => setShowPreviewModal(false)}>✕</button>
                                     </div>
