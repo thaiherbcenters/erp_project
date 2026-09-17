@@ -11,20 +11,26 @@
  * =============================================================================
  */
 
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import CustomSelect from '../components/CustomSelect';
-import ChequeManagement from '../components/ChequeManagement';
 
 import './Home.css';
 
 export default function Home() {
     const { hasSubPermission, hasSectionPermission, getVisibleSubPages, activeCompany } = useAuth();
 
-    // ── สำหรับ ELITE: หน้า Home คือระบบทะเบียนเช็คทั้งหมดตามที่ผู้ใช้สั่ง ──
-    const isElite = activeCompany?.CompanyID === 2 || activeCompany?.ShortName === 'ELITE';
-    if (isElite) {
-        return <ChequeManagement />;
+    // ── หากบริษัทที่เลือกไม่ใช่ THC ให้ส่งต่อไปยัง URL เฉพาะของบริษัทนั้น ──
+    const compShort = (activeCompany?.ShortName || '').toUpperCase();
+    const compId = activeCompany?.CompanyID;
+    if (compShort === 'ELITE' || compId === 2) {
+        return <Navigate to="/elite" replace />;
+    }
+    if (compShort === 'RIVERVIEW' || compId === 3) {
+        return <Navigate to="/riverview" replace />;
+    }
+    if (compShort === 'PSF' || compId === 4) {
+        return <Navigate to="/psf" replace />;
     }
 
     const visibleSubPages = getVisibleSubPages('home');

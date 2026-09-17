@@ -71,13 +71,13 @@ const COMPANY_CONFIGS = {
     }
 };
 
-export default function CompanyPortal() {
-    const { companyCode } = useParams();
+export default function CompanyPortal({ defaultCompanyCode }) {
+    const { companyCode: routeParamCode } = useParams();
     const navigate = useNavigate();
     const { currentUser, activeCompany, availableCompanies, switchCompany, logout } = useAuth();
     const { showAlert } = useAlert();
 
-    const normalizedCode = (companyCode || '').toLowerCase();
+    const normalizedCode = (defaultCompanyCode || routeParamCode || '').toLowerCase();
     const matchedConfig = COMPANY_CONFIGS[normalizedCode] || null;
 
     // ค้นหาข้อมูลบริษัทจาก activeCompany หรือ availableCompanies
@@ -274,12 +274,6 @@ export default function CompanyPortal() {
                                 >
                                     <Plus size={15} /> สร้างใบเสนอราคา
                                 </button>
-                                <button 
-                                    className="cp-btn-secondary"
-                                    onClick={() => navigate('/sales?tab=sales_quotation')}
-                                >
-                                    ดูประวัติเอกสาร
-                                </button>
                             </div>
                         </div>
 
@@ -299,12 +293,6 @@ export default function CompanyPortal() {
                                 >
                                     <Plus size={15} /> สร้างใบแจ้งหนี้
                                 </button>
-                                <button 
-                                    className="cp-btn-secondary"
-                                    onClick={() => navigate('/sales?tab=sales_billing')}
-                                >
-                                    ดูประวัติเอกสาร
-                                </button>
                             </div>
                         </div>
 
@@ -323,12 +311,6 @@ export default function CompanyPortal() {
                                     onClick={() => setActiveDocModal('receipt')}
                                 >
                                     <Plus size={15} /> สร้างใบเสร็จรับเงิน
-                                </button>
-                                <button 
-                                    className="cp-btn-secondary"
-                                    onClick={() => navigate('/sales?tab=sales_receipt')}
-                                >
-                                    ดูประวัติเอกสาร
                                 </button>
                             </div>
                         </div>

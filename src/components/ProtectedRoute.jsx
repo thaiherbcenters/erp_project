@@ -18,13 +18,32 @@
 
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { ALL_PAGES } from '../data/mockData';
 
 export default function ProtectedRoute({ pageId, children, adminOnly = false }) {
-    const { currentUser, hasPermission } = useAuth();
+    const { currentUser, hasPermission, activeCompany } = useAuth();
 
     // ยังไม่ได้ล็อกอิน → redirect ไปหน้า Login
     if (!currentUser) {
         return <Navigate to="/" replace />;
+    }
+
+    // ── ตรวจสอบความปลอดภัยข้ามบริษัท ──
+    // หากพยายามเข้าหน้าที่เป็นของบริษัทอื่น ให้ redirect ไปยังหน้าหลักของบริษัทที่เลือกอยู่ทันที
+    const activeCompanyId = activeCompany?.CompanyID || 1;
+    let targetPage = pageId ? ALL_PAGES.find(p => p.id === pageId) : null;
+    if (!targetPage && pageId) {
+        targetPage = ALL_PAGES.find(p => 
+            p.subPages?.some(s => s.id === pageId || s.sections?.some(sec => sec.id === pageId))
+        );
+    }
+
+    if (targetPage && (targetPage.companyId || 1) !== activeCompanyId) {
+        const isElite = activeCompanyId === 2;
+        const isRiv = activeCompanyId === 3;
+        const isPsf = activeCompanyId === 4;
+        const target = isElite ? '/elite' : (isRiv ? '/riverview' : (isPsf ? '/psf' : '/home'));
+        return <Navigate to={target} replace />;
     }
 
     // หน้า admin only แต่ user ไม่ใช่ admin → แสดงหน้าไม่มีสิทธิ์

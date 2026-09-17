@@ -40,6 +40,9 @@
   flex-direction: column;
   justify-content: center;
 }
+.tiptap-cell-editor.align-top .ProseMirror {
+  justify-content: flex-start !important;
+}
 .tiptap-cell-editor .ProseMirror p {
   margin: 0;
   width: 100%;
@@ -54,6 +57,12 @@
 
 .print-notes-container {
   word-break: break-word;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+.print-notes-container * {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
 }
 .print-notes-container p {
   margin: 0;

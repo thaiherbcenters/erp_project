@@ -1227,3 +1227,193 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* ============================================================ */
+/* Company Tabs for Page Permissions                            */
+/* ============================================================ */
+.perm-company-tabs-bar {
+    margin: 12px 0 16px 0;
+}
+
+.perm-comp-tabs-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.perm-comp-tab-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: #f8fafc;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+    position: relative;
+    user-select: none;
+}
+
+.perm-comp-tab-item:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.perm-comp-tab-item.active {
+    background: #ffffff;
+    border-color: var(--comp-brand, #4f46e5);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), inset 0 -2.5px 0 var(--comp-brand, #4f46e5);
+}
+
+.perm-comp-tab-item.disabled {
+    background: #f8fafc;
+    border-style: dashed;
+    border-color: #cbd5e1;
+    opacity: 0.75;
+}
+
+.perm-comp-tab-item.disabled:hover {
+    opacity: 1;
+    border-color: #94a3b8;
+}
+
+.perm-comp-tab-logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 3px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.perm-comp-tab-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.perm-comp-tab-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.perm-comp-tab-name-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.perm-comp-tab-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
+    line-height: 1.2;
+}
+
+.perm-comp-tab-item.active .perm-comp-tab-title {
+    color: var(--comp-brand, #4f46e5);
+}
+
+.perm-comp-tab-lock-icon {
+    font-size: 11px;
+    line-height: 1;
+}
+
+.perm-comp-tab-sub {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+/* ── Company Locked / Unauthorized Notice Banner ── */
+.perm-comp-unauthorized-banner {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 28px;
+    background: #f8fafc;
+    border: 1.5px dashed #cbd5e1;
+    border-radius: 12px;
+    margin: 12px 0 24px 0;
+    animation: fadeIn 0.25s ease;
+}
+
+.perm-comp-banner-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.perm-comp-banner-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.perm-comp-banner-body h4 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.perm-comp-banner-body p {
+    margin: 0 0 10px 0;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.perm-comp-banner-btn {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.perm-comp-banner-btn:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Empty State Card ── */
+.perm-empty-state-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 48px 24px;
+    background: #f8fafc;
+    border: 1.5px dashed #e2e8f0;
+    border-radius: 12px;
+    margin: 12px 0;
+    color: #64748b;
+    font-size: 13.5px;
+}

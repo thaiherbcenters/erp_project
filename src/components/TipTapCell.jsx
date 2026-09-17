@@ -42,7 +42,7 @@ const FontSize = Extension.create({
     },
 });
 
-export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) => {
+export const TipTapCell = ({ value, onChange, readOnly, style, placeholder, className, alignTop = false }) => {
     const lastEmittedHTML = useRef(value || '');
     const savedSelection = useRef(null);
 
@@ -119,7 +119,7 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
     const currentFontSize = (editor.getAttributes('textStyle').fontSize || '').replace('px', '');
 
     return (
-        <div style={{ ...style, display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
+        <div className={`tiptap-wrapper ${className || ''}`} style={{ ...style, display: 'flex', flexDirection: 'column', flex: 1, position: 'relative' }}>
             {editor && !readOnly && (
                 <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
                     <div style={{ background: '#333', padding: '6px', borderRadius: '8px', display: 'flex', gap: '4px', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', flexWrap: 'nowrap' }}>
@@ -182,9 +182,20 @@ export const TipTapCell = ({ value, onChange, readOnly, style, placeholder }) =>
                     </div>
                 </BubbleMenu>
             )}
-            <EditorContent editor={editor} style={{ flex: 1 }} className="tiptap-cell-editor" />
+            <EditorContent editor={editor} style={{ flex: 1 }} className={`tiptap-cell-editor ${alignTop ? 'align-top' : ''}`} />
             {!editor.getText() && placeholder && !readOnly && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', color: '#9ca3af', pointerEvents: 'none', fontSize: '14px' }}>
+                <div style={{
+                    position: 'absolute',
+                    top: alignTop ? '2px' : 0,
+                    left: alignTop ? '2px' : 0,
+                    right: 0,
+                    bottom: alignTop ? 'auto' : 0,
+                    display: 'flex',
+                    alignItems: alignTop ? 'flex-start' : 'center',
+                    color: '#9ca3af',
+                    pointerEvents: 'none',
+                    fontSize: '13px'
+                }}>
                     {placeholder}
                 </div>
             )}

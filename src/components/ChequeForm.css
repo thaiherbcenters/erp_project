@@ -1,0 +1,1721 @@
+/* =============================================================================
+   ChequeForm.css — สไตล์แบบฟอร์มเขียนและพิมพ์เช็คธนาคารกสิกรไทย (ELITE)
+   ============================================================================= */
+
+/* ── Container หลัก (อยู่ภายใน ERP Layout) ── */
+.cheque-page-wrapper {
+    font-family: 'Sarabun', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #1e293b;
+    padding-bottom: 2.5rem;
+}
+
+/* ── Form Header & Back Button ── */
+.cheque-form-header {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    position: relative;
+}
+
+.cq-btn-back {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.5rem;
+    background: #ffffff;
+    color: #4f46e5;
+    border: 1.5px solid #4f46e5;
+    border-radius: 8px;
+    padding: 0.45rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(79, 70, 229, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cq-btn-back:hover {
+    background: #4f46e5;
+    color: #ffffff;
+    box-shadow: 0 4px 8px rgba(79, 70, 229, 0.25);
+    transform: translateY(-1px);
+}
+
+.cheque-form-title {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.35rem;
+}
+
+.cheque-form-subtitle {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin: 0;
+}
+
+/* ── Split Layout ── */
+.cheque-split-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .cheque-split-layout {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+}
+
+.cheque-main-content {
+    flex: 1;
+    min-width: 0; /* Prevent flex blowout */
+}
+
+/* ── Sidebar Actions ── */
+.cheque-sidebar-panel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+    .cheque-sidebar-panel {
+        width: 320px;
+        flex-shrink: 0;
+        position: sticky;
+        top: 1.5rem;
+    }
+}
+
+.cheque-sidebar-box {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.sidebar-box-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #334155;
+    margin-top: 0;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sidebar-action-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+.cq-btn-save-action {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    border: none;
+    font-weight: 700;
+}
+
+.cq-btn-save-action:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.cq-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.95rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    border: 1px solid transparent;
+}
+
+.cq-btn-primary {
+    background: #059669;
+    color: #ffffff;
+    border-color: #059669;
+}
+
+.cq-btn-primary:hover {
+    background: #047857;
+    border-color: #047857;
+    box-shadow: 0 3px 8px rgba(5, 150, 105, 0.25);
+}
+
+.cq-btn-secondary {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+.cq-btn-secondary:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+}
+
+.cq-btn-print-real {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+}
+
+.cq-btn-print-real:hover {
+    background: #1d4ed8;
+    box-shadow: 0 3px 8px rgba(37, 99, 235, 0.25);
+}
+
+.cq-btn-print-voucher {
+    background: #7c3aed;
+    color: #ffffff;
+    border-color: #7c3aed;
+}
+
+.cq-btn-print-voucher:hover {
+    background: #6d28d9;
+    box-shadow: 0 3px 8px rgba(124, 58, 237, 0.25);
+}
+
+/* ── Cheque Card Stage ── */
+.cheque-stage {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1.75rem 2rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.cheque-stage-header {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px dashed #e2e8f0;
+}
+
+.cheque-stage-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cheque-stage-quick-switches {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.cq-switch-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    user-select: none;
+}
+
+.cq-switch-label input[type="checkbox"] {
+    accent-color: #059669;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+/* ── The Physical Cheque Canvas (180mm x 90mm ratio) ── */
+.cheque-canvas-container {
+    width: 100%;
+    max-width: 960px;
+    display: flex;
+    justify-content: center;
+    padding: 0.5rem 0;
+}
+
+.cheque-canvas {
+    container-type: inline-size;
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-height: 50cqi; /* Fallback */
+    height: auto;
+    box-sizing: border-box;
+    background: linear-gradient(135deg, #d4e8dc 0%, #e2efe7 50%, #d8eae0 100%);
+    border: 1px solid #94a3b8;
+    border-radius: 4px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    font-family: 'Sarabun', sans-serif;
+    color: #1e3a2b;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+@media (min-width: 720px) {
+    .cheque-canvas {
+        min-height: 360px;
+    }
+}
+
+/* Cheque watermark/guilloche pattern effect */
+.cheque-canvas::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: 
+        radial-gradient(ellipse 70% 65% at 30% 55%, rgba(245, 235, 205, 0.45) 0%, rgba(245, 235, 205, 0.15) 45%, transparent 70%),
+        radial-gradient(circle at 80% 30%, rgba(16, 185, 129, 0.06) 0%, transparent 60%),
+        repeating-linear-gradient(45deg, rgba(160, 205, 180, 0.22) 0px, rgba(160, 205, 180, 0.22) 1px, transparent 1px, transparent 8px);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* Top left crossed cheque lines (SVG) */
+.cheque-cross-svg-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 68px;
+    height: 54px;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.cheque-cross-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ข้อความขอบซ้ายชำระอากรแล้ว — ชิดเส้นตรงกลาง (แถว 2: บาท) และลดขนาดตัวอักษรลงตามที่ผู้ใช้กำหนด */
+.cheque-left-stamp {
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    display: block;
+    line-height: 1;
+    font-size: clamp(0.44rem, 0.65cqi, 0.52rem);
+    font-weight: 700;
+    color: #1e3d2f;
+    letter-spacing: 0.05em;
+    z-index: 5;
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* รหัสกำกับด้านล่างซ้าย — วางแนวตั้งชิดข้างตัว C ใน CHQ. และอยู่ชิดขอบด้านล่างตามที่ผู้ใช้กำหนด */
+.cheque-bottom-left-code {
+    position: absolute;
+    left: -13px;
+    bottom: -13px;
+    display: block;
+    line-height: 1;
+    transform-origin: 0 100%;
+    transform: rotate(-90deg);
+    font-size: clamp(0.48rem, 0.68cqi, 0.55rem);
+    font-weight: 700;
+    color: #1e3d2f;
+    letter-spacing: 0.08em;
+    z-index: 5;
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: none;
+}
+
+/* ── Cheque Header ── */
+.cheque-header {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 2.2% clamp(32px, 4.8cqi, 40px) 0 clamp(32px, 4.8cqi, 40px);
+    width: 100%;
+    box-sizing: border-box;
+    gap: 8px;
+}
+
+.cheque-bank-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: calc(100% - 250px);
+}
+
+.cheque-bank-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.cheque-bank-titles {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.cheque-bank-th {
+    font-family: 'Sarabun', 'TH Sarabun New', sans-serif;
+    font-size: clamp(0.95rem, 1.4cqi, 1.15rem);
+    font-weight: 800;
+    color: #232323;
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    white-space: nowrap;
+}
+
+.cheque-bank-divider-line {
+    width: 100%;
+    height: 1.5px;
+    background: #991b1b;
+    margin: 2px 0;
+}
+
+.cheque-bank-en {
+    font-family: 'Sarabun', sans-serif;
+    font-size: clamp(0.55rem, 0.8cqi, 0.65rem);
+    font-weight: 800;
+    color: #232323;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.cheque-kbank-logo-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.cheque-kbank-logo-img {
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
+
+.cheque-branch-text {
+    font-size: clamp(0.55rem, 0.9cqi, 0.68rem);
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: visible;
+    width: 100%;
+    line-height: 1.5;
+    padding: 2px 0 3px 0;
+}
+
+/* ── Cheque Date Box (Top Right) ── */
+.cheque-date-section {
+    --date-box-w: clamp(18px, 2.4cqi, 22px);
+    --date-box-h: clamp(22px, 2.9cqi, 26px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    flex: 0 0 auto;
+    width: auto;
+}
+
+.cheque-date-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.cheque-date-label {
+    font-size: clamp(0.58rem, 0.85cqi, 0.68rem);
+    font-weight: 700;
+    color: #1e3a2b;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+.cheque-date-boxes {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.cheque-date-group {
+    display: flex;
+}
+
+.cheque-digit-box {
+    width: var(--date-box-w);
+    height: var(--date-box-h);
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(0.82rem, 1.15cqi, 0.95rem);
+    font-weight: 700;
+    color: #0f172a;
+    box-sizing: border-box;
+}
+
+.cheque-date-group .cheque-digit-box + .cheque-digit-box,
+.cheque-date-group + .cheque-date-group .cheque-digit-box:first-child {
+    border-left: none;
+}
+
+.cheque-date-sublabels {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: calc(var(--date-box-w) * 8);
+    margin-top: 2px;
+    font-size: clamp(0.28rem, 0.38cqi, 0.33rem);
+    letter-spacing: -0.015em;
+    color: #475569;
+    font-weight: 600;
+    box-sizing: border-box;
+    line-height: 1;
+}
+
+.cheque-sublbl-group {
+    white-space: nowrap;
+    text-align: center;
+    line-height: 1;
+    overflow: visible;
+    font-size: inherit;
+    letter-spacing: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cheque-sublbl-group.day {
+    width: calc(var(--date-box-w) * 2);
+}
+
+.cheque-sublbl-group.month {
+    width: calc(var(--date-box-w) * 2);
+}
+
+.cheque-sublbl-group.year {
+    width: calc(var(--date-box-w) * 4);
+}
+
+.cheque-sublbl-sep {
+    width: 0;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    overflow: visible;
+    font-size: inherit;
+    color: #94a3b8;
+    line-height: 1;
+}
+
+/* ── Cheque Body Lines ── */
+.cheque-body {
+    position: relative;
+    z-index: 3;
+    padding: 0 clamp(32px, 4.8cqi, 40px);
+    margin-top: clamp(18px, 3.2cqi, 30px);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Line start with vertical tick */
+.cheque-line-start {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.cheque-line-tick {
+    width: 2px;
+    height: 16px;
+    background: #475569;
+    display: inline-block;
+    flex-shrink: 0;
+    margin-bottom: -2px;
+}
+
+.cheque-line-label {
+    font-size: clamp(0.68rem, 1cqi, 0.76rem);
+    font-weight: 700;
+    color: #1e3a2b;
+    white-space: nowrap;
+    line-height: 1.1;
+}
+
+/* Line 1: จ่าย (Payee) — เส้นใต้ต่อเนื่องตลอดทั้งแถว ตั้งแต่ | จ่าย จนถึง หรือผู้ถือ */
+.cheque-line-payee {
+    display: flex;
+    align-items: flex-end;
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+    border-bottom: 1.5px solid #64748b;
+    padding-bottom: 2px;
+    min-height: 26px;
+}
+
+.cheque-payee-line-wrapper {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    min-width: 0;
+}
+
+.cheque-payee-value {
+    font-size: clamp(0.85rem, 1.3cqi, 1.02rem);
+    font-weight: 700;
+    color: #0f172a;
+    padding-left: 8px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* หรือผู้ถือ — อยู่บนเส้นขวาสุด */
+.cheque-bearer-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    padding: 0 4px;
+    cursor: pointer;
+    background: transparent;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    transition: background 0.15s ease;
+}
+
+.cheque-bearer-box:hover {
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 2px;
+}
+
+.cheque-bearer-th {
+    font-size: clamp(0.68rem, 0.9cqi, 0.76rem);
+    font-weight: 700;
+    color: #1e3a2b;
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.cheque-bearer-en {
+    font-size: clamp(0.5rem, 0.7cqi, 0.58rem);
+    color: #475569;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.cheque-bearer-strikethrough {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    background: #dc2626;
+    transform: translateY(-50%);
+    box-shadow: 0 0 1px #dc2626;
+}
+
+/* แถว 2: บาท (Baht Text) — เส้นใต้ต่อเนื่องตลอดทั้งแถวยาวสุดขอบขวา 100% ตามเช็คจริง */
+.cheque-line-baht {
+    display: flex;
+    align-items: flex-end;
+    position: relative;
+    width: 100%;
+    box-sizing: border-box;
+    border-bottom: 1.5px solid #64748b;
+    padding-bottom: 2px;
+    min-height: 26px;
+}
+
+.cheque-baht-text-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.cheque-baht-text-value {
+    font-size: clamp(0.78rem, 1.1cqi, 0.92rem);
+    font-weight: 700;
+    color: #0f172a;
+    padding-left: 8px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* แถว 3: เส้นบรรทัดที่สาม (ว่าง) + ช่องจำนวนเงินตัวเลข ฿ */
+.cheque-amount-section {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 26px;
+    padding-bottom: 2px;
+    position: relative;
+}
+
+/* บรรทัดบาท 2: เส้นบรรทัดว่างเส้นที่สาม วิ่งจากซ้ายเข้าเชื่อมด้านข้างของกล่องจำนวนเงินตรงระดับสัญลักษณ์ ฿ */
+.cheque-baht-line-2 {
+    flex: 1;
+    min-width: 0;
+    height: 0;
+    border-bottom: 1.5px solid #64748b;
+    box-sizing: border-box;
+}
+
+/* Crisp Amount Box — ขยายความยาวของช่องจำนวนเงินให้กว้างขึ้นตามแนวเส้นสีแดง เพื่อรองรับยอดเงินจำนวนมาก */
+.cheque-amount-box {
+    width: clamp(250px, 39%, 360px);
+    height: 36px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    padding-bottom: 5px;
+    margin-bottom: -8px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    position: relative;
+    z-index: 2;
+}
+
+.cheque-amount-symbol {
+    font-family: serif, 'Times New Roman', Georgia;
+    font-size: 1.25rem;
+    font-weight: normal;
+    color: #475569;
+    user-select: none;
+    line-height: 1;
+}
+
+.cheque-amount-val {
+    font-size: clamp(0.88rem, 1.25cqi, 1.05rem);
+    font-weight: 800;
+    color: #0f172a;
+    font-family: monospace, 'Sarabun', sans-serif;
+    letter-spacing: 0.05em;
+    line-height: 1;
+}
+
+/* เส้นลายมือชื่อผู้สั่งจ่าย (Signature Line) ตรงตำแหน่งเส้นแดงตามที่ผู้ใช้กำหนด */
+.cheque-signature-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: clamp(42px, 10.8cqi, 105px);
+    margin-bottom: clamp(6px, 1.8cqi, 16px);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.cheque-signature-line {
+    width: clamp(180px, 26.5%, 240px);
+    border-bottom: 1.5px solid #64748b;
+    height: 1px;
+}
+
+/* ── Cheque Footer (ก่อนแถบขาว MICR) ── */
+.cheque-footer-area {
+    position: relative;
+    z-index: 3;
+    padding: 0 clamp(32px, 4.8cqi, 40px);
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: auto;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+/* แถวบน: CHQ. 5 9 8 4 0 0 6 4 */
+.cheque-footer-chq-row {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 0 2px 0;
+    margin-bottom: 2px;
+}
+
+.cheque-chq-prefix {
+    font-size: clamp(0.72rem, 1.05cqi, 0.88rem);
+    font-weight: 700;
+    color: #1e293b;
+    letter-spacing: 0.16em;
+    white-space: nowrap;
+    line-height: 1.1;
+}
+
+/* แถวล่าง: แถบพื้นหลังสีเทาตัดพอดีตามแนวคอลัมน์ (เริ่มตรง CHQ. จนถึง สำหรับเจ้าหน้าที่ ตามที่ผู้ใช้กำหนด) */
+.cheque-footer-labels-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    line-height: 1;
+    gap: clamp(4px, 1cqi, 10px);
+    background: #e6eef2;
+    border-top: 1px solid #cbd5e1;
+    padding: 3px 6px;
+}
+
+.cheque-footer-col {
+    display: flex;
+    align-items: center;
+}
+
+.cheque-footer-col span {
+    font-size: clamp(0.38rem, 0.54cqi, 0.46rem);
+    color: #1e293b;
+    font-weight: 700;
+    white-space: nowrap;
+    line-height: 1;
+    letter-spacing: -0.01em;
+}
+
+.cheque-footer-col.col-cheque-no {
+    margin-left: clamp(4px, 3.2cqi, 24px);
+    flex-shrink: 0;
+}
+
+.cheque-footer-col.col-branch-no {
+    flex-shrink: 0;
+}
+
+.cheque-footer-col.col-account-no {
+    flex-shrink: 0;
+}
+
+.cheque-footer-col.col-official {
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+/* ── Bottom MICR White Band ── */
+.cheque-micr-band {
+    position: relative;
+    z-index: 4;
+    background: #ffffff;
+    border-top: 1px solid #cbd5e1;
+    height: clamp(30px, 5.8cqi, 42px);
+    min-height: 25px;
+    display: flex;
+    align-items: center;
+    padding-left: 14px;
+    padding-right: 12px;
+    font-family: 'OCR-B', 'Consolas', 'Courier New', monospace;
+    font-size: clamp(0.78rem, 1.4cqi, 1rem);
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: clamp(0.08em, 0.2cqi, 0.18em);
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+/* ── Inputs / Form Controls Panel ── */
+.cheque-input-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.25rem;
+    width: 100%;
+    margin-top: 1.25rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.cq-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.cq-form-group label {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cq-input,
+.cq-select,
+.cq-textarea {
+    width: 100%;
+    padding: 0.6rem 0.85rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.9375rem;
+    font-family: inherit;
+    color: #0f172a;
+    background: #ffffff;
+    transition: all 0.15s;
+    box-sizing: border-box;
+}
+
+.cq-input:focus,
+.cq-select:focus,
+.cq-textarea:focus {
+    outline: none;
+    border-color: #059669;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+.cq-input-amount {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #047857;
+}
+
+/* ── Preview Button Row ── */
+.cheque-preview-btn-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.75rem 0;
+    margin-bottom: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.cq-btn-preview {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    color: #ffffff;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+}
+
+.cq-btn-preview:hover {
+    background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+    transform: translateY(-1px);
+}
+
+.cq-btn-preview:active {
+    transform: translateY(0);
+}
+
+/* ── Preview Modal Size ── */
+.cq-preview-modal {
+    max-width: 780px !important;
+}
+
+.cq-preview-modal .cheque-canvas-container {
+    width: 100%;
+    max-width: 720px;
+}
+
+/* ── Modal Overlay ── */
+.cq-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.cq-modal-card {
+    background: #ffffff;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 950px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.cq-modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.cq-modal-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.cq-modal-close {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #64748b;
+    padding: 4px;
+    border-radius: 6px;
+}
+
+.cq-modal-close:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.cq-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* ── Tables ── */
+.cq-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.cq-table th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 700;
+    padding: 0.85rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #e2e8f0;
+    white-space: nowrap;
+}
+
+.cq-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+}
+
+.cq-table tr:hover td {
+    background: #f0fdf4;
+}
+
+.cq-status-badge {
+    padding: 0.2rem 0.55rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.cq-status-badge.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.cq-status-badge.cleared {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.cq-status-badge.bounced {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* ── Payment Voucher (A4 View) ── */
+.voucher-wrapper {
+    background: #ffffff;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2.5rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    font-family: 'Sarabun', sans-serif;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+}
+
+.voucher-header {
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.voucher-company-name {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 0.25rem 0;
+}
+
+.voucher-company-sub {
+    font-size: 0.85rem;
+    color: #475569;
+    margin: 0;
+}
+
+.voucher-title-badge {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.voucher-title-text {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #1e40af;
+    letter-spacing: 0.02em;
+}
+
+.voucher-no-text {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.voucher-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem 1.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.voucher-info-item {
+    display: flex;
+}
+
+.voucher-info-item .lbl {
+    font-weight: 700;
+    color: #475569;
+    width: 130px;
+    flex-shrink: 0;
+}
+
+.voucher-info-item .val {
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.voucher-cheque-preview-container {
+    margin: 1.5rem 0;
+    border: 1.5px dashed #94a3b8;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.voucher-cheque-preview-container .cheque-canvas.in-voucher {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.voucher-cheque-caption {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 0.75rem;
+}
+
+.voucher-signatures-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.voucher-sig-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    font-size: 0.8125rem;
+}
+
+.voucher-sig-line {
+    width: 100%;
+    border-bottom: 1px dotted #475569;
+    height: 45px;
+    margin-bottom: 0.5rem;
+}
+
+.voucher-sig-role {
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.voucher-sig-date {
+    color: #64748b;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+/* =============================================================================
+   PRINT MEDIA RULES — สำหรับการพิมพ์ลงกระดาษจริง
+   ============================================================================= */
+
+@media print {
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .sidebar,
+    .top-navbar,
+    .cheque-toolbar,
+    .cheque-stage-header,
+    .cheque-input-grid,
+    .no-print {
+        display: none !important;
+    }
+
+    .main-content,
+    .page-wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+}
+
+/* ===== 2-Column Main Layout ===== */
+.cq-main-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    align-items: start;
+    width: 100%;
+    margin-top: 15px;
+}
+
+@media (max-width: 1024px) {
+    .cq-main-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cq-main-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.cq-section-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.cq-section-card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.cq-section-card-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #ecfdf5;
+    color: #059669;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.cq-section-card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.cq-section-card-subtitle {
+    font-size: 0.8125rem;
+    color: #64748b;
+    margin: 2px 0 0 0;
+}
+
+.cq-section-card .cheque-input-grid {
+    border: none;
+    padding: 0;
+    margin-top: 18px;
+    box-shadow: none;
+    background: transparent;
+}
+
+/* ===== Sidebar ===== */
+.cq-sidebar {
+    position: sticky;
+    top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.cq-summary-card {
+    background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+    border: 1px solid #fed7aa;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(234, 88, 12, 0.08);
+}
+
+.cq-summary-card h3 {
+    color: #c2410c;
+    margin: 0 0 14px 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.cq-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px dashed #fdba74;
+}
+
+.cq-summary-label {
+    color: #9a3412;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.cq-summary-value {
+    font-weight: 700;
+    color: #1e293b;
+    font-size: 0.875rem;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cq-grand-total-highlight {
+    padding: 14px 0 10px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cq-gt-label {
+    color: #c2410c;
+    font-size: 0.9375rem;
+    font-weight: 700;
+}
+
+.cq-gt-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #ea580c;
+}
+
+.cq-settings-section {
+    border-top: 1px dashed #fdba74;
+    padding-top: 14px;
+    margin-top: 6px;
+}
+
+.cq-settings-header {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #9a3412;
+    margin-bottom: 10px;
+}
+
+.cq-switches-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.cq-switch-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8125rem;
+    color: #431407;
+    cursor: pointer;
+    user-select: none;
+}
+
+.cq-switch-item input[type="checkbox"] {
+    accent-color: #ea580c;
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.cq-btn-block {
+    width: 100%;
+    justify-content: center;
+}
+
+/* ===== Sidebar Action Buttons ===== */
+.cq-sidebar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cq-actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.cq-btn-action {
+    justify-content: center;
+    padding: 0.65rem 0.5rem;
+    font-size: 0.8125rem;
+    text-align: center;
+}
+
+.cq-btn-save-main {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+    background: #059669;
+    color: white;
+    border: 1px solid #047857;
+}
+.cq-btn-save-main:hover:not(:disabled) {
+    background: #047857;
+}
+
+/* Print Container Hide on Screen */
+.cheque-real-print-wrapper {
+    display: none;
+}
+
+body.print-mode-real-cheque {
+        @page {
+            size: 180mm 90mm;
+            margin: 0;
+        }
+    }
+
+    body.print-mode-real-cheque .cheque-page-wrapper,
+    body.print-mode-real-cheque .layout,
+    body.print-mode-real-cheque .main-content,
+    body.print-mode-real-cheque #root,
+    body.print-mode-real-cheque .page-wrapper {
+        background: transparent !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        position: static !important;
+        display: block !important;
+    }
+
+    body.print-mode-real-cheque .cheque-stage {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    
+    body.print-mode-real-cheque .cheque-real-print-wrapper {
+        display: block !important;
+    }
+
+    body.print-mode-real-cheque .cheque-canvas-container {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: none !important;
+    }
+
+    body.print-mode-real-cheque .cheque-canvas {
+        width: 180mm !important;
+        height: 90mm !important;
+        aspect-ratio: auto !important;
+        border: none !important;
+        box-shadow: none !important;
+        background: transparent !important;
+        position: relative !important;
+        transform: translate(var(--print-offset-x, 0mm), var(--print-offset-y, 0mm)) !important;
+    }
+
+    body.print-mode-real-cheque .cheque-canvas::before {
+        display: none !important;
+    }
+
+    body.print-mode-real-cheque .cheque-canvas::after {
+        display: none !important;
+    }
+
+    /* ซ่อนลายพิมพ์เดิมของธนาคารทั้งหมด */
+    body.print-mode-real-cheque .cheque-bank-info,
+    body.print-mode-real-cheque .cheque-kbank-logo-box,
+    body.print-mode-real-cheque .cheque-kbank-logo-img,
+    body.print-mode-real-cheque .cheque-bank-brand,
+    body.print-mode-real-cheque .cheque-bank-titles,
+    body.print-mode-real-cheque .cheque-branch-text,
+    body.print-mode-real-cheque .cheque-left-stamp,
+    body.print-mode-real-cheque .cheque-bottom-left-code,
+    body.print-mode-real-cheque .cheque-date-label,
+    body.print-mode-real-cheque .cheque-date-sublabels,
+    body.print-mode-real-cheque .cheque-line-start,
+    body.print-mode-real-cheque .cheque-line-tick,
+    body.print-mode-real-cheque .cheque-line-label,
+    body.print-mode-real-cheque .cheque-amount-symbol,
+    body.print-mode-real-cheque .cheque-bearer-th,
+    body.print-mode-real-cheque .cheque-bearer-en,
+    body.print-mode-real-cheque .cheque-signature-line,
+    body.print-mode-real-cheque .cheque-official-only-text,
+    body.print-mode-real-cheque .cheque-footer-area,
+    body.print-mode-real-cheque .cheque-footer-info,
+    body.print-mode-real-cheque .cheque-micr-band {
+        visibility: hidden !important;
+    }
+
+    body.print-mode-real-cheque .cheque-digit-box {
+        border: none !important;
+        background: transparent !important;
+    }
+
+    body.print-mode-real-cheque .cheque-line-payee,
+    body.print-mode-real-cheque .cheque-line-baht,
+    body.print-mode-real-cheque .cheque-baht-line-1,
+    body.print-mode-real-cheque .cheque-baht-line-2,
+    body.print-mode-real-cheque .cheque-baht-line-wrapper,
+    body.print-mode-real-cheque .cheque-payee-line-wrapper,
+    body.print-mode-real-cheque .cheque-baht-text-wrapper {
+        border-bottom: none !important;
+    }
+
+    body.print-mode-real-cheque .cheque-bearer-box {
+        background: transparent !important;
+        border-bottom: none !important;
+    }
+
+    body.print-mode-real-cheque .cheque-amount-box {
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    body.print-mode-real-cheque .cheque-digit-box,
+    body.print-mode-real-cheque .cheque-payee-value,
+    body.print-mode-real-cheque .cheque-baht-text-value,
+    body.print-mode-real-cheque .cheque-amount-val {
+        color: #000000 !important;
+        font-weight: 700 !important;
+    }
+
+    body.print-mode-real-cheque .cheque-cross-svg line {
+        stroke: #000000 !important;
+    }
+    body.print-mode-real-cheque .cheque-cross-svg text {
+        fill: #000000 !important;
+    }
+    body.print-mode-real-cheque .cheque-cross-svg rect {
+        fill: #ffffff !important;
+    }
+
+    body.print-mode-real-cheque .cheque-bearer-strikethrough {
+        background: #000000 !important;
+        box-shadow: none !important;
+    }
+
+    /* ── 2. MODE: พิมพ์ใบสำคัญจ่าย A4 (Voucher Print Mode) ── */
+    body.print-mode-voucher {
+        @page {
+            size: A4 portrait;
+            margin: 12mm 15mm;
+        }
+    }
+
+    body.print-mode-voucher .voucher-wrapper {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+
+    body.print-mode-voucher .cheque-stage,
+    body.print-mode-voucher .cheque-canvas-container:not(.in-voucher) {
+        display: none !important;
+    }
+
+    body.print-mode-voucher .cheque-date-sublabels {
+        font-size: 3.8pt !important;
+        letter-spacing: -0.015em !important;
+    }
+
+    body.print-mode-voucher .cheque-sublbl-group {
+        font-size: 3.8pt !important;
+        letter-spacing: -0.015em !important;
+    }
+
+    body.print-mode-voucher .cheque-sublbl-sep {
+        font-size: 3.8pt !important;
+        color: #64748b !important;
+    }
+    
+    /* ── 3. MODE: พิมพ์รูปหน้าเช็คจำลอง (Mockup A4) ── */
+    body.print-mode-mockup-a4 {
+        @page {
+            size: A4 portrait;
+            margin: 15mm;
+        }
+    }
+    
+    body.print-mode-mockup-a4 .voucher-wrapper {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+    }
+    
+    body.print-mode-mockup-a4 .cheque-stage,
+    body.print-mode-mockup-a4 .cheque-canvas-container:not(.in-voucher) {
+        display: none !important;
+    }
+    
+    /* ซ่อนส่วนอื่นๆ ของ Voucher ให้เหลือแค่รูปเช็ค */
+    body.print-mode-mockup-a4 .voucher-header,
+    body.print-mode-mockup-a4 .voucher-info-grid,
+    body.print-mode-mockup-a4 .voucher-signatures-grid,
+    body.print-mode-mockup-a4 .voucher-cheque-caption {
+        display: none !important;
+    }
+    
+    body.print-mode-mockup-a4 .voucher-cheque-preview-container {
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        margin: 0 !important;
+    }
+
+    body.print-mode-mockup-a4 .cq-modal-overlay,
+    body.print-mode-mockup-a4 .cq-modal-card,
+    body.print-mode-mockup-a4 .cq-modal-body,
+    body.print-mode-mockup-a4 .layout,
+    body.print-mode-mockup-a4 .main-content,
+    body.print-mode-mockup-a4 #root,
+    body.print-mode-mockup-a4 .page-wrapper {
+        background: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        position: static !important;
+        display: block !important;
+    }
+
+    body.print-mode-mockup-a4 .cheque-canvas {
+        width: 180mm !important;
+        height: 90mm !important;
+        min-height: auto !important;
+        aspect-ratio: auto !important;
+        margin: 0 auto;
+    }
+
+    body.print-mode-mockup-a4 .cheque-canvas-container {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    body.print-mode-mockup-a4 .cheque-date-sublabels {
+        font-size: 4.2pt !important;
+        letter-spacing: -0.015em !important;
+    }
+
+    body.print-mode-mockup-a4 .cheque-sublbl-group {
+        font-size: 4.2pt !important;
+        letter-spacing: -0.015em !important;
+    }
+
+    body.print-mode-mockup-a4 .cheque-sublbl-sep {
+        font-size: 4.2pt !important;
+        color: #64748b !important;
+    }

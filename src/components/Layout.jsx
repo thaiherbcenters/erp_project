@@ -22,7 +22,7 @@
  * =============================================================================
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -81,6 +81,8 @@ const PAGE_ICONS = {
     fulfillment: <Truck size={20} />,
     document: <FileText size={20} />,
     customer: <Users size={20} />,
+    elite: <CreditCard size={20} />,
+    elite_documents: <FileText size={20} />,
 };
 
 const getPageIcon = (pageId) => {
@@ -127,12 +129,13 @@ const COMPANY_THEMES = {
 // กำหนดว่า page ใดอยู่ในกลุ่มเมนูไหน
 // =============================================================================
 const CORE_MENU_IDS = ['home', 'customer', 'stock', 'sales', 'accounts', 'procurement', 'reports', 'qc'];
-const NON_MANUFACTURING_CORE_IDS = ['home', 'customer', 'sales', 'accounts', 'reports'];
+const NON_MANUFACTURING_CORE_IDS = ['home', 'elite', 'customer', 'sales', 'accounts', 'reports'];
 const LOGISTICS_MENU_IDS = ['fulfillment'];
 const PRODUCT_MENU_IDS = ['planning', 'operator', 'rnd', 'packaging'];
 const DOC_MENU_IDS = ['document'];
 const HR_MENU_IDS = ['hr'];
 const SYSTEM_MENU_IDS = ['settings'];
+const ELITE_MENU_IDS = ['elite', 'elite_documents'];
 
 // =============================================================================
 // Layout Component
@@ -152,9 +155,9 @@ export default function Layout() {
     const [companySwitcherOpen, setCompanySwitcherOpen] = useState(false);
     const companySwitcherRef = useRef(null);
 
-    // ── ตรวจสอบว่าเป็นบริษัทผลิต (THC) หรือไม่ ──
-    const isManufacturing = !activeCompany || activeCompany.CompanyID === 1 || activeCompany.ShortName === 'THC';
-    const isElite = activeCompany?.CompanyID === 2 || activeCompany?.ShortName === 'ELITE';
+    // ── ตรวจสอบประเภทบริษัท ──
+    const isTHC = !activeCompany || activeCompany.CompanyID === 1 || (activeCompany.ShortName || '').toUpperCase() === 'THC';
+    const isElite = activeCompany?.CompanyID === 2 || (activeCompany?.ShortName || '').toUpperCase() === 'ELITE';
 
     // ── Dynamic Theme: ปรับสีหลักตามบริษัทที่เลือก (THC ใช้สีเดิมแท้ 100% ไม่ยุ่ง) ──
     useEffect(() => {
@@ -203,13 +206,20 @@ export default function Layout() {
         }
     };
 
-    // ── Auto-expand group ที่ตรงกับ URL ปัจจุบัน ──
+    const sortedVisiblePages = useMemo(() => {
+        return [...visiblePages].sort((a, b) => b.path.length - a.path.length);
+    }, [visiblePages]);
+
+    // เปิด Auto-expand group อัตโนมัติเมื่อ URL ปัจจุบันตรง
     useEffect(() => {
-        const matchedPage = visiblePages.find((p) => location.pathname.startsWith(p.path));
+        const matchedPage = sortedVisiblePages.find((p) => location.pathname.startsWith(p.path));
         if (matchedPage) {
-            setExpandedGroups((prev) => ({ ...prev, [matchedPage.id]: true }));
+            setExpandedGroups((prev) => {
+                if (prev[matchedPage.id]) return prev;
+                return { ...prev, [matchedPage.id]: true };
+            });
         }
-    }, [location.pathname]);
+    }, [location.pathname, sortedVisiblePages]);
 
     // ── ปรับ sidebar ตามขนาดหน้าจอ ──
     useEffect(() => {
@@ -246,10 +256,11 @@ export default function Layout() {
     const renderNavGroup = (page) => {
         const subPages = page.id !== 'permissions' ? getVisibleSubPages(page.id) : null;
         const hasSubPages = subPages && subPages.length > 0;
-        const isActive = location.pathname.startsWith(page.path);
+        const activePage = sortedVisiblePages.find((p) => location.pathname.startsWith(p.path));
+        const isActive = activePage && activePage.id === page.id;
         const isExpanded = expandedGroups[page.id];
-        const pageLabel = (isElite && page.id === 'home') ? 'ระบบทะเบียนเช็ค' : page.name;
-        const pageIcon = (isElite && page.id === 'home') ? <CreditCard size={20} /> : getPageIcon(page.id);
+        const pageLabel = page.name;
+        const pageIcon = getPageIcon(page.id);
 
         const handleClick = (e) => {
             if (hasSubPages && isActive) {
@@ -360,7 +371,7 @@ export default function Layout() {
                             style={{ cursor: !sidebarOpen ? 'pointer' : 'default' }}
                         >
                             <img
-                                src={activeCompany?.CompanyLogo || (sidebarOpen ? logoUrl : logoSmallUrl)}
+                                src={activeCompany?.CompanyLogo || (isElite ? '/images/logos/logo-elite.png' : (sidebarOpen ? logoUrl : logoSmallUrl))}
                                 alt={activeCompany?.CompanyName || 'Thai Herb Centers'}
                                 style={{
                                     height: sidebarOpen ? '36px' : '36px',
@@ -387,7 +398,7 @@ export default function Layout() {
                     <div className="sidebar-header">
                         <div className="sidebar-logo">
                             <img 
-                                src={activeCompany?.CompanyLogo || logoUrl} 
+                                src={activeCompany?.CompanyLogo || (isElite ? '/images/logos/logo-elite.png' : logoUrl)} 
                                 alt={activeCompany?.CompanyName || 'Thai Herb Centers'} 
                                 style={{ height: '32px', width: 'auto', objectFit: 'contain' }} 
                             />
@@ -400,12 +411,24 @@ export default function Layout() {
 
                 {/* ── Navigation Menu ── */}
                 <nav className="sidebar-nav">
-                    {renderMenuSection('เมนูหลัก', isManufacturing ? CORE_MENU_IDS : NON_MANUFACTURING_CORE_IDS)}
-                    {isManufacturing && renderMenuSection('การผลิต', PRODUCT_MENU_IDS, { marginTop: '16px' })}
-                    {isManufacturing && renderMenuSection('จัดส่ง', LOGISTICS_MENU_IDS, { marginTop: '16px' })}
-                    {renderMenuSection('ระบบเอกสาร', DOC_MENU_IDS, { marginTop: '16px' })}
-                    {isManufacturing && renderMenuSection('บุคลากร', HR_MENU_IDS, { marginTop: '16px' })}
-                    {renderMenuSection('ระบบ', SYSTEM_MENU_IDS, { marginTop: '16px' })}
+                    {/* เมนูสำหรับโรงงาน THC (ERP เต็มรูปแบบ) */}
+                    {isTHC && (
+                        <>
+                            {renderMenuSection('เมนูหลัก', CORE_MENU_IDS)}
+                            {renderMenuSection('การผลิต', PRODUCT_MENU_IDS, { marginTop: '16px' })}
+                            {renderMenuSection('จัดส่ง', LOGISTICS_MENU_IDS, { marginTop: '16px' })}
+                            {renderMenuSection('ระบบเอกสาร', DOC_MENU_IDS, { marginTop: '16px' })}
+                            {renderMenuSection('บุคลากร', HR_MENU_IDS, { marginTop: '16px' })}
+                            {renderMenuSection('ระบบ', SYSTEM_MENU_IDS, { marginTop: '16px' })}
+                        </>
+                    )}
+
+                    {/* เมนูสำหรับ ELITE (ระบบเช็คและการเงิน) */}
+                    {isElite && (
+                        <>
+                            {renderMenuSection('เมนูหลัก', ELITE_MENU_IDS)}
+                        </>
+                    )}
                 </nav>
 
                 {/* ── Sidebar Footer: ข้อมูล user + Logout ── */}
@@ -436,16 +459,17 @@ export default function Layout() {
                         <span>/</span>
                         <span className="current-page">
                             {(() => {
-                                const matchedPage = visiblePages.find((p) => location.pathname.startsWith(p.path));
+                                const matchedPage = sortedVisiblePages.find((p) => location.pathname.startsWith(p.path));
                                 if (!matchedPage) return 'Dashboard';
 
                                 const subPages = getVisibleSubPages(matchedPage.id);
                                 const currentTab = new URLSearchParams(location.search).get('tab');
-                                const activeSub = subPages?.find((s) => s.id === currentTab) || subPages?.[0];
+                                // match active sub page based on path or tab
+                                const activeSub = subPages?.find((s) => s.path ? location.pathname === s.path : s.id === currentTab) || subPages?.[0];
 
                                 return (
                                     <>
-                                        {(isElite && matchedPage.id === 'home') ? 'ระบบทะเบียนเช็ค' : matchedPage.name}
+                                        {matchedPage.name}
                                         {activeSub && (
                                             <>
                                                 <span style={{ margin: '0 8px', color: 'var(--text-muted)' }}>/</span>

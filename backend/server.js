@@ -71,7 +71,9 @@ const printRoutes = require('./routes/print');
 const templateRoutes = require('./routes/templates');
 const reportsRoutes = require('./routes/reports');
 const labelingRoutes = require('./routes/labeling');
-const chequeRoutes = require('./routes/cheques');
+const chequeFormRoutes = require('./routes/chequeForms');
+const eliteTaxInvoiceRoutes = require('./routes/eliteTaxInvoices');
+const eliteReceiptRoutes = require('./routes/eliteReceipts');
 
 // ── Rate Limiting สำหรับ Login (ป้องกัน brute force) ──
 const loginLimiter = rateLimit({
@@ -119,8 +121,10 @@ app.use('/api/tax-invoices', taxInvoiceRoutes);
 app.use('/api/delivery-orders', deliveryOrderRoutes);
 app.use('/api/receipts', receiptRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
-app.use('/api/cheques', chequeRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/cheque-forms', chequeFormRoutes);
+app.use('/api/elite-tax-invoices', eliteTaxInvoiceRoutes);
+app.use('/api/elite-receipts', eliteReceiptRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/accounts', accountsRoutes);
 app.use('/api/audit-logs', auditLogRoutes);

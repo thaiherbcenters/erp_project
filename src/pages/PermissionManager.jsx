@@ -18,7 +18,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
 import { ALL_PAGES } from '../data/mockData';
-import { ShieldCheck, Users, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, UserPlus, X, Trash2, Globe, Building2, User } from 'lucide-react';
+import { ShieldCheck, Users, ChevronDown, ChevronRight, ToggleLeft, ToggleRight, UserPlus, X, Trash2, Globe, Building2, User, Plus, Lock } from 'lucide-react';
 import './PermissionManager.css';
 import API_BASE from '../config';
 import CustomSelect from '../components/CustomSelect';
@@ -93,6 +93,7 @@ export default function PermissionManager({ isEmbed = false }) {
         { CompanyID: 4, ShortName: 'PSF', CompanyNameTH: 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด', CompanyColor: '#ea580c', CompanyLogo: '/images/logos/logo-psf.png' },
     ]);
     const [userCompanyIds, setUserCompanyIds] = useState([]);
+    const [selectedCompanyId, setSelectedCompanyId] = useState(1);
     const [isLoadingCompanies, setIsLoadingCompanies] = useState(false);
     const [isSavingCompany, setIsSavingCompany] = useState(null);
 
@@ -146,7 +147,7 @@ export default function PermissionManager({ isEmbed = false }) {
         if (!userId) return;
         setIsLoadingCompanies(true);
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('erp_token') || localStorage.getItem('token');
             const res = await fetch(`${API_BASE}/users/${userId}/companies`, {
                 headers: {
                     'Authorization': token ? `Bearer ${token}` : ''
@@ -170,6 +171,7 @@ export default function PermissionManager({ isEmbed = false }) {
     const handleToggleCompany = async (companyId) => {
         if (!activeUserId) return;
         const current = [...userCompanyIds];
+        const isEnabling = !current.includes(companyId);
         let updated;
         if (current.includes(companyId)) {
             if (current.length === 1) {
@@ -183,8 +185,11 @@ export default function PermissionManager({ isEmbed = false }) {
 
         setUserCompanyIds(updated);
         setIsSavingCompany(companyId);
+        if (isEnabling) {
+            setSelectedCompanyId(companyId);
+        }
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('erp_token') || localStorage.getItem('token');
             const res = await fetch(`${API_BASE}/users/${activeUserId}/companies`, {
                 method: 'PUT',
                 headers: {
@@ -217,7 +222,7 @@ export default function PermissionManager({ isEmbed = false }) {
         const current = [...userCompanyIds];
         setUserCompanyIds(targetCompanyIds);
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('erp_token') || localStorage.getItem('token');
             const res = await fetch(`${API_BASE}/users/${activeUserId}/companies`, {
                 method: 'PUT',
                 headers: {
@@ -258,7 +263,7 @@ export default function PermissionManager({ isEmbed = false }) {
         setIsCreating(true);
 
         try {
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('erp_token') || localStorage.getItem('token');
             const res = await fetch(`${API_BASE}/users`, {
                 method: 'POST',
                 headers: { 
@@ -316,6 +321,9 @@ export default function PermissionManager({ isEmbed = false }) {
     const activeUserId = selectedUserId || nonAdminUsers[0]?.id;
     const activeUser = nonAdminUsers.find((u) => u.id === activeUserId);
     const userPerms = activeUserId ? getUserPermissions(activeUserId) : [];
+    const currentCompany = companies.find(c => c.CompanyID === selectedCompanyId) || companies[0];
+    const currentCompanyPages = ALL_PAGES.filter(p => (p.companyId || 1) === selectedCompanyId);
+    const isCurrentCompanyEnabled = userCompanyIds.includes(selectedCompanyId);
 
     // ── โหลดสิทธิ์ของ user (หน้า + บริษัท) เมื่อ activeUserId เปลี่ยน ──
     useEffect(() => {
@@ -370,10 +378,10 @@ export default function PermissionManager({ isEmbed = false }) {
     };
 
     // =================================================================
-    // Bulk actions — เปิด/ปิดสิทธิ์ทั้งหมด
+    // Bulk actions — เปิด/ปิดสิทธิ์ทั้งหมด (เฉพาะบริษัทที่เลือกอยู่)
     // =================================================================
     const handleEnableAll = () => {
-        ALL_PAGES.forEach((page) => {
+        currentCompanyPages.forEach((page) => {
             if (!userPerms.some((p) => p.page_id === page.id)) {
                 updatePermissions(activeUserId, page.id, true);
             }
@@ -381,7 +389,7 @@ export default function PermissionManager({ isEmbed = false }) {
     };
 
     const handleDisableAll = () => {
-        ALL_PAGES.forEach((page) => {
+        currentCompanyPages.forEach((page) => {
             if (userPerms.some((p) => p.page_id === page.id)) {
                 updatePermissions(activeUserId, page.id, false);
             }
@@ -454,6 +462,7 @@ export default function PermissionManager({ isEmbed = false }) {
                                     setSelectedUserId(user.id);
                                     setExpandedPages({});
                                     setExpandedSubPages({});
+                                    setSelectedCompanyId(1);
                                     // ดึงสิทธิ์จาก DB เมื่อเลือก user
                                     await Promise.all([
                                         loadUserPermissions(user.id),
@@ -491,18 +500,8 @@ export default function PermissionManager({ isEmbed = false }) {
                                 </div>
                                 <div>
                                     <h1>จัดการสิทธิ์ — {activeUser.displayName}</h1>
-                                    <p>@{activeUser.username} {activeUser.department && `(${activeUser.department})`} · เข้าถึงได้ {ALL_PAGES.filter((p) => userPerms.some((perm) => perm.page_id === p.id)).length} จาก {ALL_PAGES.length} หน้า</p>
+                                    <p>@{activeUser.username} {activeUser.department && `(${activeUser.department})`} · สิทธิ์เข้าถึงบริษัท: {userCompanyIds.length} จาก {companies.length} บริษัท</p>
                                 </div>
-                            </div>
-                            <div className="perm-bulk-actions">
-                                <button className="perm-btn perm-btn-enable" onClick={handleEnableAll}>
-                                    <ToggleRight size={16} />
-                                    เปิดทั้งหมด
-                                </button>
-                                <button className="perm-btn perm-btn-disable" onClick={handleDisableAll}>
-                                    <ToggleLeft size={16} />
-                                    ปิดทั้งหมด
-                                </button>
                             </div>
                         </div>
 
@@ -573,15 +572,14 @@ export default function PermissionManager({ isEmbed = false }) {
                                                 </div>
                                             </div>
                                             <div className="perm-comp-card-right">
-                                                <label className="perm-toggle-switch" onClick={(e) => e.stopPropagation()}>
+                                                <div className="perm-toggle-switch" style={{ pointerEvents: 'none' }}>
                                                     <input
                                                         type="checkbox"
                                                         checked={isChecked}
-                                                        disabled={isSaving}
-                                                        onChange={() => handleToggleCompany(comp.CompanyID)}
+                                                        readOnly
                                                     />
                                                     <span className="perm-toggle-slider"></span>
-                                                </label>
+                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -595,26 +593,102 @@ export default function PermissionManager({ isEmbed = false }) {
                                 <ShieldCheck size={18} />
                                 <span>สิทธิ์การเข้าถึงหน้าระบบและฟังก์ชันงาน (Page Permissions)</span>
                             </div>
+                            {isCurrentCompanyEnabled && currentCompanyPages.length > 0 && (
+                                <div className="perm-bulk-actions">
+                                    <button className="perm-btn perm-btn-enable" onClick={handleEnableAll}>
+                                        <ToggleRight size={16} />
+                                        เปิดทั้งหมด ({currentCompany?.ShortName})
+                                    </button>
+                                    <button className="perm-btn perm-btn-disable" onClick={handleDisableAll}>
+                                        <ToggleLeft size={16} />
+                                        ปิดทั้งหมด ({currentCompany?.ShortName})
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Permission Table */}
-                        <div className="perm-table-wrap">
-                            <table className="perm-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: '40px' }}></th>
-                                        <th>ชื่อหน้า / หัวข้อ</th>
-                                        <th style={{ width: '120px', textAlign: 'center' }}>ขอบเขตข้อมูล</th>
-                                        <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>สร้าง</th>
-                                        <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>ดู</th>
-                                        <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>แก้ไข</th>
-                                        <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>ลบ</th>
-                                        <th style={{ width: '90px', textAlign: 'center' }}>หน้าย่อย</th>
-                                        <th style={{ width: '90px', textAlign: 'center' }}>สิทธิ์</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {ALL_PAGES.map((page) => {
+                        {/* Company Tabs for Page Permissions */}
+                        <div className="perm-company-tabs-bar">
+                            <div className="perm-comp-tabs-list">
+                                {companies.map((comp) => {
+                                    const isCompEnabled = userCompanyIds.includes(comp.CompanyID);
+                                    const compPages = ALL_PAGES.filter(p => (p.companyId || 1) === comp.CompanyID);
+                                    const compPermsCount = compPages.filter(p => userPerms.some(perm => perm.page_id === p.id)).length;
+                                    const isSelected = selectedCompanyId === comp.CompanyID;
+
+                                    return (
+                                        <button
+                                            key={comp.CompanyID}
+                                            type="button"
+                                            className={`perm-comp-tab-item ${isSelected ? 'active' : ''} ${!isCompEnabled ? 'disabled' : ''}`}
+                                            style={{ '--comp-brand': comp.CompanyColor || '#4f46e5' }}
+                                            onClick={() => setSelectedCompanyId(comp.CompanyID)}
+                                        >
+                                            <div className="perm-comp-tab-logo">
+                                                {comp.CompanyLogo ? (
+                                                    <img src={comp.CompanyLogo} alt={comp.ShortName} />
+                                                ) : (
+                                                    <Building2 size={16} />
+                                                )}
+                                            </div>
+                                            <div className="perm-comp-tab-text">
+                                                <div className="perm-comp-tab-name-row">
+                                                    <span className="perm-comp-tab-title">{comp.ShortName}</span>
+                                                    {!isCompEnabled && <span className="perm-comp-tab-lock-icon">🔒</span>}
+                                                </div>
+                                                <span className="perm-comp-tab-sub">
+                                                    {isCompEnabled ? `${compPermsCount}/${compPages.length} หน้า` : 'ปิดสิทธิ์บริษัทนี้'}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Page Permissions Table or Locked Notice */}
+                        {!isCurrentCompanyEnabled ? (
+                            <div className="perm-comp-unauthorized-banner">
+                                <div className="perm-comp-banner-icon" style={{ backgroundColor: `${currentCompany?.CompanyColor || '#2563eb'}18`, color: currentCompany?.CompanyColor || '#2563eb' }}>
+                                    <Building2 size={32} />
+                                </div>
+                                <div className="perm-comp-banner-body">
+                                    <h4>ยังไม่ได้เปิดสิทธิ์เข้าใช้งานบริษัท {currentCompany?.ShortName} ({currentCompany?.CompanyNameTH})</h4>
+                                    <p>ผู้ใช้งาน <strong>@{activeUser.username} ({activeUser.displayName})</strong> ยังไม่ได้รับสิทธิ์เข้าทำงานในบริษัทนี้ในส่วน "สิทธิ์การเข้าถึงบริษัท" ด้านบน ทำให้หน้าระบบและฟังก์ชันงานถูกล็อกอยู่</p>
+                                    <button 
+                                        type="button" 
+                                        className="perm-comp-banner-btn"
+                                        style={{ backgroundColor: currentCompany?.CompanyColor || '#2563eb' }}
+                                        onClick={() => handleToggleCompany(selectedCompanyId)}
+                                    >
+                                        <Plus size={16} />
+                                        เปิดสิทธิ์บริษัท {currentCompany?.ShortName} เพื่อตั้งค่าหน้าระบบ
+                                    </button>
+                                </div>
+                            </div>
+                        ) : currentCompanyPages.length === 0 ? (
+                            <div className="perm-empty-state-card">
+                                <Building2 size={36} style={{ color: '#94a3b8' }} />
+                                <p>ยังไม่มีหน้าและฟังก์ชันงานสำหรับบริษัท {currentCompany?.ShortName} ในระบบ</p>
+                            </div>
+                        ) : (
+                            <div className="perm-table-wrap">
+                                <table className="perm-table">
+                                    <thead>
+                                        <tr>
+                                            <th style={{ width: '40px' }}></th>
+                                            <th>ชื่อหน้า / หัวข้อ ({currentCompany?.ShortName})</th>
+                                            <th style={{ width: '120px', textAlign: 'center' }}>ขอบเขตข้อมูล</th>
+                                            <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>สร้าง</th>
+                                            <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>ดู</th>
+                                            <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>แก้ไข</th>
+                                            <th style={{ width: '60px', textAlign: 'center', fontSize: '13px' }}>ลบ</th>
+                                            <th style={{ width: '90px', textAlign: 'center' }}>หน้าย่อย</th>
+                                            <th style={{ width: '90px', textAlign: 'center' }}>สิทธิ์</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {currentCompanyPages.map((page) => {
                                         const currPerm = userPerms.find((p) => p.page_id === page.id);
                                         const isPageEnabled = !!currPerm;
                                         const isExpanded = expandedPages[page.id];
@@ -814,7 +888,8 @@ export default function PermissionManager({ isEmbed = false }) {
                                 </tbody>
                             </table>
                         </div>
-                    </>
+                    )}
+                </>
                 ) : (
                     <div className="perm-empty">
                         <ShieldCheck size={48} />

@@ -87,7 +87,7 @@ const InlineStatusDropdown = ({ value, onChange, options, badgeClassFn, fallback
 
 export default function Sales() {
     const { showAlert, showConfirm, showLoading, hideLoading } = useAlert();
-    const { hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate, canUpdate, canDelete } = useAuth();
+    const { hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate, canUpdate, canDelete, activeCompany } = useAuth();
     const visibleSubPages = getVisibleSubPages('sales');
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'sales_dashboard';

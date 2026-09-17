@@ -601,6 +601,101 @@ export const ALL_PAGES = [
       },
     ],
   },
+  // =========================================================================
+  // --- ELITE (CompanyID: 2) ---
+  // =========================================================================
+  {
+    id: 'elite', name: 'เช็คธนาคาร', path: '/elite', companyId: 2,
+    subPages: [
+      {
+        id: 'elite_cheque', name: 'ระบบเช็คธนาคาร',
+        sections: [
+          { id: 'elite_cheque_list', name: 'ตารางรายการเช็ค' },
+          { id: 'elite_cheque_form', name: 'ฟอร์มสั่งจ่ายเช็ค' },
+          { id: 'elite_cheque_print', name: 'พิมพ์เช็คธนาคาร' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'elite_documents', name: 'ระบบเอกสาร', path: '/elite/documents', companyId: 2,
+    subPages: [
+      { 
+        id: 'elite_doc_tax_invoice', name: 'ใบแจ้งหนี้/ใบกำกับภาษี', path: '/elite/documents/tax-invoice',
+        sections: [
+          { id: 'elite_tax_invoice_list', name: 'ตารางรายการใบแจ้งหนี้' },
+          { id: 'elite_tax_invoice_form', name: 'ฟอร์มสร้าง/แก้ไขใบแจ้งหนี้' },
+          { id: 'elite_tax_invoice_print', name: 'พิมพ์/พรีวิวใบแจ้งหนี้' },
+        ],
+      },
+      { 
+        id: 'elite_doc_receipt', name: 'ใบเสร็จรับเงิน', path: '/elite/documents/receipt',
+        sections: [
+          { id: 'elite_receipt_list', name: 'ตารางรายการใบเสร็จ' },
+          { id: 'elite_receipt_form', name: 'ฟอร์มสร้าง/แก้ไขใบเสร็จ' },
+          { id: 'elite_receipt_print', name: 'พิมพ์/พรีวิวใบเสร็จ' },
+        ],
+      },
+      { 
+        id: 'elite_doc_quotation', name: 'ใบเสนอราคา', path: '/elite/documents/quotation',
+        sections: [
+          { id: 'elite_quotation_list', name: 'ตารางรายการใบเสนอราคา' },
+          { id: 'elite_quotation_form', name: 'ฟอร์มสร้าง/แก้ไขใบเสนอราคา' },
+        ],
+      },
+      { 
+        id: 'elite_doc_sales_order', name: 'ใบสั่งจอง', path: '/elite/documents/sales-order',
+        sections: [
+          { id: 'elite_sales_order_list', name: 'ตารางรายการใบสั่งจอง' },
+          { id: 'elite_sales_order_form', name: 'ฟอร์มสร้าง/แก้ไขใบสั่งจอง' },
+        ],
+      },
+    ],
+  },
+  // =========================================================================
+  // --- RIVERVIEW (CompanyID: 3) ---
+  // =========================================================================
+  {
+    id: 'riverview_portal', name: 'หน้าหลัก Portal', path: '/riverview', companyId: 3,
+    subPages: [
+      {
+        id: 'riverview_overview', name: 'ภาพรวมธุรกิจบริการ',
+        sections: [
+          { id: 'riverview_stats', name: 'สถิติภาพรวม' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'riverview_documents', name: 'ระบบเอกสาร', path: '/riverview', companyId: 3,
+    subPages: [
+      { id: 'riverview_doc_quotation', name: 'ใบเสนอราคา (Quotation)' },
+      { id: 'riverview_doc_billing', name: 'ใบวางบิล/ใบแจ้งหนี้ (Billing/Invoice)' },
+      { id: 'riverview_doc_receipt', name: 'ใบเสร็จรับเงิน (Receipt)' },
+    ],
+  },
+  // =========================================================================
+  // --- PSF (CompanyID: 4) ---
+  // =========================================================================
+  {
+    id: 'psf_portal', name: 'หน้าหลัก Portal', path: '/psf', companyId: 4,
+    subPages: [
+      {
+        id: 'psf_overview', name: 'ภาพรวมฟาร์มอัจฉริยะ',
+        sections: [
+          { id: 'psf_stats', name: 'สถิติภาพรวม' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'psf_documents', name: 'ระบบเอกสาร', path: '/psf', companyId: 4,
+    subPages: [
+      { id: 'psf_doc_quotation', name: 'ใบเสนอราคา (Quotation)' },
+      { id: 'psf_doc_billing', name: 'ใบวางบิล/ใบแจ้งหนี้ (Billing/Invoice)' },
+      { id: 'psf_doc_receipt', name: 'ใบเสร็จรับเงิน (Receipt)' },
+    ],
+  },
 ];
 
 // =============================================================================

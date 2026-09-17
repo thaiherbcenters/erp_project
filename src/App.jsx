@@ -42,6 +42,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import CompanySelector from './pages/CompanySelector';
 const CompanyPortal = lazy(() => import('./pages/CompanyPortal'));
+const EliteChequePage = lazy(() => import('./pages/EliteChequePage'));
+const EliteTaxInvoice = lazy(() => import('./pages/EliteTaxInvoice'));
+const EliteReceipt = lazy(() => import('./pages/EliteReceipt'));
 const Home = lazy(() => import('./pages/Home'));
 const Customer = lazy(() => import('./pages/Customer'));
 const Stock = lazy(() => import('./pages/Stock'));
@@ -81,14 +84,24 @@ function App() {
               {/* ── หน้าเลือกบริษัท (ต้องล็อกอินแล้ว แต่ไม่ต้องเลือกบริษัท) ── */}
               <Route path="/select-company" element={<CompanySelector />} />
 
-              {/* ── หน้า Company Portal ประจำแต่ละบริษัท (PSF, ELITE, RIVERVIEW) ── */}
+              {/* ── หน้า Company Portal ประจำแต่ละบริษัท (RIVERVIEW, PSF) ── */}
+              <Route path="/riverview" element={
+                <ProtectedRoute pageId={null}>
+                  <CompanyPortal defaultCompanyCode="riverview" />
+                </ProtectedRoute>
+              } />
+              <Route path="/psf" element={
+                <ProtectedRoute pageId={null}>
+                  <CompanyPortal defaultCompanyCode="psf" />
+                </ProtectedRoute>
+              } />
               <Route path="/company/:companyCode" element={
                 <ProtectedRoute pageId={null}>
                   <CompanyPortal />
                 </ProtectedRoute>
               } />
 
-              {/* ── หน้าที่ต้องล็อกอิน (มี Layout ครอบ) ── */}
+              {/* ── หน้าที่ต้องล็อกอิน (มี Layout ครอบ พร้อม Sidebar) ── */}
               <Route element={
                 <ProtectedRoute pageId={null}>
                   <ProductionProvider>
@@ -100,6 +113,18 @@ function App() {
                   </ProductionProvider>
                 </ProtectedRoute>
               }>
+                {/* เมนูหลักสำหรับ ELITE */}
+                <Route path="/elite" element={
+                  <ProtectedRoute pageId="elite"><EliteChequePage /></ProtectedRoute>
+                } />
+                <Route path="/elite/documents" element={<Navigate to="/elite/documents/tax-invoice" replace />} />
+                <Route path="/elite/documents/tax-invoice" element={
+                  <ProtectedRoute pageId="elite_doc_tax_invoice"><EliteTaxInvoice /></ProtectedRoute>
+                } />
+                <Route path="/elite/documents/receipt" element={
+                  <ProtectedRoute pageId="elite_doc_receipt"><EliteReceipt /></ProtectedRoute>
+                } />
+
                 {/* เมนูหลัก */}
                 <Route path="/home" element={
                   <ProtectedRoute pageId="home"><Home /></ProtectedRoute>
