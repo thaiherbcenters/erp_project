@@ -11,7 +11,7 @@
  * =============================================================================
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from './CustomAlert';
@@ -39,6 +39,9 @@ export default function ChequeForm() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const currentTab = searchParams.get('tab') || 'history'; // Default to history table (หน้าหลัก)
+
+    const chequePrintRef = useRef(null);
+    const voucherPrintRef = useRef(null);
 
     const { currentUser, canCreate, canDelete } = useAuth();
     const { showAlert } = useAlert();
@@ -136,7 +139,19 @@ export default function ChequeForm() {
         }
     };
 
+    // ล้างสถานะ print-mode บน body เมื่อเปิดหน้า/ปิดหน้า
     useEffect(() => {
+        document.body.classList.remove('print-mode-mockup-a4', 'print-mode-voucher', 'print-mode-real-cheque');
+        return () => {
+            document.body.classList.remove('print-mode-mockup-a4', 'print-mode-voucher', 'print-mode-real-cheque');
+        };
+    }, []);
+
+    useEffect(() => {
+        setShowVoucherModal(false);
+        setShowPreviewModal(false);
+        setShowHistoryModal(false);
+        document.body.classList.remove('print-mode-mockup-a4', 'print-mode-voucher', 'print-mode-real-cheque');
         if (currentTab === 'history') {
             fetchHistory();
         }
@@ -311,26 +326,143 @@ export default function ChequeForm() {
 
 
 
-    // พิมพ์เฉพาะรูปหน้าเช็คจำลอง (Mockup A4)
-    const handlePrintMockup = () => {
+    // ── ระบบพิมพ์ผ่าน Isolated Hidden Iframe ไม่กระทบ DOM / CSS บนหน้าจอ ──
+    const printElementViaIframe = (element, title = 'Cheque', extraStyles = '') => {
+        if (!element) return;
+
+        const iframe = document.createElement('iframe');
+        iframe.style.position = 'fixed';
+        iframe.style.top = '-10000px';
+        iframe.style.left = '-10000px';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+
+        const headStyles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+            .map(el => el.outerHTML)
+            .join('\n');
+
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>${title}</title>
+                <link rel="preconnect" href="https://fonts.googleapis.com">
+                <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+                <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+                ${headStyles}
+                <style>
+                    * {
+                        box-sizing: border-box;
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: #ffffff !important;
+                        font-family: 'Sarabun', sans-serif;
+                    }
+                    ${extraStyles}
+                </style>
+            </head>
+            <body>
+                ${element.outerHTML}
+            </body>
+            </html>
+        `);
+        doc.close();
+
+        setTimeout(() => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (err) {
+                console.error('Print iframe error:', err);
+            } finally {
+                setTimeout(() => {
+                    if (iframe.parentNode) {
+                        iframe.parentNode.removeChild(iframe);
+                    }
+                }, 1000);
+            }
+        }, 400);
+    };
+
+    // พิมพ์เฉพาะรูปหน้าเช็คจำลอง (Cheque Mockup A4)
+    const handlePrintChequeMockup = () => {
         if (!payee || !amount) {
             showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุชื่อผู้รับเงินและจำนวนเงินก่อนพิมพ์', 'warning');
             return;
         }
-        setShowPreviewModal(false);
-        setShowVoucherModal(true);
-        
-        setTimeout(() => {
-            document.body.classList.add('print-mode-mockup-a4');
-            window.print();
-            
-            const cleanUp = () => {
-                document.body.classList.remove('print-mode-mockup-a4');
-                setShowVoucherModal(false);
-                window.removeEventListener('afterprint', cleanUp);
-            };
-            window.addEventListener('afterprint', cleanUp);
-        }, 150);
+        const node = chequePrintRef.current;
+        if (!node) return;
+
+        printElementViaIframe(node, `ใบเช็ค_${chequeNo || 'kasikorn'}`, `
+            @page {
+                size: A4 portrait;
+                margin: 15mm;
+            }
+            body {
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                padding-top: 25mm;
+                background: #ffffff !important;
+            }
+            .cheque-canvas-container {
+                width: 100% !important;
+                max-width: 180mm !important;
+                margin: 0 auto !important;
+                padding: 0 !important;
+            }
+            .cheque-canvas {
+                width: 180mm !important;
+                height: 90mm !important;
+                min-height: 90mm !important;
+                margin: 0 auto !important;
+                box-shadow: none !important;
+                border: 1px solid #cbd5e1 !important;
+            }
+            .cheque-date-sublabels, .cheque-sublbl-group, .cheque-sublbl-sep {
+                font-size: 4.2pt !important;
+            }
+        `);
+    };
+
+    // พิมพ์ใบสำคัญจ่าย A4 (Cheque Payment Voucher A4)
+    const handlePrintVoucher = () => {
+        if (!payee || !amount) {
+            showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุชื่อผู้รับเงินและจำนวนเงินก่อนพิมพ์', 'warning');
+            return;
+        }
+        const node = voucherPrintRef.current;
+        if (!node) return;
+
+        printElementViaIframe(node, `ใบสำคัญจ่าย_${voucherNo || chequeNo}`, `
+            @page {
+                size: A4 portrait;
+                margin: 10mm 15mm;
+            }
+            body {
+                padding: 0;
+                background: #ffffff !important;
+            }
+            .voucher-wrapper {
+                width: 100% !important;
+                max-width: 100% !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+            }
+            .cheque-date-sublabels, .cheque-sublbl-group, .cheque-sublbl-sep {
+                font-size: 3.8pt !important;
+            }
+        `);
     };
 
 
@@ -640,6 +772,14 @@ export default function ChequeForm() {
                                     <Eye size={18} />
                                     <span>พรีวิวหน้าเช็ค</span>
                                 </button>
+                                <button 
+                                    className="cq-btn" 
+                                    onClick={() => setShowVoucherModal(true)}
+                                    style={{ width: '100%', justifyContent: 'center', padding: '0.75rem', background: '#f5f3ff', color: '#7c3aed', borderColor: '#ddd6fe' }}
+                                >
+                                    <FileSpreadsheet size={18} />
+                                    <span>ใบสำคัญจ่าย A4 (Voucher)</span>
+                                </button>
                                 
 
                                 
@@ -689,16 +829,22 @@ export default function ChequeForm() {
                                     </h3>
                                     <div style={{ display: 'flex', gap: '8px' }}>
                                         <button 
-                                            onClick={handlePrintMockup}
-                                            style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}
+                                            onClick={handlePrintChequeMockup}
+                                            style={{ background: '#059669', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}
                                         >
                                             <Printer size={15} /> พิมพ์ใบเช็ค
+                                        </button>
+                                        <button 
+                                            onClick={() => { setShowPreviewModal(false); setShowVoucherModal(true); }}
+                                            style={{ background: '#7c3aed', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}
+                                        >
+                                            <FileSpreadsheet size={15} /> ใบสำคัญจ่าย A4
                                         </button>
                                         <button className="cq-modal-close" onClick={() => setShowPreviewModal(false)}>✕</button>
                                     </div>
                                 </div>
                                 <div className="cq-modal-body" style={{ background: '#f1f5f9', padding: '1.5rem', overflowY: 'auto', overflowX: 'auto' }}>
-                                    <div className="cheque-canvas-container" style={{ margin: '0 auto' }}>
+                                    <div className="cheque-canvas-container" ref={chequePrintRef} style={{ margin: '0 auto' }}>
                                         <div className="cheque-canvas">
                                             {/* ขีดคร่อมมุมบนซ้าย */}
                                             {isCrossed && (
@@ -853,7 +999,7 @@ export default function ChequeForm() {
 
             {/* ── Payment Voucher A4 Modal / Print Sheet ── */}
             {showVoucherModal && (
-                <div className="cq-modal-overlay" onClick={() => setShowVoucherModal(false)}>
+                <div className="cq-modal-overlay no-print" onClick={() => setShowVoucherModal(false)}>
                     <div className="cq-modal-card" style={{ maxWidth: '880px' }} onClick={(e) => e.stopPropagation()}>
                         <div className="cq-modal-header no-print">
                             <h3 className="cq-modal-title">
@@ -861,13 +1007,19 @@ export default function ChequeForm() {
                                 <span>พิมพ์ใบสำคัญจ่ายเช็ค (Cheque Payment Voucher A4)</span>
                             </h3>
                             <div style={{ display: 'flex', gap: '8px' }}>
+                                <button 
+                                    onClick={handlePrintVoucher}
+                                    style={{ background: '#7c3aed', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}
+                                >
+                                    <Printer size={15} /> พิมพ์ใบสำคัญจ่าย
+                                </button>
                                 <button className="cq-modal-close" onClick={() => setShowVoucherModal(false)}>✕</button>
                             </div>
                         </div>
 
                         <div className="cq-modal-body" style={{ background: '#f8fafc', padding: '1.5rem' }}>
                             {/* A4 Printable Sheet */}
-                            <div className="voucher-wrapper">
+                            <div className="voucher-wrapper" ref={voucherPrintRef}>
                                 <div className="voucher-header">
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                         <div>

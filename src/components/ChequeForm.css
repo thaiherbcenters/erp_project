@@ -984,7 +984,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 3000;
     padding: 1rem;
 }
 
@@ -1476,7 +1476,9 @@
     display: none;
 }
 
-body.print-mode-real-cheque {
+/* ── Print Media Rules (Only active during actual print) ── */
+@media print {
+    body.print-mode-real-cheque {
         @page {
             size: 180mm 90mm;
             margin: 0;
@@ -1719,3 +1721,4 @@ body.print-mode-real-cheque {
         font-size: 4.2pt !important;
         color: #64748b !important;
     }
+}
