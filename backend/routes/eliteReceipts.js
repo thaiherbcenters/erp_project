@@ -21,6 +21,10 @@ router.get('/', authMiddleware, async (req, res) => {
         const offset = (pageNum - 1) * pageLimit;
         const search = req.query.search || '';
         const status = req.query.status || '';
+        const createdBy = req.query.createdBy || '';
+        const paymentMethod = req.query.paymentMethod || '';
+        const dateFrom = req.query.dateFrom || '';
+        const dateTo = req.query.dateTo || '';
 
         const countRequest = pool.request();
         const dataRequest = pool.request();
@@ -30,13 +34,40 @@ router.get('/', authMiddleware, async (req, res) => {
         if (search && search.trim()) {
             countRequest.input('search', sql.NVarChar, `%${search.trim()}%`);
             dataRequest.input('search', sql.NVarChar, `%${search.trim()}%`);
-            whereClauses.push(`(r.DocNo LIKE @search OR r.CustomerName LIKE @search)`);
+            whereClauses.push(`(r.DocNo LIKE @search OR r.CustomerName LIKE @search OR r.BookNo LIKE @search)`);
         }
 
         if (status && status !== 'all') {
             countRequest.input('status', sql.NVarChar, status);
             dataRequest.input('status', sql.NVarChar, status);
             whereClauses.push(`r.Status = @status`);
+        }
+
+        if (createdBy && createdBy !== 'all' && createdBy !== '') {
+            const uid = parseInt(createdBy);
+            if (!isNaN(uid)) {
+                countRequest.input('createdBy', sql.Int, uid);
+                dataRequest.input('createdBy', sql.Int, uid);
+                whereClauses.push(`r.CreatedBy = @createdBy`);
+            }
+        }
+
+        if (paymentMethod && paymentMethod !== 'all' && paymentMethod !== '') {
+            countRequest.input('paymentMethod', sql.NVarChar, paymentMethod);
+            dataRequest.input('paymentMethod', sql.NVarChar, paymentMethod);
+            whereClauses.push(`r.PaymentMethod = @paymentMethod`);
+        }
+
+        if (dateFrom) {
+            countRequest.input('dateFrom', sql.Date, dateFrom);
+            dataRequest.input('dateFrom', sql.Date, dateFrom);
+            whereClauses.push(`CAST(r.DocDate AS DATE) >= @dateFrom`);
+        }
+
+        if (dateTo) {
+            countRequest.input('dateTo', sql.Date, dateTo);
+            dataRequest.input('dateTo', sql.Date, dateTo);
+            whereClauses.push(`CAST(r.DocDate AS DATE) <= @dateTo`);
         }
 
         const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';

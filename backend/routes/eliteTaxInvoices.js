@@ -8,7 +8,7 @@ const { peekNextSequence, getShortDatePrefix } = require('../utils/sequence');
 router.get('/', authMiddleware, async (req, res) => {
     try {
         const pool = await poolPromise;
-        const { search, status, page = 1, limit = 10 } = req.query;
+        const { search, status, createdBy, dateFrom, dateTo, page = 1, limit = 10 } = req.query;
         const pageNum = Math.max(1, parseInt(page) || 1);
         const pageLimit = Math.max(1, parseInt(limit) || 10);
         const offset = (pageNum - 1) * pageLimit;
@@ -20,13 +20,34 @@ router.get('/', authMiddleware, async (req, res) => {
         if (search && search.trim()) {
             countRequest.input('search', sql.NVarChar, `%${search.trim()}%`);
             dataRequest.input('search', sql.NVarChar, `%${search.trim()}%`);
-            whereClauses.push(`(ti.DocNo LIKE @search OR ti.CustomerName LIKE @search)`);
+            whereClauses.push(`(ti.DocNo LIKE @search OR ti.CustomerName LIKE @search OR ti.Reference LIKE @search)`);
         }
 
         if (status && status !== 'all') {
             countRequest.input('status', sql.NVarChar, status);
             dataRequest.input('status', sql.NVarChar, status);
             whereClauses.push(`ti.Status = @status`);
+        }
+
+        if (createdBy && createdBy !== 'all' && createdBy !== '') {
+            const uid = parseInt(createdBy);
+            if (!isNaN(uid)) {
+                countRequest.input('createdBy', sql.Int, uid);
+                dataRequest.input('createdBy', sql.Int, uid);
+                whereClauses.push(`ti.CreatedBy = @createdBy`);
+            }
+        }
+
+        if (dateFrom) {
+            countRequest.input('dateFrom', sql.Date, dateFrom);
+            dataRequest.input('dateFrom', sql.Date, dateFrom);
+            whereClauses.push(`CAST(ti.DocDate AS DATE) >= @dateFrom`);
+        }
+
+        if (dateTo) {
+            countRequest.input('dateTo', sql.Date, dateTo);
+            dataRequest.input('dateTo', sql.Date, dateTo);
+            whereClauses.push(`CAST(ti.DocDate AS DATE) <= @dateTo`);
         }
 
         const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';

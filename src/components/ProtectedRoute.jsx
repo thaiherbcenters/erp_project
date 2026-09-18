@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { ALL_PAGES } from '../data/mockData';
 
 export default function ProtectedRoute({ pageId, children, adminOnly = false }) {
-    const { currentUser, hasPermission, activeCompany } = useAuth();
+    const { currentUser, hasPermission, activeCompany, permissions } = useAuth();
 
     // ยังไม่ได้ล็อกอิน → redirect ไปหน้า Login
     if (!currentUser) {
@@ -61,6 +61,18 @@ export default function ProtectedRoute({ pageId, children, adminOnly = false }) 
 
     // ตรวจสิทธิ์ระดับ page — ถ้าไม่มีสิทธิ์แสดงข้อความแจ้ง
     if (pageId && !hasPermission(pageId)) {
+        // กรณี user ไม่มีสิทธิ์หน้า home (เช่น พนักงานฝ่ายขายที่ไม่มีสิทธิ์ดู Dashboard หน้าหลัก)
+        // ให้ redirect อัตโนมัติไปยังหน้าแรกที่ user มีสิทธิ์ในบริษัทปัจจุบัน
+        if (pageId === 'home') {
+            const companyPages = ALL_PAGES.filter(p => (p.companyId || 1) === activeCompanyId);
+            const userPerms = permissions[currentUser.id] || [];
+            const isPermAllowed = (pid) => userPerms.some(up => (typeof up === 'string' ? up : up?.page_id) === pid);
+            const firstAllowed = companyPages.find(p => isPermAllowed(p.id));
+            if (firstAllowed) {
+                return <Navigate to={firstAllowed.path || `/${firstAllowed.id}`} replace />;
+            }
+        }
+
         return (
             <div className="no-access">
                 <div className="no-access-card">

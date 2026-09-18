@@ -13,6 +13,7 @@ import CustomDatePicker from '../components/CustomDatePicker';
 import { TipTapCell } from '../components/TipTapCell';
 import { numberToThaiBaht } from '../utils/thaiBahtConverter';
 import { searchThaiAddress } from '../utils/thaiAddress';
+import { FilterToggleButton, EliteReceiptFilterDrawer } from '../components/SalesDocFilter';
 
 const DEFAULT_RECEIPT_REMARKS = '<p>ใบเสร็จรับเงินฉบับนี้จะสมบูรณ์เมื่อมีลายเซ็นของพนักงานการเงินและผู้รับมอบอำนาจ หากชำระเงินด้วยเช็ค</p><p>ใบเสร็จรับเงินจะสมบูรณ์เมื่อ บริษัท อิลิท เทรดดิ้ง 2020 จำกัด ได้รับเงินตามเช็คเรียบร้อยแล้ว</p>';
 
@@ -28,7 +29,16 @@ export default function EliteReceipt() {
     // List & Filters
     const [receipts, setReceipts] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [showFilter, setShowFilter] = useState(false);
+    const [filter, setFilter] = useState({
+        status: 'all',
+        paymentMethod: '',
+        createdBy: '',
+        dateFrom: '',
+        dateTo: ''
+    });
+    const [usersList, setUsersList] = useState([]);
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 10,
@@ -81,16 +91,101 @@ export default function EliteReceipt() {
         setAmount(val);
     };
 
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchQuery);
+            setPagination(prev => ({ ...prev, page: 1 }));
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Load users list for creator filter
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const authToken = token || localStorage.getItem('erp_token') || localStorage.getItem('token');
+                const res = await fetch('/api/users', {
+                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                });
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    setUsersList(data);
+                } else if (data.success && Array.isArray(data.users || data.data)) {
+                    setUsersList(data.users || data.data);
+                }
+            } catch (err) {
+                console.error('Error loading users:', err);
+            }
+        };
+        fetchUsers();
+    }, [token]);
+
+    const activeFilterCount = [
+        Boolean(filter.status && filter.status !== 'all'),
+        Boolean(filter.paymentMethod && filter.paymentMethod !== 'all'),
+        Boolean(filter.createdBy && filter.createdBy !== 'all'),
+        Boolean(filter.dateFrom || filter.dateTo)
+    ].filter(Boolean).length;
+
+    const handleFilterChange = (field, value) => {
+        setFilter(prev => ({ ...prev, [field]: value }));
+        setPagination(prev => ({ ...prev, page: 1 }));
+    };
+
+    const handleResetFilter = () => {
+        setFilter({
+            status: 'all',
+            paymentMethod: '',
+            createdBy: '',
+            dateFrom: '',
+            dateTo: ''
+        });
+        setPagination(prev => ({ ...prev, page: 1 }));
+    };
+
+    const handleQuickDate = (type) => {
+        const now = new Date();
+        const format = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        const todayStr = format(now);
+        setPagination(prev => ({ ...prev, page: 1 }));
+        if (type === 'today') {
+            setFilter(prev => ({ ...prev, dateFrom: todayStr, dateTo: todayStr }));
+        } else if (type === '7days') {
+            const d7 = new Date();
+            d7.setDate(d7.getDate() - 6);
+            setFilter(prev => ({ ...prev, dateFrom: format(d7), dateTo: todayStr }));
+        } else if (type === 'thisMonth') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            setFilter(prev => ({ ...prev, dateFrom: format(startOfMonth), dateTo: format(endOfMonth) }));
+        } else if (type === 'thisYear') {
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            const endOfYear = new Date(now.getFullYear(), 11, 31);
+            setFilter(prev => ({ ...prev, dateFrom: format(startOfYear), dateTo: format(endOfYear) }));
+        }
+    };
+
     // ── Fetch Receipts List ──
-    const fetchReceipts = useCallback(async (page = 1, search = searchQuery, status = statusFilter, limit = pagination.limit) => {
+    const fetchReceipts = useCallback(async (page = 1, search = debouncedSearch, currentFilter = filter, limit = pagination.limit) => {
         setIsLoadingList(true);
         try {
             const queryParams = new URLSearchParams({
                 page: page.toString(),
                 limit: limit.toString(),
-                search: search || '',
-                status: status || 'all'
+                search: search || ''
             });
+
+            if (currentFilter.status && currentFilter.status !== 'all') queryParams.append('status', currentFilter.status);
+            if (currentFilter.paymentMethod && currentFilter.paymentMethod !== 'all') queryParams.append('paymentMethod', currentFilter.paymentMethod);
+            if (currentFilter.createdBy && currentFilter.createdBy !== 'all') queryParams.append('createdBy', currentFilter.createdBy);
+            if (currentFilter.dateFrom) queryParams.append('dateFrom', currentFilter.dateFrom);
+            if (currentFilter.dateTo) queryParams.append('dateTo', currentFilter.dateTo);
 
             const res = await fetch(`/api/elite-receipts?${queryParams}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -110,16 +205,11 @@ export default function EliteReceipt() {
         } finally {
             setIsLoadingList(false);
         }
-    }, [token, searchQuery, statusFilter, pagination.limit, showAlert]);
+    }, [token, debouncedSearch, filter, pagination.limit, showAlert]);
 
     useEffect(() => {
-        fetchReceipts(pagination.page, searchQuery, statusFilter, pagination.limit);
-    }, [fetchReceipts, pagination.page, statusFilter]);
-
-    const handleSearchSubmit = (e) => {
-        e.preventDefault();
-        fetchReceipts(1, searchQuery, statusFilter, pagination.limit);
-    };
+        fetchReceipts(pagination.page, debouncedSearch, filter, pagination.limit);
+    }, [fetchReceipts, pagination.page, debouncedSearch, filter]);
 
     // ── Fetch Next Doc Number & Book No ──
     const fetchNextNumber = async (date) => {
@@ -655,56 +745,57 @@ export default function EliteReceipt() {
                         gap: '12px',
                         flexWrap: 'wrap'
                     }}>
-                        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, maxWidth: '520px' }}>
-                            <div style={{ position: 'relative', width: '100%' }}>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: '1 1 360px', maxWidth: '560px' }}>
+                            <div style={{ position: 'relative', flex: 1 }}>
                                 <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                                 <input 
                                     type="text" 
-                                    placeholder="พิมพ์เลขที่ใบเสร็จ / ชื่อลูกค้า..." 
+                                    placeholder="พิมพ์เลขที่ใบเสร็จ / ชื่อลูกค้า / เล่มที่..." 
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     style={{
                                         paddingLeft: '38px',
+                                        paddingRight: searchQuery ? '32px' : '12px',
                                         width: '100%',
                                         height: '40px',
                                         borderRadius: '8px',
                                         border: '1px solid #cbd5e1',
                                         outline: 'none',
                                         fontSize: '14px',
-                                        background: '#fff'
+                                        background: '#fff',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery('')}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '10px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: '#94a3b8',
+                                            padding: '2px',
+                                            display: 'flex'
+                                        }}
+                                        title="ล้างข้อความค้นหา"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
                             </div>
-                            <CustomSelect 
-                                value={statusFilter} 
-                                onChange={(e) => {
-                                    setStatusFilter(e.target.value);
-                                    fetchReceipts(1, searchQuery, e.target.value);
-                                }}
-                                usePortal={true}
-                                style={{
-                                    width: '130px',
-                                    height: '40px',
-                                    borderRadius: '8px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#fff',
-                                    color: '#475569',
-                                    fontSize: '14px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <option value="all">ทุกสถานะ</option>
-                                <option value="พร้อมใช้">พร้อมใช้</option>
-                                <option value="ยกเลิก">ยกเลิก</option>
-                            </CustomSelect>
-                            <button 
-                                type="submit" 
-                                className="btn-secondary" 
-                                style={{ height: '40px', padding: '0 16px', borderRadius: '8px', cursor: 'pointer', border: '1px solid #cbd5e1', background: '#fff' }}
-                            >
-                                ค้นหา
-                            </button>
-                        </form>
+
+                            {/* ปุ่ม Icon Filter Toggle */}
+                            <FilterToggleButton
+                                isOpen={showFilter}
+                                onClick={() => setShowFilter(prev => !prev)}
+                                activeCount={activeFilterCount}
+                            />
+                        </div>
 
                         {canCreate('elite_doc_receipt') && (
                             <button 
@@ -722,13 +813,26 @@ export default function EliteReceipt() {
                                     cursor: 'pointer',
                                     fontSize: '14px',
                                     fontWeight: '600',
-                                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)'
+                                    boxShadow: '0 2px 4px rgba(16, 185, 129, 0.2)',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
                                 }}
                             >
                                 <Plus size={18} /> สร้างใบเสร็จรับเงิน
                             </button>
                         )}
                     </div>
+
+                    {/* ── Advanced Filter Drawer ── */}
+                    <EliteReceiptFilterDrawer
+                        isOpen={showFilter}
+                        onClose={() => setShowFilter(false)}
+                        filter={filter}
+                        onFilterChange={handleFilterChange}
+                        onReset={handleResetFilter}
+                        onQuickDate={handleQuickDate}
+                        usersList={usersList}
+                    />
 
                     {/* Table Card */}
                     <div className="table-card card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>

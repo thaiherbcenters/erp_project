@@ -29,6 +29,7 @@ import CustomDatePicker from '../components/CustomDatePicker';
 import TaxIdInput from '../components/TaxIdInput';
 import { TipTapCell } from '../components/TipTapCell';
 import { searchThaiAddress } from '../utils/thaiAddress';
+import { FilterToggleButton, EliteTaxInvoiceFilterDrawer } from '../components/SalesDocFilter';
 import './PageCommon.css';
 
 const DEFAULT_INVOICE_REMARKS = '<p>*** โปรดชำระเงินด้วยเช็คขีดคร่อม และสั่งจ่ายในนาม "บริษัท อิลิท เทรดดิ้ง 2020 จำกัด" เท่านั้น</p><p>*** หากไม่มีการทักท้วงใดๆ เกี่ยวกับใบแจ้งหนี้ฉบับนี้ภายใน 7 วันนับแต่ได้รับใบแจ้งหนี้/ใบวางบิล บริษัทฯ จะถือว่าใบแจ้งหนี้/ใบวางบิลฉบับนี้ถูกต้อง</p>';
@@ -108,13 +109,99 @@ export default function EliteTaxInvoice() {
     // List & Filters
     const [invoices, setInvoices] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState('all');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [showFilter, setShowFilter] = useState(false);
+    const [usersList, setUsersList] = useState([]);
+    const [filter, setFilter] = useState({
+        status: 'all',
+        createdBy: '',
+        dateFrom: '',
+        dateTo: ''
+    });
     const [pagination, setPagination] = useState({
         page: 1,
         limit: 10,
         total: 0,
         totalPages: 1
     });
+
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchQuery);
+            setPagination(prev => ({ ...prev, page: 1 }));
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Load users list for creator filter
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const authToken = token || localStorage.getItem('erp_token') || localStorage.getItem('token');
+                const res = await fetch('/api/users', {
+                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
+                });
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    setUsersList(data);
+                } else if (data.success && Array.isArray(data.users || data.data)) {
+                    setUsersList(data.users || data.data);
+                }
+            } catch (err) {
+                console.error('Error loading users:', err);
+            }
+        };
+        fetchUsers();
+    }, [token]);
+
+    const activeFilterCount = [
+        Boolean(filter.status && filter.status !== 'all'),
+        Boolean(filter.createdBy && filter.createdBy !== 'all'),
+        Boolean(filter.dateFrom || filter.dateTo)
+    ].filter(Boolean).length;
+
+    const handleFilterChange = (field, value) => {
+        setFilter(prev => ({ ...prev, [field]: value }));
+        setPagination(prev => ({ ...prev, page: 1 }));
+    };
+
+    const handleResetFilter = () => {
+        setFilter({
+            status: 'all',
+            createdBy: '',
+            dateFrom: '',
+            dateTo: ''
+        });
+        setPagination(prev => ({ ...prev, page: 1 }));
+    };
+
+    const handleQuickDate = (type) => {
+        const now = new Date();
+        const format = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        const todayStr = format(now);
+        setPagination(prev => ({ ...prev, page: 1 }));
+        if (type === 'today') {
+            setFilter(prev => ({ ...prev, dateFrom: todayStr, dateTo: todayStr }));
+        } else if (type === '7days') {
+            const d7 = new Date();
+            d7.setDate(d7.getDate() - 6);
+            setFilter(prev => ({ ...prev, dateFrom: format(d7), dateTo: todayStr }));
+        } else if (type === 'thisMonth') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            setFilter(prev => ({ ...prev, dateFrom: format(startOfMonth), dateTo: format(endOfMonth) }));
+        } else if (type === 'thisYear') {
+            const startOfYear = new Date(now.getFullYear(), 0, 1);
+            const endOfYear = new Date(now.getFullYear(), 11, 31);
+            setFilter(prev => ({ ...prev, dateFrom: format(startOfYear), dateTo: format(endOfYear) }));
+        }
+    };
 
     // Form data
     const [editingId, setEditingId] = useState(null);
@@ -490,15 +577,19 @@ export default function EliteTaxInvoice() {
     };
 
     // ── Fetch Invoices List ──
-    const fetchInvoices = useCallback(async (page = 1, search = searchQuery, status = statusFilter, limit = pagination.limit) => {
+    const fetchInvoices = useCallback(async (page = 1, search = debouncedSearch, currentFilter = filter, limit = pagination.limit) => {
         setIsLoadingList(true);
         try {
             const queryParams = new URLSearchParams({
                 page: page.toString(),
                 limit: limit.toString(),
-                search: search || '',
-                status: status || 'all'
+                search: search || ''
             });
+
+            if (currentFilter.status && currentFilter.status !== 'all') queryParams.append('status', currentFilter.status);
+            if (currentFilter.createdBy && currentFilter.createdBy !== 'all') queryParams.append('createdBy', currentFilter.createdBy);
+            if (currentFilter.dateFrom) queryParams.append('dateFrom', currentFilter.dateFrom);
+            if (currentFilter.dateTo) queryParams.append('dateTo', currentFilter.dateTo);
 
             const res = await fetch(`/api/elite-tax-invoices?${queryParams}`, {
                 headers: {
@@ -520,16 +611,11 @@ export default function EliteTaxInvoice() {
         } finally {
             setIsLoadingList(false);
         }
-    }, [token, searchQuery, statusFilter, pagination.limit, showAlert]);
+    }, [token, debouncedSearch, filter, pagination.limit, showAlert]);
 
     useEffect(() => {
-        fetchInvoices(pagination.page, searchQuery, statusFilter, pagination.limit);
-    }, [fetchInvoices, pagination.page, statusFilter]);
-
-    const handleSearchSubmit = (e) => {
-        e.preventDefault();
-        fetchInvoices(1, searchQuery, statusFilter, pagination.limit);
-    };
+        fetchInvoices(pagination.page, debouncedSearch, filter, pagination.limit);
+    }, [fetchInvoices, pagination.page, debouncedSearch, filter]);
 
     // ── Fetch Next Doc Number ──
     const fetchNextNumber = async (date) => {
@@ -1109,63 +1195,64 @@ export default function EliteTaxInvoice() {
                         gap: '12px',
                         flexWrap: 'wrap'
                     }}>
-                        <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, maxWidth: '520px' }}>
-                            <div style={{ position: 'relative', width: '100%' }}>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: '1 1 360px', maxWidth: '560px' }}>
+                            <div style={{ position: 'relative', flex: 1 }}>
                                 <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                                 <input 
                                     type="text" 
-                                    placeholder="พิมพ์เลขที่ใบเสร็จ / ชื่อลูกค้า..." 
+                                    placeholder="พิมพ์เลขที่ใบแจ้งหนี้ / ชื่อลูกค้า / อ้างถึง..." 
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     style={{
                                         paddingLeft: '38px',
+                                        paddingRight: searchQuery ? '32px' : '12px',
                                         width: '100%',
                                         height: '40px',
                                         borderRadius: '8px',
                                         border: '1px solid #cbd5e1',
                                         outline: 'none',
                                         fontSize: '14px',
-                                        background: '#fff'
+                                        background: '#fff',
+                                        boxSizing: 'border-box'
                                     }}
                                 />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery('')}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '10px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            background: 'none',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: '#94a3b8',
+                                            padding: '2px',
+                                            display: 'flex'
+                                        }}
+                                        title="ล้างข้อความค้นหา"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
                             </div>
-                            <CustomSelect 
-                                value={statusFilter} 
-                                onChange={(e) => {
-                                    setStatusFilter(e.target.value);
-                                    fetchInvoices(1, searchQuery, e.target.value);
-                                }}
-                                usePortal={true}
-                                style={{
-                                    width: '130px',
-                                    height: '40px',
-                                    borderRadius: '8px',
-                                    border: '1px solid #cbd5e1',
-                                    background: '#fff',
-                                    color: '#475569',
-                                    fontSize: '14px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                <option value="all">ทุกสถานะ</option>
-                                <option value="พร้อมใช้">พร้อมใช้</option>
-                                <option value="ยกเลิก">ยกเลิก</option>
-                            </CustomSelect>
-                            <button 
-                                type="submit" 
-                                className="btn-secondary" 
-                                style={{ height: '40px', padding: '0 16px', borderRadius: '8px', cursor: 'pointer', border: '1px solid #cbd5e1', background: '#fff' }}
-                            >
-                                ค้นหา
-                            </button>
-                        </form>
+
+                            {/* ปุ่ม Icon Filter Toggle */}
+                            <FilterToggleButton
+                                isOpen={showFilter}
+                                onClick={() => setShowFilter(prev => !prev)}
+                                activeCount={activeFilterCount}
+                            />
+                        </div>
 
                         {canCreate('elite_doc_tax_invoice') && (
                             <button 
                                 type="button"
                                 onClick={handleCreateNew}
                                 style={{
-                                    display: 'flex',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '8px',
                                     background: '#10b981',
@@ -1177,13 +1264,26 @@ export default function EliteTaxInvoice() {
                                     fontSize: '14px',
                                     cursor: 'pointer',
                                     boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
-                                    transition: 'all 0.2s ease'
+                                    transition: 'all 0.2s ease',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
                                 }}
                             >
                                 <Plus size={18} /> สร้างใบแจ้งหนี้/ใบกำกับภาษี
                             </button>
                         )}
                     </div>
+
+                    {/* ── Advanced Filter Drawer ── */}
+                    <EliteTaxInvoiceFilterDrawer
+                        isOpen={showFilter}
+                        onClose={() => setShowFilter(false)}
+                        filter={filter}
+                        onFilterChange={handleFilterChange}
+                        onReset={handleResetFilter}
+                        onQuickDate={handleQuickDate}
+                        usersList={usersList}
+                    />
 
                     {/* Table Card */}
                     <div className="table-card card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
@@ -1335,11 +1435,11 @@ export default function EliteTaxInvoice() {
                             pageSize={pagination.limit}
                             onPageChange={(newPage) => {
                                 setPagination(prev => ({ ...prev, page: newPage }));
-                                fetchInvoices(newPage, searchQuery, statusFilter, pagination.limit);
+                                fetchInvoices(newPage, debouncedSearch, filter, pagination.limit);
                             }}
                             onPageSizeChange={(newSize) => {
                                 setPagination(prev => ({ ...prev, limit: newSize, page: 1 }));
-                                fetchInvoices(1, searchQuery, statusFilter, newSize);
+                                fetchInvoices(1, debouncedSearch, filter, newSize);
                             }}
                         />
                     </div>

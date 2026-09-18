@@ -24,10 +24,17 @@ export const getCompanyHomeRoute = (company, user = null, perms = []) => {
     const short = (company?.ShortName || '').toUpperCase();
     const id = company?.CompanyID;
 
+    const isPermAllowed = (pageId) => {
+        return perms.some(up => {
+            const pid = typeof up === 'string' ? up : up?.page_id;
+            return pid === pageId;
+        });
+    };
+
     if (short === 'ELITE' || id === 2) {
         if (user && user.role !== 'admin' && perms && perms.length > 0) {
             const elitePages = ALL_PAGES.filter(p => p.companyId === 2);
-            const firstAllowed = elitePages.find(p => perms.some(up => up.page_id === p.id));
+            const firstAllowed = elitePages.find(p => isPermAllowed(p.id));
             if (firstAllowed) return firstAllowed.path;
         }
         return '/elite';
@@ -36,14 +43,14 @@ export const getCompanyHomeRoute = (company, user = null, perms = []) => {
     if (short === 'PSF' || id === 4) return '/psf';
 
     // THC (CompanyID 1) หรือ Default ERP โรงงาน
-    let firstPageId = 'home';
     if (user && user.role !== 'admin' && perms && perms.length > 0) {
-        const firstAllowedPage = ALL_PAGES.find(p => (p.companyId || 1) === 1 && perms.some(up => up.page_id === p.id));
+        const thcPages = ALL_PAGES.filter(p => (p.companyId || 1) === 1);
+        const firstAllowedPage = thcPages.find(p => isPermAllowed(p.id));
         if (firstAllowedPage) {
-            firstPageId = firstAllowedPage.id;
+            return firstAllowedPage.path || `/${firstAllowedPage.id}`;
         }
     }
-    return `/${firstPageId}`;
+    return '/home';
 };
 
 // =============================================================================
@@ -56,6 +63,13 @@ export function AuthProvider({ children }) {
     const [currentUser, setCurrentUser] = useState(() => {
         const saved = localStorage.getItem('erp_current_user');
         return saved ? JSON.parse(saved) : null;
+    });
+
+    // ──────────────────────────────────────────────────────
+    // State: JWT Token
+    // ──────────────────────────────────────────────────────
+    const [token, setToken] = useState(() => {
+        return localStorage.getItem('erp_token') || localStorage.getItem('token') || null;
     });
 
     // ──────────────────────────────────────────────────────
@@ -166,6 +180,7 @@ export function AuthProvider({ children }) {
                 setCurrentUser(user);
                 localStorage.setItem('erp_token', data.token);
                 localStorage.setItem('token', data.token);
+                setToken(data.token);
 
                 // ดึงสิทธิ์จริงจาก DB (ไม่ใช่จาก token)
                 const apiPerms = await fetchPermissionsFromAPI(user.id);
@@ -202,6 +217,7 @@ export function AuthProvider({ children }) {
                         if (selRes.ok && selData.token) {
                             localStorage.setItem('erp_token', selData.token);
                             localStorage.setItem('token', selData.token);
+                            setToken(selData.token);
                         }
                     } catch (e) {
                         console.warn('Auto select-company failed:', e);
@@ -256,6 +272,7 @@ export function AuthProvider({ children }) {
         localStorage.removeItem('erp_active_company');
         localStorage.removeItem('erp_available_companies');
         localStorage.removeItem('token');
+        setToken(null);
     };
 
     // =================================================================
@@ -279,11 +296,17 @@ export function AuthProvider({ children }) {
             if (response.ok && data.token) {
                 localStorage.setItem('erp_token', data.token);
                 localStorage.setItem('token', data.token);
+                setToken(data.token);
                 setActiveCompany(data.company);
 
-                // หาหน้าที่ต้อง redirect ตามบริษัทที่เลือก
-                const userPerms = permissions[currentUser?.id] || [];
-                const redirectPath = getCompanyHomeRoute(data.company, currentUser, userPerms);
+                // หาหน้าที่ต้อง redirect ตามบริษัทที่เลือก (มั่นใจว่ามีสิทธิ์ล่าสุด)
+                let userPerms = permissions[currentUser?.id];
+                if (!userPerms || userPerms.length === 0) {
+                    if (currentUser?.id) {
+                        userPerms = await fetchPermissionsFromAPI(currentUser.id);
+                    }
+                }
+                const redirectPath = getCompanyHomeRoute(data.company, currentUser, userPerms || []);
 
                 return { success: true, company: data.company, redirectPath };
             }
@@ -638,6 +661,7 @@ export function AuthProvider({ children }) {
             value={{
                 // State
                 currentUser,
+                token,
                 permissions,
 
                 // Multi-Company State

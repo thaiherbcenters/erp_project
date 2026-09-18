@@ -75,9 +75,15 @@ const EliteReceiptPrint = forwardRef(({ data }, ref) => {
                 {/* Logo */}
                 <div style={{ flex: '0 0 100px', textAlign: 'left' }}>
                     <img 
-                        src="https://lh3.googleusercontent.com/d/1AOhQw5uKKJYoByWFR5XLW8TV7rxiIVfW" 
+                        src="/images/logos/logo-elite.png" 
                         alt="Logo"
                         style={{ width: '95px', height: 'auto', objectFit: 'contain', marginLeft: '0px' }} 
+                        onError={(e) => {
+                            if (!e.target.dataset.tried) {
+                                e.target.dataset.tried = 'true';
+                                e.target.src = '/images/logos/logo-elt.png';
+                            }
+                        }}
                     />
                 </div>
 

@@ -54,7 +54,17 @@ const EliteTaxInvoicePrint = forwardRef(({ data }, ref) => {
                 <tbody>
                     <tr>
                         <td style={{ width: '18%', paddingRight: '15px', verticalAlign: 'top', textAlign: 'right' }}>
-                            <img src="https://lh3.googleusercontent.com/d/1AOhQw5uKKJYoByWFR5XLW8TV7rxiIVfW" alt="Logo" style={{ maxWidth: '130px', maxHeight: '130px', objectFit: 'contain', display: 'inline-block' }} />
+                            <img 
+                                src="/images/logos/logo-elite.png" 
+                                alt="Logo" 
+                                style={{ maxWidth: '130px', maxHeight: '130px', objectFit: 'contain', display: 'inline-block' }} 
+                                onError={(e) => {
+                                    if (!e.target.dataset.tried) {
+                                        e.target.dataset.tried = 'true';
+                                        e.target.src = '/images/logos/logo-elt.png';
+                                    }
+                                }}
+                            />
                         </td>
                         <td style={{ width: '82%', verticalAlign: 'top', paddingTop: '10px', paddingRight: '60px', position: 'relative', textAlign: 'left' }}>
                             <div style={{ color: '#1a7a3a', fontSize: '16pt', fontWeight: 'bold', marginBottom: '4px', whiteSpace: 'nowrap' }}>บริษัท อิลิท เทรดดิ้ง 2020 จำกัด (สำนักงานใหญ่)</div>
