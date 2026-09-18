@@ -59,7 +59,7 @@ const DEFAULT_PRINT_CONFIG = {
     fontSizeBaht: 11, // pt — จำนวนเงินตัวอักษร
     fontSizeAmount: 10.5,// pt — ช่องตัวเลข ฿
     fontSizeDate: 8.5, // pt — ตัวเลขในช่องวันที่
-    rotate180: true,   // boolean — หมุนพิมพ์ 180° อัตโนมัติ (เอาฝั่งวันที่เข้าก่อน แก้ปัญหา HP กินขอบท้าย)
+    rotate180: false,  // boolean — ค่าเริ่มต้นไม่หมุน (พิมพ์แนวปกติ หัวอยู่บน)
 };
 
 /**
@@ -127,13 +127,13 @@ export default function ChequeForm() {
                 return { 
                     ...DEFAULT_PRINT_CONFIG, 
                     ...parsed,
-                    rotate180: parsed.rotate180 !== undefined ? parsed.rotate180 : true
+                    rotate180: false
                 };
             }
         } catch (e) {
             console.error('Error loading print config:', e);
         }
-        return { ...DEFAULT_PRINT_CONFIG, rotate180: true };
+        return { ...DEFAULT_PRINT_CONFIG, rotate180: false };
     });
 
     // สถานะการล็อกพิกัด (ล็อกไว้เสมอเป็นค่าเริ่มต้นเพื่อป้องกันการกดโดน ถ้าจะแก้ต้องกดปลดล็อกก่อน)
@@ -1347,6 +1347,16 @@ export default function ChequeForm() {
                                                              <option value="a4-right">ชิดขวาถาด A4 (Right Feed)</option>
                                                          </CustomSelect>
                                                      </div>
+                                                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: isConfigLocked ? 'not-allowed' : 'pointer', fontSize: '12px', color: '#475569', marginTop: '8px' }}>
+                                                         <input 
+                                                             type="checkbox"
+                                                             checked={!!printConfig.rotate180}
+                                                             disabled={isConfigLocked}
+                                                             onChange={(e) => updatePrintConfig('rotate180', e.target.checked)}
+                                                             style={{ width: '15px', height: '15px', cursor: isConfigLocked ? 'not-allowed' : 'pointer' }}
+                                                         />
+                                                         <span>หมุนพิมพ์ 180° (สำหรับเครื่องพิมพ์ที่ต้องป้อนเอาฝั่งวันที่เข้าก่อน)</span>
+                                                     </label>
                                                  </div>
 
                                                  {/* Toggle Advanced Fine-Tuning */}
