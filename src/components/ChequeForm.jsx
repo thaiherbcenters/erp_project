@@ -19,10 +19,12 @@ import { numberToThaiBaht, formatChequeAmount } from '../utils/thaiBahtConverter
 import {
     Printer, Save, RotateCcw, History, FileSpreadsheet,
     Calendar, CreditCard, DollarSign, User, FileText, Trash2, Eye,
-    CheckCircle2, ChevronRight, Search, Plus, Image, ArrowLeft, Pencil, X
+    CheckCircle2, ChevronRight, Search, Plus, Image, ArrowLeft, Pencil, X,
+    Sliders, ChevronDown, Lock, Unlock
 } from 'lucide-react';
 import '../pages/PageCommon.css';
 import './ChequeForm.css';
+import CustomSelect from './CustomSelect';
 
 // ข้อมูลตั้งต้นของเช็คกสิกรไทย (อ้างอิงจากรูปถ่ายจริง)
 const DEFAULT_KBANK_CONFIG = {
@@ -35,6 +37,79 @@ const DEFAULT_KBANK_CONFIG = {
     micrCode: '⑆69 ⑈59840064⑈004⑉0312⑆ 0681758488⑈'
 };
 
+// พิกัดมิลลิเมตรสำหรับการพิมพ์ลงใบเช็คจริง (ปรับจูนตามระยะจริงของเครื่องพิมพ์และใบเช็ค 17.7 x 9.0 cm)
+const DEFAULT_PRINT_CONFIG = {
+    paperWidth: 177, // mm
+    paperHeight: 90,  // mm
+    offsetX: 0,       // mm ชดเชยแนวนอน
+    offsetY: 0,       // mm ชดเชยแนวตั้ง
+    feedMode: 'custom-slip', // 'custom-slip' (ขนาดกำหนดเอง 17.7 × 9 ซม.) | 'a4-center' | 'a4-left' | 'a4-right'
+    dateX: 120,       // mm ช่องวันที่ช่องแรก (120 mm จากขอบซ้าย)
+    dateY: 3.5,       // mm แนววันที่ (3.5 mm จากขอบบน)
+    dateStep: 6.3,    // mm ระยะห่างแต่ละช่องวันที่ (6.3 mm ต่อช่อง)
+    payeeX: 35,       // mm สั่งจ่ายให้ (35 mm จากขอบซ้าย)
+    payeeY: 20.5,     // mm บรรทัดจ่าย (20.5 mm จากขอบบน)
+    bahtX: 35,        // mm บาทตัวอักษร (35 mm จากขอบซ้าย)
+    bahtY: 29,        // mm บรรทัดบาท (29 mm จากขอบบน)
+    amountX: 116,     // mm ช่องตัวเลข ฿ (116 mm จากขอบซ้าย)
+    amountY: 38,      // mm แนวตัวเลข (38 mm จากขอบบน)
+    crossX: 0,        // mm ขีดคร่อม
+    crossY: 0,        // mm ขีดคร่อม
+    fontSizePayee: 11,// pt — ชื่อผู้รับเงินบนใบเช็คจริง
+    fontSizeBaht: 11, // pt — จำนวนเงินตัวอักษร
+    fontSizeAmount: 10.5,// pt — ช่องตัวเลข ฿
+    fontSizeDate: 8.5, // pt — ตัวเลขในช่องวันที่
+    rotate180: true,   // boolean — หมุนพิมพ์ 180° อัตโนมัติ (เอาฝั่งวันที่เข้าก่อน แก้ปัญหา HP กินขอบท้าย)
+};
+
+/**
+ * ลบเครื่องหมายดอกจัน * ออกจากข้อความตัวอักษร
+ */
+const cleanBahtText = (str) => {
+    if (!str) return '';
+    return String(str).replace(/\*/g, '').trim();
+};
+
+/**
+ * จัดรูปแบบเครื่องหมายดอกจัน ** กำกับหัวท้าย (ป้องกันไม่ให้ซ้ำซ้อนเป็น ****)
+ */
+const ensureAsterisks = (str) => {
+    if (!str) return '';
+    let clean = String(str).trim();
+    clean = clean.replace(/^\*+/, '').replace(/\*+$/, '').trim();
+    return `**${clean}**`;
+};
+
+/**
+ * คำนวณขนาดตัวอักษร (pt) อัตโนมัติไม่ให้ข้อความล้นความกว้างสูงสุด (mm)
+ * โดยใช้ HTML5 Canvas วัดความกว้างจริงของฟอนต์ Sarabun
+ */
+const calculateAutoFitPt = (text, basePt = 8.5, maxMm = 135, minPt = 6.0) => {
+    if (!text) return basePt;
+    try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            // 96 DPI: 1 pt = 96/72 px = 1.3333 px. 1 mm = 96 / 25.4 px = 3.7795 px.
+            const ptToPx = 96 / 72;
+            const mmToPx = 96 / 25.4;
+            const maxPx = maxMm * mmToPx;
+
+            ctx.font = `bold ${basePt * ptToPx}px 'Sarabun', sans-serif`;
+            const measuredWidth = ctx.measureText(text).width;
+
+            if (measuredWidth > maxPx && maxPx > 0) {
+                const ratio = maxPx / measuredWidth;
+                const fittedPt = basePt * ratio * 0.96; // เผื่อระยะขอบปลอดภัย 4%
+                return Math.max(minPt, Number(fittedPt.toFixed(1)));
+            }
+        }
+    } catch (e) {
+        console.error('Error measuring text width:', e);
+    }
+    return basePt;
+};
+
 export default function ChequeForm() {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -42,6 +117,39 @@ export default function ChequeForm() {
 
     const chequePrintRef = useRef(null);
     const voucherPrintRef = useRef(null);
+
+    // พิกัดการพิมพ์ใบเช็คจริง (โหลดจาก LocalStorage ถ้ามีบันทึกไว้ และจำค่าล่าสุดเสมอ)
+    const [printConfig, setPrintConfig] = useState(() => {
+        try {
+            const saved = localStorage.getItem('kbank_cheque_print_config');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                return { 
+                    ...DEFAULT_PRINT_CONFIG, 
+                    ...parsed,
+                    rotate180: parsed.rotate180 !== undefined ? parsed.rotate180 : true
+                };
+            }
+        } catch (e) {
+            console.error('Error loading print config:', e);
+        }
+        return { ...DEFAULT_PRINT_CONFIG, rotate180: true };
+    });
+
+    // สถานะการล็อกพิกัด (ล็อกไว้เสมอเป็นค่าเริ่มต้นเพื่อป้องกันการกดโดน ถ้าจะแก้ต้องกดปลดล็อกก่อน)
+    const [isConfigLocked, setIsConfigLocked] = useState(true);
+
+    const [previewTab, setPreviewTab] = useState('real'); // 'real' (พิมพ์ลงใบจริง) | 'mockup' (ตัวอย่างหน้าเช็ค)
+    // จำสถานะการเปิดแผงตั้งค่าละเอียดไว้ เข้ามาใหม่ให้เปิดค้างไว้ตามที่เคยเปิด
+    const [showAdvancedConfig, setShowAdvancedConfig] = useState(() => {
+        try {
+            const saved = localStorage.getItem('kbank_cheque_show_advanced');
+            return saved !== null ? saved === 'true' : true; // ค่าเริ่มต้นเปิดค้างไว้เพื่อให้ผู้ใช้เห็นทันที
+        } catch (e) {
+            return true;
+        }
+    });
+    const [isConfigSavedNotice, setIsConfigSavedNotice] = useState(false);
 
     const { currentUser, canCreate, canDelete } = useAuth();
     const { showAlert } = useAlert();
@@ -87,10 +195,10 @@ export default function ChequeForm() {
     const [loadingChequeHistory, setLoadingChequeHistory] = useState(false);
     const [selectedHistoryCheque, setSelectedHistoryCheque] = useState(null);
 
-    // คำนวณจำนวนเงินตัวอักษรภาษาไทยแบบเรียลไทม์
+    // คำนวณจำนวนเงินตัวอักษรภาษาไทยแบบเรียลไทม์ (ไม่มีดอกจัน *)
     const autoBahtText = useMemo(() => {
         if (!amount || isNaN(parseFloat(amount))) return '';
-        return numberToThaiBaht(amount, { prefix: '**', suffix: '**' });
+        return numberToThaiBaht(amount, { prefix: '', suffix: '' });
     }, [amount]);
 
     const activeBahtText = isManualBaht ? manualBahtText : autoBahtText;
@@ -119,6 +227,32 @@ export default function ChequeForm() {
         if (!amount || isNaN(parseFloat(amount))) return '';
         return formatChequeAmount(amount);
     }, [amount]);
+
+    // คำนวณขนาดย่อฟอนต์อัตโนมัติ (Auto-shrink font size) ไม่ให้ข้อความล้นช่องหรือตกขอบเช็ค
+    const autoFitSizes = useMemo(() => {
+        const maxBahtWidthMm = Math.max(40, 177 - Number(printConfig.bahtX || 35) - 6);
+        const maxPayeeWidthMm = Math.max(40, 150 - Number(printConfig.payeeX || 30));
+        const maxAmountWidthMm = Math.max(30, 172 - Number(printConfig.amountX || 115));
+
+        const bahtText = cleanBahtText(activeBahtText || 'หนึ่งแสนบาทถ้วน');
+        const amountText = ensureAsterisks(formattedAmount || '0.00');
+
+        const bahtPt = calculateAutoFitPt(bahtText, Number(printConfig.fontSizeBaht || 8.5), maxBahtWidthMm, 6.0);
+        const payeePt = calculateAutoFitPt(payee || '', Number(printConfig.fontSizePayee || 9.5), maxPayeeWidthMm, 6.5);
+        const amountPt = calculateAutoFitPt(amountText, Number(printConfig.fontSizeAmount || 9.5), maxAmountWidthMm, 7.0);
+
+        return {
+            bahtPt,
+            payeePt,
+            amountPt,
+            maxBahtWidthMm,
+            maxPayeeWidthMm,
+            maxAmountWidthMm,
+            isBahtShrunk: bahtPt < Number(printConfig.fontSizeBaht || 8.5),
+            isPayeeShrunk: payeePt < Number(printConfig.fontSizePayee || 9.5),
+            isAmountShrunk: amountPt < Number(printConfig.fontSizeAmount || 9.5)
+        };
+    }, [activeBahtText, formattedAmount, payee, printConfig.bahtX, printConfig.payeeX, printConfig.amountX, printConfig.fontSizeBaht, printConfig.fontSizePayee, printConfig.fontSizeAmount]);
 
     // โหลดประวัติ
     const fetchHistory = async () => {
@@ -465,6 +599,218 @@ export default function ChequeForm() {
         `);
     };
 
+    const updatePrintConfig = (keyOrUpdates, value) => {
+        setPrintConfig(prev => {
+            const updates = typeof keyOrUpdates === 'string' ? { [keyOrUpdates]: value } : keyOrUpdates;
+            const next = { ...prev, ...updates };
+            try {
+                localStorage.setItem('kbank_cheque_print_config', JSON.stringify(next));
+            } catch (e) {
+                console.error('Error saving print config:', e);
+            }
+            return next;
+        });
+        setIsConfigSavedNotice(true);
+        setTimeout(() => setIsConfigSavedNotice(false), 2000);
+    };
+
+    const handleSavePrintConfig = () => {
+        try {
+            localStorage.setItem('kbank_cheque_print_config', JSON.stringify(printConfig));
+            setIsConfigLocked(true);
+            showAlert('บันทึกค่าสำเร็จ', 'บันทึกพิกัดและขนาดตัวอักษรไว้ถาวรแล้ว (พร้อมล็อกค่าเพื่อความปลอดภัย)', 'success');
+        } catch (e) {
+            showAlert('เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกลงหน่วยความจำได้: ' + e.message, 'error');
+        }
+    };
+
+    const handleResetPrintConfig = () => {
+        setPrintConfig(DEFAULT_PRINT_CONFIG);
+        try {
+            localStorage.setItem('kbank_cheque_print_config', JSON.stringify(DEFAULT_PRINT_CONFIG));
+        } catch (e) {}
+        setIsConfigLocked(true);
+        showAlert('คืนค่าเริ่มต้น', 'รีเซ็ตพิกัดตำแหน่งการพิมพ์เป็นค่ามาตรฐานที่ลงตัวแล้ว', 'info');
+    };
+
+    const handleToggleAdvancedConfig = () => {
+        setShowAdvancedConfig(prev => {
+            const next = !prev;
+            try {
+                localStorage.setItem('kbank_cheque_show_advanced', String(next));
+            } catch (e) {}
+            return next;
+        });
+    };
+
+    const getDateDigitOffset = (index) => {
+        // 8 boxes: [0,1] (Day), [2,3] (Month), [4,5,6,7] (Year)
+        // ระยะห่างระหว่างแต่ละช่องวันที่ (วัดจริง 6.2 mm ต่อช่อง)
+        const boxStep = parseFloat(printConfig.dateStep) > 0 ? parseFloat(printConfig.dateStep) : 6.2;
+        return index * boxStep;
+    };
+
+    // ── พิมพ์ลงใบเช็คจริง (Real Cheque Printing) หรือ พิมพ์แผ่นทดสอบทาบ A4 ──
+    const printRealCheque = (isTest = false) => {
+        if (!payee || !amount) {
+            showAlert('ข้อมูลไม่ครบ', 'กรุณาระบุชื่อผู้รับเงินและจำนวนเงินก่อนพิมพ์', 'warning');
+            return;
+        }
+
+        const {
+            offsetX, offsetY, feedMode,
+            dateX, dateY, payeeX, payeeY, bahtX, bahtY, amountX, amountY,
+            fontSizePayee, fontSizeBaht, fontSizeAmount, fontSizeDate
+        } = printConfig;
+
+        let pageCss = '';
+        let containerMarginCss = '';
+
+        if (feedMode === 'custom-slip') {
+            pageCss = `@page { size: 177mm 90mm; margin: 0; }`;
+            containerMarginCss = `margin: 0;`;
+        } else if (feedMode === 'a4-left') {
+            pageCss = `@page { size: A4 portrait; margin: 0; }`;
+            containerMarginCss = `margin-left: 0mm; margin-top: 0mm;`;
+        } else if (feedMode === 'a4-right') {
+            pageCss = `@page { size: A4 portrait; margin: 0; }`;
+            containerMarginCss = `margin-left: 33mm; margin-top: 0mm;`;
+        } else {
+            // a4-center (default)
+            pageCss = `@page { size: A4 portrait; margin: 0; }`;
+            containerMarginCss = `margin-left: 16.5mm; margin-top: 0mm;`;
+        }
+
+        const finalX = (base) => (Number(base) + Number(offsetX || 0)).toFixed(1);
+        const finalY = (base) => (Number(base) + Number(offsetY || 0)).toFixed(1);
+
+        const formattedAmountNum = parseFloat(amount || 0).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+
+        const activeBoxStep = parseFloat(printConfig.dateStep) > 0 ? parseFloat(printConfig.dateStep) : 6.2;
+        const dateDigitsHtml = dateDigits.map((digit, idx) => {
+            const leftMm = (Number(finalX(dateX)) + getDateDigitOffset(idx)).toFixed(1);
+            const topMm = finalY(dateY);
+            return `
+                <div style="
+                    position: absolute;
+                    left: ${leftMm}mm;
+                    top: ${topMm}mm;
+                    width: ${activeBoxStep}mm;
+                    height: 6.5mm;
+                    line-height: 6.5mm;
+                    text-align: center;
+                    font-family: 'Sarabun', sans-serif;
+                    font-size: ${fontSizeDate}pt;
+                    font-weight: 700;
+                    color: #000000;
+                    ${isTest ? 'border: 0.5px solid #94a3b8; background: rgba(226, 232, 240, 0.4);' : ''}
+                ">${digit}</div>
+            `;
+        }).join('');
+
+        const crossedSvgHtml = isCrossed ? `
+            <svg style="position: absolute; left: ${finalX(0)}mm; top: ${finalY(0)}mm; width: 38mm; height: 32mm;" viewBox="0 0 100 80">
+                <line x1="0" y1="54" x2="54" y2="0" stroke="#000000" stroke-width="2.2" />
+                <line x1="0" y1="78" x2="78" y2="0" stroke="#000000" stroke-width="2.2" />
+                <rect x="8" y="27" width="50" height="12" rx="2" fill="#ffffff" transform="rotate(-45 33 33)" />
+                <text x="33" y="35.5" text-anchor="middle" fill="#000000" font-size="6.8" font-weight="bold" font-family="'Sarabun', sans-serif" letter-spacing="0.05em" transform="rotate(-45 33 33)">
+                    A/C PAYEE ONLY
+                </text>
+            </svg>
+        ` : '';
+
+        const testGuideOverlay = isTest ? `
+            <div style="position: absolute; top: 2mm; left: 4mm; font-size: 8pt; color: #64748b; font-family: 'Sarabun', sans-serif;">
+                แผ่นทดสอบทาบพิมพ์เช็ค (17.7 × 9.0 cm) — วางใบเช็คจริงทาบตามกรอบเส้นประ
+            </div>
+            <div style="position: absolute; left: 115mm; top: 41mm; width: 56mm; height: 9mm; border: 0.8px dashed #94a3b8; border-radius: 2px;"></div>
+        ` : '';
+
+        const rotateCss = printConfig.rotate180 ? 'transform: rotate(180deg); transform-origin: center center;' : '';
+        const slipContainerStyle = `
+            width: 177mm;
+            height: 90mm;
+            position: relative;
+            box-sizing: border-box;
+            overflow: hidden;
+            background: transparent;
+            ${containerMarginCss}
+            ${rotateCss}
+            ${isTest ? 'border: 1.5px dashed #475569; background: #ffffff;' : 'border: none;'}
+        `;
+
+        const htmlContent = `
+            <div style="${slipContainerStyle}">
+                ${testGuideOverlay}
+                ${crossedSvgHtml}
+                ${dateDigitsHtml}
+                
+                <!-- Payee -->
+                <div style="
+                    position: absolute;
+                    left: ${finalX(payeeX)}mm;
+                    top: ${finalY(payeeY)}mm;
+                    max-width: ${autoFitSizes.maxPayeeWidthMm}mm;
+                    font-family: 'Sarabun', sans-serif;
+                    font-size: ${autoFitSizes.payeePt}pt;
+                    font-weight: 700;
+                    color: #000000;
+                    white-space: nowrap;
+                    line-height: 1.35;
+                ">
+                    ${payee}
+                </div>
+
+                <!-- Baht Text -->
+                <div style="
+                    position: absolute;
+                    left: ${finalX(bahtX)}mm;
+                    top: ${finalY(bahtY)}mm;
+                    max-width: ${autoFitSizes.maxBahtWidthMm}mm;
+                    font-family: 'Sarabun', sans-serif;
+                    font-size: ${autoFitSizes.bahtPt}pt;
+                    font-weight: 700;
+                    color: #000000;
+                    white-space: nowrap;
+                    line-height: 1.35;
+                ">
+                    ${cleanBahtText(activeBahtText)}
+                </div>
+
+                <!-- Amount Number -->
+                <div style="
+                    position: absolute;
+                    left: ${finalX(amountX)}mm;
+                    top: ${finalY(amountY)}mm;
+                    max-width: ${autoFitSizes.maxAmountWidthMm}mm;
+                    font-family: 'Sarabun', sans-serif;
+                    font-size: ${autoFitSizes.amountPt}pt;
+                    font-weight: 700;
+                    color: #000000;
+                    white-space: nowrap;
+                    line-height: 1.35;
+                ">
+                    ${ensureAsterisks(formattedAmountNum)}
+                </div>
+            </div>
+        `;
+
+        const title = isTest ? `Test_Cheque_A4_${chequeNo}` : `Real_Cheque_${chequeNo}`;
+        
+        printElementViaIframe({ outerHTML: htmlContent }, title, `
+            ${pageCss}
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: #ffffff !important;
+                font-family: 'Sarabun', sans-serif;
+            }
+        `);
+    };
+
 
 
     return (
@@ -580,49 +926,6 @@ export default function ChequeForm() {
                                 readOnly={!isManualBaht}
                                 onChange={(e) => setManualBahtText(e.target.value)}
                                 style={{ background: isManualBaht ? '#ffffff' : '#f1f5f9' }}
-                            />
-                        </div>
-
-                        {/* อ้างอิงเอกสาร */}
-                        <div className="cq-form-group">
-                            <label>
-                                <span>อ้างอิงเอกสาร (Ref Invoice / PO)</span>
-                                <FileText size={15} color="#64748b" />
-                            </label>
-                            <input 
-                                type="text" 
-                                className="cq-input" 
-                                value={refDocNo} 
-                                onChange={(e) => setRefDocNo(e.target.value)}
-                                placeholder="เช่น INV-2026-008, PO-102"
-                            />
-                        </div>
-
-                        {/* วันที่ครบกำหนดเช็ค */}
-                        <div className="cq-form-group">
-                            <label>
-                                <span>วันที่ครบกำหนดเช็ค (Due Date)</span>
-                                <Calendar size={15} color="#64748b" />
-                            </label>
-                            <input 
-                                type="date" 
-                                className="cq-input" 
-                                value={dueDate} 
-                                onChange={(e) => setDueDate(e.target.value)}
-                            />
-                        </div>
-
-                        {/* หมายเหตุ / วัตถุประสงค์ */}
-                        <div className="cq-form-group" style={{ gridColumn: 'span 2' }}>
-                            <label>
-                                <span>รายละเอียด / วัตถุประสงค์ในการจ่าย</span>
-                            </label>
-                            <input 
-                                type="text" 
-                                className="cq-input" 
-                                value={notes} 
-                                onChange={(e) => setNotes(e.target.value)}
-                                placeholder="เช่น ชำระค่าสินค้าและวัตถุดิบรอบมีนาคม 2569"
                             />
                         </div>
                     </div>
@@ -773,25 +1076,6 @@ export default function ChequeForm() {
                                     <span>พรีวิวหน้าเช็ค</span>
                                 </button>
                                 
-
-                                
-                                <div className="cheque-stage-quick-switches" style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '0.5rem', background: '#ffffff', padding: '0.75rem', borderRadius: '8px', border: '1px solid #fde68a' }}>
-                                    <label className="cq-switch-label" style={{ fontSize: '0.75rem' }}>
-                                        <input type="checkbox" checked={isCrossed} onChange={(e) => setIsCrossed(e.target.checked)} />
-                                        <span>ขีดคร่อม (// A/C PAYEE ONLY //)</span>
-                                    </label>
-                                    <label className="cq-switch-label" style={{ fontSize: '0.75rem' }}>
-                                        <input type="checkbox" checked={isStrikeBearer} onChange={(e) => setIsStrikeBearer(e.target.checked)} />
-                                        <span>ขีดฆ่า "หรือผู้ถือ"</span>
-                                    </label>
-                                    <label className="cq-switch-label" style={{ fontSize: '0.75rem' }}>
-                                        <input type="checkbox" checked={isBuddhistYear} onChange={(e) => setIsBuddhistYear(e.target.checked)} />
-                                        <span>ปี พ.ศ. (บวก 543)</span>
-                                    </label>
-                                </div>
-
-                                <hr style={{ border: 'none', borderTop: '1px dashed #fcd34d', margin: '0.25rem 0' }} />
-                                
                                 <button 
                                     className="cq-btn cq-btn-save-action" 
                                     onClick={handleSaveCheque}
@@ -813,24 +1097,463 @@ export default function ChequeForm() {
                     {/* ── Cheque Preview Modal (Popup) ── */}
                     {showPreviewModal && (
                         <div className="cq-modal-overlay no-print" onClick={() => setShowPreviewModal(false)}>
-                            <div className="cq-modal-card cq-preview-modal" onClick={(e) => e.stopPropagation()}>
-                                <div className="cq-modal-header no-print">
-                                    <h3 className="cq-modal-title">
-                                        <CreditCard size={20} color="#059669" />
-                                        <span>ตัวอย่างหน้าเช็ค (Kasikornbank Cheque Preview)</span>
-                                    </h3>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
+                            <div className="cq-modal-card cq-preview-modal" style={{ maxWidth: '880px' }} onClick={(e) => e.stopPropagation()}>
+                                <div className="cq-modal-header no-print" style={{ flexWrap: 'wrap', gap: '10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                        <h3 className="cq-modal-title" style={{ margin: 0 }}>
+                                            <CreditCard size={20} color="#059669" />
+                                            <span>พิมพ์เช็คธนาคารกสิกรไทย</span>
+                                        </h3>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                         <button 
-                                            onClick={handlePrintChequeMockup}
-                                            style={{ background: '#059669', color: 'white', border: 'none', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 500 }}
+                                            type="button"
+                                            onClick={() => printRealCheque(false)}
+                                            style={{ background: '#059669', color: 'white', border: 'none', padding: '0.45rem 1.1rem', borderRadius: '7px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontWeight: 600, boxShadow: '0 2px 4px rgba(5,150,105,0.25)' }}
                                         >
-                                            <Printer size={15} /> พิมพ์ใบเช็ค
+                                            <Printer size={15} /> สั่งพิมพ์ลงใบเช็คจริง
                                         </button>
                                         <button className="cq-modal-close" onClick={() => setShowPreviewModal(false)}>✕</button>
                                     </div>
                                 </div>
-                                <div className="cq-modal-body" style={{ background: '#f1f5f9', padding: '1.5rem', overflowY: 'auto', overflowX: 'auto' }}>
-                                    <div className="cheque-canvas-container" ref={chequePrintRef} style={{ margin: '0 auto' }}>
+                                <div className="cq-modal-body" style={{ background: '#f8fafc', padding: '1.5rem', overflowY: 'auto', overflowX: 'auto' }}>
+                                    {previewTab === 'real' ? (
+                                        <div className="real-cheque-viewport">
+                                            {/* คำแนะนำ */}
+                                            <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '10px 16px', borderRadius: '8px', width: '100%', maxWidth: '708px', fontSize: '13px', color: '#065f46', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxSizing: 'border-box' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <CheckCircle2 size={16} color="#059669" />
+                                                    <span><strong>โหมดพิมพ์ลงใบเช็คจริง</strong>: ระบบจะพิมพ์เฉพาะตัวหนังสือและตัวเลขลงในช่องของใบเช็คกสิกรไทย</span>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    {(autoFitSizes.isBahtShrunk || autoFitSizes.isPayeeShrunk || autoFitSizes.isAmountShrunk) && (
+                                                        <span style={{ fontSize: '11px', background: '#dcfce7', color: '#15803d', padding: '2px 8px', borderRadius: '12px', border: '1px solid #86efac', fontWeight: 600 }}>
+                                                            ✨ ย่อขนาดฟอนต์อัตโนมัติ ({autoFitSizes.isBahtShrunk ? `บาท: ${autoFitSizes.bahtPt}pt` : ''}{autoFitSizes.isPayeeShrunk ? ` ผู้รับ: ${autoFitSizes.payeePt}pt` : ''})
+                                                        </span>
+                                                    )}
+                                                    <span style={{ fontSize: '12px', color: '#047857', fontWeight: 600 }}>ขนาด 17.7 × 9.0 ซม.</span>
+                                                </div>
+                                            </div>
+
+                                            {/* จำลองแผ่นเช็คจริงพร้อมตำแหน่งตัวอักษร */}
+                                            <div className="real-cheque-slip-wrapper">
+                                                {/* ไกด์ไลน์จางๆ อ้างอิงสัดส่วนเช็คจริง */}
+                                                <div style={{ position: 'absolute', inset: 0, opacity: 0.18, pointerEvents: 'none', background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)' }}>
+                                                    <div style={{ position: 'absolute', left: '16.9%', top: '7.7%', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#166534' }}>ธนาคารกสิกรไทย KASIKORNBANK</span>
+                                                    </div>
+                                                    <div style={{ position: 'absolute', left: '16.9%', top: '33%', right: '12%', borderBottom: '1px dashed #94a3b8' }}></div>
+                                                    <div style={{ position: 'absolute', left: '19.7%', top: '42%', right: '5%', borderBottom: '1px dashed #94a3b8' }}></div>
+                                                    <div style={{ position: 'absolute', left: '65%', top: '46%', width: '31%', height: '14%', border: '1px dashed #94a3b8', borderRadius: '2px' }}></div>
+                                                </div>
+
+                                                <div className="real-cheque-slip-watermark">
+                                                    ✦ สัดส่วนใบเช็คจริง (17.7 × 9.0 ซม.)
+                                                </div>
+
+                                                {/* ขีดคร่อม (ถ้าเลือก) */}
+                                                {isCrossed && (
+                                                    <div style={{ 
+                                                        position: 'absolute', 
+                                                        left: `${((0 + Number(printConfig.offsetX || 0)) / 177 * 100)}%`, 
+                                                        top: `${((0 + Number(printConfig.offsetY || 0)) / 90 * 100)}%`, 
+                                                        width: '18%', 
+                                                        height: '35%' 
+                                                    }}>
+                                                        <svg viewBox="0 0 100 80" style={{ width: '100%', height: '100%' }}>
+                                                            <line x1="0" y1="54" x2="54" y2="0" stroke="#000000" strokeWidth="2.2" />
+                                                            <line x1="0" y1="78" x2="78" y2="0" stroke="#000000" strokeWidth="2.2" />
+                                                            <rect x="8" y="27" width="50" height="12" rx="2" fill="#ffffff" stroke="#000000" strokeWidth="0.5" transform="rotate(-45 33 33)" />
+                                                            <text x="33" y="35.5" textAnchor="middle" fill="#000000" fontSize="6.8" fontWeight="bold" transform="rotate(-45 33 33)">
+                                                                A/C PAYEE ONLY
+                                                            </text>
+                                                        </svg>
+                                                    </div>
+                                                )}
+
+                                                {/* วันที่ 8 หลัก */}
+                                                {dateDigits.map((digit, idx) => {
+                                                    const leftMm = Number(printConfig.dateX) + getDateDigitOffset(idx) + Number(printConfig.offsetX || 0);
+                                                    const topMm = Number(printConfig.dateY) + Number(printConfig.offsetY || 0);
+                                                    return (
+                                                        <div 
+                                                            key={idx}
+                                                            style={{
+                                                                position: 'absolute',
+                                                                left: `${(leftMm / 177 * 100)}%`,
+                                                                top: `${(topMm / 90 * 100)}%`,
+                                                                width: `${((parseFloat(printConfig.dateStep) || 6.5) / 177 * 100)}%`,
+                                                                height: `${(6.5 / 90 * 100)}%`,
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontFamily: "'Sarabun', sans-serif",
+                                                                fontSize: `clamp(9px, ${((Number(printConfig.fontSizeDate || 8.5)) * 0.20).toFixed(2)}cqi, 13px)`,
+                                                                fontWeight: 700,
+                                                                color: '#000000',
+                                                                border: '1px dashed #cbd5e1',
+                                                                background: 'rgba(255, 255, 255, 0.85)',
+                                                                borderRadius: '2px',
+                                                                lineHeight: 1
+                                                            }}
+                                                        >
+                                                            {digit}
+                                                        </div>
+                                                    );
+                                                })}
+
+                                                {/* ชื่อผู้รับเงิน (Payee) */}
+                                                <div 
+                                                    style={{
+                                                        position: 'absolute',
+                                                        left: `${((Number(printConfig.payeeX) + Number(printConfig.offsetX || 0)) / 177 * 100)}%`,
+                                                        top: `${((Number(printConfig.payeeY) + Number(printConfig.offsetY || 0)) / 90 * 100)}%`,
+                                                        maxWidth: `${(autoFitSizes.maxPayeeWidthMm / 177 * 100)}%`,
+                                                        fontFamily: "'Sarabun', sans-serif",
+                                                        fontSize: `clamp(10px, ${(autoFitSizes.payeePt * 0.20).toFixed(2)}cqi, 15px)`,
+                                                        fontWeight: 700,
+                                                        color: '#000000',
+                                                        whiteSpace: 'nowrap',
+                                                        lineHeight: 1.35,
+                                                        overflow: 'visible'
+                                                    }}
+                                                    title={autoFitSizes.isPayeeShrunk ? `ย่อขนาดอัตโนมัติเป็น ${autoFitSizes.payeePt}pt เพื่อไม่ให้ล้น` : undefined}
+                                                >
+                                                    {payee || <span style={{ color: '#94a3b8', fontStyle: 'italic', fontWeight: 400 }}>ระบุชื่อผู้รับเงิน...</span>}
+                                                </div>
+
+                                                {/* จำนวนเงินตัวอักษร (Baht Text) */}
+                                                <div 
+                                                    style={{
+                                                        position: 'absolute',
+                                                        left: `${((Number(printConfig.bahtX) + Number(printConfig.offsetX || 0)) / 177 * 100)}%`,
+                                                        top: `${((Number(printConfig.bahtY) + Number(printConfig.offsetY || 0)) / 90 * 100)}%`,
+                                                        maxWidth: `${(autoFitSizes.maxBahtWidthMm / 177 * 100)}%`,
+                                                        fontFamily: "'Sarabun', sans-serif",
+                                                        fontSize: `clamp(8px, ${(autoFitSizes.bahtPt * 0.20).toFixed(2)}cqi, 14px)`,
+                                                        fontWeight: 700,
+                                                        color: '#000000',
+                                                        whiteSpace: 'nowrap',
+                                                        lineHeight: 1.35,
+                                                        overflow: 'visible'
+                                                    }}
+                                                    title={autoFitSizes.isBahtShrunk ? `ย่อขนาดอัตโนมัติเป็น ${autoFitSizes.bahtPt}pt เพื่อไม่ให้ล้นใบเช็ค` : undefined}
+                                                >
+                                                    {cleanBahtText(activeBahtText) || 'หนึ่งแสนบาทถ้วน'}
+                                                </div>
+
+                                                {/* ช่องจำนวนเงินตัวเลข (฿) */}
+                                                <div 
+                                                    style={{
+                                                        position: 'absolute',
+                                                        left: `${((Number(printConfig.amountX) + Number(printConfig.offsetX || 0)) / 177 * 100)}%`,
+                                                        top: `${((Number(printConfig.amountY) + Number(printConfig.offsetY || 0)) / 90 * 100)}%`,
+                                                        maxWidth: `${(autoFitSizes.maxAmountWidthMm / 177 * 100)}%`,
+                                                        fontFamily: "'Sarabun', sans-serif",
+                                                        fontSize: `clamp(9px, ${(autoFitSizes.amountPt * 0.20).toFixed(2)}cqi, 15px)`,
+                                                        fontWeight: 700,
+                                                        color: '#000000',
+                                                        whiteSpace: 'nowrap',
+                                                        lineHeight: 1.35,
+                                                        overflow: 'visible',
+                                                        padding: '2px 6px',
+                                                        border: '1px dashed #94a3b8',
+                                                        borderRadius: '3px',
+                                                        background: 'rgba(255, 255, 255, 0.9)'
+                                                    }}
+                                                    title={autoFitSizes.isAmountShrunk ? `ย่อขนาดอัตโนมัติเป็น ${autoFitSizes.amountPt}pt เพื่อไม่ให้ล้นช่องตัวเลข` : undefined}
+                                                >
+                                                    {ensureAsterisks(formattedAmount)}
+                                                </div>
+                                            </div>
+
+                                             {/* แผงปรับตำแหน่งและการป้อนกระดาษ (แสดงเฉพาะหน้าเขียนเช็ค ไม่แสดงตอนพรีวิวจากหน้าหลัก) */}
+                                             {currentTab !== 'history' && (
+                                                 <div className="cheque-calibration-box">
+                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                         <Sliders size={18} color="#059669" />
+                                                         <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>ตั้งค่าการพิมพ์และตำแหน่งระยะชดเชย (Print Calibration)</span>
+                                                         {isConfigSavedNotice && (
+                                                             <span style={{ fontSize: '11px', color: '#059669', background: '#ecfdf5', border: '1px solid #a7f3d0', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                                                                 ✓ จำค่าอัตโนมัติแล้ว
+                                                             </span>
+                                                         )}
+                                                     </div>
+                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                         <button 
+                                                             type="button" 
+                                                             onClick={() => {
+                                                                 const nextLocked = !isConfigLocked;
+                                                                 setIsConfigLocked(nextLocked);
+                                                                 if (!nextLocked) {
+                                                                     showAlert('ปลดล็อกแล้ว', 'สามารถแก้ไขตัวเลขพิกัดการพิมพ์ได้แล้ว (แก้ไขเสร็จอย่าลืมกดบันทึกหรือล็อกค่า)', 'info');
+                                                                 } else {
+                                                                     showAlert('ล็อกพิกัดแล้ว', 'ล็อกตัวเลขพิกัดเรียบร้อย ป้องกันการเลื่อนหลุดตำแหน่ง', 'success');
+                                                                 }
+                                                             }}
+                                                             style={{ 
+                                                                 background: isConfigLocked ? '#f8fafc' : '#fef3c7', 
+                                                                 border: isConfigLocked ? '1.5px solid #cbd5e1' : '1.5px solid #f59e0b', 
+                                                                 color: isConfigLocked ? '#334155' : '#b45309', 
+                                                                 padding: '5px 12px', 
+                                                                 borderRadius: '6px', 
+                                                                 fontSize: '12px', 
+                                                                 fontWeight: 700, 
+                                                                 cursor: 'pointer', 
+                                                                 display: 'flex', 
+                                                                 alignItems: 'center', 
+                                                                 gap: '6px' 
+                                                             }}
+                                                             title={isConfigLocked ? 'คลิกเพื่อปลดล็อกแก้ไขพิกัด' : 'คลิกเพื่อล็อกพิกัด'}
+                                                         >
+                                                             {isConfigLocked ? <Lock size={13} color="#059669" /> : <Unlock size={13} color="#d97706" />}
+                                                             <span>{isConfigLocked ? '🔒 ล็อกพิกัดไว้แล้ว (คลิกปลดล็อก)' : '🔓 ปลดล็อกอยู่ (คลิกเพื่อล็อก)'}</span>
+                                                         </button>
+                                                         <button 
+                                                             type="button"
+                                                             onClick={handleSavePrintConfig}
+                                                             style={{ background: '#059669', border: 'none', color: '#ffffff', padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                                                             title="บันทึกค่าพิกัดทั้งหมดนี้ไว้ถาวร (เปิดเข้าใหม่จะแสดงค่านี้เสมอ)"
+                                                         >
+                                                             <Save size={13} /> บันทึกค่านี้ไว้ถาวร
+                                                         </button>
+                                                         {!isConfigLocked && (
+                                                             <button 
+                                                                 type="button"
+                                                                 onClick={handleResetPrintConfig}
+                                                                 style={{ background: 'transparent', border: '1px solid #cbd5e1', color: '#64748b', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                 title="รีเซ็ตค่าพิกัดทั้งหมดเป็นค่ามาตรฐาน"
+                                                             >
+                                                                 <RotateCcw size={13} /> คืนค่าเริ่มต้น
+                                                             </button>
+                                                         )}
+                                                     </div>
+                                                 </div>
+
+                                                 <div style={{ maxWidth: '360px' }}>
+                                                     {/* Feed Mode */}
+                                                     <div className="calib-group">
+                                                         <label className="calib-label">ตำแหน่งการใส่เช็คเข้าถาดพิมพ์:</label>
+                                                         <CustomSelect 
+                                                             value={printConfig.feedMode || 'custom-slip'}
+                                                             onChange={(e) => updatePrintConfig('feedMode', e.target.value)}
+                                                             usePortal={true}
+                                                         >
+                                                             <option value="custom-slip">ขนาดกำหนดเอง 17.7 × 9 ซม. (Slip Printer)</option>
+                                                             <option value="a4-center">กึ่งกลางถาด A4 (Center Feed - ทั่วไป)</option>
+                                                             <option value="a4-left">ชิดซ้ายถาด A4 (Left Feed)</option>
+                                                             <option value="a4-right">ชิดขวาถาด A4 (Right Feed)</option>
+                                                         </CustomSelect>
+                                                     </div>
+                                                 </div>
+
+                                                 {/* Toggle Advanced Fine-Tuning */}
+                                                 <div style={{ borderTop: '1px dashed #a7f3d0', paddingTop: '10px' }}>
+                                                     <button 
+                                                         type="button"
+                                                         onClick={handleToggleAdvancedConfig}
+                                                         style={{ background: 'transparent', border: 'none', color: '#059669', fontSize: '13px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: 0 }}
+                                                     >
+                                                         <ChevronDown size={16} style={{ transform: showAdvancedConfig ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                                                         <span>{showAdvancedConfig ? 'ซ่อนการตั้งค่าพิกัดรายช่อง (Advanced)' : 'ปรับแต่งพิกัดรายช่องแบบละเอียด (คลิกขยาย)'}</span>
+                                                     </button>
+
+                                                     {showAdvancedConfig && (
+                                                         <div className="calib-advanced-grid">
+                                                             {isConfigLocked && (
+                                                                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px', gridColumn: '1 / -1' }}>
+                                                                     <Lock size={14} color="#059669" />
+                                                                     <span>พิกัดนี้ปรับจูนลงตัวแล้วและถูก<strong>ล็อกไว้</strong>เพื่อป้องกันการกดโดน (หากต้องการแก้ไข ให้กดปุ่ม <strong>"🔒 ล็อกพิกัดไว้แล้ว (คลิกปลดล็อก)"</strong> ด้านบน)</span>
+                                                                 </div>
+                                                             )}
+                                                             {/* Date */}
+                                                             <div className="calib-field-group">
+                                                                 <span className="calib-field-title">📅 ช่องวันที่ (8 หลัก)</span>
+                                                                 <div className="calib-field-inputs" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                                                                     <label title="ตำแหน่งแนวนอนจากขอบซ้ายของใบเช็ค">Left: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.dateX !== undefined && printConfig.dateX !== '' ? printConfig.dateX : ''} 
+                                                                             onChange={(e) => updatePrintConfig('dateX', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('dateX', DEFAULT_PRINT_CONFIG.dateX); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ตำแหน่งแนวตั้งจากขอบบนของใบเช็ค">Top: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.dateY !== undefined && printConfig.dateY !== '' ? printConfig.dateY : ''} 
+                                                                             onChange={(e) => updatePrintConfig('dateY', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('dateY', DEFAULT_PRINT_CONFIG.dateY); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ระยะห่างระหว่างแต่ละช่อง (Pitch / Box Step)">ห่าง: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.1" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.dateStep !== undefined && printConfig.dateStep !== '' ? printConfig.dateStep : ''} 
+                                                                             onChange={(e) => updatePrintConfig('dateStep', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('dateStep', DEFAULT_PRINT_CONFIG.dateStep); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ขนาดตัวอักษรวันที่">ขนาด: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             min="5" 
+                                                                             max="18" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.fontSizeDate !== undefined && printConfig.fontSizeDate !== '' ? printConfig.fontSizeDate : ''} 
+                                                                             onChange={(e) => updatePrintConfig('fontSizeDate', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('fontSizeDate', DEFAULT_PRINT_CONFIG.fontSizeDate); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">pt</span>
+                                                                     </label>
+                                                                 </div>
+                                                             </div>
+
+                                                             {/* Payee */}
+                                                             <div className="calib-field-group">
+                                                                 <span className="calib-field-title">👤 ชื่อผู้รับเงิน (Payee)</span>
+                                                                 <div className="calib-field-inputs" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                                                                     <label title="ตำแหน่งแนวนอน">Left: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.payeeX !== undefined && printConfig.payeeX !== '' ? printConfig.payeeX : ''} 
+                                                                             onChange={(e) => updatePrintConfig('payeeX', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('payeeX', DEFAULT_PRINT_CONFIG.payeeX); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ตำแหน่งแนวตั้ง">Top: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.payeeY !== undefined && printConfig.payeeY !== '' ? printConfig.payeeY : ''} 
+                                                                             onChange={(e) => updatePrintConfig('payeeY', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('payeeY', DEFAULT_PRINT_CONFIG.payeeY); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ขนาดตัวอักษรชื่อผู้รับเงิน">ขนาด: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             min="5" 
+                                                                             max="18" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.fontSizePayee !== undefined && printConfig.fontSizePayee !== '' ? printConfig.fontSizePayee : ''} 
+                                                                             onChange={(e) => updatePrintConfig('fontSizePayee', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('fontSizePayee', DEFAULT_PRINT_CONFIG.fontSizePayee); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">pt</span>
+                                                                     </label>
+                                                                 </div>
+                                                             </div>
+
+                                                             {/* Baht text */}
+                                                             <div className="calib-field-group">
+                                                                 <span className="calib-field-title">📝 จำนวนเงินตัวอักษร</span>
+                                                                 <div className="calib-field-inputs" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                                                                     <label title="ตำแหน่งแนวนอน">Left: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.bahtX !== undefined && printConfig.bahtX !== '' ? printConfig.bahtX : ''} 
+                                                                             onChange={(e) => updatePrintConfig('bahtX', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('bahtX', DEFAULT_PRINT_CONFIG.bahtX); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ตำแหน่งแนวตั้ง">Top: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.bahtY !== undefined && printConfig.bahtY !== '' ? printConfig.bahtY : ''} 
+                                                                             onChange={(e) => updatePrintConfig('bahtY', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('bahtY', DEFAULT_PRINT_CONFIG.bahtY); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ขนาดตัวอักษรจำนวนเงินภาษาไทย">ขนาด: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             min="5" 
+                                                                             max="18" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.fontSizeBaht !== undefined && printConfig.fontSizeBaht !== '' ? printConfig.fontSizeBaht : ''} 
+                                                                             onChange={(e) => updatePrintConfig('fontSizeBaht', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('fontSizeBaht', DEFAULT_PRINT_CONFIG.fontSizeBaht); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">pt</span>
+                                                                     </label>
+                                                                 </div>
+                                                             </div>
+
+                                                             {/* Amount */}
+                                                             <div className="calib-field-group">
+                                                                 <span className="calib-field-title">💰 จำนวนเงินตัวเลข (฿)</span>
+                                                                 <div className="calib-field-inputs" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                                                                     <label title="ตำแหน่งแนวนอน">Left: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.amountX !== undefined && printConfig.amountX !== '' ? printConfig.amountX : ''} 
+                                                                             onChange={(e) => updatePrintConfig('amountX', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('amountX', DEFAULT_PRINT_CONFIG.amountX); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ตำแหน่งแนวตั้ง">Top: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.amountY !== undefined && printConfig.amountY !== '' ? printConfig.amountY : ''} 
+                                                                             onChange={(e) => updatePrintConfig('amountY', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('amountY', DEFAULT_PRINT_CONFIG.amountY); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">mm</span>
+                                                                     </label>
+                                                                     <label title="ขนาดตัวเลขอารบิก">ขนาด: 
+                                                                         <input 
+                                                                             type="number" 
+                                                                             step="0.5" 
+                                                                             min="5" 
+                                                                             max="18" 
+                                                                             disabled={isConfigLocked}
+                                                                             value={printConfig.fontSizeAmount !== undefined && printConfig.fontSizeAmount !== '' ? printConfig.fontSizeAmount : ''} 
+                                                                             onChange={(e) => updatePrintConfig('fontSizeAmount', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))} 
+                                                                             onBlur={(e) => { if (e.target.value === '') updatePrintConfig('fontSizeAmount', DEFAULT_PRINT_CONFIG.fontSizeAmount); }}
+                                                                         /> 
+                                                                         <span className="calib-unit">pt</span>
+                                                                     </label>
+                                                                 </div>
+                                                             </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                        <div className="cheque-canvas-container" ref={chequePrintRef} style={{ margin: '0 auto' }}>
                                         <div className="cheque-canvas">
                                             {/* ขีดคร่อมมุมบนซ้าย */}
                                             {isCrossed && (
@@ -978,6 +1701,7 @@ export default function ChequeForm() {
                                             </div>
                                         </div>
                                     </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

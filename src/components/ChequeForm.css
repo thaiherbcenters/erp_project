@@ -940,7 +940,7 @@
 }
 
 .cq-btn-preview {
-    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     color: #ffffff;
     border: none;
     padding: 0.6rem 1.25rem;
@@ -952,12 +952,12 @@
     align-items: center;
     gap: 0.4rem;
     transition: all 0.2s;
-    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 .cq-btn-preview:hover {
-    background: linear-gradient(135deg, #047857 0%, #065f46 100%);
-    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+    background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
     transform: translateY(-1px);
 }
 
@@ -1037,6 +1037,279 @@
     overflow-y: auto;
     flex: 1;
 }
+
+/* ── Real Cheque Mode Tabs & Controls ── */
+.preview-mode-tabs {
+    display: flex;
+    gap: 4px;
+    background: #ecfdf5;
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid #a7f3d0;
+}
+
+.preview-tab-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.preview-tab-btn:hover {
+    color: #047857;
+    background: rgba(5, 150, 105, 0.06);
+}
+
+.preview-tab-btn.active {
+    background: #059669;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);
+}
+
+.real-cheque-viewport {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+}
+
+.real-cheque-slip-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 708px;
+    aspect-ratio: 177 / 90;
+    container-type: inline-size;
+    background: #ffffff;
+    border: 1.5px dashed #059669;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    user-select: none;
+}
+
+.real-cheque-slip-watermark {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.cheque-calibration-box {
+    width: 100%;
+    max-width: 708px;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+    border: 1px solid #a7f3d0;
+    border-radius: 12px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 2px 8px rgba(5, 150, 105, 0.06);
+}
+
+.calibration-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+}
+
+.calib-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.calib-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #065f46;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.calib-stepper {
+    display: flex;
+    align-items: center;
+    border: 1.5px solid #a7f3d0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.calib-btn {
+    border: none;
+    background: #ecfdf5;
+    color: #047857;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.calib-btn:hover {
+    background: #059669;
+    color: #ffffff;
+}
+
+.calib-btn:active {
+    background: #047857;
+    color: #ffffff;
+}
+
+.calib-val {
+    flex: 1;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    padding: 0 6px;
+    min-width: 60px;
+}
+
+.calib-select {
+    padding: 8px 12px;
+    border: 1.5px solid #a7f3d0;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #065f46;
+    background: #ffffff;
+    outline: none;
+    height: 36px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23059669' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 14px;
+    padding-right: 32px;
+}
+
+.calib-select:focus {
+    border-color: #059669;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+.calib-select option {
+    font-weight: 600;
+    color: #334155;
+    padding: 8px;
+}
+
+/* ── Advanced Calibration Inputs ── */
+.calib-advanced-grid {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+    background: #ffffff;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid #d1fae5;
+}
+
+.calib-field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    background: #f0fdf4;
+    border-radius: 8px;
+    border: 1px solid #a7f3d0;
+}
+
+.calib-field-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #065f46;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.calib-field-inputs {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.calib-field-inputs label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.calib-field-inputs input[type="number"] {
+    width: 52px;
+    padding: 4px 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    border: 1.5px solid #a7f3d0;
+    border-radius: 6px;
+    background: #ffffff;
+    outline: none;
+    text-align: center;
+    transition: border-color 0.15s;
+    -moz-appearance: textfield;
+}
+
+.calib-field-inputs input[type="number"]:focus {
+    border-color: #059669;
+    box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.12);
+}
+
+.calib-field-inputs input[type="number"]::-webkit-inner-spin-button,
+.calib-field-inputs input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+    height: 20px;
+}
+
+.calib-field-inputs input[type="number"]:disabled {
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #cbd5e1;
+    cursor: not-allowed;
+    user-select: none;
+}
+
+.calib-field-inputs input[type="number"]:disabled::-webkit-inner-spin-button,
+.calib-field-inputs input[type="number"]:disabled::-webkit-outer-spin-button {
+    display: none;
+}
+
+.calib-field-inputs .calib-unit {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+}
+
 
 /* ── Tables ── */
 .cq-table {

@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 require('dotenv').config({ path: path.resolve(__dirname, '.env'), override: true });
 require('dotenv').config();
 
@@ -75,16 +74,7 @@ const chequeFormRoutes = require('./routes/chequeForms');
 const eliteTaxInvoiceRoutes = require('./routes/eliteTaxInvoices');
 const eliteReceiptRoutes = require('./routes/eliteReceipts');
 
-// ── Rate Limiting สำหรับ Login (ป้องกัน brute force) ──
-const loginLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 นาที
-    max: 5,                   // จำกัด 5 ครั้ง/นาที
-    message: { success: false, message: 'คุณพยายามเข้าสู่ระบบบ่อยเกินไป กรุณารอ 1 นาที' },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
-
-app.use('/api/auth', loginLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 
 app.use(authMiddleware);
 
