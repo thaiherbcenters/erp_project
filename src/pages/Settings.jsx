@@ -224,17 +224,19 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
         } catch { showToast('เกิดข้อผิดพลาด', 'error'); }
     };
 
-    const handleResetPassword = async (id, newPassword) => {
+    const handleResetPassword = async (id, creds) => {
         try {
-            const res = await fetch(`${API}/users/${id}/password`, {
+            const payload = typeof creds === 'string' ? { newPassword: creds } : creds;
+            const res = await fetch(`${API}/users/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ newPassword })
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             if (res.ok) {
-                showToast(data.message);
+                showToast(data.message || 'บันทึกข้อมูลเรียบร้อยแล้ว');
                 setModal(null);
+                loadData();
             } else {
                 showToast(data.message, 'error');
             }
@@ -314,7 +316,7 @@ function UsersTab({ showToast }) { const { canCreate, canUpdate, canDelete } = u
                                         <button className="settings-action-btn" title="แก้ไข" onClick={() => setModal({ type: 'edit', user })}>
                                             <Pencil size={14} />
                                         </button>
-                                        <button className="settings-action-btn" title="รีเซ็ตรหัสผ่าน" onClick={() => setModal({ type: 'password', user })}>
+                                        <button className="settings-action-btn" title="เปลี่ยนรหัสผ่าน / Username" onClick={() => setModal({ type: 'password', user })}>
                                             <KeyRound size={14} />
                                         </button>
                                         <button className="settings-action-btn danger" title="ลบ" onClick={() => handleDelete(user)}>
@@ -740,10 +742,15 @@ function UserFormModal({ title, departments, roles, user, onClose, onSave, isCre
     const availableRoles = getAvailableRoles(form.department);
 
     const handleSubmit = async () => {
-        if (!form.displayName) return;
-        if (isCreate && (!form.username || !form.password)) return;
+        if (!form.displayName?.trim()) return;
+        if (!form.username?.trim()) return;
+        if (isCreate && (!form.password || form.password.length < 4)) return;
         setSaving(true);
-        await onSave(form);
+        await onSave({
+            ...form,
+            displayName: form.displayName.trim(),
+            username: form.username.trim()
+        });
         setSaving(false);
     };
 
@@ -759,17 +766,15 @@ function UserFormModal({ title, departments, roles, user, onClose, onSave, isCre
                         <label>ชื่อ-นามสกุล</label>
                         <input value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} placeholder="กรอกชื่อ-นามสกุล" />
                     </div>
+                    <div className="settings-field">
+                        <label>Username (ชื่อผู้ใช้)</label>
+                        <input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="กรอก username" />
+                    </div>
                     {isCreate && (
-                        <>
-                            <div className="settings-field">
-                                <label>Username</label>
-                                <input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} placeholder="กรอก username" />
-                            </div>
-                            <div className="settings-field">
-                                <label>รหัสผ่าน</label>
-                                <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="กรอกรหัสผ่าน" />
-                            </div>
-                        </>
+                        <div className="settings-field">
+                            <label>รหัสผ่าน (อย่างน้อย 4 ตัวอักษร)</label>
+                            <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="กรอกรหัสผ่าน" />
+                        </div>
                     )}
                     <div className="settings-field">
                         <label>แผนก</label>
@@ -799,7 +804,7 @@ function UserFormModal({ title, departments, roles, user, onClose, onSave, isCre
                 </div>
                 <div className="settings-modal-footer">
                     <button className="settings-btn-cancel" onClick={onClose}>ยกเลิก</button>
-                    <button className="settings-btn-save" onClick={handleSubmit} disabled={saving}>
+                    <button className="settings-btn-save" onClick={handleSubmit} disabled={saving || !form.displayName?.trim() || !form.username?.trim()}>
                         {saving ? 'กำลังบันทึก...' : 'บันทึก'}
                     </button>
                 </div>
@@ -809,16 +814,25 @@ function UserFormModal({ title, departments, roles, user, onClose, onSave, isCre
 }
 
 // =============================================================================
-// Password Reset Modal
+// Password & Credentials Reset Modal
 // =============================================================================
 function PasswordModal({ user, onClose, onSave }) {
+    const [username, setUsername] = useState(user?.username || '');
     const [password, setPassword] = useState('');
     const [saving, setSaving] = useState(false);
 
+    const isUsernameChanged = username.trim() !== (user?.username || '');
+    const isPasswordFilled = password.length > 0;
+    const canSubmit = (isUsernameChanged && username.trim().length > 0) || (isPasswordFilled && password.length >= 4);
+
     const handleSubmit = async () => {
-        if (!password || password.length < 4) return;
+        if (!canSubmit) return;
+        if (isPasswordFilled && password.length < 4) return;
         setSaving(true);
-        await onSave(password);
+        const payload = {};
+        if (isUsernameChanged) payload.username = username.trim();
+        if (isPasswordFilled) payload.newPassword = password;
+        await onSave(payload);
         setSaving(false);
     };
 
@@ -826,19 +840,38 @@ function PasswordModal({ user, onClose, onSave }) {
         <div className="settings-modal-backdrop" onClick={onClose}>
             <div className="settings-modal" onClick={e => e.stopPropagation()}>
                 <div className="settings-modal-header">
-                    <h2>รีเซ็ตรหัสผ่าน — {user.displayName}</h2>
+                    <h2>เปลี่ยนรหัสผ่าน / Username — {user.displayName}</h2>
                     <button className="settings-modal-close" onClick={onClose}><X size={16} /></button>
                 </div>
                 <div className="settings-modal-body">
                     <div className="settings-field">
-                        <label>รหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)</label>
-                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="กรอกรหัสผ่านใหม่" autoFocus />
+                        <label>Username (ชื่อผู้ใช้เข้าสู่ระบบ)</label>
+                        <input
+                            type="text"
+                            value={username}
+                            onChange={e => setUsername(e.target.value)}
+                            placeholder="กรอก username"
+                            autoFocus
+                        />
+                    </div>
+                    <div className="settings-field">
+                        <label>รหัสผ่านใหม่ (เว้นว่างไว้หากไม่ต้องการเปลี่ยนรหัสผ่าน)</label>
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            placeholder="กรอกรหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)"
+                        />
                     </div>
                 </div>
                 <div className="settings-modal-footer">
                     <button className="settings-btn-cancel" onClick={onClose}>ยกเลิก</button>
-                    <button className="settings-btn-save settings-btn-danger" onClick={handleSubmit} disabled={saving || password.length < 4}>
-                        {saving ? 'กำลังบันทึก...' : 'เปลี่ยนรหัสผ่าน'}
+                    <button
+                        className="settings-btn-save settings-btn-danger"
+                        onClick={handleSubmit}
+                        disabled={saving || !canSubmit}
+                    >
+                        {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
                     </button>
                 </div>
             </div>

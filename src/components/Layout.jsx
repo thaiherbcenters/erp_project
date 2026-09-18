@@ -146,7 +146,7 @@ export default function Layout() {
     const location = useLocation();
 
     // ── Data & Menu Visibility ──
-    const visiblePages = getVisiblePages();
+    const visiblePages = useMemo(() => getVisiblePages(), [currentUser, activeCompany, permissions]);
 
     // ── Sidebar state ──
     const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
@@ -210,14 +210,19 @@ export default function Layout() {
         return [...visiblePages].sort((a, b) => b.path.length - a.path.length);
     }, [visiblePages]);
 
-    // เปิด Auto-expand group อัตโนมัติเมื่อ URL ปัจจุบันตรง
+    const lastPathnameRef = useRef('');
+
+    // เปิด Auto-expand group อัตโนมัติเมื่อ URL ปัจจุบันเปลี่ยน (Navigation)
     useEffect(() => {
-        const matchedPage = sortedVisiblePages.find((p) => location.pathname.startsWith(p.path));
-        if (matchedPage) {
-            setExpandedGroups((prev) => {
-                if (prev[matchedPage.id]) return prev;
-                return { ...prev, [matchedPage.id]: true };
-            });
+        if (location.pathname !== lastPathnameRef.current) {
+            lastPathnameRef.current = location.pathname;
+            const matchedPage = sortedVisiblePages.find((p) => location.pathname.startsWith(p.path));
+            if (matchedPage) {
+                setExpandedGroups((prev) => ({
+                    ...prev,
+                    [matchedPage.id]: true
+                }));
+            }
         }
     }, [location.pathname, sortedVisiblePages]);
 
@@ -286,7 +291,15 @@ export default function Layout() {
                     <span className="nav-icon-wrapper">{pageIcon}</span>
                     <span className="nav-label">{pageLabel}</span>
                     {hasSubPages && sidebarOpen && (
-                        <span className={`nav-chevron ${isExpanded ? 'expanded' : ''}`}>
+                        <span 
+                            className={`nav-chevron ${isExpanded ? 'expanded' : ''}`}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleGroup(page.id);
+                            }}
+                            title={isExpanded ? 'ย่อเมนู' : 'ขยายเมนู'}
+                        >
                             <ChevronDown size={16} />
                         </span>
                     )}

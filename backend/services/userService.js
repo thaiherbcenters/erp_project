@@ -95,11 +95,35 @@ const createUser = async (userData) => {
 };
 
 const updateUser = async (id, updateData) => {
-    const { displayName, role, department, avatar } = updateData;
+    const { username, displayName, role, department, avatar, newPassword, password } = updateData;
     const pool = await poolPromise;
 
     const request = pool.request().input('id', sql.Int, id);
     const sets = [];
+
+    if (username !== undefined) {
+        const trimmedUsername = String(username).trim();
+        if (!trimmedUsername) {
+            const error = new Error('Username ต้องไม่เป็นค่าว่าง');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // ตรวจสอบว่ามี username นี้ซ้ำกับผู้ใช้อื่นหรือไม่
+        const checkUser = await pool.request()
+            .input('username', sql.NVarChar, trimmedUsername)
+            .input('id', sql.Int, id)
+            .query('SELECT user_id FROM Users WHERE username = @username AND user_id != @id');
+
+        if (checkUser.recordset.length > 0) {
+            const error = new Error('Username นี้ถูกใช้งานไปแล้ว');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        sets.push('username = @username');
+        request.input('username', sql.NVarChar, trimmedUsername);
+    }
 
     if (displayName !== undefined) {
         sets.push('display_name = @display_name');
@@ -116,6 +140,18 @@ const updateUser = async (id, updateData) => {
     if (avatar !== undefined) {
         sets.push('avatar = @avatar');
         request.input('avatar', sql.NVarChar, avatar);
+    }
+    if (newPassword || password) {
+        const pwd = newPassword || password;
+        if (pwd.length < 4) {
+            const error = new Error('รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร');
+            error.statusCode = 400;
+            throw error;
+        }
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(pwd, salt);
+        sets.push('password_hash = @password_hash');
+        request.input('password_hash', sql.NVarChar, hashedPassword);
     }
 
     if (sets.length === 0) {

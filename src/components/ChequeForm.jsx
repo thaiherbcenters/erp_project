@@ -1020,13 +1020,6 @@ export default function ChequeForm() {
                                 <option value="cleared">ตัดยอดแล้ว</option>
                                 <option value="bounced">เช็คคืน</option>
                             </CustomSelect>
-                            <button 
-                                type="submit" 
-                                className="btn-secondary" 
-                                style={{ height: '40px', padding: '0 16px', borderRadius: '8px', cursor: 'pointer', border: '1px solid #cbd5e1', background: '#fff', fontSize: '14px', color: '#475569' }}
-                            >
-                                ค้นหา
-                            </button>
                         </form>
 
                         {(!canCreate || canCreate('elite_cheque') || canCreate('elite_cheque_form')) && (
