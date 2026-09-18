@@ -25,6 +25,7 @@ import {
 import '../pages/PageCommon.css';
 import './ChequeForm.css';
 import CustomSelect from './CustomSelect';
+import PaginationControl from './PaginationControl';
 
 // ข้อมูลตั้งต้นของเช็คกสิกรไทย (อ้างอิงจากรูปถ่ายจริง)
 const DEFAULT_KBANK_CONFIG = {
@@ -151,7 +152,7 @@ export default function ChequeForm() {
     });
     const [isConfigSavedNotice, setIsConfigSavedNotice] = useState(false);
 
-    const { currentUser, canCreate, canDelete } = useAuth();
+    const { currentUser, canCreate, canUpdate, canDelete } = useAuth();
     const { showAlert } = useAlert();
 
     // ── Form State ──
@@ -188,6 +189,9 @@ export default function ChequeForm() {
     const [historyList, setHistoryList] = useState([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [searchHistory, setSearchHistory] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const [saving, setSaving] = useState(false);
     const [editingChequeId, setEditingChequeId] = useState(null);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -291,12 +295,23 @@ export default function ChequeForm() {
         }
     }, [currentTab]);
 
-    const filteredHistory = historyList.filter(item => {
-        if (!searchHistory) return true;
-        const s = searchHistory.toLowerCase();
-        return (item.ChequeNo && item.ChequeNo.toLowerCase().includes(s)) ||
-               (item.PayeeOrPayer && item.PayeeOrPayer.toLowerCase().includes(s));
-    });
+    const filteredHistory = useMemo(() => {
+        return historyList.filter(item => {
+            if (statusFilter && statusFilter !== 'all') {
+                if (item.Status !== statusFilter) return false;
+            }
+            if (!searchHistory || !searchHistory.trim()) return true;
+            const s = searchHistory.toLowerCase().trim();
+            return (item.ChequeNo && item.ChequeNo.toLowerCase().includes(s)) ||
+                   (item.PayeeOrPayer && item.PayeeOrPayer.toLowerCase().includes(s)) ||
+                   (item.RefDocNo && item.RefDocNo.toLowerCase().includes(s));
+        });
+    }, [historyList, searchHistory, statusFilter]);
+
+    const paginatedHistory = useMemo(() => {
+        const start = (currentPage - 1) * pageSize;
+        return filteredHistory.slice(start, start + pageSize);
+    }, [filteredHistory, currentPage, pageSize]);
 
     // บันทึกข้อมูลเช็ค
     const handleSaveCheque = async () => {
@@ -935,123 +950,274 @@ export default function ChequeForm() {
             {/* ── TAB 2: HISTORY (ตารางประวัติการสั่งจ่าย) ── */}
             {currentTab === 'history' && (
                 <div className="page-container page-enter no-print" style={{ padding: '0', background: 'transparent', minHeight: 'auto' }}>
-                    <div className="page-title" style={{ padding: '0 0 20px 0' }}>
-                        <h1>ประวัติการสั่งจ่ายเช็ค</h1>
-                        <p>จัดการรายการและประวัติการสั่งจ่ายเช็คธนาคาร</p>
+                    {/* Header */}
+                    <div className="page-header" style={{ marginBottom: '20px' }}>
+                        <div className="header-left">
+                            <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '24px', fontWeight: '700', color: '#1e293b' }}>
+                                <CreditCard size={28} color="#10b981" /> เช็คธนาคาร (Cheque Management)
+                            </h1>
+                            <p className="page-subtitle" style={{ color: '#64748b', fontSize: '14px', marginTop: '4px' }}>
+                                จัดการรายการและประวัติการสั่งจ่ายเช็คธนาคาร (ELITE)
+                            </p>
+                        </div>
                     </div>
 
-                    <div className="subpage-content" style={{ margin: 0, padding: 0 }}>
-                        <div className="toolbar">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, flexWrap: 'wrap' }}>
-                                <div className="search-group">
-                                    <div className="search-input-wrap">
-                                        <Search size={16} />
-                                        <input 
-                                            type="text" 
-                                            placeholder="ค้นหาตามเลขที่เช็ค หรือชื่อผู้รับเงิน..."
-                                            value={searchHistory}
-                                            onChange={(e) => setSearchHistory(e.target.value)}
-                                        />
-                                    </div>
-                                    <button className="search-btn">ค้นหา</button>
-                                </div>
+                    {/* Search & Actions Toolbar */}
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '16px',
+                        gap: '12px',
+                        flexWrap: 'wrap'
+                    }}>
+                        <form 
+                            onSubmit={(e) => { e.preventDefault(); setCurrentPage(1); }} 
+                            style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1, maxWidth: '560px' }}
+                        >
+                            <div style={{ position: 'relative', width: '100%' }}>
+                                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                                <input 
+                                    type="text" 
+                                    placeholder="พิมพ์เลขที่เช็ค / ชื่อผู้รับเงิน..." 
+                                    value={searchHistory}
+                                    onChange={(e) => {
+                                        setSearchHistory(e.target.value);
+                                        setCurrentPage(1);
+                                    }}
+                                    style={{
+                                        paddingLeft: '38px',
+                                        width: '100%',
+                                        height: '40px',
+                                        borderRadius: '8px',
+                                        border: '1px solid #cbd5e1',
+                                        outline: 'none',
+                                        fontSize: '14px',
+                                        background: '#fff'
+                                    }}
+                                />
                             </div>
-                            <button className="btn-primary" onClick={handleNewCheque}>
-                                + เขียนเช็คใหม่
+                            <CustomSelect 
+                                value={statusFilter} 
+                                onChange={(e) => {
+                                    setStatusFilter(e.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                usePortal={true}
+                                style={{
+                                    width: '130px',
+                                    height: '40px',
+                                    borderRadius: '8px',
+                                    border: '1px solid #cbd5e1',
+                                    background: '#fff',
+                                    color: '#475569',
+                                    fontSize: '14px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                <option value="all">ทุกสถานะ</option>
+                                <option value="pending">รอขึ้นเงิน</option>
+                                <option value="cleared">ตัดยอดแล้ว</option>
+                                <option value="bounced">เช็คคืน</option>
+                            </CustomSelect>
+                            <button 
+                                type="submit" 
+                                className="btn-secondary" 
+                                style={{ height: '40px', padding: '0 16px', borderRadius: '8px', cursor: 'pointer', border: '1px solid #cbd5e1', background: '#fff', fontSize: '14px', color: '#475569' }}
+                            >
+                                ค้นหา
                             </button>
-                        </div>
+                        </form>
 
-                        {loadingHistory ? (
-                            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                                กำลังโหลดข้อมูลประวัติเช็ค...
-                            </div>
-                        ) : historyList.length === 0 ? (
-                            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                                ไม่พบรายการสั่งจ่ายเช็คในระบบ
-                            </div>
-                        ) : (
-                            <div className="table-card card">
-                                <table className="data-table">
-                                    <thead>
-                                        <tr>
-                                            <th>วันที่สั่งจ่าย</th>
-                                            <th>เลขที่เช็ค</th>
-                                            <th>สั่งจ่ายให้ (Payee)</th>
-                                            <th style={{ textAlign: 'right' }}>จำนวนเงิน</th>
-                                            <th>อ้างอิงเอกสาร</th>
-                                            <th>ผู้จัดทำ</th>
-                                            <th>สถานะ</th>
-                                            <th style={{ textAlign: 'center' }}>จัดการ</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {historyList
-                                            .filter(item => {
-                                                if (!searchHistory) return true;
-                                                const q = searchHistory.toLowerCase();
-                                                return (item.ChequeNo && item.ChequeNo.toLowerCase().includes(q)) ||
-                                                       (item.PayeeOrPayer && item.PayeeOrPayer.toLowerCase().includes(q));
-                                            })
-                                            .map(item => (
-                                                <tr key={item.ChequeID}>
-                                                    <td>{item.IssueDate ? new Date(item.IssueDate).toLocaleDateString('th-TH') : '-'}</td>
-                                                    <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{item.ChequeNo}</td>
-                                                    <td className="text-bold">{item.PayeeOrPayer}</td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#059669' }}>
-                                                        {Number(item.Amount).toLocaleString('th-TH', { minimumFractionDigits: 2 })} ฿
-                                                    </td>
-                                                    <td>{item.RefDocNo || '-'}</td>
-                                                    <td>{item.CreatedByName || 'เจ้าหน้าที่'}</td>
-                                                    <td>
-                                                        <span className={`badge ${item.Status === 'cleared' ? 'badge-success' : item.Status === 'bounced' ? 'badge-danger' : 'badge-warning'}`}>
-                                                            {item.Status === 'cleared' ? 'ตัดยอดแล้ว' : item.Status === 'bounced' ? 'เช็คคืน' : 'รอขึ้นเงิน'}
-                                                        </span>
-                                                    </td>
-                                                    <td style={{ textAlign: 'center' }}>
-                                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '0' }}>
-                                                            <button 
-                                                                className="doc-action-btn" 
-                                                                style={{ margin: 0, color: '#3b82f6' }}
-                                                                onClick={() => handlePreviewFromHistory(item)}
-                                                                title="พรีวิวหน้าเช็ค"
-                                                            >
-                                                                <Eye size={15} />
-                                                            </button>
-                                                            <button 
-                                                                className="doc-action-btn" 
-                                                                style={{ margin: 0, color: '#eab308' }}
-                                                                onClick={() => handleLoadFromHistory(item)}
-                                                                title="แก้ไขข้อมูล"
-                                                            >
-                                                                <Pencil size={15} />
-                                                            </button>
-                                                            {((item.HistoryCount || 0) > 0 || (item.Revision || 1) > 1) && (
-                                                                <button 
-                                                                    className="doc-action-btn" 
-                                                                    style={{ margin: 0, color: '#8b5cf6' }}
-                                                                    onClick={() => handleViewChequeHistory(item.ChequeID)}
-                                                                    title="ดูประวัติแก้ไข"
-                                                                >
-                                                                    <History size={15} />
-                                                                </button>
-                                                            )}
-                                                            <button 
-                                                                className="doc-action-btn doc-action-btn-danger" 
-                                                                style={{ margin: 0 }}
-                                                                onClick={() => handleDeleteHistoryItem(item.ChequeID, item.ChequeNo)}
-                                                                title="ลบข้อมูล"
-                                                            >
-                                                                <Trash2 size={15} />
-                                                            </button>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
+                        {(!canCreate || canCreate('elite_cheque') || canCreate('elite_cheque_form')) && (
+                            <button 
+                                type="button"
+                                onClick={handleNewCheque}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    background: '#10b981',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    padding: '10px 20px',
+                                    borderRadius: '8px',
+                                    fontWeight: '600',
+                                    fontSize: '14px',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                <Plus size={18} /> เขียนเช็คใหม่
+                            </button>
                         )}
+                    </div>
+
+                    {/* Table Card */}
+                    <div className="table-card card" style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                        <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                                    <th style={{ padding: '12px 14px', textAlign: 'center', width: '60px', color: '#64748b', fontSize: '13px' }}>ลำดับ</th>
+                                    <th style={{ padding: '12px 14px', textAlign: 'center', width: '80px', color: '#64748b', fontSize: '13px' }}>เวอร์ชั่น</th>
+                                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontSize: '13px' }}>เลขที่เช็ค</th>
+                                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontSize: '13px' }}>สั่งจ่ายให้ (Payee)</th>
+                                    <th style={{ padding: '12px 14px', textAlign: 'right', color: '#64748b', fontSize: '13px' }}>จำนวนเงิน (บาท)</th>
+                                    <th style={{ padding: '12px 14px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>วันที่สั่งจ่าย</th>
+                                    <th style={{ padding: '12px 14px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>สถานะ</th>
+                                    <th style={{ padding: '12px 14px', textAlign: 'left', color: '#64748b', fontSize: '13px' }}>ผู้จัดทำ</th>
+                                    <th style={{ padding: '12px 14px', textAlign: 'center', width: '120px', color: '#64748b', fontSize: '13px' }}>จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {loadingHistory ? (
+                                    <tr>
+                                        <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                                            <RotateCcw className="spin" size={24} style={{ display: 'inline-block', marginBottom: '8px' }} />
+                                            <div>กำลังโหลดข้อมูลประวัติเช็ค...</div>
+                                        </td>
+                                    </tr>
+                                ) : filteredHistory.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                                            <CreditCard size={40} color="#cbd5e1" style={{ display: 'inline-block', marginBottom: '10px' }} />
+                                            <div>ไม่พบรายการสั่งจ่ายเช็คในระบบ</div>
+                                            <p style={{ fontSize: '13px', marginTop: '4px' }}>กดปุ่ม "เขียนเช็คใหม่" ด้านบนเพื่อเริ่มเขียนเช็ค</p>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    paginatedHistory.map((item, idx) => (
+                                        <tr key={item.ChequeID} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#64748b' }}>
+                                                {(currentPage - 1) * pageSize + idx + 1}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                {((item.HistoryCount || 0) > 0 || (item.Revision || 1) > 1) ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleViewChequeHistory(item.ChequeID)}
+                                                        title="คลิกเพื่อดูประวัติการแก้ไข (Revision History)"
+                                                        style={{
+                                                            background: '#e0e7ff',
+                                                            color: '#4338ca',
+                                                            border: '1px solid #c7d2fe',
+                                                            padding: '3px 8px',
+                                                            borderRadius: '12px',
+                                                            fontSize: '12px',
+                                                            fontWeight: '600',
+                                                            cursor: 'pointer',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}
+                                                    >
+                                                        v.{item.Revision || 1} <History size={12} />
+                                                    </button>
+                                                ) : (
+                                                    <span style={{
+                                                        background: '#f1f5f9',
+                                                        color: '#64748b',
+                                                        padding: '3px 8px',
+                                                        borderRadius: '12px',
+                                                        fontSize: '12px',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        v.1
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', fontWeight: 600, color: '#0f172a' }}>
+                                                {item.ChequeNo}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', fontWeight: 500, color: '#1e293b' }}>
+                                                {item.PayeeOrPayer}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'right', fontWeight: 600, color: '#059669' }}>
+                                                {Number(item.Amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center', color: '#475569' }}>
+                                                {item.IssueDate ? new Date(item.IssueDate).toLocaleDateString('th-TH') : '-'}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                <span style={{
+                                                    background: item.Status === 'cleared' ? '#ecfdf5' : item.Status === 'bounced' ? '#fee2e2' : '#fef3c7',
+                                                    color: item.Status === 'cleared' ? '#047857' : item.Status === 'bounced' ? '#b91c1c' : '#b45309',
+                                                    border: `1px solid ${item.Status === 'cleared' ? '#a7f3d0' : item.Status === 'bounced' ? '#fecaca' : '#fde68a'}`,
+                                                    padding: '3px 10px',
+                                                    borderRadius: '16px',
+                                                    fontSize: '12px',
+                                                    fontWeight: '500',
+                                                    display: 'inline-block'
+                                                }}>
+                                                    {item.Status === 'cleared' ? 'ตัดยอดแล้ว' : item.Status === 'bounced' ? 'เช็คคืน' : 'รอขึ้นเงิน'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '12px 14px', color: '#475569' }}>
+                                                {item.CreatedByName || '-'}
+                                            </td>
+                                            <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                                                <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => handlePreviewFromHistory(item)}
+                                                        title="พรีวิว / พิมพ์เช็ค"
+                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: '#2563eb', borderRadius: '4px' }}
+                                                    >
+                                                        <Eye size={17} />
+                                                    </button>
+                                                    {((item.HistoryCount || 0) > 0 || (item.Revision || 1) > 1) && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleViewChequeHistory(item.ChequeID)}
+                                                            title="ประวัติการแก้ไข (Revision History)"
+                                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: '#6366f1', borderRadius: '4px' }}
+                                                        >
+                                                            <History size={17} />
+                                                        </button>
+                                                    )}
+                                                    {(!canUpdate || canUpdate('elite_cheque') || canUpdate('elite_cheque_form')) && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleLoadFromHistory(item)}
+                                                            title="แก้ไขข้อมูลเช็ค"
+                                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: '#7c3aed', borderRadius: '4px' }}
+                                                        >
+                                                            <Pencil size={17} />
+                                                        </button>
+                                                    )}
+                                                    {(!canDelete || canDelete('elite_cheque') || canDelete('elite_cheque_list')) && (
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleDeleteHistoryItem(item.ChequeID, item.ChequeNo)}
+                                                            title="ลบข้อมูลเช็ค"
+                                                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: '#ef4444', borderRadius: '4px' }}
+                                                        >
+                                                            <Trash2 size={17} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+
+                        {/* Pagination */}
+                        <PaginationControl
+                            currentPage={currentPage}
+                            totalPages={Math.ceil(filteredHistory.length / pageSize) || 1}
+                            totalItems={filteredHistory.length}
+                            pageSize={pageSize}
+                            onPageChange={(newPage) => setCurrentPage(newPage)}
+                            onPageSizeChange={(newSize) => {
+                                setPageSize(newSize);
+                                setCurrentPage(1);
+                            }}
+                            pageSizeOptions={[10, 20, 50]}
+                            itemLabel="รายการ"
+                        />
                     </div>
                 </div>
             )}
