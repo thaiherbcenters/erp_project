@@ -32,6 +32,7 @@ const getStatusBadge = (status) => {
         'รอบรรจุ':     'badge-danger',
         'กำลังบรรจุ':   'badge-warning',
         'บรรจุเสร็จ':   'badge-info',
+        'บรรจุเสร็จ-รอติดฉลาก': 'badge-purple',
         'รอ QC Final': 'badge-purple',
         'QC ผ่าน':     'badge-success',
         'ส่งมอบแล้ว':   'badge-success',
@@ -242,15 +243,39 @@ export default function Packaging() {
         setDefectQty('');
     };
 
-    // ── Filter ──
-    const statusOptions = ['ทั้งหมด', 'บรรจุเสร็จ', 'รอ QC Final', 'QC ผ่าน', 'ส่งมอบแล้ว'];
-    const filtered = orders.filter(o => {
-        if (o.status === 'รอเบิกบรรจุภัณฑ์' || o.status === 'รอบรรจุ' || o.status === 'กำลังบรรจุ') return false; // Hide from table
+    // ── Filter & Sort (Latest First) ──
+    const activeOrders = React.useMemo(() => {
+        return orders
+            .filter(o => o.status === 'รอเบิกบรรจุภัณฑ์' || o.status === 'รอบรรจุ' || o.status === 'กำลังบรรจุ')
+            .sort((a, b) => {
+                const dateA = new Date(a.createdAt || 0).getTime();
+                const dateB = new Date(b.createdAt || 0).getTime();
+                if (dateB !== dateA) return dateB - dateA;
+                return (b.code || b.id || '').localeCompare(a.code || a.id || '');
+            });
+    }, [orders]);
 
-        const matchSearch = (o.product || '').includes(searchTerm) || (o.code || '').includes(searchTerm) || (o.batch || '').includes(searchTerm);
-        const matchStatus = statusFilter === 'ทั้งหมด' || o.status === statusFilter;
-        return matchSearch && matchStatus;
-    });
+    const statusOptions = ['ทั้งหมด', 'บรรจุเสร็จ', 'บรรจุเสร็จ-รอติดฉลาก', 'รอ QC Final', 'QC ผ่าน', 'ส่งมอบแล้ว'];
+    const filtered = React.useMemo(() => {
+        return orders
+            .filter(o => {
+                if (o.status === 'รอเบิกบรรจุภัณฑ์' || o.status === 'รอบรรจุ' || o.status === 'กำลังบรรจุ') return false; // Hide from table
+
+                const term = searchTerm.toLowerCase();
+                const matchSearch = (o.product || '').toLowerCase().includes(term) || 
+                                     (o.code || '').toLowerCase().includes(term) || 
+                                     (o.batch || '').toLowerCase().includes(term) ||
+                                     (o.jobOrderId || '').toLowerCase().includes(term);
+                const matchStatus = statusFilter === 'ทั้งหมด' || o.status === statusFilter;
+                return matchSearch && matchStatus;
+            })
+            .sort((a, b) => {
+                const dateA = new Date(a.createdAt || 0).getTime();
+                const dateB = new Date(b.createdAt || 0).getTime();
+                if (dateB !== dateA) return dateB - dateA;
+                return (b.code || b.id || '').localeCompare(a.code || a.id || '');
+            });
+    }, [orders, searchTerm, statusFilter]);
 
     useEffect(() => {
         setPkgPage(1);
@@ -785,13 +810,13 @@ export default function Packaging() {
             <div className="packaging-main">
 
                 {/* ── Active Tasks (Kanban Board) for Pending Orders ── */}
-                {hasSectionPermission('packaging_main_orders') && !loading && orders.filter(o => o.status === 'รอเบิกบรรจุภัณฑ์' || o.status === 'รอบรรจุ' || o.status === 'กำลังบรรจุ').length > 0 && (
+                {hasSectionPermission('packaging_main_orders') && !loading && activeOrders.length > 0 && (
                     <div style={{ marginBottom: 24 }}>
                         <h3 className="card-title" style={{ fontSize: '1.1rem', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <PackageOpen size={18} style={{ color: '#f43f5e' }} /> งานที่ต้องดำเนินการ (รอเบิก / รอบรรจุ / กำลังบรรจุ)
                         </h3>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
-                            {orders.filter(o => o.status === 'รอเบิกบรรจุภัณฑ์' || o.status === 'รอบรรจุ' || o.status === 'กำลังบรรจุ').map(order => (
+                            {activeOrders.map(order => (
                                 <div key={order.id} className={`pkg-pending-card ${getCardStatusClass(order.status)}`} onClick={() => setSelectedOrder(order)}>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
@@ -1126,7 +1151,7 @@ export default function Packaging() {
 
     const getPageDesc = () => {
         switch (currentTab) {
-            case 'packaging_main': return 'จัดการงานบรรจุภัณฑ์และติดตามสถานะการบรรจุ → ส่ง QC Final';
+            case 'packaging_main': return 'จัดการงานบรรจุภัณฑ์และติดตามสถานะการบรรจุ → ส่งงานติดฉลาก / QC Final';
             case 'packaging_materials': return 'จัดการข้อมูลวัสดุบรรจุภัณฑ์และสต็อกคงเหลือ';
             default: return 'จัดการการบรรจุภัณฑ์';
         }

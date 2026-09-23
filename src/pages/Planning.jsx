@@ -583,11 +583,11 @@ export default function Planning() {
         if (!showSODetailModal || !viewingSODetail) return null;
         const so = viewingSODetail;
         return (
-            <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                <div className="card" style={{ width: '90%', maxWidth: 650, maxHeight: '85vh', overflowY: 'auto', padding: 24, animation: 'slideUp 0.25s ease-out' }}>
+            <div className="modal-overlay" onClick={() => setShowSODetailModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                <div className="card" onClick={(e) => e.stopPropagation()} style={{ width: '90%', maxWidth: 680, maxHeight: '85vh', overflowY: 'auto', padding: 24, animation: 'slideUp 0.25s ease-out' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>📄 รายละเอียด {so.SalesOrderNo}</h2>
-                        <button onClick={() => setShowSODetailModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18 }}>✖</button>
+                        <button onClick={() => setShowSODetailModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 18, padding: 4 }}>✖</button>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 20px', marginBottom: 20, fontSize: 13 }}>
@@ -622,26 +622,28 @@ export default function Planning() {
                     </div>
 
                     <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 10px', borderBottom: '1px solid var(--border-light)', paddingBottom: 8 }}>📦 รายการสินค้าที่ต้องผลิต</h3>
-                    <table className="data-table" style={{ fontSize: 12, marginBottom: 16 }}>
-                        <thead>
-                            <tr>
-                                <th style={{ width: 40 }}>#</th>
-                                <th>ชื่อสินค้า</th>
-                                <th style={{ textAlign: 'right' }}>จำนวน</th>
-                                <th>หน่วย</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {(so.items || []).map((item, idx) => (
-                                <tr key={idx}>
-                                    <td>{idx + 1}</td>
-                                    <td style={{ fontWeight: 500 }}>{item.ItemName}</td>
-                                    <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--primary)' }}>{Number(item.Qty || 0).toLocaleString('th-TH')}</td>
-                                    <td>{item.Unit || 'ชิ้น'}</td>
+                    <div style={{ width: '100%', overflowX: 'auto', border: '1px solid var(--border-light)', borderRadius: 8, marginBottom: 8 }}>
+                        <table className="data-table" style={{ width: '100%', minWidth: 'unset', fontSize: 13, marginBottom: 0 }}>
+                            <thead>
+                                <tr>
+                                    <th style={{ width: 45, textAlign: 'center' }}>#</th>
+                                    <th>ชื่อสินค้า</th>
+                                    <th style={{ width: 110, textAlign: 'right' }}>จำนวน</th>
+                                    <th style={{ width: 80, textAlign: 'center' }}>หน่วย</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {(so.items || []).map((item, idx) => (
+                                    <tr key={idx}>
+                                        <td style={{ textAlign: 'center' }}>{idx + 1}</td>
+                                        <td style={{ fontWeight: 500, whiteSpace: 'normal' }}>{item.ItemName}</td>
+                                        <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--primary)' }}>{Number(item.Qty || 0).toLocaleString('th-TH')}</td>
+                                        <td style={{ textAlign: 'center' }}>{item.Unit || 'ชิ้น'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         );

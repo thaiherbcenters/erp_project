@@ -293,7 +293,7 @@ export default function EliteTaxInvoice() {
 
     // ── Spaces Management State ──
     const [spacesList, setSpacesList] = useState(() => {
-        const saved = localStorage.getItem('elite_spaces_data') || localStorage.getItem('psf_spaces_data');
+        const saved = localStorage.getItem('elite_spaces_data') || localStorage.getItem('elite_space_data') || localStorage.getItem('psf_spaces_data');
         return parseSpaceData(saved);
     });
     const [selectedSpaceKeys, setSelectedSpaceKeys] = useState([]);
@@ -336,7 +336,7 @@ export default function EliteTaxInvoice() {
     }, [spacesList, spaceSearch]);
 
     // Sync rental items with selected spaces
-    const syncRentalItems = useCallback((keys, spaces) => {
+    const syncRentalItems = useCallback((keys, spaces, forceOverwrite = false) => {
         const currentSpaces = spaces || spacesList;
         const selectedSpaces = currentSpaces.filter(sp => keys.includes(sp.key));
 
@@ -344,25 +344,27 @@ export default function EliteTaxInvoice() {
         const spaceDescs = [];
 
         selectedSpaces.forEach(sp => {
-            const zoneChar = sp.zone.replace('โซน', '').trim().charAt(0).toUpperCase();
+            const z = sp.zone || '';
+            const zoneChar = z.replace('โซน', '').trim().charAt(0).toUpperCase();
             let rate = 450;
             if (zoneChar === 'C') rate = 350;
 
-            totalSqm += sp.size;
+            const sizeNum = parseFloat(sp.size) || 0;
+            totalSqm += sizeNum;
 
-            const zoneLabel = sp.zone.startsWith('โซน') ? sp.zone : `โซน ${sp.zone}`;
-            let descName = `ค่าเช่าพื้นที่ ${zoneLabel} ล็อก ${sp.name}`;
+            const zoneLabel = z.startsWith('โซน') ? z : `โซน ${z}`;
+            let descName = `ค่าเช่าพื้นที่ ${zoneLabel} ล็อก ${sp.name || '-'}`;
             if (sp.booker && sp.booker !== sp.name) {
                 descName += ` (${sp.booker})`;
             }
-            descName += ` (ขนาด ${sp.size} ตร.ม.)`;
+            descName += ` (ขนาด ${sizeNum} ตร.ม.)`;
 
             spaceDescs.push({
                 name: descName,
-                qty: sp.size,
+                qty: sizeNum,
                 unit: 'ตร.ม.',
                 price: rate,
-                baseName: `ค่าเช่าพื้นที่ ${zoneLabel} ล็อก ${sp.name}`
+                baseName: `ค่าเช่าพื้นที่ ${zoneLabel} ล็อก ${sp.name || '-'}`
             });
         });
 
@@ -405,12 +407,35 @@ export default function EliteTaxInvoice() {
         }
 
         setItems(prevItems => {
-            const currentData = prevItems.map(item => ({
-                id: item.id,
-                desc: item.desc,
-                qty: item.qty,
-                unit: item.unit,
-                price: item.price,
+            if (forceOverwrite) {
+                const list = [];
+                spaceDescs.forEach((sp, idx) => {
+                    list.push({
+                        id: Date.now() + idx + Math.random(),
+                        desc: sp.name,
+                        qty: sp.qty,
+                        unit: sp.unit,
+                        price: sp.price
+                    });
+                });
+                standardItems.forEach((std, idx) => {
+                    list.push({
+                        id: Date.now() + 100 + idx + Math.random(),
+                        desc: std.name,
+                        qty: std.qty,
+                        unit: std.unit,
+                        price: std.price
+                    });
+                });
+                return list;
+            }
+
+            const currentData = (prevItems || []).map(item => ({
+                id: item.id || (Date.now() + Math.random()),
+                desc: item.desc || '',
+                qty: item.qty !== undefined ? item.qty : 1,
+                unit: item.unit || '',
+                price: item.price !== undefined ? item.price : 0,
                 used: false
             }));
 
@@ -418,7 +443,11 @@ export default function EliteTaxInvoice() {
 
             // 1. Add selected spaces
             spaceDescs.forEach(spaceObj => {
-                const existing = currentData.find(d => !d.used && (d.desc.startsWith(spaceObj.baseName) || d.desc.startsWith('ค่าเช่าพื้นที่ โซน/ล็อก')));
+                const existing = currentData.find(d => !d.used && (
+                    (d.desc || '').startsWith(spaceObj.baseName) || 
+                    (d.desc || '').startsWith('ค่าเช่าพื้นที่ โซน/ล็อก') ||
+                    (!(d.desc || '').trim() && Number(d.price || 0) === 0)
+                ));
                 if (existing) {
                     newItemsList.push({
                         id: existing.id,
@@ -441,12 +470,13 @@ export default function EliteTaxInvoice() {
 
             // 2. Add other non-space, non-standard items
             currentData.forEach(d => {
-                const isStandard = d.desc.startsWith('ค่าเช่าพื้นที่') ||
-                                   d.desc.startsWith('ค่าส่วนกลาง') ||
-                                   d.desc.startsWith('ค่าน้ำประปา') ||
-                                   d.desc.startsWith('ค่าไฟฟ้า') ||
-                                   ['เงินประกันความเสียหาย', 'ค่าประกันมิเตอร์น้ำ / ไฟฟ้า'].includes(d.desc.trim());
-                const isEmpty = (d.desc.trim() === '' && Number(d.price) === 0);
+                const descStr = (d.desc || '').trim();
+                const isStandard = descStr.startsWith('ค่าเช่าพื้นที่') ||
+                                   descStr.startsWith('ค่าส่วนกลาง') ||
+                                   descStr.startsWith('ค่าน้ำประปา') ||
+                                   descStr.startsWith('ค่าไฟฟ้า') ||
+                                   ['เงินประกันความเสียหาย', 'ค่าประกันมิเตอร์น้ำ / ไฟฟ้า'].includes(descStr);
+                const isEmpty = (descStr === '' && Number(d.price || 0) === 0);
                 if (!d.used && !isStandard && !isEmpty) {
                     newItemsList.push(d);
                     d.used = true;
@@ -455,7 +485,7 @@ export default function EliteTaxInvoice() {
 
             // 3. Add standard items
             standardItems.forEach(stdObj => {
-                const existing = currentData.find(d => !d.used && d.desc.startsWith(stdObj.baseName));
+                const existing = currentData.find(d => !d.used && (d.desc || '').startsWith(stdObj.baseName));
                 if (existing) {
                     newItemsList.push({
                         id: existing.id,
@@ -479,6 +509,15 @@ export default function EliteTaxInvoice() {
             return newItemsList;
         });
     }, [spacesList]);
+
+    const handleApplyStandardRentalItems = () => {
+        if (selectedSpaceKeys.length === 0) {
+            showAlert('แจ้งเตือน', 'กรุณาเลือกล็อกพื้นที่ให้เช่าด้านบนก่อน เพื่อดึงรายการเช่ามาตรฐาน', 'warning');
+            return;
+        }
+        syncRentalItems(selectedSpaceKeys, spacesList, true);
+        showAlert('สำเร็จ', 'ดึงรายการเช่ามาตรฐานตามล็อกที่เลือกลงในตารางเรียบร้อยแล้ว', 'success');
+    };
 
     const handleToggleSpace = (spaceKey) => {
         let newSelected;
@@ -564,6 +603,7 @@ export default function EliteTaxInvoice() {
 
         const rawText = serializedLines.join('\n');
         localStorage.setItem('elite_spaces_data', rawText);
+        localStorage.setItem('elite_space_data', rawText);
         localStorage.setItem('psf_spaces_data', rawText);
 
         const parsed = parseSpaceData(rawText);
@@ -1765,29 +1805,52 @@ export default function EliteTaxInvoice() {
                                                 fontSize: '14px',
                                                 margin: 0
                                             }}>
-                                                เลือกพื้นที่ให้เช่า (สามารถเลือกได้หลายล็อก จากนั้นกดปุ่มเพิ่มรายการเช่ามาตรฐานด้านล่าง)
+                                                เลือกพื้นที่ให้เช่า (ระบบจะซิงค์รายการลงในตารางให้อัตโนมัติ หรือกดปุ่มดึงรายการเช่า)
                                             </label>
-                                            <button 
-                                                type="button"
-                                                onClick={handleOpenSpaceModal}
-                                                style={{
-                                                    backgroundColor: '#64748b',
-                                                    color: '#ffffff',
-                                                    fontSize: '12px',
-                                                    padding: '5px 12px',
-                                                    borderRadius: '6px',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    fontWeight: '500'
-                                                }}
-                                                title="จัดการล็อกและพื้นที่"
-                                            >
-                                                <Settings size={13} />
-                                                จัดการล็อก/การจอง
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                <button 
+                                                    type="button"
+                                                    onClick={handleApplyStandardRentalItems}
+                                                    style={{
+                                                        backgroundColor: '#16a34a',
+                                                        color: '#ffffff',
+                                                        fontSize: '12px',
+                                                        padding: '5px 12px',
+                                                        borderRadius: '6px',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        fontWeight: '600'
+                                                    }}
+                                                    title="ดึงรายการเช่าและส่วนกลางตามล็อกที่เลือกลงในตารางรายการ"
+                                                >
+                                                    <Plus size={13} />
+                                                    ดึงรายการเช่าลงตาราง {selectedSpaceKeys.length > 0 ? `(${selectedSpaceKeys.length})` : ''}
+                                                </button>
+                                                <button 
+                                                    type="button"
+                                                    onClick={handleOpenSpaceModal}
+                                                    style={{
+                                                        backgroundColor: '#64748b',
+                                                        color: '#ffffff',
+                                                        fontSize: '12px',
+                                                        padding: '5px 12px',
+                                                        borderRadius: '6px',
+                                                        border: 'none',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        fontWeight: '500'
+                                                    }}
+                                                    title="จัดการล็อกและพื้นที่"
+                                                >
+                                                    <Settings size={13} />
+                                                    จัดการล็อก/การจอง
+                                                </button>
+                                            </div>
                                         </div>
 
                                         {/* Multi-select Dropdown Container */}
@@ -2045,25 +2108,49 @@ export default function EliteTaxInvoice() {
                                         </tbody>
                                     </table>
 
-                                    <button 
-                                        type="button" 
-                                        onClick={addItem} 
-                                        style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '6px',
-                                            background: '#16a34a',
-                                            color: '#ffffff',
-                                            border: 'none',
-                                            padding: '8px 16px',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            fontWeight: '600',
-                                            fontSize: '13px'
-                                        }}
-                                    >
-                                        + เพิ่มรายการ
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                        <button 
+                                            type="button" 
+                                            onClick={addItem} 
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                background: '#16a34a',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                padding: '8px 16px',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontWeight: '600',
+                                                fontSize: '13px'
+                                            }}
+                                        >
+                                            <Plus size={16} />
+                                            เพิ่มรายการ
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleApplyStandardRentalItems}
+                                            style={{
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                background: '#f0fdf4',
+                                                color: '#16a34a',
+                                                border: '1.5px solid #86efac',
+                                                padding: '8px 16px',
+                                                borderRadius: '6px',
+                                                cursor: 'pointer',
+                                                fontWeight: '600',
+                                                fontSize: '13px'
+                                            }}
+                                            title="ดึงรายการเช่ามาตรฐานตามล็อกที่เลือกด้านบนลงในตาราง"
+                                        >
+                                            <RefreshCw size={14} />
+                                            ดึงรายการเช่ามาตรฐานตามล็อกที่เลือก {selectedSpaceKeys.length > 0 ? `(${selectedSpaceKeys.length})` : ''}
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Section 4: หมายเหตุ */}

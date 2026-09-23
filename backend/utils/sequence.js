@@ -19,7 +19,10 @@ const parseDateParts = (date) => {
                 dd: parts[2].padStart(2, '0')
             };
         }
-        date = new Date(date);
+        const parsed = new Date(date);
+        date = isNaN(parsed.getTime()) ? new Date() : parsed;
+    } else if (!(date instanceof Date) || isNaN(date.getTime())) {
+        date = new Date();
     }
     const yyyy = String(date.getFullYear());
     const yy = yyyy.slice(-2);
@@ -114,9 +117,40 @@ const peekNextSequence = async (pool, tableName, columnName, prefix, padLength =
 const generateSequence = async (pool, tableName, columnName, prefix, padLength = 3, separator = '-') => {
     const fullPrefix = prefix.endsWith(separator) ? prefix : `${prefix}${separator}`;
     
-    // Atomically get the next number from the Sequences table
+    // 1. If tableName & columnName are provided, find max existing number from table to ensure Sequences is never behind
+    let tableMax = 0;
+    if (tableName && columnName) {
+        try {
+            const tableCheck = await pool.request()
+                .input('tablePrefixPattern', sql.NVarChar, `${fullPrefix}%`)
+                .query(`
+                    SELECT ${columnName} AS no 
+                    FROM ${tableName} WITH (NOLOCK) 
+                    WHERE ${columnName} LIKE @tablePrefixPattern
+                `);
+            
+            if (tableCheck.recordset && tableCheck.recordset.length > 0) {
+                for (const row of tableCheck.recordset) {
+                    if (row.no) {
+                        const fullVal = String(row.no).trim();
+                        const parts = fullVal.split(separator);
+                        const lastPart = parts[parts.length - 1];
+                        const num = parseInt(lastPart, 10);
+                        if (!isNaN(num) && num > tableMax) {
+                            tableMax = num;
+                        }
+                    }
+                }
+            }
+        } catch (te) {
+            console.error('Error scanning table for max sequence in generateSequence:', te);
+        }
+    }
+
+    // 2. Atomically get and increment the next number from the Sequences table, ensuring it is at least tableMax
     const result = await pool.request()
         .input('prefix', sql.NVarChar, fullPrefix)
+        .input('tableMax', sql.Int, tableMax)
         .query(`
             BEGIN TRY
                 BEGIN TRANSACTION;
@@ -124,7 +158,14 @@ const generateSequence = async (pool, tableName, columnName, prefix, padLength =
                 -- Ensure the row exists
                 IF NOT EXISTS (SELECT 1 FROM Sequences WITH (UPDLOCK, SERIALIZABLE) WHERE Prefix = @prefix)
                 BEGIN
-                    INSERT INTO Sequences (Prefix, LastNumber, UpdatedAt) VALUES (@prefix, 0, GETDATE());
+                    INSERT INTO Sequences (Prefix, LastNumber, UpdatedAt) VALUES (@prefix, @tableMax, GETDATE());
+                END
+                ELSE
+                BEGIN
+                    -- If table has a higher number than recorded in Sequences, sync it up
+                    UPDATE Sequences
+                    SET LastNumber = @tableMax, UpdatedAt = GETDATE()
+                    WHERE Prefix = @prefix AND LastNumber < @tableMax;
                 END
 
                 -- Increment and get the new number
@@ -142,7 +183,34 @@ const generateSequence = async (pool, tableName, columnName, prefix, padLength =
             END CATCH
         `);
 
-    const nextSeq = result.recordset[0].LastNumber;
+    let nextSeq = result.recordset[0].LastNumber;
+
+    // 3. Final collision guarantee: if the ID already exists in tableName, advance until free
+    if (tableName && columnName) {
+        let candidate = `${fullPrefix}${String(nextSeq).padStart(padLength, '0')}`;
+        let attempts = 0;
+        while (attempts < 50) {
+            const existsCheck = await pool.request()
+                .input('candId', sql.VarChar, candidate)
+                .query(`SELECT 1 FROM ${tableName} WITH (NOLOCK) WHERE ${columnName} = @candId`);
+            if (existsCheck.recordset.length === 0) {
+                break;
+            }
+            // Candidate already exists in table! Increment Sequences again
+            const incRes = await pool.request()
+                .input('prefix', sql.NVarChar, fullPrefix)
+                .query(`
+                    UPDATE Sequences 
+                    SET LastNumber = LastNumber + 1, UpdatedAt = GETDATE()
+                    OUTPUT inserted.LastNumber
+                    WHERE Prefix = @prefix
+                `);
+            nextSeq = incRes.recordset[0].LastNumber;
+            candidate = `${fullPrefix}${String(nextSeq).padStart(padLength, '0')}`;
+            attempts++;
+        }
+    }
+
     const seq = String(nextSeq).padStart(padLength, '0');
     return `${fullPrefix}${seq}`;
 };

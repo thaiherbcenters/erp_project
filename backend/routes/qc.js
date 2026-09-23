@@ -62,6 +62,145 @@ router.post('/incoming', authorizeRoles('admin', 'executive', 'qc'), async (req,
     }
 });
 
+// Update incoming qc inspection result and sync to Stock when passed
+router.put('/incoming/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { result_status, inspectorId, notes, receivedQty } = req.body;
+        const pool = await poolPromise;
+
+        // 1. Get existing incoming item
+        const existingRes = await pool.request()
+            .input('id', sql.Int, id)
+            .query(`SELECT * FROM QC_Incoming WHERE IncomingID = @id`);
+
+        if (existingRes.recordset.length === 0) {
+            return res.status(404).json({ success: false, message: 'ไม่พบรายการตรวจรับวัตถุดิบ' });
+        }
+
+        const currentItem = existingRes.recordset[0];
+        const wasPassed = currentItem.Result === 'ผ่าน';
+        const finalResult = result_status || currentItem.Result;
+        const finalInspector = inspectorId || req.user?.display_name || req.user?.username || currentItem.InspectorID || 'QC';
+        const finalNotes = notes !== undefined ? notes : currentItem.Notes;
+
+        // 2. Update QC_Incoming
+        await pool.request()
+            .input('id', sql.Int, id)
+            .input('Result', sql.VarChar, finalResult)
+            .input('InspectorID', sql.VarChar, finalInspector)
+            .input('Notes', sql.NVarChar, finalNotes)
+            .query(`
+                UPDATE QC_Incoming 
+                SET Result = @Result, 
+                    InspectorID = @InspectorID, 
+                    Notes = @Notes 
+                WHERE IncomingID = @id
+            `);
+
+        // 3. If transitioning to 'ผ่าน' (and wasn't already 'ผ่าน'), auto-add into Stock!
+        if (finalResult === 'ผ่าน' && !wasPassed) {
+            // ตรวจสอบว่าอ้างอิงจากใบสั่งซื้อ (PO) หรือไม่
+            const poMatch = (currentItem.Notes || '').match(/PO:\s*(PO[0-9-]+)/i) || (currentItem.LotNumber || '').match(/LOT-(PO[0-9-]+)/i);
+            
+            let itemsToStock = [];
+            if (poMatch && poMatch[1]) {
+                const poNumber = poMatch[1].trim();
+                const poItemsRes = await pool.request()
+                    .input('poNumber', sql.NVarChar, poNumber)
+                    .query(`
+                        SELECT poi.ItemName, poi.Qty, poi.Unit 
+                        FROM PurchaseOrder po
+                        JOIN PurchaseOrderItem poi ON po.PurchaseOrderID = poi.PurchaseOrderID
+                        WHERE po.PONumber = @poNumber
+                    `);
+                if (poItemsRes.recordset && poItemsRes.recordset.length > 0) {
+                    itemsToStock = poItemsRes.recordset.map(i => ({
+                        name: i.ItemName,
+                        qty: parseFloat(i.Qty) || 1,
+                        unit: i.Unit || 'หน่วย'
+                    }));
+                }
+            }
+
+            // หากไม่ได้มาจาก PO หรือไม่มีรายการ ให้ตรวจรับเป็นรายการเดี่ยว
+            if (itemsToStock.length === 0) {
+                let qtyToAdd = parseFloat(receivedQty);
+                if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
+                    const match = (currentItem.Notes || '').match(/(?:จำนวน|Qty|ปริมาณ)[:\s]+([0-9.]+)/i);
+                    qtyToAdd = match && match[1] ? parseFloat(match[1]) : 1;
+                }
+                let unitToAdd = 'หน่วย';
+                const unitMatch = (currentItem.Notes || '').match(/(?:จำนวน|Qty|ปริมาณ)[:\s]+[0-9.]+\s*([^\s|]+)/i);
+                if (unitMatch && unitMatch[1]) unitToAdd = unitMatch[1];
+
+                itemsToStock = [{
+                    name: currentItem.ItemName,
+                    qty: qtyToAdd,
+                    unit: unitToAdd
+                }];
+            }
+
+            // เพิ่มรายการเข้า Stock_Items และลงประวัติใน Stock_Logs ทุกรายการ
+            for (const stockItem of itemsToStock) {
+                if (!stockItem.name) continue;
+
+                const stockCheck = await pool.request()
+                    .input('name', sql.NVarChar, stockItem.name.trim())
+                    .query(`SELECT * FROM Stock_Items WHERE ProductName = @name AND (IsHidden = 0 OR IsHidden IS NULL)`);
+
+                let targetItemId = null;
+                if (stockCheck.recordset.length > 0) {
+                    targetItemId = stockCheck.recordset[0].ItemID;
+                    await pool.request()
+                        .input('ItemID', sql.VarChar, targetItemId)
+                        .input('AddQty', sql.Float, stockItem.qty)
+                        .query(`
+                            UPDATE Stock_Items 
+                            SET Quantity = Quantity + @AddQty, UpdatedAt = GETDATE() 
+                            WHERE ItemID = @ItemID
+                        `);
+                } else {
+                    targetItemId = await generateSequence(pool, 'Stock_Items', 'ItemID', 'RM', 3);
+                    await pool.request()
+                        .input('ItemID', sql.VarChar, targetItemId)
+                        .input('ProductName', sql.NVarChar, stockItem.name.trim())
+                        .input('Category', sql.NVarChar, 'วัตถุดิบ (RM)')
+                        .input('Quantity', sql.Float, stockItem.qty)
+                        .input('Unit', sql.NVarChar, stockItem.unit)
+                        .input('Status', sql.NVarChar, 'มีสินค้า')
+                        .query(`
+                            INSERT INTO Stock_Items (ItemID, ProductName, Category, Quantity, Unit, Status, CreatedAt, UpdatedAt) 
+                            VALUES (@ItemID, @ProductName, @Category, @Quantity, @Unit, @Status, GETDATE(), GETDATE())
+                        `);
+                }
+
+                await pool.request()
+                    .input('ItemID', sql.VarChar, targetItemId)
+                    .input('Type', sql.VarChar, 'IN')
+                    .input('Quantity', sql.Float, stockItem.qty)
+                    .input('RefNo', sql.VarChar, currentItem.RequestID || currentItem.LotNumber)
+                    .input('RefType', sql.VarChar, 'qc_incoming')
+                    .input('ProductName', sql.NVarChar, stockItem.name)
+                    .input('Notes', sql.NVarChar, `รับเข้าจากการตรวจรับ QC: ${currentItem.RequestID} (Lot: ${currentItem.LotNumber || '-'})`)
+                    .input('CreatedBy', sql.VarChar, finalInspector)
+                    .query(`
+                        INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy, CreatedAt) 
+                        VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy, GETDATE())
+                    `);
+            }
+        }
+
+        res.json({
+            success: true,
+            message: finalResult === 'ผ่าน' ? 'บันทึกผลตรวจผ่าน และนำเข้าคลังสินค้าเรียบร้อยแล้ว' : 'บันทึกผลตรวจเรียบร้อยแล้ว'
+        });
+    } catch (err) {
+        console.error('Error updating incoming qc:', err);
+        res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในการบันทึกผลตรวจรับวัตถุดิบ', error: err.message });
+    }
+});
+
 
 // ==========================================
 // QC PRODUCTION MODULE (In-Process / Final)

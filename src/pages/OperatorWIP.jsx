@@ -66,7 +66,14 @@ const OperatorWIP = () => {
     
     const wipTasks = useMemo(() => {
         if (!tasks) return [];
-        return tasks.filter(t => t.batchNo && t.batchNo.includes('-WIP')).reverse();
+        return [...tasks]
+            .filter(t => t.batchNo && t.batchNo.includes('-WIP'))
+            .sort((a, b) => {
+                const timeA = new Date(a.createdAt || a.startTime || 0).getTime();
+                const timeB = new Date(b.createdAt || b.startTime || 0).getTime();
+                if (timeB !== timeA) return timeB - timeA;
+                return (b.batchNo || '').localeCompare(a.batchNo || '');
+            });
     }, [tasks]);
     
     const activeWipTasks = useMemo(() => wipTasks.filter(t => t.status === 'รอเริ่มงาน' || t.status === 'กำลังทำ' || t.status === 'รอเบิกวัตถุดิบ' || t.status === 'พร้อมเริ่มงาน'), [wipTasks]);
@@ -92,6 +99,8 @@ const OperatorWIP = () => {
     const [existingTask, setExistingTask] = useState(null);
     const [detailModalTask, setDetailModalTask] = useState(null);
     const isUrlParsed = React.useRef(false);
+
+    const isLocked = Boolean(fromTask || sourceJobOrderId || existingTask);
 
     const handleStartTask = (task) => {
         setFormData({
@@ -198,19 +207,36 @@ const OperatorWIP = () => {
 
         const usedRawMaterials = rawMaterials.map((ing, idx) => {
             if (!checkedItems[idx]) return null;
-            const stockItem = stockItems.find(s => ing.materialId && String(s.id).trim() === String(ing.materialId).trim());
-            if (!stockItem) return null;
-            
+            const pmMatch = pmMaterials?.find(m => String(m.id) === String(ing.materialId));
+            const rawMatch = MOCK_RAW_MATERIALS?.find(m => String(m.id) === String(ing.materialId));
+            const foundName = ing.name || (pmMatch ? pmMatch.name : (rawMatch ? rawMatch.name : 'วัตถุดิบ'));
+            let cleanName = foundName ? foundName.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').replace(/[\u200B-\u200D\uFEFF]/g, '').trim() : '-';
+            cleanName = cleanName.replace(/\s*\(.*?\)/g, '').trim();
+
+            const stockItem = stockItems.find(s => 
+                (ing.materialId && String(s.id).trim() === String(ing.materialId).trim()) ||
+                (cleanName && s.name && s.name.trim().toLowerCase() === cleanName.toLowerCase())
+            );
+
             let deductQty = ing.qty * scaleFactor;
             const displayQty = deductQty;
             const displayUnit = ing.unit;
 
-            if (stockItem.unit === 'กิโลกรัม' && ing.unit === 'กรัม') deductQty /= 1000;
-            else if (stockItem.unit === 'กรัม' && ing.unit === 'กิโลกรัม') deductQty *= 1000;
-            if (['ลิตร', 'l', 'liter', 'liters'].includes((stockItem.unit||'').toLowerCase()) && ['มิลลิลิตร', 'ml'].includes((ing.unit||'').toLowerCase())) deductQty /= 1000;
-            else if (['มิลลิลิตร', 'ml'].includes((stockItem.unit||'').toLowerCase()) && ['ลิตร', 'l', 'liter', 'liters'].includes((ing.unit||'').toLowerCase())) deductQty *= 1000;
+            if (stockItem) {
+                if (stockItem.unit === 'กิโลกรัม' && ing.unit === 'กรัม') deductQty /= 1000;
+                else if (stockItem.unit === 'กรัม' && ing.unit === 'กิโลกรัม') deductQty *= 1000;
+                if (['ลิตร', 'l', 'liter', 'liters'].includes((stockItem.unit||'').toLowerCase()) && ['มิลลิลิตร', 'ml'].includes((ing.unit||'').toLowerCase())) deductQty /= 1000;
+                else if (['มิลลิลิตร', 'ml'].includes((stockItem.unit||'').toLowerCase()) && ['ลิตร', 'l', 'liter', 'liters'].includes((ing.unit||'').toLowerCase())) deductQty *= 1000;
+            }
             
-            return { id: stockItem.id, name: stockItem.name, unit: stockItem.unit, deductQty, displayQty, displayUnit };
+            return { 
+                id: stockItem ? stockItem.id : (ing.materialId || `RM-${idx + 1}`), 
+                name: stockItem ? stockItem.name : cleanName, 
+                unit: (stockItem && stockItem.unit) ? stockItem.unit : ing.unit, 
+                deductQty, 
+                displayQty, 
+                displayUnit 
+            };
         }).filter(Boolean);
 
         if (usedRawMaterials.length === 0) {
@@ -368,45 +394,27 @@ const OperatorWIP = () => {
         }));
     };
 
-    // Auto-check items that have enough stock
+    // Auto-check all items in formula by default for requisition
     useEffect(() => {
-        if (rawMaterials.length > 0 && stockItems.length > 0) {
-            setCheckedItems(prev => {
-                let hasChanges = false;
-                const next = { ...prev };
-
-                rawMaterials.forEach((ing, idx) => {
-                    if (prev[idx] !== undefined) return; // Already explicitly checked or unchecked
-
-                    const requiredQtyNum = (ing.qty * scaleFactor);
-                    const stockItem = stockItems.find(s => ing.materialId && String(s.id).trim() === String(ing.materialId).trim());
-
-                    if (stockItem) {
-                        let availQty = stockItem.qty || 0;
-                        if (stockItem.unit === 'กิโลกรัม' && ing.unit === 'กรัม') availQty *= 1000;
-                        else if (stockItem.unit === 'กรัม' && ing.unit === 'กิโลกรัม') availQty /= 1000;
-
-                        if (availQty >= requiredQtyNum) {
-                            next[idx] = true;
-                            hasChanges = true;
-                        } else {
-                            next[idx] = false; // explicitly false so it doesn't try again
-                            hasChanges = true;
-                        }
-                    } else {
-                        next[idx] = false;
-                        hasChanges = true;
-                    }
-                });
-
-                return hasChanges ? next : prev;
+        if (rawMaterials.length > 0) {
+            const next = {};
+            rawMaterials.forEach((_, idx) => {
+                next[idx] = true;
             });
+            setCheckedItems(next);
+        } else {
+            setCheckedItems({});
         }
-    }, [rawMaterials, stockItems, scaleFactor, pmMaterials]);
+    }, [rawMaterials]);
 
     const allChecked = useMemo(() => {
         if (!rawMaterials || rawMaterials.length === 0) return false;
-        return rawMaterials.every((_, idx) => checkedItems[idx]);
+        return rawMaterials.every((_, idx) => !!checkedItems[idx]);
+    }, [rawMaterials, checkedItems]);
+
+    const hasAnyChecked = useMemo(() => {
+        if (!rawMaterials || rawMaterials.length === 0) return false;
+        return rawMaterials.some((_, idx) => !!checkedItems[idx]);
     }, [rawMaterials, checkedItems]);
 
     const handleCheckAll = () => {
@@ -416,24 +424,10 @@ const OperatorWIP = () => {
             rawMaterials.forEach((_, idx) => newChecked[idx] = false);
             setCheckedItems(newChecked);
         } else {
-            // Check only those with enough stock (skip errors)
-            setCheckedItems(prev => {
-                const next = { ...prev };
-                rawMaterials.forEach((ing, idx) => {
-                    const requiredQtyNum = (ing.qty * scaleFactor);
-                    const stockItem = stockItems.find(s => ing.materialId && String(s.id).trim() === String(ing.materialId).trim());
-
-                    let hasEnough = false;
-                    if (stockItem) {
-                        let availQty = stockItem.qty || 0;
-                        if (stockItem.unit === 'กิโลกรัม' && ing.unit === 'กรัม') availQty *= 1000;
-                        else if (stockItem.unit === 'กรัม' && ing.unit === 'กิโลกรัม') availQty /= 1000;
-                        if (availQty >= requiredQtyNum) hasEnough = true;
-                    }
-                    if (hasEnough) next[idx] = true;
-                });
-                return next;
-            });
+            // Check all
+            const newChecked = {};
+            rawMaterials.forEach((_, idx) => newChecked[idx] = true);
+            setCheckedItems(newChecked);
         }
     };
 
@@ -442,8 +436,8 @@ const OperatorWIP = () => {
             showAlert('ข้อมูลไม่ถูกต้อง', 'กรุณาระบุจำนวนที่ต้องการผลิต', 'warning');
             return;
         }
-        if (!allChecked && (!existingTask || !existingTask.RequisitionJSON)) {
-            showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาติ๊กเตรียมวัตถุดิบให้ครบถ้วนก่อนขอเบิก', 'warning');
+        if (!hasAnyChecked && (!existingTask || !existingTask.RequisitionJSON)) {
+            showAlert('ข้อมูลไม่ครบถ้วน', 'กรุณาเลือกวัตถุดิบอย่างน้อย 1 รายการเพื่อขอเบิก', 'warning');
             return;
         }
 
@@ -457,19 +451,36 @@ const OperatorWIP = () => {
                 // Construct requisition items
                 const usedRawMaterials = rawMaterials.map((ing, idx) => {
                     if (!checkedItems[idx]) return null;
-                    const stockItem = stockItems.find(s => ing.materialId && String(s.id).trim() === String(ing.materialId).trim());
-                    if (!stockItem) return null;
-                    
+                    const pmMatch = pmMaterials?.find(m => String(m.id) === String(ing.materialId));
+                    const rawMatch = MOCK_RAW_MATERIALS?.find(m => String(m.id) === String(ing.materialId));
+                    const foundName = ing.name || (pmMatch ? pmMatch.name : (rawMatch ? rawMatch.name : 'วัตถุดิบ'));
+                    let cleanName = foundName ? foundName.replace(/<\/p>\s*<p>/gi, ', ').replace(/<[^>]+>/g, '').replace(/&nbsp;/gi, ' ').replace(/[\u200B-\u200D\uFEFF]/g, '').trim() : '-';
+                    cleanName = cleanName.replace(/\s*\(.*?\)/g, '').trim();
+
+                    const stockItem = stockItems.find(s => 
+                        (ing.materialId && String(s.id).trim() === String(ing.materialId).trim()) ||
+                        (cleanName && s.name && s.name.trim().toLowerCase() === cleanName.toLowerCase())
+                    );
+
                     let deductQty = ing.qty * scaleFactor;
                     const displayQty = deductQty;
                     const displayUnit = ing.unit;
 
-                    if (stockItem.unit === 'กิโลกรัม' && ing.unit === 'กรัม') deductQty /= 1000;
-                    else if (stockItem.unit === 'กรัม' && ing.unit === 'กิโลกรัม') deductQty *= 1000;
-                    if (['ลิตร', 'l', 'liter', 'liters'].includes((stockItem.unit||'').toLowerCase()) && ['มิลลิลิตร', 'ml'].includes((ing.unit||'').toLowerCase())) deductQty /= 1000;
-                    else if (['มิลลิลิตร', 'ml'].includes((stockItem.unit||'').toLowerCase()) && ['ลิตร', 'l', 'liter', 'liters'].includes((ing.unit||'').toLowerCase())) deductQty *= 1000;
+                    if (stockItem) {
+                        if (stockItem.unit === 'กิโลกรัม' && ing.unit === 'กรัม') deductQty /= 1000;
+                        else if (stockItem.unit === 'กรัม' && ing.unit === 'กิโลกรัม') deductQty *= 1000;
+                        if (['ลิตร', 'l', 'liter', 'liters'].includes((stockItem.unit||'').toLowerCase()) && ['มิลลิลิตร', 'ml'].includes((ing.unit||'').toLowerCase())) deductQty /= 1000;
+                        else if (['มิลลิลิตร', 'ml'].includes((stockItem.unit||'').toLowerCase()) && ['ลิตร', 'l', 'liter', 'liters'].includes((ing.unit||'').toLowerCase())) deductQty *= 1000;
+                    }
                     
-                    return { id: stockItem.id, name: stockItem.name, unit: stockItem.unit, deductQty, displayQty, displayUnit };
+                    return { 
+                        id: stockItem ? stockItem.id : (ing.materialId || `RM-${idx + 1}`), 
+                        name: stockItem ? stockItem.name : cleanName, 
+                        unit: (stockItem && stockItem.unit) ? stockItem.unit : ing.unit, 
+                        deductQty, 
+                        displayQty, 
+                        displayUnit 
+                    };
                 }).filter(Boolean);
 
                 if (!existingTask) {
@@ -652,7 +663,18 @@ const OperatorWIP = () => {
                     </h2>
                     {canCreate('operator_wip') && (
                         <button 
-                            onClick={() => setViewMode('create')}
+                            onClick={() => {
+                                setFromTask(false);
+                                setSourceJobOrderId('');
+                                setExistingTask(null);
+                                setFormData({
+                                    formulaName: approvedFormulas[0]?.name || '',
+                                    expectedQty: '',
+                                    unit: approvedFormulas[0]?.unit || 'กรัม'
+                                });
+                                setCheckedItems({});
+                                setViewMode('create');
+                            }}
                             className="primary-button"
                             style={{ 
                                 background: '#10b981', color: '#fff', border: 'none', padding: '10px 18px', 
@@ -1000,6 +1022,8 @@ const OperatorWIP = () => {
                                 navigate('/operator');
                             } else {
                                 setFromTask(false);
+                                setSourceJobOrderId('');
+                                setExistingTask(null);
                                 setViewMode('list');
                             }
                         }}
@@ -1057,14 +1081,43 @@ const OperatorWIP = () => {
                     
                     <form style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 14 }}>สูตรที่ต้องการผลิต <span style={{color: '#ef4444'}}>*</span></label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 14 }}>สูตรที่ต้องการผลิต <span style={{color: '#ef4444'}}>*</span></label>
+                                {isLocked && (
+                                    <span style={{ 
+                                        fontSize: 12, 
+                                        color: '#1d4ed8', 
+                                        backgroundColor: '#eff6ff', 
+                                        border: '1px solid #bfdbfe', 
+                                        padding: '2px 8px', 
+                                        borderRadius: 12, 
+                                        fontWeight: 600,
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4
+                                    }}>
+                                        🔒 ล็อคตามใบสั่งผลิต
+                                    </span>
+                                )}
+                            </div>
                             <CustomSelect 
                                 name="formulaName" 
                                 value={formData.formulaName} 
-                                onChange={(val) => { setFormData(prev => ({ ...prev, formulaName: val })); setCheckedItems({}); }}
+                                onChange={(val) => { 
+                                    if (isLocked) return;
+                                    setFormData(prev => ({ ...prev, formulaName: val })); 
+                                    setCheckedItems({}); 
+                                }}
+                                disabled={isLocked}
                                 style={{ 
-                                    padding: '12px 14px', borderRadius: 8, border: '1px solid #cbd5e1', 
-                                    fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', width: '100%'
+                                    padding: '12px 14px', borderRadius: 8, 
+                                    border: isLocked ? '1px solid #cbd5e1' : '1px solid #cbd5e1', 
+                                    fontSize: 14, 
+                                    color: isLocked ? '#64748b' : '#334155', 
+                                    backgroundColor: isLocked ? '#f1f5f9' : '#f8fafc', 
+                                    cursor: isLocked ? 'not-allowed' : 'pointer',
+                                    width: '100%',
+                                    opacity: isLocked ? 0.9 : 1
                                 }}
                             >
                                 {approvedFormulas.map(item => (
@@ -1077,21 +1130,37 @@ const OperatorWIP = () => {
 
                         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 14 }}>จำนวนที่ผลิต <span style={{color: '#ef4444'}}>*</span></label>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <label style={{ fontWeight: 600, color: '#1e293b', fontSize: 14 }}>จำนวนที่ผลิต <span style={{color: '#ef4444'}}>*</span></label>
+                                    {isLocked && (
+                                        <span style={{ fontSize: 11, color: '#64748b' }}>🔒 ล็อค</span>
+                                    )}
+                                </div>
                                 <input 
                                     type="number" 
                                     name="expectedQty"
                                     value={formData.expectedQty} 
-                                    onChange={handleChange}
+                                    onChange={(e) => {
+                                        if (isLocked) return;
+                                        handleChange(e);
+                                    }}
+                                    readOnly={isLocked}
                                     placeholder="ระบุตัวเลข เช่น 1000"
                                     step="any"
                                     min="0"
                                     style={{ 
-                                        padding: '12px 14px', borderRadius: 8, border: '1px solid #cbd5e1', 
-                                        fontSize: 15, color: '#334155', outline: 'none', transition: 'border-color 0.2s', fontWeight: 600
+                                        padding: '12px 14px', borderRadius: 8, 
+                                        border: isLocked ? '1px solid #cbd5e1' : '1px solid #cbd5e1', 
+                                        fontSize: 15, 
+                                        color: isLocked ? '#64748b' : '#334155', 
+                                        backgroundColor: isLocked ? '#f1f5f9' : '#fff',
+                                        cursor: isLocked ? 'not-allowed' : 'text',
+                                        outline: 'none', 
+                                        transition: 'border-color 0.2s', 
+                                        fontWeight: 600 
                                     }}
-                                    onFocus={(e) => e.target.style.borderColor = '#3b82f6'}
-                                    onBlur={(e) => e.target.style.borderColor = '#cbd5e1'}
+                                    onFocus={(e) => { if (!isLocked) e.target.style.borderColor = '#3b82f6'; }}
+                                    onBlur={(e) => { if (!isLocked) e.target.style.borderColor = '#cbd5e1'; }}
                                 />
                             </div>
                             
@@ -1100,10 +1169,20 @@ const OperatorWIP = () => {
                                 <CustomSelect 
                                     name="unit" 
                                     value={formData.unit} 
-                                    onChange={(val) => setFormData(prev => ({ ...prev, unit: val }))}
+                                    onChange={(val) => {
+                                        if (isLocked) return;
+                                        setFormData(prev => ({ ...prev, unit: val }));
+                                    }}
+                                    disabled={isLocked}
                                     style={{ 
-                                        padding: '12px 14px', borderRadius: 8, border: '1px solid #cbd5e1', 
-                                        fontSize: 14, color: '#334155', backgroundColor: '#f8fafc', width: '100%'
+                                        padding: '12px 14px', borderRadius: 8, 
+                                        border: isLocked ? '1px solid #cbd5e1' : '1px solid #cbd5e1', 
+                                        fontSize: 14, 
+                                        color: isLocked ? '#64748b' : '#334155', 
+                                        backgroundColor: isLocked ? '#f1f5f9' : '#f8fafc', 
+                                        cursor: isLocked ? 'not-allowed' : 'pointer',
+                                        width: '100%',
+                                        opacity: isLocked ? 0.9 : 1
                                     }}
                                 >
                                     <option value="ชิ้น">ชิ้น (pcs)</option>
@@ -1130,9 +1209,9 @@ const OperatorWIP = () => {
                                 <h4 style={{ margin: '0 0 6px 0', fontSize: 14, color: '#0369a1', fontWeight: 700 }}>ขั้นตอนการทำงานแบบใหม่ (One-Page)</h4>
                                 <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: '#0c4a6e', display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     <li>ระบุสูตรและจำนวนด้านซ้าย</li>
-                                    <li>เตรียมวัตถุดิบและผสมตามตารางด้านขวา</li>
-                                    <li>ติ๊กยืนยันครบทุกรายการ แล้วกดบันทึก</li>
-                                    <li>ระบบจะสร้างงานและส่งให้ QC อัตโนมัติ</li>
+                                    <li>ตรวจสอบวัตถุดิบแล้วส่งใบเบิกไปยังคลังสินค้า</li>
+                                    <li>เมื่อคลังอนุมัติจ่ายของแล้ว จึงเริ่มกระบวนการผสม</li>
+                                    <li>ระบบจะสร้างงานและส่งตรวจ QC ต่อไป</li>
                                 </ul>
                             </div>
                         </div>
@@ -1189,6 +1268,7 @@ const OperatorWIP = () => {
                                                 <th style={{ padding: '10px 12px', fontSize: 13, color: '#475569', width: 40, textAlign: 'center' }}>
                                                     <div 
                                                         onClick={handleCheckAll}
+                                                        title={allChecked ? "ยกเลิกการเลือกทั้งหมด" : "เลือกทั้งหมด"}
                                                         style={{ 
                                                             width: 20, height: 20, borderRadius: 4, 
                                                             border: allChecked ? 'none' : '2px solid #cbd5e1',
@@ -1201,9 +1281,8 @@ const OperatorWIP = () => {
                                                     </div>
                                                 </th>
                                                 <th style={{ padding: '10px 12px', fontSize: 13, color: '#475569' }}>วัตถุดิบ</th>
-                                                <th style={{ padding: '10px 12px', fontSize: 13, color: '#475569', textAlign: 'right' }}>ในสต็อก</th>
                                                 <th style={{ padding: '10px 12px', fontSize: 13, color: '#475569', textAlign: 'right' }}>ปริมาณที่ต้องใช้</th>
-                                                <th style={{ padding: '10px 12px', fontSize: 13, color: '#475569', width: 60 }}>หน่วย</th>
+                                                <th style={{ padding: '10px 12px', fontSize: 13, color: '#475569', width: 80 }}>หน่วย</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1216,61 +1295,27 @@ const OperatorWIP = () => {
                                                 
                                                 const requiredQtyNum = (ing.qty * scaleFactor);
                                                 const requiredQty = requiredQtyNum.toFixed(4);
-                                                
-                                                const stockItem = stockItems.find(s => ing.materialId && String(s.id).trim() === String(ing.materialId).trim());
-
-                                                let hasEnoughStock = true;
-                                                let stockDisplay = "-";
-                                                let isStockError = false;
-
-                                                if (stockItem) {
-                                                    let availQty = stockItem.qty || 0;
-                                                    
-                                                    if (stockItem.unit === 'กิโลกรัม' && ing.unit === 'กรัม') {
-                                                        availQty = availQty * 1000;
-                                                    } else if (stockItem.unit === 'กรัม' && ing.unit === 'กิโลกรัม') {
-                                                        availQty = availQty / 1000;
-                                                    }
-
-                                                    hasEnoughStock = availQty >= requiredQtyNum;
-                                                    stockDisplay = `${(stockItem.qty || 0).toLocaleString()} ${stockItem.unit || ''}`;
-                                                    isStockError = !hasEnoughStock;
-                                                } else {
-                                                    hasEnoughStock = false;
-                                                    isStockError = true;
-                                                    stockDisplay = "0";
-                                                }
 
                                                 const isChecked = checkedItems[idx] || false;
 
                                                 return (
-                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: isChecked ? '#f0fdf4' : (isStockError ? '#fef2f2' : '#fff'), transition: 'background 0.2s' }}>
+                                                    <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9', background: isChecked ? '#f0fdf4' : '#fff', transition: 'background 0.2s' }}>
                                                         <td style={{ padding: '10px 12px', textAlign: 'center', verticalAlign: 'middle' }}>
                                                             <div 
-                                                                onClick={() => {
-                                                                    if (isStockError) {
-                                                                        showAlert('สต็อกไม่เพียงพอ', `ไม่สามารถเตรียมวัตถุดิบ ${cleanName} ได้เนื่องจากสต็อกไม่พอ`, 'error');
-                                                                        return; 
-                                                                    }
-                                                                    handleCheckItem(idx);
-                                                                }}
+                                                                onClick={() => handleCheckItem(idx)}
                                                                 style={{ 
                                                                     width: 24, height: 24, borderRadius: 6, 
-                                                                    border: isChecked ? 'none' : (isStockError ? '2px solid #fca5a5' : '2px solid #cbd5e1'),
-                                                                    background: isChecked ? '#22c55e' : (isStockError ? '#fee2e2' : '#fff'),
+                                                                    border: isChecked ? 'none' : '2px solid #cbd5e1',
+                                                                    background: isChecked ? '#22c55e' : '#fff',
                                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                    cursor: isStockError ? 'not-allowed' : 'pointer', margin: '0 auto', transition: 'all 0.1s'
+                                                                    cursor: 'pointer', margin: '0 auto', transition: 'all 0.1s'
                                                                 }}
                                                             >
                                                                 {isChecked && <CheckCircle size={16} color="#fff" strokeWidth={3} />}
                                                             </div>
                                                         </td>
-                                                        <td style={{ padding: '10px 12px', fontSize: 14, color: isChecked ? '#166534' : (isStockError ? '#b91c1c' : '#1e293b'), fontWeight: isChecked ? 600 : (isStockError ? 600 : 400) }}>
+                                                        <td style={{ padding: '10px 12px', fontSize: 14, color: isChecked ? '#166534' : '#1e293b', fontWeight: isChecked ? 600 : 400 }}>
                                                             {cleanName}
-                                                            {isStockError && <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>⚠️ สต็อกไม่พอ</div>}
-                                                        </td>
-                                                        <td style={{ padding: '10px 12px', fontSize: 14, color: isStockError ? '#ef4444' : '#64748b', textAlign: 'right' }}>
-                                                            {stockDisplay}
                                                         </td>
                                                         <td style={{ padding: '10px 12px', fontSize: 15, fontWeight: 700, color: isChecked ? '#15803d' : '#0369a1', textAlign: 'right' }}>
                                                             {requiredQty}
@@ -1288,9 +1333,12 @@ const OperatorWIP = () => {
 
                             {/* Actions */}
                             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                {(!existingTask || !existingTask.RequisitionJSON) && !allChecked && rawMaterials.length > 0 && (
-                                    <div style={{ fontSize: 13, color: '#ef4444', textAlign: 'right', fontWeight: 500 }}>
-                                        * กรุณาตรวจสอบและเลือกวัตถุดิบให้ครบเพื่อทำใบขอเบิก
+                                {(!existingTask || !existingTask.RequisitionJSON) && rawMaterials.length > 0 && (
+                                    <div style={{ fontSize: 13, color: hasAnyChecked ? '#15803d' : '#ef4444', textAlign: 'right', fontWeight: 500 }}>
+                                        {hasAnyChecked 
+                                            ? `* เลือกวัตถุดิบ ${Object.values(checkedItems).filter(Boolean).length}/${rawMaterials.length} รายการสำหรับส่งใบเบิก`
+                                            : '* กรุณาเลือกวัตถุดิบอย่างน้อย 1 รายการเพื่อทำใบขอเบิก'
+                                        }
                                     </div>
                                 )}
                                 
@@ -1300,7 +1348,7 @@ const OperatorWIP = () => {
                                     </div>
                                 )}
 
-                                {existingTask && (existingTask.status === 'พร้อมเริ่มงาน' || existingTask.status === 'เริ่มผสม') && (
+                                {existingTask && (existingTask.status === 'พร้อมเริ่มงาน' || existingTask.status === 'เริ่มผสม' || existingTask.status === 'รอเริ่มงาน') && (
                                     <div style={{ fontSize: 14, color: '#15803d', textAlign: 'center', fontWeight: 600, padding: 12, background: '#dcfce7', borderRadius: 8, border: '1px solid #bbf7d0' }}>
                                         ✅ คลังอนุมัติจ่ายวัตถุดิบแล้ว! สามารถเริ่มผสมได้เลย
                                     </div>
@@ -1315,14 +1363,14 @@ const OperatorWIP = () => {
                                             handleSubmit(e);
                                         }
                                     }}
-                                    disabled={loading || ((!existingTask || !existingTask.RequisitionJSON) && !allChecked) || rawMaterials.length === 0 || (existingTask && existingTask.status === 'รอเบิกวัตถุดิบ')}
+                                    disabled={loading || ((!existingTask || !existingTask.RequisitionJSON) && !hasAnyChecked) || rawMaterials.length === 0 || (existingTask && existingTask.status === 'รอเบิกวัตถุดิบ')}
                                     style={{ 
-                                        background: (loading || ((!existingTask || !existingTask.RequisitionJSON) && !allChecked) || rawMaterials.length === 0 || (existingTask && existingTask.status === 'รอเบิกวัตถุดิบ')) ? '#94a3b8' : (isMixing ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'), 
+                                        background: (loading || ((!existingTask || !existingTask.RequisitionJSON) && !hasAnyChecked) || rawMaterials.length === 0 || (existingTask && existingTask.status === 'รอเบิกวัตถุดิบ')) ? '#94a3b8' : (isMixing ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'), 
                                         color: '#ffffff', border: 'none', padding: '16px', 
                                         borderRadius: 12, fontSize: 16, fontWeight: 700, 
-                                        cursor: (loading || ((!existingTask || !existingTask.RequisitionJSON) && !allChecked) || rawMaterials.length === 0 || (existingTask && existingTask.status === 'รอเบิกวัตถุดิบ')) ? 'not-allowed' : 'pointer',
+                                        cursor: (loading || ((!existingTask || !existingTask.RequisitionJSON) && !hasAnyChecked) || rawMaterials.length === 0 || (existingTask && existingTask.status === 'รอเบิกวัตถุดิบ')) ? 'not-allowed' : 'pointer',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, 
-                                        boxShadow: (loading || ((!existingTask || !existingTask.RequisitionJSON) && !allChecked) || (existingTask && existingTask.status === 'รอเบิกวัตถุดิบ')) ? 'none' : (isMixing ? '0 4px 12px rgba(16, 185, 129, 0.4)' : '0 4px 12px rgba(37, 99, 235, 0.4)'),
+                                        boxShadow: (loading || ((!existingTask || !existingTask.RequisitionJSON) && !hasAnyChecked) || (existingTask && existingTask.status === 'รอเบิกวัตถุดิบ')) ? 'none' : (isMixing ? '0 4px 12px rgba(16, 185, 129, 0.4)' : '0 4px 12px rgba(37, 99, 235, 0.4)'),
                                         transition: 'all 0.2s ease', width: '100%'
                                     }}
                                 >
@@ -1330,7 +1378,7 @@ const OperatorWIP = () => {
                                     {loading ? 'กำลังดำเนินการ...' : 
                                         (isMixing ? 'ผสมเสร็จสิ้น — บันทึกการผลิตและส่งตรวจ QC' : 
                                             ((!existingTask || !existingTask.RequisitionJSON) ? 'บันทึกและส่งใบเบิกวัตถุดิบ' : 
-                                                (existingTask.status === 'รอเบิกวัตถุดิบ' ? 'รอเบิกวัตถุดิบ' : 'เริ่มผสม')
+                                                (existingTask.status === 'รอเบิกวัตถุดิบ' ? 'รอคลังอนุมัติเบิกวัตถุดิบ' : 'เริ่มผสม')
                                             )
                                         )
                                     }

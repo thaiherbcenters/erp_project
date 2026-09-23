@@ -44,6 +44,16 @@ export const SYSTEM_BANKS = [
         badgeClass: 'bank-badge-scb',
         logo: '/images/banks/bank-scb.png',
         defaultCategory: 'thc'
+    },
+    {
+        id: 'kbank_elite_2020',
+        bankName: 'ธนาคารกสิกรไทย',
+        accountNo: '083-3-95366-4',
+        accountName: 'บจก. อิลิท เทรดดิ้ง 2020',
+        shortCode: 'KBANK',
+        badgeClass: 'bank-badge-kbank',
+        logo: '/images/banks/bank-kbank.png',
+        defaultCategory: 'elt'
     }
 ];
 
@@ -52,7 +62,7 @@ export const getDocCategory = (docType) => {
     if (!docType) return 'thc';
     const lower = String(docType).toLowerCase();
     if (lower.includes('_psf') || lower.endsWith('psf')) return 'psf';
-    if (lower.includes('_elt') || lower.endsWith('elt')) return 'elt';
+    if (lower.includes('_elt') || lower.endsWith('elt') || lower.includes('elite')) return 'elt';
     return 'thc';
 };
 
@@ -148,7 +158,7 @@ export const getDefaultBankForDocType = (docType) => {
     const category = getDocCategory(docType);
     const deleted = getDeletedBankIds(docType);
 
-    let candidate = category === 'psf' ? 'kbank' : 'ktb';
+    let candidate = category === 'elt' ? 'kbank_elite_2020' : category === 'psf' ? 'kbank' : 'ktb';
     if (!deleted.includes(candidate)) return candidate;
 
     // ถ้า candidate โดนลบ ให้หาบัญชีมาตรฐานแรกที่ไม่โดนลบ

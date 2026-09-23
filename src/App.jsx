@@ -45,6 +45,7 @@ const CompanyPortal = lazy(() => import('./pages/CompanyPortal'));
 const EliteChequePage = lazy(() => import('./pages/EliteChequePage'));
 const EliteTaxInvoice = lazy(() => import('./pages/EliteTaxInvoice'));
 const EliteReceipt = lazy(() => import('./pages/EliteReceipt'));
+const EliteBookingOrder = lazy(() => import('./pages/EliteBookingOrder'));
 const Home = lazy(() => import('./pages/Home'));
 const Customer = lazy(() => import('./pages/Customer'));
 const Stock = lazy(() => import('./pages/Stock'));
@@ -124,6 +125,10 @@ function App() {
                 <Route path="/elite/documents/receipt" element={
                   <ProtectedRoute pageId="elite_doc_receipt"><EliteReceipt /></ProtectedRoute>
                 } />
+                <Route path="/elite/documents/sales-order" element={
+                  <ProtectedRoute pageId="elite_doc_sales_order"><EliteBookingOrder /></ProtectedRoute>
+                } />
+                <Route path="/elite/documents/booking" element={<Navigate to="/elite/documents/sales-order" replace />} />
 
                 {/* เมนูหลัก */}
                 <Route path="/home" element={

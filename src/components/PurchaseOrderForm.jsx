@@ -18,6 +18,7 @@ import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
 import API_BASE from '../config';
 import SupplierSelectorModal from './SupplierSelectorModal';
+import PRSelectorModal from './PRSelectorModal';
 import './PurchaseOrderForm.css';
 
 // ── Formatting Helpers ──
@@ -148,7 +149,7 @@ const getInitialNotes = () => {
     return DEFAULT_PO_NOTES;
 };
 
-export default function PurchaseOrderForm({ editId, onBack, onSave, onEdit, viewOnly = false, hideControls = false, isHistory = false }) {
+export default function PurchaseOrderForm({ editId, initialPR, onBack, onSave, onEdit, viewOnly = false, hideControls = false, isHistory = false }) {
     const { showAlert, showConfirm } = useAlert();
     const { signatures, userSignatures, bossSignatures, getSignatureUrl, defaultSignerKey } = useSignatures();
 
@@ -156,6 +157,7 @@ export default function PurchaseOrderForm({ editId, onBack, onSave, onEdit, view
     const [saving, setSaving] = useState(false);
     const [suppliers, setSuppliers] = useState([]);
     const [showSupplierModal, setShowSupplierModal] = useState(false);
+    const [showPRModal, setShowPRModal] = useState(false);
 
     // ── Form State ──
     const [formData, setFormData] = useState({
@@ -389,6 +391,47 @@ export default function PurchaseOrderForm({ editId, onBack, onSave, onEdit, view
             supplierTaxId: sup.TaxID || ''
         }));
     };
+
+    // ── Handle Select PR (ดึงข้อมูลและรายการสินค้าจากใบขอซื้อ) ──
+    const handleSelectPR = (pr) => {
+        if (!pr) return;
+        const prItems = Array.isArray(pr.items) ? pr.items : [];
+        if (prItems.length > 0) {
+            const mappedItems = prItems.map((it, idx) => ({
+                id: Date.now() + idx,
+                name: it.itemName || it.name || '',
+                code: it.itemCode || it.code || '',
+                qty: Number(it.requestQty) || Number(it.qty) || Number(it.deductQty) || 1,
+                unit: it.unit || it.displayUnit || 'กก.',
+                price: Number(it.estimatedPrice) || Number(it.price) || 0
+            }));
+            setItems(mappedItems);
+        }
+
+        const prNo = pr.prNumber || pr.number || '';
+        const prRefNotes = pr.notes || (pr.taskId ? `ขอซื้อวัตถุดิบสำหรับงานผลิต ${pr.taskId}` : '');
+
+        setFormData(prev => ({
+            ...prev,
+            refNumber: prNo,
+            prNumber: prNo,
+            notes: prRefNotes ? (prev.notes ? `${prev.notes}\n(อ้างอิง ${prNo}: ${prRefNotes})` : `อ้างอิง ${prNo}: ${prRefNotes}`) : prev.notes
+        }));
+
+        setShowPRModal(false);
+        showAlert(
+            'ดึงข้อมูลสำเร็จ',
+            `ดึงรายการสินค้า ${prItems.length} รายการจากใบขอซื้อ "${prNo}" เรียบร้อยแล้ว`,
+            'success'
+        );
+    };
+
+    // ── Pre-fill from initialPR if provided (เมื่อกดสร้าง PO จากหน้า PR) ──
+    useEffect(() => {
+        if (initialPR && !editId) {
+            handleSelectPR(initialPR);
+        }
+    }, [initialPR, editId]);
 
     // ── Handle Supplier Input Changes ──
     const handleSupplierNameChange = (val) => {
@@ -985,8 +1028,8 @@ export default function PurchaseOrderForm({ editId, onBack, onSave, onEdit, view
                                     type="text"
                                     className="po-input"
                                     value={formData.refNumber}
-                                    onChange={(e) => setFormData(prev => ({ ...prev, refNumber: e.target.value }))}
-                                    placeholder="เช่น QT20260422-001 หรือ PR-001"
+                                    onChange={(e) => setFormData(prev => ({ ...prev, refNumber: e.target.value, prNumber: e.target.value }))}
+                                    placeholder="เช่น PR20260919-001 หรือ QT20260422-001"
                                     readOnly={viewOnly}
                                 />
                             </div>
@@ -1546,6 +1589,14 @@ export default function PurchaseOrderForm({ editId, onBack, onSave, onEdit, view
                 suppliers={suppliers}
                 selectedSupplierId={formData.supplierId}
                 onSelect={handleSelectSupplier}
+            />
+
+            {/* ── Modal: เลือกใบขอซื้อ (PR) เพื่อดึงรายการสินค้า ── */}
+            <PRSelectorModal
+                show={showPRModal}
+                onClose={() => setShowPRModal(false)}
+                selectedPRNumber={formData.refNumber || formData.prNumber}
+                onSelect={handleSelectPR}
             />
         </div>
     );

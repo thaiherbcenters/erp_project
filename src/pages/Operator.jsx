@@ -11,7 +11,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useProduction } from '../context/ProductionContext';
 import { usePlanner } from '../context/PlannerContext';
@@ -33,7 +33,7 @@ import './Operator.css';
 
 // Icon map
 const STEP_ICONS = {
-    Play, SearchCheck, Repeat, CheckCircle, Package, ShieldCheck, Warehouse
+    Play, SearchCheck, Repeat, CheckCircle, Package, ShieldCheck, Warehouse, Tag
 };
 
 const WipChecklist = ({ task, targetWeight, onComplete, allTasks = [], user }) => {
@@ -249,6 +249,7 @@ export default function Operator() {
     const { jobs } = usePlanner();
     const { formulas: MOCK_FORMULAS, materials: MOCK_RAW_MATERIALS, pmMaterials } = useRnD();
     const location = useLocation();
+    const navigate = useNavigate();
     const visibleSubPages = getVisibleSubPages('operator');
     const currentTab = new URLSearchParams(location.search).get('tab') || visibleSubPages[0]?.id;
 
@@ -562,7 +563,13 @@ export default function Operator() {
                         <div className="rnd-modal-info-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: 24, gap: '16px' }}>
                             <div className="rnd-modal-info-item">
                                 <label>กระบวนการ</label>
-                                <span>{task.process}</span>
+                                <span>
+                                    {task.currentStep === 'packaging' ? 'งานบรรจุภัณฑ์' : 
+                                     task.currentStep === 'labeling' ? 'งานติดฉลาก' : 
+                                     task.currentStep === 'qc_final' ? 'ตรวจสอบคุณภาพ (QC Final)' : 
+                                     task.currentStep === 'stock' ? 'นำเข้าคลังสินค้า' : 
+                                     (task.process || 'เตรียมวัตถุดิบ + ผสม')}
+                                </span>
                             </div>
                             <div className="rnd-modal-info-item" style={{ padding: '12px 14px', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
                                 <label style={{ color: '#0369a1', marginBottom: 4 }}>ผลิตได้ / เป้าหมาย (Batch)</label>
@@ -578,7 +585,7 @@ export default function Operator() {
                             <div className="rnd-modal-info-item">
                                 <label>ขั้นตอนปัจจุบัน</label>
                                 <span style={{ color: waitingQc ? '#f59e0b' : '#7b7bf5', fontWeight: 700, fontSize: 14 }}>
-                                    {PRODUCTION_STEPS.find(s => s.key === task.currentStep)?.label}
+                                    {PRODUCTION_STEPS.find(s => s.key === task.currentStep)?.label || task.currentStep || 'รอเริ่มงาน'}
                                     {waitingQc && ' (รอ QC)'}
                                 </span>
                             </div>
@@ -645,7 +652,7 @@ export default function Operator() {
                         )}
 
                         {/* Normal Next Step (non-QC) */}
-                        {!isLastStep && !isQcStep && task.currentStep !== 'requisition' && task.currentStep !== 'packaging' && task.currentStep !== 'pending' && task.currentStep !== 'prepare' && task.status !== 'เสร็จสิ้น' && !waitingQc && (
+                        {!isLastStep && !isQcStep && task.currentStep !== 'requisition' && task.currentStep !== 'packaging' && task.currentStep !== 'labeling' && task.currentStep !== 'pending' && task.currentStep !== 'prepare' && task.status !== 'เสร็จสิ้น' && !waitingQc && (
                             <div className="op-modal-next-action" style={{ marginBottom: 24 }}>
                                 <span style={{ fontSize: 15 }}>ขั้นตอนถัดไป: <strong>{nextStep?.label}</strong></span>
                                 {canUpdate('operator_dashboard') && (
@@ -667,8 +674,43 @@ export default function Operator() {
 
                         {/* Packaging Wait State */}
                         {task.currentStep === 'packaging' && (
-                            <div className="op-modal-next-action" style={{ background: '#f5f3ff', borderColor: '#ddd6fe', marginBottom: 24 }}>
-                                <span style={{ color: '#8b5cf6', fontWeight: 700 }}>📦 ข้อมูลถูกส่งไปฝ่ายบรรจุภัณฑ์แล้ว กรุณารอ...</span>
+                            <div className="op-modal-next-action" style={{ background: '#f5f3ff', borderColor: '#ddd6fe', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <h4 style={{ margin: 0, fontSize: 15, color: '#6d28d9', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <Package size={18} /> ข้อมูลถูกส่งไปฝ่ายบรรจุภัณฑ์แล้ว
+                                    </h4>
+                                    <span style={{ fontSize: 13, color: '#7c3aed' }}>
+                                        พนักงานบรรจุสามารถบันทึกยอดบรรจุได้ที่เมนู "งานบรรจุ"
+                                    </span>
+                                </div>
+                                <button 
+                                    className="op-btn op-btn-start" 
+                                    onClick={() => navigate('/operator/packaging')} 
+                                    style={{ padding: '8px 16px', fontSize: 14, background: '#8b5cf6', borderColor: '#7c3aed', color: '#fff' }}
+                                >
+                                    <Package size={14} /> ไปยังหน้างานบรรจุ
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Labeling State */}
+                        {task.currentStep === 'labeling' && (
+                            <div className="op-modal-next-action" style={{ background: '#ecfdf5', borderColor: '#a7f3d0', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                    <h4 style={{ margin: 0, fontSize: 15, color: '#166534', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <Tag size={18} /> บรรจุเสร็จสิ้นแล้ว — กำลังอยู่ในขั้นตอน "งานติดฉลาก"
+                                    </h4>
+                                    <span style={{ fontSize: 13, color: '#15803d' }}>
+                                        ระบบส่งงานต่อไปยังสถานีติดฉลากแล้ว สามารถดำเนินการติดฉลากได้ที่เมนู "งานติดฉลาก"
+                                    </span>
+                                </div>
+                                <button 
+                                    className="op-btn op-btn-start" 
+                                    onClick={() => navigate('/operator/labeling')} 
+                                    style={{ padding: '8px 16px', fontSize: 14, background: '#10b981', borderColor: '#059669', color: '#fff' }}
+                                >
+                                    <Tag size={14} /> ไปยังหน้างานติดฉลาก
+                                </button>
                             </div>
                         )}
 

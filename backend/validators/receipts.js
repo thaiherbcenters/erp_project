@@ -72,6 +72,9 @@ const createReceiptSchema = z.object({
     quotationNo: z.string().nullable().optional(),
     quotationId: z.union([z.string(), z.number()]).nullable().optional(),
     receiptType: z.string().nullable().optional(),
+    isDeposit: z.boolean().optional().default(false),
+    depositStatus: z.string().nullable().optional(),
+    paidDepositAmount: z.union([z.number(), z.string()]).optional().default(0).transform(val => Number(val) || 0),
 
     items: z.array(ReceiptItemSchema).optional().default([]),
 });

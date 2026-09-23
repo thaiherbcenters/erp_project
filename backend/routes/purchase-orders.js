@@ -17,7 +17,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, poolPromise } = require('../config/db');
-const { peekNextSequence, getDatePrefix } = require('../utils/sequence');
+const { peekNextSequence, generateSequence, getDatePrefix } = require('../utils/sequence');
 
 // ── Helper: Generate PO Number (POYYYYMMDD-001) ──
 const generatePONumber = async (pool, targetDate) => {
@@ -364,6 +364,23 @@ router.post('/', async (req, res) => {
             }
         }
 
+        // Auto-link Purchase Requisition (PR) if referenced
+        const linkedPR = (prNumber || refNumber || '').trim();
+        if (linkedPR && linkedPR.startsWith('PR')) {
+            try {
+                const prLinkReq = new sql.Request(transaction);
+                prLinkReq.input('linkedPr', sql.NVarChar, linkedPR);
+                prLinkReq.input('linkedPo', sql.NVarChar, finalPONumber.trim());
+                await prLinkReq.query(`
+                    UPDATE Purchase_Requisitions 
+                    SET PONumber = @linkedPo, Status = N'สั่งซื้อแล้ว', UpdatedAt = GETDATE()
+                    WHERE PRNumber = @linkedPr
+                `);
+            } catch (prErr) {
+                console.warn('Auto-link PR with PO error (ignored):', prErr.message);
+            }
+        }
+
         await transaction.commit();
         res.status(201).json({
             success: true,
@@ -620,6 +637,29 @@ router.put('/:id', async (req, res) => {
             }
         }
 
+        // Auto-link Purchase Requisition (PR) if referenced
+        const linkedPR = (prNumber || refNumber || '').trim();
+        if (linkedPR && linkedPR.startsWith('PR')) {
+            try {
+                const poNumResult = await new sql.Request(transaction)
+                    .input('poid', sql.Int, id)
+                    .query('SELECT PONumber FROM PurchaseOrder WHERE PurchaseOrderID = @poid');
+                const poNum = poNumResult.recordset[0]?.PONumber || '';
+                if (poNum) {
+                    const prLinkReq = new sql.Request(transaction);
+                    prLinkReq.input('linkedPr', sql.NVarChar, linkedPR);
+                    prLinkReq.input('linkedPo', sql.NVarChar, poNum);
+                    await prLinkReq.query(`
+                        UPDATE Purchase_Requisitions 
+                        SET PONumber = @linkedPo, Status = N'สั่งซื้อแล้ว', UpdatedAt = GETDATE()
+                        WHERE PRNumber = @linkedPr
+                    `);
+                }
+            } catch (prErr) {
+                console.warn('Auto-link PR with PO error (ignored):', prErr.message);
+            }
+        }
+
         await transaction.commit();
         res.json({ success: true, message: 'บันทึกการแก้ไขใบสั่งซื้อ (PO) เรียบร้อยแล้ว' });
     } catch (err) {
@@ -670,7 +710,67 @@ router.patch('/:id/status', async (req, res) => {
             .input('status', sql.NVarChar, status)
             .query(`UPDATE PurchaseOrder SET Status = @status, UpdatedAt = GETDATE() WHERE PurchaseOrderID = @id`);
 
-        res.json({ success: true, message: 'อัปเดตสถานะเรียบร้อยแล้ว' });
+        let qcCreatedCount = 0;
+        // หากเปลี่ยนสถานะเป็น 'รับสินค้าแล้ว' ให้สร้างรายการตรวจรับใน QC_Incoming อัตโนมัติ
+        if (status === 'รับสินค้าแล้ว') {
+            const poData = await pool.request()
+                .input('id', sql.Int, id)
+                .query(`
+                    SELECT po.PurchaseOrderID, po.PONumber, po.SupplierName,
+                           poi.ItemOrder, poi.ItemName, poi.Qty, poi.Unit
+                    FROM PurchaseOrder po
+                    LEFT JOIN PurchaseOrderItem poi ON po.PurchaseOrderID = poi.PurchaseOrderID
+                    WHERE po.PurchaseOrderID = @id
+                `);
+
+            if (poData.recordset && poData.recordset.length > 0) {
+                const poNumber = poData.recordset[0].PONumber;
+                const supplierName = poData.recordset[0].SupplierName || '-';
+
+                // ตรวจสอบว่าเคยสร้าง QC_Incoming ของ PO ใบนี้ไปแล้วหรือยัง เพื่อป้องกันการสร้างซ้ำ
+                const checkExisting = await pool.request()
+                    .input('poPattern', sql.NVarChar, `%${poNumber}%`)
+                    .query(`SELECT COUNT(*) as count FROM QC_Incoming WHERE Notes LIKE @poPattern OR LotNumber LIKE @poPattern`);
+
+                if (checkExisting.recordset[0].count === 0) {
+                    const validItems = poData.recordset.filter(i => i.ItemName);
+                    if (validItems.length > 0) {
+                        const datePrefix = getDatePrefix();
+                        const finalRequestID = await generateSequence(pool, 'QC_Incoming', 'RequestID', `QCIC${datePrefix}`, 3);
+                        const lotNumber = `LOT-${poNumber}`;
+                        
+                        // รวมชื่อสินค้าให้กระชับในตาราง เช่น "มะกรูด, พริกไทยดำ"
+                        const itemNameSummary = validItems.map(i => i.ItemName).join(', ');
+                        
+                        // บันทึกรายละเอียดสินค้าและจำนวนทั้งหมดไว้ในหมายเหตุ
+                        const itemsDetail = validItems.map(i => `${i.ItemName} (${i.Qty || 1} ${i.Unit || 'หน่วย'})`).join(', ');
+                        const notes = `อ้างอิง PO: ${poNumber} | ${validItems.length} รายการ: ${itemsDetail}`;
+
+                        await pool.request()
+                            .input('RequestID', sql.VarChar, finalRequestID)
+                            .input('LotNumber', sql.VarChar, lotNumber)
+                            .input('ItemName', sql.NVarChar, itemNameSummary)
+                            .input('SupplierName', sql.NVarChar, supplierName)
+                            .input('InspectorID', sql.VarChar, '-')
+                            .input('Result', sql.VarChar, 'รอตรวจสอบ')
+                            .input('Notes', sql.NVarChar, notes)
+                            .query(`
+                                INSERT INTO QC_Incoming (RequestID, LotNumber, ItemName, SupplierName, InspectorID, Result, Notes, CreatedAt)
+                                VALUES (@RequestID, @LotNumber, @ItemName, @SupplierName, @InspectorID, @Result, @Notes, GETDATE())
+                            `);
+                        qcCreatedCount = 1;
+                    }
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            message: qcCreatedCount > 0
+                ? `อัปเดตสถานะเรียบร้อย และส่งเข้าตรวจรับที่ QC Incoming เรียบร้อยแล้ว`
+                : 'อัปเดตสถานะเรียบร้อยแล้ว',
+            qcCreatedCount
+        });
     } catch (err) {
         console.error('Error updating PO status:', err);
         res.status(500).json({ success: false, message: 'Failed to update status', error: err.message });

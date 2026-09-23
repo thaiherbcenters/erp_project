@@ -334,6 +334,7 @@ export function AuthProvider({ children }) {
             ids.push(sub.id);
             sub.sections?.forEach((sec) => ids.push(sec.id));
         });
+        page?.sections?.forEach((sec) => ids.push(sec.id));
         return ids;
     };
 
@@ -521,7 +522,8 @@ export function AuthProvider({ children }) {
         let topPage = ALL_PAGES.find(p => p.id === pageId);
         if (!topPage) {
             topPage = ALL_PAGES.find(p => 
-                p.subPages?.some(s => s.id === pageId || s.sections?.some(sec => sec.id === pageId))
+                p.subPages?.some(s => s.id === pageId || s.sections?.some(sec => sec.id === pageId)) ||
+                p.sections?.some(sec => sec.id === pageId)
             );
         }
 
@@ -530,7 +532,7 @@ export function AuthProvider({ children }) {
         }
 
         const userPerms = permissions[currentUser.id] || [];
-        return userPerms.some(p => p.page_id === pageId);
+        return userPerms.some(p => p.page_id === pageId || (pageId === 'fulfillment' && (p.page_id === 'fulfillment_dashboard' || p.page_id === 'fulfillment_orders')));
     };
 
     /** ตรวจสิทธิ์ระดับ subPage */

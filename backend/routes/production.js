@@ -202,7 +202,11 @@ router.get('/tasks', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT pt.*, p.Unit as PlannerUnit 
+            SELECT pt.*, p.Unit as PlannerUnit,
+                   CASE 
+                       WHEN ISNULL(pt.ProducedQty, 0) > 0 THEN pt.ProducedQty
+                       ELSE ISNULL((SELECT TOP 1 PackedQty FROM Packaging_Tasks WHERE ProductionTaskID = pt.TaskID OR (BatchNo = pt.BatchNo AND pt.BatchNo IS NOT NULL)), 0)
+                   END as EffectiveProducedQty
             FROM Production_Tasks pt
             LEFT JOIN Planner p ON pt.JobOrderID = p.PlannerID
             ORDER BY pt.StartTime DESC, pt.CreatedAt DESC
@@ -224,11 +228,13 @@ router.get('/tasks', async (req, res) => {
                 jobOrderId: row.JobOrderID,
                 formulaName: row.FormulaName,
                 productName: row.ProductName || row.FormulaName,
-                process: row.ProcessName,
+                process: (row.ProcessName && row.ProcessName !== 'เตรียมวัตถุดิบ + ผสม') 
+                    ? row.ProcessName 
+                    : (row.CurrentStep === 'packaging' ? 'งานบรรจุภัณฑ์' : row.CurrentStep === 'labeling' ? 'งานติดฉลาก' : row.CurrentStep === 'qc_final' ? 'ตรวจสอบคุณภาพ (QC Final)' : row.CurrentStep === 'stock' ? 'นำเข้าคลังสินค้า' : (row.ProcessName || 'เตรียมวัตถุดิบ + ผสม')),
                 batchNo: row.BatchNo,
                 line: row.Line,
                 expectedQty: row.ExpectedQty,
-                producedQty: row.ProducedQty,
+                producedQty: (row.EffectiveProducedQty !== undefined && row.EffectiveProducedQty !== null) ? row.EffectiveProducedQty : (row.ProducedQty || 0),
                 defectQty: row.DefectQty,
                 status: row.Status,
                 currentStep: row.CurrentStep,

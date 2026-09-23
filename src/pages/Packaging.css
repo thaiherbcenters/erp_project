@@ -399,6 +399,22 @@
     background: #8b5cf6;
 }
 
+/* status-delivered (ส่งมอบแล้ว - Green) */
+.pkg-pending-card.status-delivered {
+    background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+    border: 1px solid #bbf7d0;
+}
+.pkg-pending-card.status-delivered:hover {
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.12);
+    border-color: #86efac;
+}
+.pkg-pending-card.status-delivered::before {
+    background: #10b981;
+}
+.pkg-pending-card.status-delivered .pkg-pending-id {
+    background: #10b981;
+}
+
 @keyframes pulse-slow {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.05); opacity: 0.9; }

@@ -128,11 +128,17 @@ router.put('/:id/status', authorizeRoles('admin', 'executive', 'shipping', 'stoc
 
         const updatedRow = result.recordset[0];
 
-        // หากสถานะเปลี่ยนเป็นจัดส่ง (กำลังจัดส่ง) ให้บันทึกตัดสต็อก (OUT) ถ้ายังไม่เคยตัด
-        if (status === 'กำลังจัดส่ง') {
+        // หากสถานะเปลี่ยนเป็นจัดส่ง (กำลังจัดส่ง หรือ ส่งมอบแล้ว) ให้บันทึกตัดสต็อก (OUT) ถ้ายังไม่เคยตัด
+        if (status === 'กำลังจัดส่ง' || status === 'ส่งมอบแล้ว') {
             const checkLog = await pool.request()
                 .input('RefNoCheck', sql.VarChar, updatedRow.ShipmentID)
-                .query("SELECT 1 FROM Stock_Logs WHERE RefNo = @RefNoCheck AND Type = 'OUT' AND RefType = 'shipping'");
+                .input('ProductNameCheck', sql.NVarChar, updatedRow.ProductName || '')
+                .query(`
+                    SELECT 1 FROM Stock_Logs 
+                    WHERE RefNo = @RefNoCheck 
+                      AND UPPER(Type) = 'OUT' 
+                      AND (ItemID = 'OEM-DIRECT' OR ItemID LIKE 'FG-%' OR ProductName = @ProductNameCheck)
+                `);
             
             if (checkLog.recordset.length === 0) {
                 await pool.request()
@@ -142,8 +148,8 @@ router.put('/:id/status', authorizeRoles('admin', 'executive', 'shipping', 'stoc
                     .input('RefNo', sql.VarChar, updatedRow.ShipmentID)
                     .input('RefType', sql.VarChar, 'shipping')
                     .input('ProductName', sql.NVarChar, updatedRow.ProductName || '')
-                    .input('Notes', sql.NVarChar, `ดำเนินการจัดส่งสินค้าให้ลูกค้า — อ้างอิงใบสั่งผลิต: ${updatedRow.JobOrderID || '-'}`)
-                    .input('CreatedBy', sql.VarChar, shippedBy || 'system')
+                    .input('Notes', sql.NVarChar, `ดำเนินการจัดส่งสินค้าให้ลูกค้า — อ้างอิงใบสั่งผลิต: ${updatedRow.JobOrderID || '-'} (Batch: ${updatedRow.BatchNo || '-'})`)
+                    .input('CreatedBy', sql.VarChar, shippedBy || (req.user ? req.user.username : 'system'))
                     .query(`INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
                             VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)`);
             }
@@ -273,7 +279,13 @@ router.patch('/:id/ship', authorizeRoles('admin', 'executive', 'shipping'), uplo
         // บันทึกตัดสต็อก (OUT) เมื่อกดยืนยันการจัดส่ง
         const checkLog = await pool.request()
             .input('RefNoCheck', sql.VarChar, updatedRow.ShipmentID)
-            .query("SELECT 1 FROM Stock_Logs WHERE RefNo = @RefNoCheck AND Type = 'OUT' AND RefType = 'shipping'");
+            .input('ProductNameCheck', sql.NVarChar, updatedRow.ProductName || '')
+            .query(`
+                SELECT 1 FROM Stock_Logs 
+                WHERE RefNo = @RefNoCheck 
+                  AND UPPER(Type) = 'OUT' 
+                  AND (ItemID = 'OEM-DIRECT' OR ItemID LIKE 'FG-%' OR ProductName = @ProductNameCheck)
+            `);
         
         if (checkLog.recordset.length === 0) {
             await pool.request()
@@ -283,8 +295,8 @@ router.patch('/:id/ship', authorizeRoles('admin', 'executive', 'shipping'), uplo
                 .input('RefNo', sql.VarChar, updatedRow.ShipmentID)
                 .input('RefType', sql.VarChar, 'shipping')
                 .input('ProductName', sql.NVarChar, updatedRow.ProductName || '')
-                .input('Notes', sql.NVarChar, `ดำเนินการจัดส่งสินค้าให้ลูกค้า — อ้างอิงใบสั่งผลิต: ${updatedRow.JobOrderID || '-'}`)
-                .input('CreatedBy', sql.VarChar, shippedBy || 'system')
+                .input('Notes', sql.NVarChar, `ดำเนินการจัดส่งสินค้าให้ลูกค้า — อ้างอิงใบสั่งผลิต: ${updatedRow.JobOrderID || '-'} (Batch: ${updatedRow.BatchNo || '-'})`)
+                .input('CreatedBy', sql.VarChar, shippedBy || (req.user ? req.user.username : 'system'))
                 .query(`INSERT INTO Stock_Logs (ItemID, Type, Quantity, RefNo, RefType, ProductName, Notes, CreatedBy)
                         VALUES (@ItemID, @Type, @Quantity, @RefNo, @RefType, @ProductName, @Notes, @CreatedBy)`);
         }

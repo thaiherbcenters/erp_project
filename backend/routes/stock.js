@@ -38,6 +38,54 @@ router.get('/next-id', async (req, res) => {
     }
 });
 
+// Check for duplicate product name
+router.get('/check-name', async (req, res) => {
+    try {
+        const { name, excludeId } = req.query;
+        if (!name || !name.trim()) {
+            return res.json({ exists: false });
+        }
+
+        const pool = await poolPromise;
+        const request = pool.request().input('ProductName', sql.NVarChar, name.trim());
+        
+        let query = `
+            SELECT TOP 1 ItemID, ProductName, Category, Quantity, Unit, Location, Status
+            FROM Stock_Items 
+            WHERE (IsHidden = 0 OR IsHidden IS NULL) 
+              AND LOWER(TRIM(ProductName)) = LOWER(TRIM(@ProductName))
+        `;
+        
+        if (excludeId) {
+            request.input('ExcludeID', sql.VarChar, excludeId.trim());
+            query += ` AND ItemID != @ExcludeID`;
+        }
+
+        const result = await request.query(query);
+
+        if (result.recordset.length > 0) {
+            const row = result.recordset[0];
+            return res.json({
+                exists: true,
+                item: {
+                    id: row.ItemID,
+                    name: row.ProductName,
+                    category: row.Category,
+                    qty: row.Quantity,
+                    unit: row.Unit,
+                    location: row.Location,
+                    status: row.Status
+                }
+            });
+        }
+
+        res.json({ exists: false });
+    } catch (err) {
+        console.error('Error checking duplicate product name:', err);
+        res.status(500).json({ message: 'Error checking product name' });
+    }
+});
+
 // Get all stock items
 router.get('/', async (req, res) => {
     try {
@@ -46,7 +94,7 @@ router.get('/', async (req, res) => {
         
         let queryStr = `
             SELECT s.*, 
-                (SELECT STRING_AGG(FGProductName, ', ') FROM Label_Configurations lc WHERE lc.StickerItemID = s.ItemID) as MappedFGs
+                (SELECT STRING_AGG(CONCAT(FGProductName, CASE WHEN ApplyTo IS NOT NULL AND ApplyTo != '' THEN CONCAT(' (ติด', ApplyTo, ')') ELSE '' END), ', ') FROM Label_Configurations lc WHERE lc.StickerItemID = s.ItemID) as MappedFGs
             FROM Stock_Items s 
             WHERE (s.IsHidden = 0 OR s.IsHidden IS NULL)
         `;
@@ -396,9 +444,24 @@ router.get('/logs/:batchNo/detail', async (req, res) => {
         const batchNo = req.params.batchNo;
         const pool = await poolPromise;
 
+        let targetBatchNo = batchNo;
+        let shippingInfo = null;
+
+        if (batchNo.startsWith('SHP')) {
+            const shipRes = await pool.request()
+                .input('ShipID', sql.VarChar, batchNo)
+                .query('SELECT * FROM Shipping_Orders WHERE ShipmentID = @ShipID');
+            if (shipRes.recordset.length > 0) {
+                shippingInfo = shipRes.recordset[0];
+                if (shippingInfo.BatchNo) {
+                    targetBatchNo = shippingInfo.BatchNo;
+                }
+            }
+        }
+
         // 1. Production Task
         const prodRes = await pool.request()
-            .input('BatchNo', sql.VarChar, batchNo)
+            .input('BatchNo', sql.VarChar, targetBatchNo)
             .query(`
                 SELECT pt.*, p.Notes as PlannerNotes, p.Priority, p.PlanDate, p.DueDate,
                        p.FormulaID, p.FormulaName as PlannerFormulaName
@@ -409,24 +472,26 @@ router.get('/logs/:batchNo/detail', async (req, res) => {
 
         // 2. Packaging Task
         const pkgRes = await pool.request()
-            .input('BatchNo', sql.VarChar, batchNo)
+            .input('BatchNo', sql.VarChar, targetBatchNo)
             .query('SELECT * FROM Packaging_Tasks WHERE BatchNo = @BatchNo');
 
         // 3. QC Results
         const qcRes = await pool.request()
-            .input('BatchNo', sql.VarChar, batchNo)
+            .input('BatchNo', sql.VarChar, targetBatchNo)
             .query('SELECT * FROM QC_Production WHERE BatchNo = @BatchNo ORDER BY RequestedAt DESC');
 
-        // 4. Stock Logs for this batch
+        // 4. Stock Logs for this batch and shipment
         const logsRes = await pool.request()
-            .input('BatchNo', sql.VarChar, batchNo)
-            .query('SELECT * FROM Stock_Logs WHERE RefNo = @BatchNo ORDER BY CreatedAt DESC');
+            .input('BatchNo', sql.VarChar, targetBatchNo)
+            .input('OrigRef', sql.VarChar, batchNo)
+            .query('SELECT * FROM Stock_Logs WHERE RefNo = @BatchNo OR RefNo = @OrigRef ORDER BY CreatedAt DESC');
 
         const prod = prodRes.recordset[0] || null;
         const pkg = pkgRes.recordset[0] || null;
 
         res.json({
             batch: batchNo,
+            shipping: shippingInfo,
             production: prod ? (() => {
                 // Extract customer info from Notes
                 const notes = prod.PlannerNotes || '';
@@ -498,9 +563,33 @@ router.put('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req, re
     try {
         const { id } = req.params;
         const { name, nameEN, category, unit, location, minStock, status, adjustQty, adjustReason, labelConfigs } = req.body;
-        const pool = await poolPromise;
-        const transaction = new sql.Transaction(pool);
         
+        if (!name || !name.trim()) {
+            return res.status(400).json({ message: 'กรุณาระบุชื่อสินค้า' });
+        }
+
+        const pool = await poolPromise;
+
+        // Check for duplicate product name excluding current item
+        const dupCheck = await pool.request()
+            .input('ItemID', sql.VarChar, id)
+            .input('ProductName', sql.NVarChar, name.trim())
+            .query(`
+                SELECT TOP 1 ItemID, ProductName, Category 
+                FROM Stock_Items 
+                WHERE (IsHidden = 0 OR IsHidden IS NULL) 
+                  AND ItemID != @ItemID
+                  AND LOWER(TRIM(ProductName)) = LOWER(TRIM(@ProductName))
+            `);
+
+        if (dupCheck.recordset.length > 0) {
+            const existing = dupCheck.recordset[0];
+            return res.status(400).json({ 
+                message: `มีสินค้าชื่อ "${existing.ProductName}" อยู่ในระบบแล้ว (รหัส: ${existing.ItemID}, หมวด: ${existing.Category})` 
+            });
+        }
+
+        const transaction = new sql.Transaction(pool);
         await transaction.begin();
 
         try {
@@ -614,9 +703,31 @@ router.delete('/:id', authorizeRoles('admin', 'executive', 'stock'), async (req,
 router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res) => {
     try {
         const { name, nameEN, category, unit, location, minStock, status, initialQty, adjustReason, labelConfigs } = req.body;
-        const pool = await poolPromise;
-        const transaction = new sql.Transaction(pool);
         
+        if (!name || !name.trim()) {
+            return res.status(400).json({ message: 'กรุณาระบุชื่อสินค้า' });
+        }
+
+        const pool = await poolPromise;
+
+        // Check for duplicate product name in active Stock_Items
+        const dupCheck = await pool.request()
+            .input('ProductName', sql.NVarChar, name.trim())
+            .query(`
+                SELECT TOP 1 ItemID, ProductName, Category, Quantity, Unit 
+                FROM Stock_Items 
+                WHERE (IsHidden = 0 OR IsHidden IS NULL) 
+                  AND LOWER(TRIM(ProductName)) = LOWER(TRIM(@ProductName))
+            `);
+
+        if (dupCheck.recordset.length > 0) {
+            const existing = dupCheck.recordset[0];
+            return res.status(400).json({ 
+                message: `มีสินค้าชื่อ "${existing.ProductName}" อยู่ในระบบแล้ว (รหัส: ${existing.ItemID}, หมวด: ${existing.Category}, คงเหลือ: ${existing.Quantity} ${existing.Unit}) กรุณาตรวจสอบหรือปรับปรุงสต็อกแทนการสร้างใหม่`
+            });
+        }
+
+        const transaction = new sql.Transaction(pool);
         await transaction.begin();
 
         try {
@@ -637,7 +748,7 @@ router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res)
                 .input('ProductName', sql.NVarChar, name)
                 .input('ProductNameEN', sql.NVarChar, nameEN || null)
                 .input('Category', sql.NVarChar, category)
-                .input('Quantity', sql.Int, Number(initialQty) || 0)
+                .input('Quantity', sql.Float, parseFloat(initialQty) || 0)
                 .input('Unit', sql.NVarChar, unit)
                 .input('Location', sql.NVarChar, location)
                 .input('MinStock', sql.Float, minStock || 0)
@@ -646,6 +757,20 @@ router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res)
                     INSERT INTO Stock_Items (ItemID, ProductName, ProductNameEN, Category, Quantity, Unit, Location, MinStock, Status, IsHidden)
                     VALUES (@ItemID, @ProductName, @ProductNameEN, @Category, @Quantity, @Unit, @Location, @MinStock, @Status, 0)
                 `);
+
+            // Automatically link any RnD formula ingredients that had this name to the new ItemID
+            try {
+                await transaction.request()
+                    .input('ItemID', sql.VarChar, itemId)
+                    .input('ProductName', sql.NVarChar, name)
+                    .query(`
+                        UPDATE RnD_Formula_Ingredients 
+                        SET MaterialID = @ItemID 
+                        WHERE MaterialName = @ProductName AND (MaterialID IS NULL OR MaterialID NOT IN (SELECT ItemID FROM Stock_Items))
+                    `);
+            } catch (linkErr) {
+                console.warn('Could not auto-link RnD ingredients:', linkErr.message);
+            }
 
             // If category is label, insert label configs
             if (category === 'ฉลาก/สิ่งพิมพ์' && Array.isArray(labelConfigs)) {
@@ -665,12 +790,12 @@ router.post('/', authorizeRoles('admin', 'executive', 'stock'), async (req, res)
             }
 
             // Add log if initial qty > 0
-            const qty = Number(initialQty) || 0;
+            const qty = parseFloat(initialQty) || 0;
             if (qty > 0) {
                 await transaction.request()
                     .input('ItemID', sql.VarChar, itemId)
                     .input('Type', sql.VarChar, 'ADJ_IN')
-                    .input('Quantity', sql.Int, qty)
+                    .input('Quantity', sql.Float, qty)
                     .input('ProductName', sql.NVarChar, name)
                     .input('Notes', sql.NVarChar, adjustReason || 'เพิ่มสินค้ารายการใหม่')
                     .input('CreatedBy', sql.VarChar, req.user?.username || 'system')
@@ -733,10 +858,38 @@ router.get('/requisitions', async (req, res) => {
             ORDER BY CreatedAt ASC
         `);
         
-        const stockRes = await pool.request().query('SELECT ItemID, Quantity FROM Stock_Items');
+        const stockRes = await pool.request().query(`
+            SELECT s.ItemID, s.ProductName, s.Quantity, s.Unit,
+                   (SELECT TOP 1 ApplyTo FROM Label_Configurations lc WHERE lc.StickerItemID = s.ItemID) as ApplyTo
+            FROM Stock_Items s 
+            WHERE s.IsHidden = 0 OR s.IsHidden IS NULL
+        `);
         const stockDict = {};
+        const stockByName = {};
         stockRes.recordset.forEach(s => {
-            stockDict[String(s.ItemID).trim()] = s.Quantity;
+            const id = String(s.ItemID).trim();
+            const name = String(s.ProductName).trim().toLowerCase();
+            stockDict[id] = s;
+            if (!stockByName[name]) {
+                stockByName[name] = s;
+            }
+        });
+
+        // Check for linked Purchase Requisitions
+        const prRes = await pool.request().query(`
+            SELECT PRNumber, TaskID, Status, CreatedAt 
+            FROM Purchase_Requisitions 
+            WHERE Status != N'ยกเลิก'
+        `);
+        const prByTaskId = {};
+        prRes.recordset.forEach(p => {
+            if (p.TaskID && !prByTaskId[p.TaskID]) {
+                prByTaskId[p.TaskID] = {
+                    prNumber: p.PRNumber,
+                    status: p.Status,
+                    createdAt: p.CreatedAt
+                };
+            }
         });
 
         const requisitions = result.recordset.map(row => {
@@ -752,11 +905,22 @@ router.get('/requisitions', async (req, res) => {
             let items = pendingReq.items || [];
             
             items = items.map(it => {
-                const currentQty = stockDict[String(it.id).trim()] || 0;
+                const cleanName = String(it.name || '').trim().toLowerCase();
+                const matchedStock = (it.id && stockDict[String(it.id).trim()] !== undefined)
+                    ? stockDict[String(it.id).trim()]
+                    : (stockByName[cleanName] || null);
+
+                const currentQty = matchedStock ? (matchedStock.Quantity || 0) : 0;
                 return {
                     ...it,
+                    id: matchedStock ? matchedStock.ItemID : it.id,
+                    code: matchedStock ? matchedStock.ItemID : (it.code || it.id),
+                    name: matchedStock ? matchedStock.ProductName : it.name,
+                    applyTo: it.applyTo || (matchedStock ? matchedStock.ApplyTo : null),
                     currentStock: currentQty,
-                    isSufficient: currentQty >= (it.deductQty || 0)
+                    isSufficient: currentQty >= (it.deductQty || 0),
+                    estimatedPrice: 0,
+                    cost: 0
                 };
             });
 
@@ -770,7 +934,8 @@ router.get('/requisitions', async (req, res) => {
                 status: row.Status,
                 createdAt: row.CreatedAt,
                 items: items,
-                requesterName: parsed.requesterName || 'ไม่ระบุ'
+                requesterName: parsed.requesterName || 'ไม่ระบุ',
+                prInfo: prByTaskId[row.TaskID] || null
             };
         });
         
@@ -786,7 +951,7 @@ router.get('/requisitions/history', async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT TOP 50 * FROM (
+            SELECT TOP 200 * FROM (
                 SELECT TaskID, JobOrderID, BatchNo, FormulaName, ExpectedQty, JobUnit, Status, CreatedAt, RequisitionJSON 
                 FROM Production_Tasks 
                 WHERE RequisitionJSON IS NOT NULL AND (CurrentStep != 'requisition' AND Status != 'รอเบิกวัตถุดิบ')
@@ -904,13 +1069,28 @@ router.post('/requisitions/:taskId/issue', authorizeRoles('admin', 'executive', 
         try {
             // 2. Pre-check Stock Sufficiency
             for (const item of items) {
-                if (!item.id || !item.deductQty) continue;
-                const checkRes = await transaction.request()
-                    .input('ItemID', sql.VarChar, item.id)
-                    .query('SELECT Quantity, ProductName FROM Stock_Items WHERE ItemID = @ItemID');
+                if (!item.deductQty) continue;
                 
-                if (checkRes.recordset.length === 0) {
-                    throw new Error(`ไม่พบสินค้า ${item.name} (${item.id}) ในระบบสต็อก`);
+                let checkRes = null;
+                if (item.id) {
+                    checkRes = await transaction.request()
+                        .input('ItemID', sql.VarChar, item.id)
+                        .query('SELECT ItemID, Quantity, ProductName FROM Stock_Items WHERE ItemID = @ItemID');
+                }
+                
+                // Fallback: If not found by ItemID, find by trimmed ProductName
+                if ((!checkRes || checkRes.recordset.length === 0) && item.name) {
+                    checkRes = await transaction.request()
+                        .input('ProductName', sql.NVarChar, item.name.trim())
+                        .query('SELECT TOP 1 ItemID, Quantity, ProductName FROM Stock_Items WHERE TRIM(ProductName) = @ProductName');
+                    
+                    if (checkRes && checkRes.recordset.length > 0) {
+                        item.id = checkRes.recordset[0].ItemID; // Map to the real ItemID
+                    }
+                }
+
+                if (!checkRes || checkRes.recordset.length === 0) {
+                    throw new Error(`ไม่พบสินค้า ${item.name || ''} (${item.id || 'ไม่มีรหัส'}) ในระบบสต็อก`);
                 }
                 
                 const currentQty = checkRes.recordset[0].Quantity;

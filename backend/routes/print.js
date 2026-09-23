@@ -45,7 +45,7 @@ router.get('/requisition/:taskId', async (req, res) => {
         const pool = await poolPromise;
         let taskRes;
         
-        if (taskId.startsWith('PKG-')) {
+        if (taskId.startsWith('PKG')) {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
                 .query(`
@@ -53,7 +53,7 @@ router.get('/requisition/:taskId', async (req, res) => {
                            Qty AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, CreatedAt 
                     FROM Packaging_Tasks WHERE TaskID = @TaskID
                 `);
-        } else if (taskId.startsWith('SHP-')) {
+        } else if (taskId.startsWith('SHP')) {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
                 .query(`
@@ -61,12 +61,12 @@ router.get('/requisition/:taskId', async (req, res) => {
                            Quantity AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, CreatedAt 
                     FROM Shipping_Orders WHERE ShipmentID = @TaskID
                 `);
-        } else if (taskId.startsWith('LBL-')) {
+        } else if (taskId.startsWith('LBL')) {
             taskRes = await pool.request()
                 .input('TaskID', sql.VarChar, taskId)
                 .query(`
                     SELECT TaskID, JobOrderID, BatchNo, ProductName AS FormulaName, 
-                           Qty AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, CreatedAt 
+                           Qty AS ExpectedQty, 'ชิ้น' AS Unit, RequisitionJSON, LabelConfigJSON, CreatedAt 
                     FROM Labeling_Tasks WHERE TaskID = @TaskID
                 `);
         } else {
@@ -113,6 +113,36 @@ router.get('/requisition/:taskId', async (req, res) => {
             } catch (e) {
                 items = [];
             }
+        }
+
+        // Fallback for labeling task if RequisitionJSON not yet saved but LabelConfigJSON exists
+        if (items.length === 0 && task.LabelConfigJSON) {
+            try {
+                const parsed = JSON.parse(task.LabelConfigJSON);
+                items = (Array.isArray(parsed) ? parsed : []).map(c => ({
+                    id: c.stickerItemId,
+                    name: c.stickerName,
+                    deductQty: c.needed || ((c.qtyPerUnit || 1) * task.ExpectedQty),
+                    unit: c.unit || 'ดวง'
+                }));
+            } catch (e) {}
+        }
+
+        // Fallback: look up Label_Configurations if still empty for labeling task
+        if (items.length === 0 && taskId.startsWith('LBL')) {
+            try {
+                const cfgRes = await pool.request()
+                    .input('FGProductName', sql.NVarChar, task.FormulaName)
+                    .query('SELECT StickerItemID, StickerName, QtyPerUnit FROM Label_Configurations WHERE FGProductName = @FGProductName');
+                if (cfgRes.recordset.length > 0) {
+                    items = cfgRes.recordset.map(c => ({
+                        id: c.StickerItemID,
+                        name: c.StickerName,
+                        deductQty: (c.QtyPerUnit || 1) * task.ExpectedQty,
+                        unit: 'ดวง'
+                    }));
+                }
+            } catch (e) {}
         }
 
         const data = {
@@ -617,25 +647,52 @@ router.get('/qc-request/:taskId', async (req, res) => {
         const pool = await poolPromise;
         
         let searchTaskId = taskId;
-        if (taskId.startsWith('PKG')) {
+        let searchBatchNo = null;
+        let searchJobOrderId = null;
+
+        if (taskId.startsWith('LBL')) {
+            const lblRes = await pool.request()
+                .input('LBLID', sql.VarChar, taskId)
+                .query(`SELECT ProductionTaskID, PackagingTaskID, JobOrderID, BatchNo FROM Labeling_Tasks WHERE TaskID = @LBLID`);
+            if (lblRes.recordset.length > 0) {
+                const row = lblRes.recordset[0];
+                searchTaskId = row.ProductionTaskID || row.PackagingTaskID || taskId;
+                searchBatchNo = row.BatchNo;
+                searchJobOrderId = row.JobOrderID;
+            }
+        } else if (taskId.startsWith('PKG')) {
             const pkgRes = await pool.request()
                 .input('PKGID', sql.VarChar, taskId)
-                .query(`SELECT ProductionTaskID FROM Packaging_Tasks WHERE TaskID = @PKGID`);
-            if (pkgRes.recordset.length > 0 && pkgRes.recordset[0].ProductionTaskID) {
-                searchTaskId = pkgRes.recordset[0].ProductionTaskID;
+                .query(`SELECT ProductionTaskID, BatchNo, JobOrderID FROM Packaging_Tasks WHERE TaskID = @PKGID`);
+            if (pkgRes.recordset.length > 0) {
+                const row = pkgRes.recordset[0];
+                if (row.ProductionTaskID) searchTaskId = row.ProductionTaskID;
+                searchBatchNo = row.BatchNo;
+                searchJobOrderId = row.JobOrderID;
             }
         }
 
         // 1. Fetch QC Request data
-        const qcRes = await pool.request()
+        const qcRequest = pool.request()
             .input('TaskID', sql.VarChar, taskId)
-            .input('SearchTaskID', sql.VarChar, searchTaskId)
-            .query(`
-                SELECT TOP 1 * FROM QC_Production 
-                WHERE TaskID = @TaskID OR RequestID = @TaskID
-                   OR TaskID = @SearchTaskID OR RequestID = @SearchTaskID
-                ORDER BY RequestedAt DESC
-            `);
+            .input('SearchTaskID', sql.VarChar, searchTaskId);
+
+        let queryQC = `
+            SELECT TOP 1 * FROM QC_Production 
+            WHERE TaskID = @TaskID OR RequestID = @TaskID
+               OR TaskID = @SearchTaskID OR RequestID = @SearchTaskID
+        `;
+        if (searchBatchNo) {
+            qcRequest.input('BatchNo', sql.VarChar, searchBatchNo);
+            queryQC += ` OR BatchNo = @BatchNo`;
+        }
+        if (searchJobOrderId) {
+            qcRequest.input('JobOrderID', sql.VarChar, searchJobOrderId);
+            queryQC += ` OR JobOrderID = @JobOrderID`;
+        }
+        queryQC += ` ORDER BY RequestedAt DESC`;
+
+        const qcRes = await qcRequest.query(queryQC);
             
         if (qcRes.recordset.length === 0) {
             return res.status(404).json({ error: 'ไม่พบคำขอตรวจ QC สำหรับงานนี้' });
@@ -644,13 +701,21 @@ router.get('/qc-request/:taskId', async (req, res) => {
 
         let taskInfo = {};
         const realTaskId = qcData.TaskID || '';
-        const isPkg = realTaskId.startsWith('PKG');
-        const queryStr = isPkg ? 
-            `SELECT BatchNo, Line, Qty, Product AS FormulaName FROM Packaging_Tasks WHERE TaskID = @RealTaskID` :
-            `SELECT BatchNo, Line, ExpectedQty, ProducedQty, ProductName, FormulaName FROM Production_Tasks WHERE TaskID = @RealTaskID`;
+        const isPkg = realTaskId.startsWith('PKG') || taskId.startsWith('PKG');
+        const isLbl = realTaskId.startsWith('LBL') || taskId.startsWith('LBL');
+        
+        let queryStr = '';
+        if (isLbl) {
+            queryStr = `SELECT BatchNo, Line, Qty, ProductName AS FormulaName FROM Labeling_Tasks WHERE TaskID = @RealTaskID OR TaskID = @OriginalTaskId`;
+        } else if (isPkg) {
+            queryStr = `SELECT BatchNo, Line, Qty, Product AS FormulaName FROM Packaging_Tasks WHERE TaskID = @RealTaskID OR TaskID = @OriginalTaskId`;
+        } else {
+            queryStr = `SELECT BatchNo, Line, ExpectedQty, ProducedQty, ProductName, FormulaName FROM Production_Tasks WHERE TaskID = @RealTaskID`;
+        }
             
         const tRes = await pool.request()
             .input('RealTaskID', sql.VarChar, realTaskId)
+            .input('OriginalTaskId', sql.VarChar, taskId)
             .query(queryStr);
             
         if (tRes.recordset.length > 0) {
@@ -658,7 +723,7 @@ router.get('/qc-request/:taskId', async (req, res) => {
             taskInfo = {
                 batchNo: qcData.BatchNo || t.BatchNo,
                 line: t.Line || '-',
-                qty: isPkg ? t.Qty : (t.ProducedQty || t.ExpectedQty),
+                qty: (isPkg || isLbl) ? t.Qty : (t.ProducedQty || t.ExpectedQty),
                 formulaName: qcData.FormulaName || t.FormulaName || t.ProductName,
             };
         } else {
@@ -666,7 +731,7 @@ router.get('/qc-request/:taskId', async (req, res) => {
                 batchNo: qcData.BatchNo,
                 formulaName: qcData.FormulaName,
                 qty: 'ระบุในใบงาน',
-                line: '-'
+                line: qcData.Line || '-'
             };
         }
             

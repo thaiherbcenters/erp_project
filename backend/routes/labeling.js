@@ -83,54 +83,168 @@ router.get('/tasks/:id/check-stock', async (req, res) => {
         // 1. Get task
         const taskRes = await pool.request()
             .input('TaskID', sql.VarChar, id)
-            .query('SELECT ProductName, Qty FROM Labeling_Tasks WHERE TaskID = @TaskID');
+            .query('SELECT TaskID, ProductName, Qty, LabelType, Status, LabelConfigJSON, RequisitionJSON FROM Labeling_Tasks WHERE TaskID = @TaskID');
         
         if (taskRes.recordset.length === 0) return res.status(404).json({ message: 'Task not found' });
         const task = taskRes.recordset[0];
 
-        // 2. Find FG Item
-        const fgRes = await pool.request()
-            .input('ProductName', sql.NVarChar, task.ProductName)
-            .query(`SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName AND Category = N'สินค้าสำเร็จรูป'`);
-            
+        // 2. Query all stickers in warehouse (Category: ฉลาก/สิ่งพิมพ์)
+        const allStickersRes = await pool.request().query(`
+            SELECT ItemID, ProductName, Quantity, Unit 
+            FROM Stock_Items 
+            WHERE Category = N'ฉลาก/สิ่งพิมพ์' OR Category = N'บรรจุภัณฑ์' AND (ProductName LIKE N'%ฉลาก%' OR ProductName LIKE N'%สติ๊กเกอร์%')
+            ORDER BY ProductName
+        `);
+        const availableStickers = allStickersRes.recordset;
+
         let configs = [];
-        if (fgRes.recordset.length > 0) {
-            const fgItemId = fgRes.recordset[0].ItemID;
+
+        // 3a. If task already has saved LabelConfigJSON, use it
+        if (task.LabelConfigJSON) {
+            try {
+                const parsed = JSON.parse(task.LabelConfigJSON);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    for (const cfg of parsed) {
+                        const stockRes = await pool.request()
+                            .input('StickerID', sql.VarChar, cfg.stickerItemId)
+                            .query('SELECT ItemID, ProductName, Quantity, Unit FROM Stock_Items WHERE ItemID = @StickerID');
+                        const stockItem = stockRes.recordset[0];
+                        const stockQty = stockItem ? stockItem.Quantity : 0;
+                        const needed = (cfg.qtyPerUnit || 1) * task.Qty;
+                        configs.push({
+                            stickerItemId: cfg.stickerItemId,
+                            stickerName: stockItem ? stockItem.ProductName : cfg.stickerName,
+                            applyTo: cfg.applyTo || 'ขวด',
+                            qtyPerUnit: cfg.qtyPerUnit || 1,
+                            unit: stockItem ? stockItem.Unit : 'ดวง',
+                            stockAvailable: stockQty,
+                            needed: needed,
+                            isEnough: stockQty >= needed
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing LabelConfigJSON:', e);
+            }
+        }
+
+        // 3b. If no configs from task, look up Label_Configurations
+        if (configs.length === 0) {
+            // Find FG Item
+            const fgRes = await pool.request()
+                .input('ProductName', sql.NVarChar, task.ProductName)
+                .query(`SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName AND Category = N'สินค้าสำเร็จรูป'`);
             
-            // 3. Get label configs for this FG
-            const configRes = await pool.request()
-                .input('FGItemID', sql.VarChar, fgItemId)
-                .query('SELECT * FROM Label_Configurations WHERE FGItemID = @FGItemID');
-                
+            const fgItemId = fgRes.recordset.length > 0 ? fgRes.recordset[0].ItemID : null;
+            let configRes = { recordset: [] };
+            if (fgItemId) {
+                configRes = await pool.request()
+                    .input('FGItemID', sql.VarChar, fgItemId)
+                    .query('SELECT * FROM Label_Configurations WHERE FGItemID = @FGItemID');
+            }
+            if (configRes.recordset.length === 0) {
+                configRes = await pool.request()
+                    .input('FGProductName', sql.NVarChar, task.ProductName)
+                    .query('SELECT * FROM Label_Configurations WHERE FGProductName = @FGProductName');
+            }
+
             for (const cfg of configRes.recordset) {
-                // 4. Get live stock
                 const stockRes = await pool.request()
                     .input('StickerID', sql.VarChar, cfg.StickerItemID)
-                    .query('SELECT Quantity FROM Stock_Items WHERE ItemID = @StickerID');
-                    
-                const stockQty = stockRes.recordset.length > 0 ? stockRes.recordset[0].Quantity : 0;
+                    .query('SELECT ItemID, ProductName, Quantity, Unit FROM Stock_Items WHERE ItemID = @StickerID');
+                const stockItem = stockRes.recordset[0];
+                const stockQty = stockItem ? stockItem.Quantity : 0;
                 const needed = (cfg.QtyPerUnit || 1) * task.Qty;
-                
                 configs.push({
                     stickerItemId: cfg.StickerItemID,
-                    stickerName: cfg.StickerName,
+                    stickerName: stockItem ? stockItem.ProductName : cfg.StickerName,
                     applyTo: cfg.ApplyTo,
                     qtyPerUnit: cfg.QtyPerUnit,
+                    unit: stockItem ? stockItem.Unit : 'ดวง',
                     stockAvailable: stockQty,
                     needed: needed,
                     isEnough: stockQty >= needed
                 });
             }
         }
-        
+
+        // 3c. If still no configs, try auto-matching by product name in Stock_Items (Category: ฉลาก/สิ่งพิมพ์)
+        if (configs.length === 0 && task.ProductName) {
+            const matchedSticker = availableStickers.find(s => 
+                s.ProductName.includes(task.ProductName) || task.ProductName.includes(s.ProductName.replace(/ฉลาก|สติ๊กเกอร์/g, '').trim())
+            );
+            if (matchedSticker) {
+                const needed = task.Qty;
+                configs.push({
+                    stickerItemId: matchedSticker.ItemID,
+                    stickerName: matchedSticker.ProductName,
+                    applyTo: 'ขวด',
+                    qtyPerUnit: 1,
+                    unit: matchedSticker.Unit || 'ดวง',
+                    stockAvailable: matchedSticker.Quantity,
+                    needed: needed,
+                    isEnough: matchedSticker.Quantity >= needed
+                });
+            }
+        }
+
+        const allSufficient = configs.length > 0 && configs.every(c => c.isEnough);
+
         res.json({ 
             taskQty: task.Qty, 
             configs, 
-            allSufficient: configs.length === 0 || configs.every(c => c.isEnough) 
+            availableStickers,
+            allSufficient
         });
     } catch (err) {
         console.error('Error checking sticker stock:', err);
         res.status(500).json({ message: 'Error checking stock' });
+    }
+});
+
+// ==========================================
+// PUT /tasks/:id/select-sticker — เลือกสติ๊กเกอร์จากคลัง
+// ==========================================
+router.put('/tasks/:id/select-sticker', authorizeRoles('admin','executive','planner','operator'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { stickerItemId, qtyPerUnit, applyTo } = req.body;
+        const pool = await poolPromise;
+
+        const taskRes = await pool.request()
+            .input('TaskID', sql.VarChar, id)
+            .query('SELECT TaskID, ProductName, Qty FROM Labeling_Tasks WHERE TaskID = @TaskID');
+        if (taskRes.recordset.length === 0) return res.status(404).json({ message: 'Task not found' });
+        const task = taskRes.recordset[0];
+
+        const stickerRes = await pool.request()
+            .input('ItemID', sql.VarChar, stickerItemId)
+            .query('SELECT ItemID, ProductName, Quantity, Unit FROM Stock_Items WHERE ItemID = @ItemID');
+        if (stickerRes.recordset.length === 0) return res.status(404).json({ message: 'Sticker item not found in stock' });
+        const sticker = stickerRes.recordset[0];
+
+        const ratio = parseInt(qtyPerUnit, 10) || 1;
+        const needed = ratio * task.Qty;
+        const config = [{
+            stickerItemId: sticker.ItemID,
+            stickerName: sticker.ProductName,
+            applyTo: applyTo || 'ขวด',
+            qtyPerUnit: ratio,
+            unit: sticker.Unit || 'ดวง',
+            stockAvailable: sticker.Quantity,
+            needed: needed,
+            isEnough: sticker.Quantity >= needed
+        }];
+
+        await pool.request()
+            .input('TaskID', sql.VarChar, id)
+            .input('LabelConfigJSON', sql.NVarChar, JSON.stringify(config))
+            .query('UPDATE Labeling_Tasks SET LabelConfigJSON = @LabelConfigJSON, UpdatedAt = GETDATE() WHERE TaskID = @TaskID');
+
+        res.json({ message: 'เลือกสติ๊กเกอร์สำเร็จ', configs: config, allSufficient: sticker.Quantity >= needed });
+    } catch (err) {
+        console.error('Error selecting sticker:', err);
+        res.status(500).json({ message: 'Error selecting sticker' });
     }
 });
 
@@ -149,8 +263,8 @@ router.put('/tasks/:id/complete', authorizeRoles('admin','executive','planner','
         if (taskRes.recordset.length === 0) return res.status(404).json({ message: 'Task not found' });
         const task = taskRes.recordset[0];
 
-        // 2. ตัดสต็อกสติ๊กเกอร์ (กรณี MTS เท่านั้น)
-        if (task.LabelType === 'stock' && task.LabelConfigJSON) {
+        // 2. ตัดสต็อกสติ๊กเกอร์ (เฉพาะกรณีที่ไม่ได้ตัดผ่านใบเบิก Requisition ของคลังสินค้า)
+        if (!task.RequisitionJSON && task.LabelConfigJSON) {
             try {
                 const configs = JSON.parse(task.LabelConfigJSON);
                 for (const cfg of configs) {

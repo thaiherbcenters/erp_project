@@ -76,7 +76,9 @@ router.get('/', async (req, res) => {
         const result = await request.query(`
             SELECT 
                 r.CustomerID, r.ReceiptID, r.ReceiptNo, r.DocType, r.ContractID, r.CustomerName, r.BillDate, r.ValidUntil, 
-                r.GrandTotal, r.Status, r.CreatedAt, r.Revision, u.display_name AS CreatedByName
+                r.GrandTotal, r.DepositPercent, r.DepositAmount, r.RemainingAmount,
+                r.IsDeposit, r.DepositStatus, r.PaidDepositAmount,
+                r.Status, r.CreatedAt, r.Revision, u.display_name AS CreatedByName
             FROM Receipt r
             LEFT JOIN Users u ON r.CreatedBy = u.user_id
             ${whereClause}
@@ -141,6 +143,211 @@ router.get('/status/approved', async (req, res) => {
     }
 });
 
+// 1d. Get Receipt Tracking list & summary metrics for Sales Tracking page
+router.get('/tracking', async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.max(1, parseInt(req.query.limit) || 20);
+        const search = req.query.search || '';
+        const offset = (page - 1) * limit;
+
+        const depositStatus = req.query.depositStatus || req.query.status || '';
+        const isDeposit = req.query.isDeposit || '';
+        const subType = req.query.subType || '';
+        const createdBy = req.query.createdBy || '';
+        const dateFrom = req.query.dateFrom || '';
+        const dateTo = req.query.dateTo || '';
+
+        let whereClauses = [];
+        const request = pool.request();
+        const companyId = parseInt(req.headers['x-company-id'] || req.query.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
+        whereClauses.push('(r.CompanyID = @companyId OR (r.CompanyID IS NULL AND @companyId = 1))');
+        request.input('companyId', sql.Int, companyId);
+
+        if (search && search.trim()) {
+            whereClauses.push('(r.ReceiptNo LIKE @search OR r.CustomerName LIKE @search OR r.Phone LIKE @search OR r.TaxID LIKE @search OR r.CustomerOrder LIKE @search)');
+            request.input('search', sql.NVarChar, `%${search.trim()}%`);
+        }
+
+        if (depositStatus && depositStatus !== 'ทั้งหมด' && depositStatus !== 'all') {
+            whereClauses.push("COALESCE(r.DepositStatus, N'ชำระครบถ้วน') = @depositStatus");
+            request.input('depositStatus', sql.NVarChar, depositStatus.trim());
+        }
+
+        if (isDeposit === '1' || isDeposit === 'true') {
+            whereClauses.push("r.IsDeposit = 1");
+        } else if (isDeposit === '0' || isDeposit === 'false') {
+            whereClauses.push("(r.IsDeposit = 0 OR r.IsDeposit IS NULL)");
+        }
+
+        if (subType === 'fda') {
+            whereClauses.push("r.DocType LIKE '%fda%'");
+        } else if (subType === 'normal') {
+            whereClauses.push("(r.DocType NOT LIKE '%fda%' OR r.DocType IS NULL)");
+        } else if (subType) {
+            whereClauses.push("(r.DocType = @subType OR r.DocType LIKE '%' + @subTypeClean + '%')");
+            request.input('subType', sql.NVarChar, subType);
+            const clean = subType.replace(/^(receipt_|delivery_order_|tax_invoice_|billing_invoice_|quotation_)/, '');
+            request.input('subTypeClean', sql.NVarChar, clean || subType);
+        }
+
+        if (createdBy) {
+            whereClauses.push("r.CreatedBy = @createdBy");
+            request.input('createdBy', sql.Int, parseInt(createdBy, 10));
+        }
+
+        if (dateFrom) {
+            whereClauses.push("CAST(COALESCE(r.BillDate, r.CreatedAt) AS DATE) >= @dateFrom");
+            request.input('dateFrom', sql.Date, dateFrom);
+        }
+
+        if (dateTo) {
+            whereClauses.push("CAST(COALESCE(r.BillDate, r.CreatedAt) AS DATE) <= @dateTo");
+            request.input('dateTo', sql.Date, dateTo);
+        }
+
+        const whereClause = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+
+        // Summary Aggregates
+        const summaryResult = await request.query(`
+            SELECT 
+                COUNT(*) as totalReceipts,
+                COALESCE(SUM(r.GrandTotal), 0) as totalGrandTotal,
+                COALESCE(SUM(CASE WHEN r.DepositAmount > 0 THEN r.DepositAmount WHEN r.IsDeposit = 1 THEN r.GrandTotal ELSE 0 END), 0) as totalDepositRequired,
+                COALESCE(SUM(r.PaidDepositAmount), 0) as totalPaidDeposit,
+                COALESCE(SUM(CASE WHEN r.RemainingAmount IS NOT NULL THEN r.RemainingAmount ELSE (r.GrandTotal - COALESCE(r.PaidDepositAmount, 0)) END), 0) as totalRemaining,
+                SUM(CASE WHEN COALESCE(r.DepositStatus, N'ชำระครบถ้วน') = N'ชำระครบถ้วน' THEN 1 ELSE 0 END) as countPaidFull,
+                SUM(CASE WHEN COALESCE(r.DepositStatus, N'ชำระครบถ้วน') = N'ชำระมัดจำแล้ว' THEN 1 ELSE 0 END) as countDepositPaid,
+                SUM(CASE WHEN COALESCE(r.DepositStatus, N'ชำระครบถ้วน') = N'รอมัดจำ' THEN 1 ELSE 0 END) as countPendingDeposit,
+                SUM(CASE WHEN COALESCE(r.DepositStatus, N'ชำระครบถ้วน') = N'ค้างชำระ' THEN 1 ELSE 0 END) as countOverdue
+            FROM Receipt r
+            ${whereClause}
+        `);
+
+        const summaryData = summaryResult.recordset[0] || {};
+        const total = summaryData.totalReceipts || 0;
+
+        request.input('offset', sql.Int, offset);
+        request.input('limit', sql.Int, limit);
+
+        const result = await request.query(`
+            SELECT 
+                r.ReceiptID, r.ReceiptNo, r.DocType, r.CustomerID, r.CustomerName, r.Address, r.Phone, r.TaxID,
+                r.BillDate, r.DueDate, r.ValidUntil,
+                r.SubTotal, r.DiscountAmount, r.VatAmount, r.ShippingCost, r.GrandTotal,
+                r.DepositPercent, r.DepositAmount, r.RemainingAmount,
+                COALESCE(r.IsDeposit, 0) AS IsDeposit,
+                COALESCE(r.DepositStatus, N'ชำระครบถ้วน') AS DepositStatus,
+                COALESCE(r.PaidDepositAmount, 0) AS PaidDepositAmount,
+                r.Status, r.CustomerOrder, r.PurchaseNo, r.Notes, r.CreatedAt, r.Revision,
+                r.QuotationID, COALESCE(r.QuotationGrandTotal, 0) AS QuotationGrandTotal,
+                q.QuotationNo,
+                u.display_name AS CreatedByName
+            FROM Receipt r
+            LEFT JOIN Users u ON r.CreatedBy = u.user_id
+            LEFT JOIN Quotation q ON r.QuotationID = q.QuotationID
+            ${whereClause}
+            ORDER BY r.ReceiptID DESC
+            OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
+        `);
+
+        res.json({
+            success: true,
+            data: result.recordset,
+            summary: {
+                totalReceipts: total,
+                totalGrandTotal: Number(summaryData.totalGrandTotal || 0),
+                totalDepositRequired: Number(summaryData.totalDepositRequired || 0),
+                totalPaidDeposit: Number(summaryData.totalPaidDeposit || 0),
+                totalRemaining: Number(summaryData.totalRemaining || 0),
+                countPaidFull: Number(summaryData.countPaidFull || 0),
+                countDepositPaid: Number(summaryData.countDepositPaid || 0),
+                countPendingDeposit: Number(summaryData.countPendingDeposit || 0),
+                countOverdue: Number(summaryData.countOverdue || 0)
+            },
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+    } catch (err) {
+        console.error('Error fetching receipt tracking:', err);
+        res.status(500).json({ success: false, message: 'Failed to fetch receipt tracking', error: err.message });
+    }
+});
+
+// 1e. Update Receipt Deposit & Payment Status
+router.patch('/:id/deposit-status', authorizeRoles('admin', 'sales', 'account'), async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const { depositStatus, paidDepositAmount, notes } = req.body;
+        const receiptId = req.params.id;
+
+        const curRes = await pool.request()
+            .input('id', sql.Int, receiptId)
+            .query('SELECT ReceiptID, ReceiptNo, GrandTotal, DepositAmount, PaidDepositAmount, RemainingAmount, Notes, DepositStatus FROM Receipt WHERE ReceiptID = @id');
+
+        if (curRes.recordset.length === 0) {
+            return res.status(404).json({ success: false, message: 'Receipt not found' });
+        }
+
+        const current = curRes.recordset[0];
+        const grandTotal = Number(current.GrandTotal) || 0;
+        let newPaid = paidDepositAmount !== undefined && paidDepositAmount !== null 
+            ? Number(paidDepositAmount) 
+            : Number(current.PaidDepositAmount) || 0;
+
+        let newStatus = depositStatus || current.DepositStatus || 'ชำระครบถ้วน';
+        if (depositStatus === 'ชำระครบถ้วน' && (paidDepositAmount === undefined || paidDepositAmount === null)) {
+            newPaid = grandTotal;
+        }
+
+        const newRemaining = Math.max(0, grandTotal - newPaid);
+
+        let updateNotes = current.Notes;
+        if (notes && notes.trim()) {
+            const dateStr = new Date().toLocaleDateString('th-TH');
+            updateNotes = updateNotes ? `${updateNotes}\n[${dateStr}] ${notes.trim()}` : `[${dateStr}] ${notes.trim()}`;
+        }
+
+        await pool.request()
+            .input('id', sql.Int, receiptId)
+            .input('status', sql.NVarChar, newStatus)
+            .input('paid', sql.Decimal(18, 2), newPaid)
+            .input('remaining', sql.Decimal(18, 2), newRemaining)
+            .input('notes', sql.NVarChar, updateNotes)
+            .query(`
+                UPDATE Receipt 
+                SET DepositStatus = @status, 
+                    PaidDepositAmount = @paid, 
+                    RemainingAmount = @remaining,
+                    Notes = @notes,
+                    UpdatedAt = GETDATE() 
+                WHERE ReceiptID = @id
+            `);
+
+        await logAction(req, 'UPDATE', 'receipts', receiptId, 
+            `อัปเดตสถานะการชำระใบเสร็จ ${current.ReceiptNo} เป็น "${newStatus}" (ชำระแล้ว: ฿${newPaid.toLocaleString('th-TH')}, คงเหลือ: ฿${newRemaining.toLocaleString('th-TH')})`);
+
+        res.json({ 
+            success: true, 
+            message: 'อัปเดตสถานะการชำระเรียบร้อยแล้ว',
+            data: {
+                receiptId,
+                depositStatus: newStatus,
+                paidDepositAmount: newPaid,
+                remainingAmount: newRemaining
+            }
+        });
+    } catch (err) {
+        console.error('Error updating receipt deposit status:', err);
+        res.status(500).json({ success: false, message: 'Failed to update deposit status', error: err.message });
+    }
+});
+
 // 2. Get single receipt by ID (with items)
 router.get('/:id', async (req, res) => {
     try {
@@ -187,7 +394,8 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceRegisterQuantity, fdaServiceTrademark, fdaServiceTrademarkPrice, fdaServiceTrademarkQuantity,
         status, contractId, items,
         deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate,
-        quotationNo, quotationId, receiptType
+        quotationNo, quotationId, receiptType, quotationGrandTotal,
+        isDeposit, depositStatus, paidDepositAmount
     } = req.body;
 
     let transaction;
@@ -275,6 +483,20 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
         const companyId = parseInt(req.headers['x-company-id'] || req.body.companyId || (req.user && req.user.activeCompanyId) || 1, 10);
         request.input('companyId', sql.Int, companyId);
 
+        // คำนวณสถานะมัดจำ: ใบเสร็จปิดยอด (final) จะต้องไม่ใช่ใบเสร็จมัดจำ (finalIsDeposit = 0)
+        const isDepReceipt = (receiptType === 'deposit') || Boolean(isDeposit);
+        const finalIsDeposit = (receiptType === 'final') ? 0 : (isDepReceipt ? 1 : 0);
+        const finalDepositStatus = depositStatus || (finalIsDeposit ? 'ชำระมัดจำแล้ว' : 'ชำระครบถ้วน');
+        const finalPaidDepositAmount = paidDepositAmount !== undefined && paidDepositAmount !== null 
+            ? parseFloat(paidDepositAmount) 
+            : (finalIsDeposit ? (parseFloat(depositAmount) || parseFloat(grandTotal) || 0) : (parseFloat(grandTotal) || 0));
+
+        request.input('isDeposit', sql.Bit, finalIsDeposit);
+        request.input('depositStatus', sql.NVarChar, finalDepositStatus);
+        request.input('paidDepositAmount', sql.Decimal(18, 2), finalPaidDepositAmount);
+        request.input('quotationIdVal', sql.Int, quotationId || null);
+        request.input('quotationGrandTotal', sql.Decimal(18, 2), quotationGrandTotal || null);
+
         const headerResult = await request.query(`
             INSERT INTO Receipt (
                 CustomerID, ReceiptNo, ContractID, DocType, BankAccount, CustomerName, Address, Phone, TaxID,
@@ -283,7 +505,9 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status,
                 FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
                 DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate,
-                CreatedBy, CompanyID
+                CreatedBy, CompanyID,
+                IsDeposit, DepositStatus, PaidDepositAmount,
+                QuotationID, QuotationGrandTotal
             )
             OUTPUT INSERTED.ReceiptID
             VALUES (
@@ -293,7 +517,9 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                 @remainingAmount, @signer, @customerOrder, @purchaseNo, @salesperson, @termOfPayment, @notes, @showDiscount, @showVat, @showDeposit, @showShipping, @designFee, @showDesignFee, @status,
                 @fdaCustomerCode, @fdaEmail, @fdaProjectName, @fdaCreditTerms, @fdaServiceRegister, @fdaServiceRegisterPrice, @fdaServiceRegisterQuantity, @fdaServiceTrademark, @fdaServiceTrademarkPrice, @fdaServiceTrademarkQuantity,
                 @deliverTo, @dueDate, @paymentMethod, @customerBank, @customerBranch, @chequeNo, @chequeDate,
-                @createdBy, @companyId
+                @createdBy, @companyId,
+                @isDeposit, @depositStatus, @paidDepositAmount,
+                @quotationIdVal, @quotationGrandTotal
             )
         `);
 
@@ -388,6 +614,19 @@ router.post('/', authorizeRoles('admin', 'sales'), validate(createReceiptSchema)
                             WHERE QuotationNo = @qno
                         `);
                     console.log(`✅ Auto-updated Quotation ${targetQno} DepositStatus to 'ชำระครบถ้วน'`);
+
+                    // อัปเดตสถานะใบเสร็จมัดจำเดิมให้เป็น 'ชำระครบถ้วน'
+                    await pool.request()
+                        .input('qno', sql.NVarChar, targetQno)
+                        .input('curId', sql.Int, receiptId)
+                        .query(`
+                            UPDATE Receipt 
+                            SET DepositStatus = N'ชำระครบถ้วน' 
+                            WHERE (CustomerOrder = @qno OR CustomerOrder LIKE '%' + @qno + '%')
+                              AND ReceiptID <> @curId
+                              AND IsDeposit = 1
+                        `);
+                    console.log(`✅ Auto-updated linked deposit receipt(s) to 'ชำระครบถ้วน'`);
                 }
             } catch (syncErr) {
                 console.error('⚠️ Warning syncing quotation deposit status:', syncErr.message);
@@ -421,7 +660,9 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
         fdaCustomerCode, fdaEmail, fdaProjectName, fdaCreditTerms, 
         fdaServiceRegister, fdaServiceRegisterPrice, fdaServiceRegisterQuantity, fdaServiceTrademark, fdaServiceTrademarkPrice, fdaServiceTrademarkQuantity,
         status, contractId, items,
-        deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate
+        deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate,
+        isDeposit, depositStatus, paidDepositAmount,
+        quotationId, quotationGrandTotal
     } = req.body;
 
     let transaction;
@@ -507,6 +748,12 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
         request.input('chequeNo', sql.NVarChar, chequeNo || null);
         request.input('chequeDate', sql.Date, chequeDate || null);
 
+        request.input('isDeposit', sql.Bit, isDeposit !== undefined ? (isDeposit ? 1 : 0) : null);
+        request.input('depositStatus', sql.NVarChar, depositStatus || null);
+        request.input('paidDepositAmount', sql.Decimal(18, 2), (paidDepositAmount !== undefined && paidDepositAmount !== null) ? parseFloat(paidDepositAmount) : null);
+        request.input('quotationIdVal', sql.Int, quotationId || null);
+        request.input('quotationGrandTotal', sql.Decimal(18, 2), quotationGrandTotal || null);
+
         // 1. Backup Current Version to History Table before modifying
         const backupReq = new sql.Request(transaction);
         backupReq.input('id', sql.Int, qid);
@@ -517,7 +764,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
                 FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
-                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate
+                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate,
+                IsDeposit, DepositStatus, PaidDepositAmount
             )
             OUTPUT INSERTED.HistoryID
             SELECT 
@@ -526,7 +774,8 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 VatRate, VatAmount, ShippingCost, GrandTotal, DepositPercent, DepositAmount,
                 RemainingAmount, Signer, CustomerOrder, PurchaseNo, Salesperson, TermOfPayment, Notes, ShowDiscountInPrint, ShowVatInPrint, ShowDepositInPrint, ShowShippingInPrint, DesignFee, ShowDesignFeeInPrint, Status, CreatedAt,
                 FdaCustomerCode, FdaEmail, FdaProjectName, FdaCreditTerms, FdaServiceRegister, FdaServiceRegisterPrice, FdaServiceRegisterQuantity, FdaServiceTrademark, FdaServiceTrademarkPrice, FdaServiceTrademarkQuantity,
-                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate
+                DeliverTo, DueDate, PaymentMethod, CustomerBank, CustomerBranch, ChequeNo, ChequeDate,
+                IsDeposit, DepositStatus, PaidDepositAmount
             FROM Receipt
             WHERE ReceiptID = @id
         `);
@@ -560,6 +809,11 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 FdaServiceTrademark = @fdaServiceTrademark, FdaServiceTrademarkPrice = @fdaServiceTrademarkPrice, FdaServiceTrademarkQuantity = @fdaServiceTrademarkQuantity,
                 DeliverTo = @deliverTo, DueDate = @dueDate, PaymentMethod = @paymentMethod,
                 CustomerBank = @customerBank, CustomerBranch = @customerBranch, ChequeNo = @chequeNo, ChequeDate = @chequeDate,
+                IsDeposit = ISNULL(@isDeposit, IsDeposit),
+                DepositStatus = ISNULL(@depositStatus, DepositStatus),
+                PaidDepositAmount = ISNULL(@paidDepositAmount, PaidDepositAmount),
+                QuotationID = @quotationIdVal,
+                QuotationGrandTotal = @quotationGrandTotal,
                 Revision = Revision + 1,
                 UpdatedAt = GETDATE()
             WHERE ReceiptID = @id

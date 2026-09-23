@@ -74,7 +74,7 @@ router.get('/', async (req, res) => {
         const result = await request.query(`
             SELECT 
                 bi.CustomerID, bi.BillingInvoiceID, bi.BillingInvoiceNo, bi.DocType, bi.ContractID, bi.CustomerName, bi.BillDate, bi.ValidUntil, 
-                bi.GrandTotal, bi.Status, bi.CreatedAt, bi.Revision, u.display_name AS CreatedByName
+                bi.GrandTotal, bi.DepositAmount, bi.RemainingAmount, bi.Status, bi.CreatedAt, bi.Revision, u.display_name AS CreatedByName
             FROM BillingInvoice bi
             LEFT JOIN Users u ON bi.CreatedBy = u.user_id
             ${whereClause}

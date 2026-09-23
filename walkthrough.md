@@ -1,3 +1,31 @@
+# Implementation of Accounts Dashboard & Dynamic Period Export
+
+## รายละเอียดการปรับปรุงระบบ Export รายงานการเงินตามวันที่ / เดือนที่เลือก (Accounts Dashboard Export)
+
+### ปัญหาที่พบเดิม:
+1. การเลือกวันเดียว (Single Day) หรือเดือน (Month) ใน DatePicker ไม่ส่งพารามิเตอร์ `dateFrom` / `dateTo` ไปยัง Backend หากไม่มีการระบุวันสิ้นสุด (`dateTo = ''`) ทำให้ Backend ตีความเป็นทั้งปี
+2. ใน `backend/routes/accounts.js` มีการกรองที่อนุญาตให้บิลที่ไม่มี `BillDate` หลุดเข้ามา (`if (!bDate) return true;`)
+3. ในหน้าพรีวิวรายงานผู้บริหาร (PDF Sheet) และการส่งออก CSV เดิมแสดงตารางแจกแจงรายรับทั้ง 12 เดือน (ม.ค. - ธ.ค.) ทำให้เมื่อเลือกเดือนกันยายนหรือเลือกวันเดียว รายงานยังคงแสดง 12 เดือนโดยมี 11 เดือนเป็น 0 บาท และไม่มีตารางรายการใบเสร็จ
+
+### สิ่งที่แก้ไขและพัฒนาเรียบร้อย:
+1. **Frontend (`src/pages/Accounts.jsx`)**:
+   - `fetchDashboardStats`: ปรับปรุงให้กำหนด `effectiveTo = dashboardDateTo || dashboardDateFrom;` เมื่อเลือกวันเดียว ระบบจะส่ง `dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD` ทันที
+   - ฟังก์ชัน `getPeriodDescription`: แสดงข้อความช่วงเวลาภาษาไทยอัตโนมัติอย่างแม่นยำ เช่น:
+     - วันเดียว: `ประจำวันที่ 23 กันยายน พ.ศ. 2569 (23/09/2569)`
+     - รายเดือน: `ประจำเดือนกันยายน พ.ศ. 2569 (01/09/2569 - 30/09/2569)`
+     - ช่วงวันที่: `ช่วงวันที่ 01/09/2569 ถึง 15/09/2569`
+     - ทั้งปี: `ประจำปี พ.ศ. 2569 (ค.ศ. 2026)`
+   - `handleExportCSV`: ส่งออกไฟล์ CSV ตามช่วงเวลาที่เลือก พร้อมชื่อไฟล์แบบไดนามิก (เช่น `Executive_Report_2026-09-23.csv`) และส่งออกตารางรายการใบเสร็จรับเงินที่ตรงตามช่วงเวลาที่เลือกทั้งหมด
+   - `ExecutiveReportModal` (พรีวิวพิมพ์ A4 / บันทึก PDF):
+     - ปรับหัวเรื่องเอกสารให้ระบุช่วงเวลาที่เลือกอย่างชัดเจน
+     - เมื่อเลือกวันที่/เดือน/ช่วงวันที่: ส่วนที่ 2 จะแสดง **"2. รายการใบเสร็จรับเงินที่รับชำระในช่วงเวลาดังกล่าว (Receipt Transactions Breakdown)"** พร้อมตารางรายละเอียดบิลทุกใบ (เลขที่บิล, วันที่, ลูกค้า, ประเภท, ช่องทาง, สถานะ, ยอดเงินรับจริง) และแถวรวมยอดสุทธิ
+     - เมื่อเลือกดูภาพรวมทั้งปี: แสดงตารางแจกแจงรายรับ 12 เดือนตามปกติ
+     - ปรับ CSS การพิมพ์ให้ใช้ `position: absolute` เพื่อรองรับการพิมพ์หลายหน้า (multi-page print) ได้อย่างสมบูรณ์แบบ
+2. **Backend (`backend/routes/accounts.js`)**:
+   - ปรับการกรอง `filteredReceipts`: เมื่อมีการระบุช่วงวันที่ บิลที่ไม่มีวันที่จัดทำจะถูกตัดออกอย่างเข้มงวด (`if (!bDate) return false;`)
+
+---
+
 # Implementation of Planner and Operator Roles
 
 ## What Was Done
@@ -233,3 +261,55 @@ You can now log in using the newly created test accounts to verify the functiona
      - `handleSave`: ส่ง `formData.signer || 'thawat'`
      - `selectedSignature`: คำนวณ `bossSignature` อย่างแม่นยำ เพื่อนำไปแสดงรูปภาพลายเซ็นในช่อง "ผู้มีอำนาจลงนาม / Authorized Signature" ของเอกสาร A4 พรีวิวและสั่งพิมพ์ทันที
 - **Build Verified**: ผ่านการทดสอบ `npm run build` สำเร็จ 100%
+
+## Procurement PR (ใบขอซื้อ) & Receiving (รับสินค้า) Standardization & Summary Cards
+1. **ลบข้อมูลทดสอบเก่า (Mock Data Cleared)**:
+   - ล้าง `MOCK_PR = [];` ใน `src/data/mockData.js` ให้เป็นค่าว่างทั้งหมด
+   - ปรับ `Procurement.jsx` ให้แสดงเฉพาะข้อมูลใบขอซื้อจริงจากฐานข้อมูล MSSQL ผ่าน API `/api/purchase-requisitions`
+2. **จัดรูปแบบตาราง PR ให้ได้มาตรฐานเดียวกันกับ PO**:
+   - เพิ่มคอลัมน์ `ลำดับ` (Sequence numbering)
+   - ปรับแต่งการแสดงยอดเงินประเมินจัดชิดขวา ตัวหนาสีเขียวมรกต (`#15803d`)
+   - ปรับสถานะเป็น Dropdown Pill สวยงามด้วย `CustomSelect` (`border-radius: 20px`) พร้อมสีตามสถานะ
+   - ปุ่มจัดการใช้ปุ่มกลมมาตรฐาน `doc-action-btn` (ดูรายละเอียด `<Eye />` และลบ `<Trash2 />`)
+   - เพิ่มระบบแบ่งหน้า `PaginationControl` (เลือกขนาดหน้า 10, 20, 50 รายการต่อหน้า)
+3. **เพิ่มการ์ดใบงานคำขอซื้อ (PR Job Cards) ด้านบน และตารางประวัติด้านล่าง**:
+   - **ส่วนบน (การ์ดใบงาน PR รอจัดซื้อ)**:
+     - แสดงการ์ดคำขอซื้อรูปแบบเดียวกับการ์ดงานในหน้ารายการรอเบิกจ่ายของคลังสินค้า
+     - หัวการ์ดแสดงเลขที่ PR (เช่น `PR20260919-001`) พร้อมป้ายสถานะ `รอจัดซื้อ`
+     - แสดงสูตร, เลขที่งานผลิต (WIP), ผู้ขอ, แผนก, และตารางรายการวัตถุดิบที่ขอซื้อพร้อมจำนวน/หน่วย
+     - ปุ่มคำสั่งในการ์ด: `[👁️ ดูรายละเอียด]`, `[✅ อนุมัติแล้ว]`, `[🛒 สั่งซื้อแล้ว]`
+     - หากไม่มีคำขอซื้อรออยู่ จะแสดงกล่องข้อความว่างแจ้งสถานะอย่างชัดเจน
+   - **ส่วนล่าง (ตารางประวัติและรายการใบขอซื้อทั้งหมด)**:
+     - แสดงตารางข้อมูลใบขอซื้อทั้งหมด พร้อมช่องค้นหา ปุ่มสร้าง PR และตัวแบ่งหน้า (Pagination) อยู่ด้านล่างการ์ดงานอย่างสมบูรณ์แบบ
+5. **ออกแบบเอกสารใบขอซื้อขนาด A4 (Purchase Requisition Document - PR)**:
+   - **คอมโพเนนต์มาตรฐาน**: สร้าง `PurchaseRequisitionDoc.jsx` และ `PurchaseRequisitionDoc.css`
+   - **องค์ประกอบเอกสาร A4**:
+     - **ส่วนหัว**: โลโก้ THC, ชื่อวิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์ (สำนักงานใหญ่) ทั้งภาษาไทยและอังกฤษ พร้อมที่อยู่ เบอร์โทร และเลขประจำตัวผู้เสียภาษี
+     - **กล่องข้อมูลเอกสาร & ผู้ขอซื้อ**: เลขที่ PR, วันที่ขอซื้อ, สถานะ, แผนกที่ขอ, ผู้ขอซื้อ, อ้างอิงงานผลิต (WIP No.), สูตรที่ผลิต, และวัตถุประสงค์
+     - **ตารางรายการวัตถุดิบ/สินค้า**: แสดงลำดับ, รหัสวัตถุดิบ, ชื่อรายการ, สต็อกปัจจุบันขณะขอ, จำนวนขอซื้อ, หน่วย, ราคาประเมิน, และรวมเงินประเมิน พร้อมสรุปจำนวนรายการและคำอ่านบาทไทย (`ThaiBaht`)
+     - **หมายเหตุความเร่งด่วนในการจัดซื้อ**: ข้อความชี้แจงสถานะวัตถุดิบขาดแคลน
+     - **ช่องลงนาม 3 ส่วน**: ผู้ขอซื้อ (Requested By), ผู้ตรวจสอบ (Verified By), และผู้อนุมัติการจัดซื้อ (Approved By) พร้อมลายเซ็นดิจิทัลของคุณธวัช จรุงพิรวงศ์ เมื่ออนุมัติแล้ว
+   - **ระบบพิมพ์และแสดงผล**:
+     - ปุ่ม `[🖨️ พิมพ์เอกสาร (Print A4)]` รองรับการสั่งพิมพ์ A4 คมชัดผ่านเบราว์เซอร์ ด้วย `@media print`
+     - **เปิดดูอัตโนมัติ**: เมื่อกดส่งใบขอซื้อจากหน้าคลังสินค้า (`Stock.jsx`) หรือสร้าง PR จากหน้าจัดซื้อ (`Procurement.jsx`) ระบบจะเปิดตัวอย่างเอกสาร A4 นี้ขึ้นมาให้ตรวจสอบและสั่งพิมพ์ได้ทันที!
+
+6. **UI Icon Cleanup & Live Document Preview on PR Actions**:
+   - **Card Button (Outside)**: Removed `<Package />` icon and `📦` emoji from the shortfall job card action button in [`Stock.jsx`](file:///c:/Users/thaih/OneDrive/เอกสาร/GitHub/erp_project/src/pages/Stock.jsx). It now cleanly displays:
+     `ส่งใบขอซื้อ (PR) ไปยังฝ่ายจัดซื้อ`
+   - **Modal Confirmation Button (Inside)**: Removed the rocket emoji `🚀` and `<Package />` icon from the PR creation modal confirm button in [`Stock.jsx`](file:///c:/Users/thaih/OneDrive/เอกสาร/GitHub/erp_project/src/pages/Stock.jsx). It now cleanly displays:
+     `ยืนยันส่งใบขอซื้อ (PR)`
+   - **Modal Header**: Cleaned up the header title to `ส่งใบขอซื้อวัตถุดิบ (PR) ไปยังฝ่ายจัดซื้อ` (removed emoji clutter).
+   - **New Live Document Preview Button in PR Modal**:
+     - Added `[👁️ พรีวิวเอกสาร]` button at the bottom-left of the PR creation modal.
+     - Allows users to preview the exact A4 Purchase Requisition document with current quantities and notes in real time before sending.
+     - Closing the preview smoothly returns the user back to the modal without losing any entered data.
+   - **Real Next PR Number Peeking (`PRYYYYMMDD-XXX`)**:
+     - Added `GET /api/purchase-requisitions/next-number` endpoint using `peekNextSequence` to preview the exact running number from the database without prematurely consuming the sequence.
+     - The modal header now displays the next assigned number badge: `เลขที่ใบขอซื้อ: PRYYYYMMDD-001`.
+     - The document preview replaces the placeholder `PR (ตัวอย่างเอกสารร่าง)` with the actual assigned sequence number (e.g. `PR20260919-001`).
+     - Enhanced stock requisitions backend query to attach real catalog prices/costs and item codes to requested items for full estimated total calculation.
+   - **Fix: Print Preview Blank White**:
+     - Resolved the blank white page issue when printing from the PR preview window.
+     - Upgraded `handlePrint` in [`PurchaseRequisitionDoc.jsx`](file:///c:/Users/thaih/OneDrive/เอกสาร/GitHub/erp_project/src/components/PurchaseRequisitionDoc.jsx) to use an isolated hidden iframe printing strategy (identical to `ProductionOrderPreview` and `EliteTaxInvoice`). This completely decouples print rendering from the main application's scroll/overflow-hidden containers and guarantees 100% crisp, full-color A4 output.
+     - Also updated `@media print` fallback styles in [`PurchaseRequisitionDoc.css`](file:///c:/Users/thaih/OneDrive/เอกสาร/GitHub/erp_project/src/components/PurchaseRequisitionDoc.css) with static unclipped layout positioning.
+   - **Procurement Helper Text**: Updated the PR queue hint in [`Procurement.jsx`](file:///c:/Users/thaih/OneDrive/เอกสาร/GitHub/erp_project/src/pages/Procurement.jsx) to match the new button label.

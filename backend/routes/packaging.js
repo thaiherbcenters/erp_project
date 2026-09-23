@@ -33,16 +33,7 @@ router.get('/tasks', async (req, res) => {
             FROM Packaging_Tasks pt
             LEFT JOIN Production_Tasks p ON pt.ProductionTaskID = p.TaskID
             LEFT JOIN Planner pl ON pt.JobOrderID = pl.PlannerID
-            ORDER BY 
-                CASE pt.Status 
-                    WHEN N'กำลังบรรจุ' THEN 1 
-                    WHEN N'รอบรรจุ' THEN 2 
-                    WHEN N'บรรจุเสร็จ' THEN 3 
-                    WHEN N'รอ QC Final' THEN 4
-                    WHEN N'QC ผ่าน' THEN 5
-                    ELSE 6 
-                END ASC, 
-                pt.CreatedAt DESC
+            ORDER BY pt.CreatedAt DESC, pt.TaskID DESC
         `);
 
         // Format data to match frontend expectations (null-safe)
@@ -120,6 +111,44 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
 
         const updatedTask = result.recordset[0];
 
+        // --- Sync Production_Tasks (ProducedQty, DefectQty, ProcessName) ---
+        const totalPacked = updatedTask.PackedQty || 0;
+        const totalDefect = updatedTask.DefectQty || 0;
+        const isFinishedPackaging = (totalPacked + totalDefect) >= updatedTask.Qty;
+        const processName = isFinishedPackaging ? 'งานติดฉลาก' : 'งานบรรจุภัณฑ์';
+        
+        try {
+            if (updatedTask.ProductionTaskID) {
+                await pool.request()
+                    .input('ProdTaskID', sql.VarChar, updatedTask.ProductionTaskID)
+                    .input('ProducedQty', sql.Int, totalPacked)
+                    .input('DefectQty', sql.Int, totalDefect)
+                    .input('ProcessName', sql.NVarChar, processName)
+                    .query(`
+                        UPDATE Production_Tasks 
+                        SET ProducedQty = @ProducedQty,
+                            DefectQty = @DefectQty,
+                            ProcessName = @ProcessName
+                        WHERE TaskID = @ProdTaskID
+                    `);
+            } else if (updatedTask.BatchNo) {
+                await pool.request()
+                    .input('BatchNo', sql.VarChar, updatedTask.BatchNo)
+                    .input('ProducedQty', sql.Int, totalPacked)
+                    .input('DefectQty', sql.Int, totalDefect)
+                    .input('ProcessName', sql.NVarChar, processName)
+                    .query(`
+                        UPDATE Production_Tasks 
+                        SET ProducedQty = @ProducedQty,
+                            DefectQty = @DefectQty,
+                            ProcessName = @ProcessName
+                        WHERE BatchNo = @BatchNo AND Line != 'WIP Line'
+                    `);
+            }
+        } catch (prodSyncErr) {
+            console.error('Error syncing Production_Tasks quantities:', prodSyncErr);
+        }
+
         // --- Auto Labeling: เมื่อยอดรวม (ดี+เสีย) >= Qty → สร้างงานติดฉลากอัตโนมัติ ---
         if ((updatedTask.PackedQty + updatedTask.DefectQty) >= updatedTask.Qty && updatedTask.Status !== 'รอ QC Final' && updatedTask.Status !== 'QC ผ่าน') {
             // 1. Update packaging status to 'บรรจุเสร็จ-รอติดฉลาก'
@@ -149,53 +178,51 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
                 customerName = customerName || updatedTask.Customer || null;
             }
 
-            // 3. Get label configurations for this product (MTS only)
+            // 3. Get label configurations for this product
             let labelConfigJSON = null;
-            let initialStatus = labelType === 'custom' ? 'รอสั่งสติ๊กเกอร์' : 'รอสติ๊กเกอร์';
-            if (labelType === 'stock') {
-                try {
-                    // Find FG item by product name
-                    const fgRes = await pool.request()
-                        .input('ProductName', sql.NVarChar, updatedTask.Product)
-                        .query(`SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName AND Category = N'สินค้าสำเร็จรูป'`);
-                    
-                    if (fgRes.recordset.length > 0) {
-                        const fgItemId = fgRes.recordset[0].ItemID;
-                        const configRes = await pool.request()
-                            .input('FGItemID', sql.VarChar, fgItemId)
-                            .query('SELECT * FROM Label_Configurations WHERE FGItemID = @FGItemID');
-                        
-                        if (configRes.recordset.length > 0) {
-                            const configs = [];
-                            let allSufficient = true;
-                            for (const cfg of configRes.recordset) {
-                                const stockRes = await pool.request()
-                                    .input('StickerID', sql.VarChar, cfg.StickerItemID)
-                                    .query('SELECT Quantity FROM Stock_Items WHERE ItemID = @StickerID');
-                                const stockQty = stockRes.recordset.length > 0 ? stockRes.recordset[0].Quantity : 0;
-                                const needed = (cfg.QtyPerUnit || 1) * updatedTask.Qty;
-                                if (stockQty < needed) allSufficient = false;
-                                configs.push({
-                                    stickerItemId: cfg.StickerItemID,
-                                    stickerName: cfg.StickerName,
-                                    applyTo: cfg.ApplyTo,
-                                    qtyPerUnit: cfg.QtyPerUnit,
-                                    stockAvailable: stockQty,
-                                    needed: needed
-                                });
-                            }
-                            labelConfigJSON = JSON.stringify(configs);
-                            initialStatus = 'รอสติ๊กเกอร์'; // Always require requisition
-                        } else {
-                            initialStatus = 'พร้อมติดฉลาก'; // No config, just assume ready
-                        }
-                    } else {
-                        initialStatus = 'พร้อมติดฉลาก'; // FG not found, just assume ready
-                    }
-                } catch (cfgErr) {
-                    console.error('Error checking label config:', cfgErr);
-                    initialStatus = 'พร้อมติดฉลาก';
+            let initialStatus = 'รอสติ๊กเกอร์';
+            try {
+                // Find FG item by product name
+                const fgRes = await pool.request()
+                    .input('ProductName', sql.NVarChar, updatedTask.Product)
+                    .query(`SELECT ItemID FROM Stock_Items WHERE ProductName = @ProductName AND Category = N'สินค้าสำเร็จรูป'`);
+                
+                const fgItemId = fgRes.recordset.length > 0 ? fgRes.recordset[0].ItemID : null;
+                let configRes = { recordset: [] };
+                if (fgItemId) {
+                    configRes = await pool.request()
+                        .input('FGItemID', sql.VarChar, fgItemId)
+                        .query('SELECT * FROM Label_Configurations WHERE FGItemID = @FGItemID');
                 }
+
+                if (configRes.recordset.length === 0) {
+                    configRes = await pool.request()
+                        .input('FGProductName', sql.NVarChar, updatedTask.Product)
+                        .query('SELECT * FROM Label_Configurations WHERE FGProductName = @FGProductName');
+                }
+                
+                if (configRes.recordset.length > 0) {
+                    const configs = [];
+                    for (const cfg of configRes.recordset) {
+                        const stockRes = await pool.request()
+                            .input('StickerID', sql.VarChar, cfg.StickerItemID)
+                            .query('SELECT Quantity FROM Stock_Items WHERE ItemID = @StickerID');
+                        const stockQty = stockRes.recordset.length > 0 ? stockRes.recordset[0].Quantity : 0;
+                        const needed = (cfg.QtyPerUnit || 1) * updatedTask.Qty;
+                        configs.push({
+                            stickerItemId: cfg.StickerItemID,
+                            stickerName: cfg.StickerName,
+                            applyTo: cfg.ApplyTo,
+                            qtyPerUnit: cfg.QtyPerUnit,
+                            stockAvailable: stockQty,
+                            needed: needed,
+                            isEnough: stockQty >= needed
+                        });
+                    }
+                    labelConfigJSON = JSON.stringify(configs);
+                }
+            } catch (cfgErr) {
+                console.error('Error checking label config:', cfgErr);
             }
 
             // 4. Create Labeling Task
@@ -233,7 +260,9 @@ router.put('/tasks/:id/progress', authorizeRoles('admin', 'executive', 'packagin
                     await pool.request()
                         .input('ProdTaskID', sql.VarChar, updatedTask.ProductionTaskID)
                         .input('StepTimesJSON', sql.NVarChar, JSON.stringify(stepTimes))
-                        .query(`UPDATE Production_Tasks SET CurrentStep = 'labeling', StepTimesJSON = @StepTimesJSON WHERE TaskID = @ProdTaskID`);
+                        .input('ProducedQty', sql.Int, totalPacked)
+                        .input('ProcessName', sql.NVarChar, 'งานติดฉลาก')
+                        .query(`UPDATE Production_Tasks SET CurrentStep = 'labeling', ProcessName = @ProcessName, ProducedQty = @ProducedQty, StepTimesJSON = @StepTimesJSON WHERE TaskID = @ProdTaskID`);
                 }
             } catch (lblErr) {
                 console.error('Error creating labeling task:', lblErr);

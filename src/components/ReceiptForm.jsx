@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Printer, ArrowLeft, Plus, Trash2, FileText, CheckCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { Save, Printer, ArrowLeft, Plus, Trash2, FileText, CheckCircle, Calendar as CalendarIcon, Search, ChevronDown, FileSpreadsheet } from 'lucide-react';
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import CustomDatePicker from '../components/CustomDatePicker';
@@ -13,6 +13,7 @@ import { TipTapCell } from './TipTapCell';
 import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN } from '../utils/formatters';
 import FormattedAddress from './FormattedAddress';
 import ThaiAddressInputGroup from './ThaiAddressInputGroup';
+import PaginationControl from './PaginationControl';
 import '../pages/PageCommon.css';
 
 const styles = `
@@ -826,6 +827,14 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
     const [showCustomerModal, setShowCustomerModal] = useState(false);
     const [showContractModal, setShowContractModal] = useState(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+    const [showQuotationModal, setShowQuotationModal] = useState(false);
+    const [quotationList, setQuotationList] = useState([]);
+    const [quotationSearchTerm, setQuotationSearchTerm] = useState('');
+    const [quotationPage, setQuotationPage] = useState(1);
+    const [quotationPageSize, setQuotationPageSize] = useState(5);
+    const [loadingQuotations, setLoadingQuotations] = useState(false);
+    const [savedQuotationItems, setSavedQuotationItems] = useState(null);
+    const savedVatConfigRef = useRef(null);
 
     const [customBanks, setCustomBanks] = useState(() => {
         try {
@@ -866,6 +875,9 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         shippingCost: 0,
         depositPercent: '0',
         customDepositAmount: 0,
+        isDeposit: false,
+        depositStatus: 'ชำระครบถ้วน',
+        paidDepositAmount: 0,
         signer: 'thawat',
         customerOrder: '',
         purchaseNo: '',
@@ -875,7 +887,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         notes: DEFAULT_NORMAL_NOTES,
         showDiscountInPrint: false,
         showVatInPrint: false,
-        showDepositInPrint: true,
+        showDepositInPrint: false,
         showShippingInPrint: false,
         designFee: 500,
         showDesignFeeInPrint: false,
@@ -888,7 +900,10 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         fdaServiceRegisterQuantity: 1,
         fdaServiceTrademark: false,
         fdaServiceTrademarkPrice: 5000,
-        fdaServiceTrademarkQuantity: 1
+        fdaServiceTrademarkQuantity: 1,
+        quotationId: null,
+        quotationNo: '',
+        quotationGrandTotal: 0
     });
 
     const userModifiedFdaQty = useRef({ register: false, trademark: false });
@@ -933,6 +948,14 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             const qData = initialFromQuotation;
             const parsedAddr = parseAddressToSplit(qData.address || '');
 
+            const isDepositVal = qData.receiptType === 'deposit';
+            if (isDepositVal) {
+                savedVatConfigRef.current = {
+                    vatRate: qData.vatRate !== undefined ? Number(qData.vatRate) : 7,
+                    showVatInPrint: qData.showVatInPrint !== undefined ? !!qData.showVatInPrint : true
+                };
+            }
+
             setFormData(prev => ({
                 ...prev,
                 docType: qData.docType || prev.docType,
@@ -945,17 +968,20 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                 phone: qData.phone || '',
                 taxId: qData.taxId || '',
                 notes: formatNotesForDisplay(qData.notes || prev.notes),
-                vatRate: qData.vatRate !== undefined ? Number(qData.vatRate) : prev.vatRate,
-                showVatInPrint: qData.showVatInPrint !== undefined ? !!qData.showVatInPrint : prev.showVatInPrint,
+                vatRate: isDepositVal ? 0 : (qData.vatRate !== undefined ? Number(qData.vatRate) : prev.vatRate),
+                showVatInPrint: isDepositVal ? false : (qData.showVatInPrint !== undefined ? !!qData.showVatInPrint : prev.showVatInPrint),
                 discountPercent: qData.discountPercent !== undefined ? Number(qData.discountPercent) : prev.discountPercent,
                 showDiscountInPrint: qData.showDiscountInPrint !== undefined ? !!qData.showDiscountInPrint : prev.showDiscountInPrint,
                 shippingCost: qData.shippingCost !== undefined ? qData.shippingCost : prev.shippingCost,
                 showShippingInPrint: qData.showShippingInPrint !== undefined ? !!qData.showShippingInPrint : prev.showShippingInPrint,
                 designFee: qData.designFee !== undefined ? qData.designFee : prev.designFee,
                 showDesignFeeInPrint: qData.showDesignFeeInPrint !== undefined ? !!qData.showDesignFeeInPrint : prev.showDesignFeeInPrint,
-                depositPercent: qData.depositPercent !== undefined ? String(qData.depositPercent) : prev.depositPercent,
+                depositPercent: qData.depositPercent !== undefined ? String(qData.depositPercent) : (Number(qData.depositAmount || 0) > 0 ? 'custom' : prev.depositPercent),
                 customDepositAmount: Number(qData.depositAmount || 0),
                 showDepositInPrint: qData.showDepositInPrint !== undefined ? !!qData.showDepositInPrint : Number(qData.depositAmount || 0) > 0,
+                isDeposit: isDepositVal,
+                depositStatus: isDepositVal ? 'ชำระมัดจำแล้ว' : 'ชำระครบถ้วน',
+                paidDepositAmount: Number(qData.depositAmount || 0),
                 signer: 'thawat',
                 customerOrder: prev.customerOrder || qData.quotationNo || '',
                 quotationNo: qData.quotationNo || '',
@@ -999,6 +1025,117 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         };
         fetchContracts();
     }, []);
+
+    // Fetch quotations for modal
+    const fetchQuotations = async (searchTerm = '') => {
+        setLoadingQuotations(true);
+        setQuotationPage(1);
+        try {
+            const params = new URLSearchParams({ limit: '100', category: 'quotation' });
+            if (searchTerm) params.set('search', searchTerm);
+            const res = await fetch(`${API_BASE}/quotations?${params.toString()}`);
+            const json = await res.json();
+            if (json.success) {
+                setQuotationList(json.data || []);
+            }
+        } catch (err) {
+            console.error('Error fetching quotations:', err);
+        } finally {
+            setLoadingQuotations(false);
+        }
+    };
+
+    // Handle selecting a quotation from modal
+    const handleSelectQuotation = async (quotation) => {
+        try {
+            // Fetch full quotation details with items
+            const res = await fetch(`${API_BASE}/quotations/${quotation.QuotationID}`);
+            const json = await res.json();
+            if (!json.success) {
+                showAlert('ข้อผิดพลาด', 'ไม่สามารถดึงข้อมูลใบเสนอราคาได้', 'error');
+                return;
+            }
+            const qData = json.data;
+
+            // Parse address into split fields
+            const parsedAddr = parseAddressToSplit(qData.Address || '');
+
+            if (formData.isDeposit) {
+                savedVatConfigRef.current = {
+                    vatRate: qData.VatRate !== undefined ? Number(qData.VatRate) : 7,
+                    showVatInPrint: qData.ShowVatInPrint !== undefined ? !!qData.ShowVatInPrint : true
+                };
+            }
+
+            // Set quotation reference in formData
+            setFormData(prev => ({
+                ...prev,
+                quotationId: qData.QuotationID,
+                quotationNo: qData.QuotationNo,
+                quotationGrandTotal: Number(qData.GrandTotal) || 0,
+                customerOrder: prev.customerOrder || qData.QuotationNo || '',
+                customerId: qData.CustomerID || prev.customerId,
+                customerName: qData.CustomerName || prev.customerName,
+                address: qData.Address || prev.address,
+                addr_no: qData.Address ? parsedAddr.addr_no : prev.addr_no,
+                addr_soi: qData.Address ? parsedAddr.addr_soi : prev.addr_soi,
+                addr_road: qData.Address ? parsedAddr.addr_road : prev.addr_road,
+                addr_subdistrict: qData.Address ? parsedAddr.addr_subdistrict : prev.addr_subdistrict,
+                addr_district: qData.Address ? parsedAddr.addr_district : prev.addr_district,
+                addr_province: qData.Address ? parsedAddr.addr_province : prev.addr_province,
+                addr_zip: qData.Address ? parsedAddr.addr_zip : prev.addr_zip,
+                phone: qData.Phone || prev.phone,
+                taxId: qData.TaxID || prev.taxId,
+                contractId: qData.ContractID || prev.contractId,
+                discountPercent: qData.DiscountPercent !== undefined ? Number(qData.DiscountPercent) : prev.discountPercent,
+                showDiscountInPrint: qData.ShowDiscountInPrint !== undefined ? !!qData.ShowDiscountInPrint : prev.showDiscountInPrint,
+                vatRate: prev.isDeposit ? 0 : (qData.VatRate !== undefined ? Number(qData.VatRate) : prev.vatRate),
+                showVatInPrint: prev.isDeposit ? false : (qData.ShowVatInPrint !== undefined ? !!qData.ShowVatInPrint : prev.showVatInPrint),
+                shippingCost: qData.ShippingCost !== undefined ? Number(qData.ShippingCost) : prev.shippingCost,
+                showShippingInPrint: qData.ShowShippingInPrint !== undefined ? !!qData.ShowShippingInPrint : prev.showShippingInPrint,
+                designFee: qData.DesignFee !== undefined ? Number(qData.DesignFee) : prev.designFee,
+                showDesignFeeInPrint: qData.ShowDesignFeeInPrint !== undefined ? !!qData.ShowDesignFeeInPrint : prev.showDesignFeeInPrint
+            }));
+
+            // Load items from quotation
+            if (qData.items && qData.items.length > 0) {
+                const loadedItems = qData.items.map((item, idx) => ({
+                    id: idx + 1,
+                    name: item.ItemName || '',
+                    qty: item.Qty !== null && item.Qty !== undefined ? item.Qty : '',
+                    price: item.Price !== null && item.Price !== undefined ? item.Price : '',
+                    amount: item.Amount !== undefined ? item.Amount : 0,
+                    manualTotal: item.Amount !== undefined ? item.Amount : undefined,
+                    isPromo: !!item.IsPromo,
+                    promoType: item.IsPromo ? 'old' : '',
+                    promoMultiplier: item.PromoMultiplier || 1,
+                    basePromoName: item.ItemName || '',
+                    image: item.ImageURL || null,
+                    unit: item.Unit || 'ชิ้น',
+                    showDropdown: false
+                }));
+                setItems(loadedItems);
+                setSavedQuotationItems(loadedItems);
+            }
+
+            setShowQuotationModal(false);
+            setQuotationSearchTerm('');
+        } catch (err) {
+            console.error('Error loading quotation:', err);
+            showAlert('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลใบเสนอราคาได้', 'error');
+        }
+    };
+
+    // Clear quotation reference
+    const handleClearQuotation = () => {
+        setFormData(prev => ({
+            ...prev,
+            quotationId: null,
+            quotationNo: '',
+            quotationGrandTotal: 0
+        }));
+        setSavedQuotationItems(null);
+    };
 
     const [customerList, setCustomerList] = useState([]);
     useEffect(() => {
@@ -1130,6 +1267,9 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             shippingCost: data.ShippingCost || 0,
                             depositPercent: data.DepositPercent || '0',
                             customDepositAmount: data.DepositPercent === 'custom' ? data.DepositAmount : 0,
+                            isDeposit: Boolean(data.IsDeposit),
+                            depositStatus: data.DepositStatus || (Boolean(data.IsDeposit) ? 'ชำระมัดจำแล้ว' : 'ชำระครบถ้วน'),
+                            paidDepositAmount: data.PaidDepositAmount !== undefined ? Number(data.PaidDepositAmount) : (Boolean(data.IsDeposit) ? Number(data.DepositAmount || 0) : 0),
                             signer: (data.Signer && !data.Signer.startsWith('sig_')) ? data.Signer : 'thawat',
                             customerOrder: data.CustomerOrder || '',
                             purchaseNo: data.PurchaseNo || '',
@@ -1210,6 +1350,59 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
     const [items, setItems] = useState([
         { id: 1, name: '', basePromoName: '', qty: '', price: '', isPromo: false, promoType: '', promoMultiplier: 1, unit: 'ชิ้น', image: null, showDropdown: false }
     ]);
+    const handleDepositToggle = (targetChecked) => {
+        const isChecked = typeof targetChecked === 'boolean' ? targetChecked : !formData.isDeposit;
+        
+        if (isChecked) {
+            savedVatConfigRef.current = {
+                vatRate: formData.vatRate,
+                showVatInPrint: formData.showVatInPrint
+            };
+        }
+
+        const restoredVat = savedVatConfigRef.current || { vatRate: 7, showVatInPrint: true };
+
+        setFormData(prev => ({
+            ...prev,
+            isDeposit: isChecked,
+            depositStatus: isChecked ? 'ชำระมัดจำแล้ว' : 'ชำระครบถ้วน',
+            depositPercent: '0',
+            customDepositAmount: 0,
+            showDepositInPrint: false,
+            vatRate: isChecked ? 0 : restoredVat.vatRate,
+            showVatInPrint: isChecked ? false : restoredVat.showVatInPrint
+        }));
+
+        if (isChecked) {
+            // Save current items before replacing (for restore when unchecking)
+            setItems(prevItems => {
+                // Only save if we haven't saved yet or items are from quotation
+                if (prevItems && prevItems.length > 0 && prevItems[0].name !== 'เงินมัดจำสินค้า') {
+                    setSavedQuotationItems([...prevItems]);
+                }
+                return [{
+                    id: Date.now(),
+                    name: 'เงินมัดจำสินค้า',
+                    basePromoName: 'เงินมัดจำสินค้า',
+                    qty: '',
+                    price: '',
+                    isPromo: false,
+                    promoType: '',
+                    promoMultiplier: 1,
+                    unit: 'ชิ้น',
+                    image: null,
+                    showDropdown: false
+                }];
+            });
+        } else {
+            // Restore saved items from quotation (if any)
+            if (savedQuotationItems && savedQuotationItems.length > 0) {
+                setItems(savedQuotationItems);
+            } else {
+                setItems([{ id: 1, name: '', basePromoName: '', qty: '', price: '', isPromo: false, promoType: '', promoMultiplier: 1, unit: 'ชิ้น', image: null, showDropdown: false }]);
+            }
+        }
+    };
 
     const handleFormChange = (e) => {
         const { name, value, type, checked } = e.target;
@@ -1218,6 +1411,23 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         }
         setFormData(prev => {
             const nextData = { ...prev, [name]: type === 'checkbox' ? checked : value };
+            if (name === 'isDeposit') {
+                if (checked) {
+                    savedVatConfigRef.current = {
+                        vatRate: prev.vatRate,
+                        showVatInPrint: prev.showVatInPrint
+                    };
+                }
+                const restoredVat = savedVatConfigRef.current || { vatRate: 7, showVatInPrint: true };
+                nextData.isDeposit = checked;
+                nextData.depositStatus = checked ? 'ชำระมัดจำแล้ว' : 'ชำระครบถ้วน';
+                nextData.depositPercent = '0';
+                nextData.customDepositAmount = 0;
+                nextData.showDepositInPrint = false;
+                nextData.vatRate = checked ? 0 : restoredVat.vatRate;
+                nextData.showVatInPrint = checked ? false : restoredVat.showVatInPrint;
+            }
+
             if (name.startsWith('addr_')) {
                 nextData.address = formatFullAddress(nextData);
             }
@@ -1436,8 +1646,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
     const discountAmount = (!isFda && formData.showDiscountInPrint) ? (subTotal * (parseFloat(formData.discountPercent) || 0) / 100) : 0;
     const afterDiscount = subTotal - discountAmount;
     
-    const effectiveVatRate = isFda ? 7 : (parseFloat(formData.vatRate) || 0);
-    const effectiveShowVat = isFda ? true : formData.showVatInPrint;
+    const effectiveVatRate = isFda ? 7 : (formData.isDeposit ? 0 : (parseFloat(formData.vatRate) || 0));
+    const effectiveShowVat = isFda ? true : (formData.isDeposit ? false : formData.showVatInPrint);
     const vatAmount = effectiveShowVat ? (afterDiscount * effectiveVatRate / 100) : 0;
     
     const shipping = !isFda ? (parseFloat(formData.shippingCost) || 0) : 0;
@@ -1536,17 +1746,20 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             discountPercent: Number(formData.discountPercent) || 0,
             discountAmount: Number(discountAmount) || 0,
             afterDiscount: Number(afterDiscount) || 0,
-            vatRate: Number(formData.vatRate) || 0,
-            vatAmount: Number(vatAmount) || 0,
+            vatRate: formData.isDeposit ? 0 : (Number(formData.vatRate) || 0),
+            vatAmount: formData.isDeposit ? 0 : (Number(vatAmount) || 0),
             shippingCost: Number(formData.shippingCost) || 0,
             grandTotal: Number(grandTotal) || 0,
             depositPercent: formData.depositPercent,
             depositAmount: Number(depositAmount) || 0,
             remainingAmount: Number(remainingAmount) || 0,
+            isDeposit: Boolean(formData.isDeposit),
+            depositStatus: formData.isDeposit ? (formData.depositStatus || 'ชำระมัดจำแล้ว') : 'ชำระครบถ้วน',
+            paidDepositAmount: formData.isDeposit ? (Number(depositAmount) || Number(grandTotal) || 0) : Number(grandTotal) || 0,
             signer: formData.signer || 'thawat',
             notes: formData.notes,
             showDiscountInPrint: formData.showDiscountInPrint,
-            showVatInPrint: formData.showVatInPrint,
+            showVatInPrint: formData.isDeposit ? false : formData.showVatInPrint,
             showDepositInPrint: formData.showDepositInPrint,
             showShippingInPrint: formData.showShippingInPrint,
             designFee: Number(designFee) || 0,
@@ -1576,6 +1789,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             customerOrder: formData.customerOrder || formData.quotationNo || (initialFromQuotation ? initialFromQuotation.quotationNo : null),
             quotationNo: formData.quotationNo || (initialFromQuotation ? initialFromQuotation.quotationNo : null),
             quotationId: formData.quotationId || (initialFromQuotation ? initialFromQuotation.quotationId : null),
+            quotationGrandTotal: formData.quotationGrandTotal || null,
             receiptType: formData.receiptType || (initialFromQuotation ? initialFromQuotation.receiptType : null),
             items: items.filter(i => i.name).map(i => ({
                 name: i.name,
@@ -1757,6 +1971,139 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             <div>
                                 <div className="q-section-title">ข้อมูลเอกสาร</div>
                                 <div className="q-section-desc">ตั้งค่าอ้างอิงสัญญา ประเภทเอกสาร บัญชีธนาคาร และเลขที่เอกสาร</div>
+                            </div>
+                        </div>
+
+                        {/* Quotation Selector Row */}
+                        <div className="form-row" style={{ gridTemplateColumns: '1fr', marginBottom: '14px' }}>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                    <span style={{ fontWeight: 600, color: '#1e293b' }}>
+                                        อ้างอิงใบเสนอราคา (Quotation)
+                                    </span>
+                                    <span style={{ fontSize: '12px', color: '#64748b', fontWeight: 'normal' }}>
+                                        เลือกเพื่อดึงข้อมูลสินค้าและตั้งเป็นฐานคำนวณเงินมัดจำ
+                                    </span>
+                                </label>
+                                {formData.quotationId ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ 
+                                            flex: 1, 
+                                            border: '1.5px solid #10b981', 
+                                            padding: '8px 14px', 
+                                            borderRadius: '8px', 
+                                            background: '#f0fdf4', 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'center', 
+                                            fontSize: '14px', 
+                                            minHeight: '44px',
+                                            boxShadow: '0 1px 2px rgba(16, 185, 129, 0.08)'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <span style={{ 
+                                                    background: '#dcfce7', 
+                                                    color: '#15803d', 
+                                                    padding: '4px 10px', 
+                                                    borderRadius: '6px', 
+                                                    fontWeight: 700, 
+                                                    fontSize: '13px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '5px',
+                                                    border: '1px solid #bbf7d0'
+                                                }}>
+                                                    <FileSpreadsheet size={15} />
+                                                    {formData.quotationNo}
+                                                </span>
+                                                <span style={{ color: '#166534', fontWeight: 600 }}>
+                                                    ราคาเต็ม: ฿{Number(formData.quotationGrandTotal || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            {!viewOnly && (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setShowQuotationModal(true); fetchQuotations(); }}
+                                                        style={{
+                                                            background: '#ffffff',
+                                                            border: '1px solid #86efac',
+                                                            color: '#15803d',
+                                                            borderRadius: '6px',
+                                                            padding: '4px 12px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}
+                                                    >
+                                                        <Search size={13} /> เปลี่ยนใบเสนอราคา
+                                                    </button>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={handleClearQuotation} 
+                                                        style={{ 
+                                                            background: '#fee2e2', 
+                                                            border: '1px solid #fca5a5', 
+                                                            color: '#b91c1c', 
+                                                            borderRadius: '6px',
+                                                            padding: '4px 10px', 
+                                                            cursor: 'pointer', 
+                                                            fontSize: '12px',
+                                                            fontWeight: 600
+                                                        }} 
+                                                        title="ยกเลิกการเชื่อมโยงใบเสนอราคา"
+                                                    >
+                                                        ✕ ลบ
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div 
+                                        onClick={() => { if (!viewOnly) { setShowQuotationModal(true); fetchQuotations(); } }} 
+                                        style={{ 
+                                            border: '1.5px solid #3b82f6', 
+                                            padding: '8px 14px', 
+                                            borderRadius: '8px', 
+                                            cursor: viewOnly ? 'default' : 'pointer', 
+                                            background: '#f8fafc', 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'center', 
+                                            fontSize: '14px', 
+                                            minHeight: '44px',
+                                            boxShadow: '0 1px 3px rgba(59, 130, 246, 0.08)',
+                                            transition: 'all 0.15s ease'
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#1e40af', fontWeight: 500 }}>
+                                            <div style={{ background: '#dbeafe', padding: '6px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <FileSpreadsheet size={16} color="#2563eb" />
+                                            </div>
+                                            <span>-- คลิกเพื่อเลือกใบเสนอราคา (Quotation) --</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ 
+                                                fontSize: '12px', 
+                                                background: '#2563eb', 
+                                                color: '#ffffff', 
+                                                padding: '4px 12px', 
+                                                borderRadius: '6px', 
+                                                fontWeight: 600,
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}>
+                                                <Search size={13} /> เลือกใบเสนอราคา
+                                            </span>
+                                            <ChevronDown size={14} color="#64748b" />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -2053,6 +2400,45 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             </div>
                         </div>
 
+                        {/* Toggle Checkbox: เป็นใบเสร็จรับเงินมัดจำ */}
+                        <div 
+                            onClick={() => handleDepositToggle(!formData.isDeposit)}
+                            style={{
+                                marginBottom: '16px',
+                                background: formData.isDeposit ? '#f0fdf4' : '#f8fafc',
+                                border: formData.isDeposit ? '1.5px solid #22c55e' : '1px solid #e2e8f0',
+                                borderRadius: '10px',
+                                padding: '12px 16px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                transition: 'all 0.2s ease',
+                                cursor: 'pointer',
+                                userSelect: 'none'
+                            }}
+                        >
+                            <label 
+                                style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: 0, fontWeight: 600, color: formData.isDeposit ? '#15803d' : '#334155', fontSize: '13.5px' }} 
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <input 
+                                    type="checkbox" 
+                                    name="isDeposit" 
+                                    checked={!!formData.isDeposit} 
+                                    onChange={(e) => handleDepositToggle(e.target.checked)} 
+                                    style={{ width: '18px', height: '18px', accentColor: '#16a34a', cursor: 'pointer' }} 
+                                />
+                                <span>เป็นเงินมัดจำ (Deposit Receipt)</span>
+                            </label>
+                            {formData.isDeposit ? (
+                                <span style={{ fontSize: '12px', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '16px', fontWeight: 600 }}>
+                                    ✓ รายการเงินมัดจำสินค้า ({formData.depositStatus || 'ชำระมัดจำแล้ว'})
+                                </span>
+                            ) : (
+                                <span style={{ fontSize: '12px', color: '#94a3b8' }}>ชำระเต็มจำนวน</span>
+                            )}
+                        </div>
+
                     <div className="products-container">
                         {items.map((item) => (
                             <div className="product-item" key={item.id}>
@@ -2333,7 +2719,9 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                         </div>
 
                                         <div style={{ flex: '1 1 120px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center' }}>
-                                            <label style={{ fontSize: '12px', color: '#64748b', display: 'block', marginBottom: '6px', fontWeight: 500 }}>รวมเป็นเงิน</label>
+                                            <label style={{ fontSize: '12px', color: formData.isDeposit ? '#d97706' : '#64748b', display: 'block', marginBottom: '6px', fontWeight: formData.isDeposit ? 600 : 500 }}>
+                                                รวมเป็นเงิน{formData.isDeposit && <span style={{ color: '#d97706', fontSize: '11px' }}> ← กรอกตรงนี้</span>}
+                                            </label>
                                             <div className="row-amount" style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
                                                 {item.isEditingTotal ? (
                                                     <input 
@@ -2492,13 +2880,36 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         <div className="payment-row">
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <span className="label">ภาษีมูลค่าเพิ่ม (VAT)</span>
-                                <CustomSelect name="vatRate" usePortal={true} value={isFda ? '7' : formData.vatRate} onChange={handleFormChange} disabled={isFda} style={{ width: '60px', textAlign: 'center', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '4px', fontSize: '13px', background: isFda ? '#f1f5f9' : '#fff', cursor: isFda ? 'not-allowed' : 'pointer' }}>
+                                <CustomSelect 
+                                    name="vatRate" 
+                                    usePortal={true} 
+                                    value={formData.isDeposit ? '0' : (isFda ? '7' : String(formData.vatRate))} 
+                                    onChange={handleFormChange} 
+                                    disabled={isFda || formData.isDeposit} 
+                                    style={{ 
+                                        width: '60px', 
+                                        textAlign: 'center', 
+                                        border: '1px solid #e2e8f0', 
+                                        borderRadius: '6px', 
+                                        padding: '4px', 
+                                        fontSize: '13px', 
+                                        background: (isFda || formData.isDeposit) ? '#f1f5f9' : '#fff', 
+                                        cursor: (isFda || formData.isDeposit) ? 'not-allowed' : 'pointer' 
+                                    }}
+                                >
                                     <option value="0">0%</option>
                                     <option value="7">7%</option>
                                 </CustomSelect>
                                 {!isFda && (
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#666', cursor: 'pointer', margin: 0, fontWeight: 'normal' }}>
-                                        <input type="checkbox" name="showVatInPrint" checked={formData.showVatInPrint} onChange={handleFormChange} style={{ width: '13px', height: '13px', margin: 0, cursor: 'pointer' }} />
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: formData.isDeposit ? '#94a3b8' : '#666', cursor: formData.isDeposit ? 'not-allowed' : 'pointer', margin: 0, fontWeight: 'normal' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            name="showVatInPrint" 
+                                            checked={formData.isDeposit ? false : !!formData.showVatInPrint} 
+                                            onChange={handleFormChange} 
+                                            disabled={formData.isDeposit}
+                                            style={{ width: '13px', height: '13px', margin: 0, cursor: formData.isDeposit ? 'not-allowed' : 'pointer' }} 
+                                        />
                                         แสดงในบิล
                                     </label>
                                 )}
@@ -2573,14 +2984,19 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         {/* Grand Total */}
                         <div className="grand-total-highlight">
                             <span className="gt-label">ยอดเงินสุทธิ / Grand Total</span>
-                            <span className="gt-value">{grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                            <span className="gt-value">{finalPayableTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
                         </div>
+                        {formData.showDepositInPrint && depositAmount > 0 && (
+                            <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'right', marginTop: '-6px', marginBottom: '8px' }}>
+                                (ยอดรวมก่อนหักมัดจำ: {grandTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท)
+                            </div>
+                        )}
 
                         {/* Deposit Breakdown */}
                         {!isFda && depositAmount > 0 && (
                             <div className="payment-row" style={{ borderTop: '1px dashed #ffb74d', marginTop: '6px', borderBottom: 'none' }}>
                                 <span className="label" style={{ color: '#059669', fontWeight: 'bold' }}>ยอดคงเหลือที่ต้องชำระ</span>
-                                <span className="value" style={{ color: '#10b981', fontWeight: 'bold', fontSize: '14px' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
+                                <span className="value" style={{ color: '#059669', fontWeight: 'bold', fontSize: '14px' }}>{remainingAmount.toLocaleString('th-TH', {minimumFractionDigits: 2})} บาท</span>
                             </div>
                         )}
                     </div>
@@ -3544,6 +3960,188 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                 </div>
             )}
         
+            {/* Quotation Selection Modal */}
+            {showQuotationModal && (() => {
+                const totalQuotationPages = Math.ceil(quotationList.length / quotationPageSize) || 1;
+                const paginatedQuotations = quotationList.slice(
+                    (quotationPage - 1) * quotationPageSize,
+                    quotationPage * quotationPageSize
+                );
+
+                return (
+                    <div style={{ 
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+                        backgroundColor: 'rgba(15, 23, 42, 0.65)', 
+                        backdropFilter: 'blur(3px)',
+                        zIndex: 9999, 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center',
+                        padding: '16px'
+                    }}
+                    onClick={() => { setShowQuotationModal(false); setQuotationSearchTerm(''); }}>
+                        <div style={{ 
+                            background: 'white', 
+                            borderRadius: '14px', 
+                            width: 'min(720px, 96vw)', 
+                            maxHeight: 'min(86vh, 660px)', 
+                            display: 'flex', 
+                            flexDirection: 'column', 
+                            overflow: 'hidden', 
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' 
+                        }}
+                        onClick={e => e.stopPropagation()}>
+                            {/* Modal Header */}
+                            <div style={{ 
+                                padding: '16px 20px', 
+                                borderBottom: '1px solid #e2e8f0', 
+                                display: 'flex', 
+                                justifyContent: 'space-between', 
+                                alignItems: 'center', 
+                                background: '#f8fafc' 
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <FileSpreadsheet size={18} color="#2563eb" />
+                                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>เลือกใบเสนอราคา (Quotation)</h3>
+                                    <span style={{ fontSize: '12px', background: '#e0e7ff', color: '#3730a3', padding: '2px 8px', borderRadius: '12px', fontWeight: 600 }}>
+                                        {quotationList.length} ฉบับ
+                                    </span>
+                                </div>
+                                <button 
+                                    type="button" 
+                                    onClick={() => { setShowQuotationModal(false); setQuotationSearchTerm(''); }} 
+                                    style={{ 
+                                        background: 'none', 
+                                        border: 'none', 
+                                        fontSize: '18px', 
+                                        cursor: 'pointer', 
+                                        color: '#94a3b8',
+                                        padding: '4px',
+                                        lineHeight: 1
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            {/* Search Bar */}
+                            <div style={{ padding: '12px 20px', borderBottom: '1px solid #f1f5f9', background: '#ffffff' }}>
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <Search size={16} style={{ position: 'absolute', left: '12px', color: '#94a3b8' }} />
+                                    <input
+                                        type="text"
+                                        placeholder="ค้นหาเลขที่ใบเสนอราคา หรือ ชื่อลูกค้า..."
+                                        value={quotationSearchTerm}
+                                        onChange={e => {
+                                            setQuotationSearchTerm(e.target.value);
+                                            fetchQuotations(e.target.value);
+                                        }}
+                                        style={{ 
+                                            width: '100%', 
+                                            padding: '9px 36px 9px 36px', 
+                                            border: '1.5px solid #cbd5e1', 
+                                            borderRadius: '8px', 
+                                            fontSize: '14px', 
+                                            outline: 'none', 
+                                            boxSizing: 'border-box' 
+                                        }}
+                                        autoFocus
+                                    />
+                                    {quotationSearchTerm && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setQuotationSearchTerm('');
+                                                fetchQuotations('');
+                                            }}
+                                            style={{
+                                                position: 'absolute',
+                                                right: '10px',
+                                                background: '#e2e8f0',
+                                                border: 'none',
+                                                borderRadius: '50%',
+                                                width: '20px',
+                                                height: '20px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                cursor: 'pointer',
+                                                fontSize: '11px',
+                                                color: '#64748b'
+                                            }}
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Quotation List */}
+                            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px', minHeight: '260px' }}>
+                                {loadingQuotations ? (
+                                    <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>กำลังโหลดข้อมูลใบเสนอราคา...</div>
+                                ) : quotationList.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                                        {quotationSearchTerm ? 'ไม่พบใบเสนอราคาที่ค้นหา' : 'ไม่มีรายการใบเสนอราคาในระบบ'}
+                                    </div>
+                                ) : (
+                                    paginatedQuotations.map(qt => (
+                                        <div key={qt.QuotationID}
+                                             onClick={() => handleSelectQuotation(qt)}
+                                             style={{ 
+                                                 padding: '12px 16px', 
+                                                 borderRadius: '10px', 
+                                                 border: '1px solid #e2e8f0', 
+                                                 marginBottom: '8px', 
+                                                 cursor: 'pointer', 
+                                                 transition: 'all 0.15s ease', 
+                                                 background: '#fff' 
+                                             }}
+                                             onMouseEnter={e => { 
+                                                 e.currentTarget.style.background = '#f0f9ff'; 
+                                                 e.currentTarget.style.borderColor = '#3b82f6';
+                                                 e.currentTarget.style.transform = 'translateY(-1px)';
+                                             }}
+                                             onMouseLeave={e => { 
+                                                 e.currentTarget.style.background = '#fff'; 
+                                                 e.currentTarget.style.borderColor = '#e2e8f0'; 
+                                                 e.currentTarget.style.transform = 'none';
+                                             }}
+                                        >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                <span style={{ fontWeight: 700, color: '#1d4ed8', fontSize: '14px' }}>{qt.QuotationNo}</span>
+                                                <span style={{ fontWeight: 700, color: '#059669', fontSize: '14px' }}>
+                                                    ฿{Number(qt.GrandTotal || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span style={{ color: '#475569', fontSize: '13px', fontWeight: 500 }}>{qt.CustomerName || '-'}</span>
+                                                <span style={{ color: '#94a3b8', fontSize: '12px' }}>{qt.BillDate ? new Date(qt.BillDate).toLocaleDateString('th-TH') : ''}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Pagination Footer */}
+                            {quotationList.length > 0 && (
+                                <PaginationControl
+                                    currentPage={quotationPage}
+                                    totalPages={totalQuotationPages}
+                                    totalItems={quotationList.length}
+                                    pageSize={quotationPageSize}
+                                    onPageChange={(p) => setQuotationPage(p)}
+                                    onPageSizeChange={(s) => { setQuotationPageSize(s); setQuotationPage(1); }}
+                                    pageSizeOptions={[5, 10, 20]}
+                                    itemLabel="ฉบับ"
+                                    style={{ borderRadius: 0, padding: '10px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}
+                                />
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+
             <ContractSelectorModal 
                 show={showContractModal} 
                 onClose={() => setShowContractModal(false)} 

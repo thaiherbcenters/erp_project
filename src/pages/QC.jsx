@@ -63,6 +63,99 @@ export default function QC() {
     const [inspectNotes, setInspectNotes] = useState('');
     const [rejectDialog, setRejectDialog] = useState({ open: false, request: null });
 
+    // ── Incoming QC Inspection States ──
+    const [inspectingIncoming, setInspectingIncoming] = useState(null);
+    const [incomingInspectForm, setIncomingInspectForm] = useState({ inspector: '', qty: '', notes: '' });
+    const [showAddIncomingModal, setShowAddIncomingModal] = useState(false);
+    const [newIncomingForm, setNewIncomingForm] = useState({ itemName: '', supplierName: '', lotNumber: '', qty: '', unit: 'กก.', notes: '' });
+
+    const handleOpenInspectIncoming = (item) => {
+        let defaultQty = '';
+        const isFromPO = (item.notes || '').includes('PO:');
+        if (isFromPO) {
+            defaultQty = 'ครบตาม PO';
+        } else {
+            const match = (item.notes || '').match(/(?:จำนวน|Qty|ปริมาณ)[:\s]+([0-9.]+)/i);
+            if (match && match[1]) defaultQty = match[1];
+        }
+
+        setInspectingIncoming(item);
+        setIncomingInspectForm({
+            inspector: currentUser?.name || currentUser?.username || 'QC',
+            qty: defaultQty || '1',
+            notes: item.notes || ''
+        });
+    };
+
+    const handleSubmitIncomingInspect = async (resultStatus) => {
+        if (!inspectingIncoming) return;
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/qc/incoming/${inspectingIncoming.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({
+                    result_status: resultStatus,
+                    inspectorId: incomingInspectForm.inspector,
+                    receivedQty: incomingInspectForm.qty,
+                    notes: incomingInspectForm.notes
+                })
+            });
+
+            const data = await res.json();
+            if (res.ok && data.success) {
+                showAlert('สำเร็จ', data.message || 'บันทึกผลการตรวจรับเรียบร้อยแล้ว', 'success');
+                setInspectingIncoming(null);
+                fetchQcData();
+            } else {
+                showAlert('ข้อผิดพลาด', data.message || 'ไม่สามารถบันทึกผลตรวจได้', 'error');
+            }
+        } catch (err) {
+            console.error('Error submitting incoming inspection:', err);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        }
+    };
+
+    const handleSaveNewIncoming = async () => {
+        if (!newIncomingForm.itemName.trim()) {
+            showAlert('แจ้งเตือน', 'กรุณาระบุชื่อวัตถุดิบ', 'warning');
+            return;
+        }
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/qc/incoming`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({
+                    itemName: newIncomingForm.itemName.trim(),
+                    supplierName: newIncomingForm.supplierName.trim() || '-',
+                    lotNumber: newIncomingForm.lotNumber.trim() || `LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
+                    inspectorId: currentUser?.name || currentUser?.username || 'QC',
+                    result_status: 'รอตรวจสอบ',
+                    notes: `จำนวน: ${newIncomingForm.qty || 1} ${newIncomingForm.unit} | ${newIncomingForm.notes}`
+                })
+            });
+
+            if (res.ok) {
+                showAlert('สำเร็จ', 'สร้างรายการตรวจรับวัตถุดิบเรียบร้อยแล้ว', 'success');
+                setShowAddIncomingModal(false);
+                setNewIncomingForm({ itemName: '', supplierName: '', lotNumber: '', qty: '', unit: 'กก.', notes: '' });
+                fetchQcData();
+            } else {
+                showAlert('ข้อผิดพลาด', 'ไม่สามารถสร้างรายการตรวจรับได้', 'error');
+            }
+        } catch (err) {
+            console.error('Error creating incoming QC:', err);
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        }
+    };
+
     // QC/Lab Formula Testing
     const { formulas, fetchFormulaTests, submitFormulaTest } = useRnD();
     const [formulaTests, setFormulaTests] = useState([]);
@@ -747,18 +840,32 @@ export default function QC() {
                                 </div>
                                 <button className="search-btn">ค้นหา</button>
                             </div>
-                            {canCreate('qc_incoming') && (<button className="btn-primary">+ ตรวจรับวัตถุดิบ</button>)}
+                            {canCreate('qc_incoming') && (
+                                <button className="btn-primary" onClick={() => setShowAddIncomingModal(true)}>
+                                    + ตรวจรับวัตถุดิบ
+                                </button>
+                            )}
                         </div>
                     )}
                     {hasSectionPermission('qc_incoming_table') && (
                         <div className="table-card card">
                             <table className="data-table">
                                 <thead>
-                                    <tr><th>รหัสอ้างอิง</th><th>วันที่</th><th>Lot Number</th><th>วัตถุดิบ</th><th>Supplier</th><th>ผู้ตรวจ</th><th>ผลตรวจ</th><th>หมายเหตุ</th></tr>
+                                    <tr>
+                                        <th>รหัสอ้างอิง</th>
+                                        <th>วันที่</th>
+                                        <th>Lot Number</th>
+                                        <th>วัตถุดิบ</th>
+                                        <th>Supplier</th>
+                                        <th>ผู้ตรวจ</th>
+                                        <th>ผลตรวจ</th>
+                                        <th>หมายเหตุ</th>
+                                        <th style={{ textAlign: 'center' }}>จัดการ</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     {filteredIncoming.length === 0 ? (
-                                        <tr><td colSpan="8" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบข้อมูลการตรวจรับวัตถุดิบ</td></tr>
+                                        <tr><td colSpan="9" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบข้อมูลการตรวจรับวัตถุดิบ</td></tr>
                                     ) : paginatedIncoming.map(item => (
                                         <tr key={item.id}>
                                             <td className="text-bold" style={{ color: '#475569' }}>{item.requestId}</td>
@@ -769,6 +876,22 @@ export default function QC() {
                                             <td>{item.inspector}</td>
                                             <td><span className={`badge ${getResultBadge(item.result)}`}>{item.result}</span></td>
                                             <td className="text-muted">{item.notes}</td>
+                                            <td style={{ textAlign: 'center' }}>
+                                                {(item.result === 'รอตรวจสอบ' || item.result === 'รอตรวจ' || !item.result) ? (
+                                                    <button 
+                                                        className="btn-secondary" 
+                                                        style={{ padding: '4px 8px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                                        onClick={() => handleOpenInspectIncoming(item)}
+                                                        title="ลงผลการตรวจรับและเข้าคลัง"
+                                                    >
+                                                        <ListChecks size={14} /> ตรวจรับ
+                                                    </button>
+                                                ) : item.result === 'ผ่าน' ? (
+                                                    <span style={{ color: '#16a34a', fontSize: '12px', fontWeight: 600 }}>✅ เข้าคลังแล้ว</span>
+                                                ) : (
+                                                    <span style={{ color: '#dc2626', fontSize: '12px', fontWeight: 600 }}>❌ ไม่ผ่าน</span>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -1142,6 +1265,176 @@ export default function QC() {
                             {canCreate('qc_reports') && (<button className="btn-primary" style={{ marginTop: '1.5rem' }}>สร้างรายงานใหม่</button>)}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── Modal: ตรวจรับวัตถุดิบ (Incoming Inspection) ── */}
+            {inspectingIncoming && (
+                <div className="rnd-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setInspectingIncoming(null)}>
+                    <div className="rnd-modal" style={{ maxWidth: 560, borderTop: '4px solid var(--primary, #4f46e5)' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>
+                                    🔍 ตรวจรับวัตถุดิบ — {inspectingIncoming.item}
+                                </h2>
+                                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>
+                                    รหัสอ้างอิง: <span style={{ fontWeight: 600, color: '#2563eb' }}>{inspectingIncoming.requestId}</span> | Lot: {inspectingIncoming.lotNumber}
+                                </p>
+                            </div>
+                            <button onClick={() => setInspectingIncoming(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+                        </div>
+
+                        <div style={{ padding: '20px 24px' }}>
+                            <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 18 }}>
+                                <div style={{ fontSize: 13, color: '#475569', marginBottom: 4 }}>
+                                    <strong>ซัพพลายเออร์:</strong> {inspectingIncoming.supplier || '-'}
+                                </div>
+                                <div style={{ fontSize: 13, color: '#475569' }}>
+                                    <strong>ข้อมูลจาก PO:</strong> {inspectingIncoming.notes || '-'}
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>ผู้ตรวจสอบ (Inspector):</label>
+                                    <input 
+                                        type="text" 
+                                        style={fmtInput} 
+                                        value={incomingInspectForm.inspector} 
+                                        onChange={e => setIncomingInspectForm({ ...incomingInspectForm, inspector: e.target.value })} 
+                                        placeholder="ชื่อเจ้าหน้าที่ QC" 
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                                        {inspectingIncoming.notes?.includes('PO:') ? 'จำนวนรับเข้า (ตาม PO):' : 'จำนวนที่รับเข้าคลังจริง:'}
+                                    </label>
+                                    <input 
+                                        type={inspectingIncoming.notes?.includes('PO:') ? "text" : "number"} 
+                                        step="any" 
+                                        style={{ ...fmtInput, background: inspectingIncoming.notes?.includes('PO:') ? '#f1f5f9' : '#fff' }} 
+                                        value={incomingInspectForm.qty} 
+                                        onChange={e => setIncomingInspectForm({ ...incomingInspectForm, qty: e.target.value })} 
+                                        placeholder="จำนวนที่นับได้" 
+                                        readOnly={inspectingIncoming.notes?.includes('PO:')}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: 14 }}>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>บันทึกผลการตรวจ / หมายเหตุ:</label>
+                                <textarea 
+                                    rows={3} 
+                                    style={{ ...fmtInput, resize: 'vertical' }} 
+                                    value={incomingInspectForm.notes} 
+                                    onChange={e => setIncomingInspectForm({ ...incomingInspectForm, notes: e.target.value })} 
+                                    placeholder="ระบุสภาพของวัตถุดิบ ผลตรวจทางกายภาพ (สี, กลิ่น, สิ่งปนเปื้อน)..." 
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }}>
+                            <button className="btn-secondary" onClick={() => setInspectingIncoming(null)}>ยกเลิก</button>
+                            <div style={{ display: 'flex', gap: 10 }}>
+                                <button className="btn-danger" onClick={() => handleSubmitIncomingInspect('ไม่ผ่าน')}>
+                                    ❌ ตรวจไม่ผ่าน
+                                </button>
+                                <button className="btn-primary" onClick={() => handleSubmitIncomingInspect('ผ่าน')}>
+                                    ✅ ตรวจผ่าน & ส่งเข้าคลัง
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Modal: เพิ่มรายการตรวจรับวัตถุดิบด้วยตนเอง ── */}
+            {showAddIncomingModal && (
+                <div className="rnd-modal-overlay" style={{ zIndex: 1100 }} onClick={() => setShowAddIncomingModal(false)}>
+                    <div className="rnd-modal" style={{ maxWidth: 540, borderTop: '4px solid var(--primary, #4f46e5)' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ padding: '20px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>
+                                + บันทึกตรวจรับวัตถุดิบ (Incoming QC)
+                            </h2>
+                            <button onClick={() => setShowAddIncomingModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+                        </div>
+
+                        <div style={{ padding: '20px 24px' }}>
+                            <div style={{ marginBottom: 14 }}>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>ชื่อวัตถุดิบ / สินค้า *</label>
+                                <input 
+                                    type="text" 
+                                    style={fmtInput} 
+                                    placeholder="เช่น ใบมะกรูดอบแห้ง, แอลกอฮอล์ 95%" 
+                                    value={newIncomingForm.itemName} 
+                                    onChange={e => setNewIncomingForm({ ...newIncomingForm, itemName: e.target.value })} 
+                                />
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>ซัพพลายเออร์ (Supplier)</label>
+                                    <input 
+                                        type="text" 
+                                        style={fmtInput} 
+                                        placeholder="ชื่อบริษัท/ผู้ขาย" 
+                                        value={newIncomingForm.supplierName} 
+                                        onChange={e => setNewIncomingForm({ ...newIncomingForm, supplierName: e.target.value })} 
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Lot Number</label>
+                                    <input 
+                                        type="text" 
+                                        style={fmtInput} 
+                                        placeholder="เว้นว่างเพื่อสร้างอัตโนมัติ" 
+                                        value={newIncomingForm.lotNumber} 
+                                        onChange={e => setNewIncomingForm({ ...newIncomingForm, lotNumber: e.target.value })} 
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>จำนวน</label>
+                                    <input 
+                                        type="number" 
+                                        step="any" 
+                                        style={fmtInput} 
+                                        placeholder="1" 
+                                        value={newIncomingForm.qty} 
+                                        onChange={e => setNewIncomingForm({ ...newIncomingForm, qty: e.target.value })} 
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>หน่วย</label>
+                                    <input 
+                                        type="text" 
+                                        style={fmtInput} 
+                                        placeholder="เช่น กก., ลิตร, ถุง" 
+                                        value={newIncomingForm.unit} 
+                                        onChange={e => setNewIncomingForm({ ...newIncomingForm, unit: e.target.value })} 
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: 14 }}>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>หมายเหตุ / รายละเอียดเพิ่มเติม</label>
+                                <textarea 
+                                    rows={2} 
+                                    style={{ ...fmtInput, resize: 'vertical' }} 
+                                    placeholder="เช่น เลขที่เอกสารอ้างอิง, ผลการตรวจเบื้องต้น" 
+                                    value={newIncomingForm.notes} 
+                                    onChange={e => setNewIncomingForm({ ...newIncomingForm, notes: e.target.value })} 
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ padding: '16px 24px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 10, background: '#f8fafc', borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }}>
+                            <button className="btn-secondary" onClick={() => setShowAddIncomingModal(false)}>ยกเลิก</button>
+                            <button className="btn-primary" onClick={handleSaveNewIncoming}>บันทึกรายการ</button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

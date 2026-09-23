@@ -59,6 +59,7 @@ const deliveryOrderRoutes = require('./routes/deliveryOrders');
 const receiptRoutes = require('./routes/receipts');
 const salesOrderRoutes = require('./routes/sales-orders');
 const purchaseOrderRoutes = require('./routes/purchase-orders');
+const purchaseRequisitionRoutes = require('./routes/purchase-requisitions');
 const supplierRoutes = require('./routes/suppliers');
 const accountsRoutes = require('./routes/accounts');
 const auditLogRoutes = require('./routes/audit-logs');
@@ -73,6 +74,7 @@ const labelingRoutes = require('./routes/labeling');
 const chequeFormRoutes = require('./routes/chequeForms');
 const eliteTaxInvoiceRoutes = require('./routes/eliteTaxInvoices');
 const eliteReceiptRoutes = require('./routes/eliteReceipts');
+const eliteBookingOrderRoutes = require('./routes/eliteBookingOrders');
 
 app.use('/api/auth', authRoutes);
 
@@ -112,9 +114,11 @@ app.use('/api/delivery-orders', deliveryOrderRoutes);
 app.use('/api/receipts', receiptRoutes);
 app.use('/api/sales-orders', salesOrderRoutes);
 app.use('/api/purchase-orders', purchaseOrderRoutes);
+app.use('/api/purchase-requisitions', purchaseRequisitionRoutes);
 app.use('/api/cheque-forms', chequeFormRoutes);
 app.use('/api/elite-tax-invoices', eliteTaxInvoiceRoutes);
 app.use('/api/elite-receipts', eliteReceiptRoutes);
+app.use('/api/elite-booking-orders', eliteBookingOrderRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/accounts', accountsRoutes);
 app.use('/api/audit-logs', auditLogRoutes);

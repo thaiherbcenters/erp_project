@@ -16,26 +16,28 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
+import { useSignatures } from '../hooks/useSignatures';
 import API_BASE from '../config';
-import { MOCK_PR, MOCK_RECV } from '../data/mockData';
-import { Search, Plus, Eye, Edit, Trash2, Building2, X, Clock, Printer, FileText } from 'lucide-react';
+import { Search, Plus, Eye, Edit, Trash2, Building2, X, Clock, Printer, FileText, CheckCircle, ShoppingBag, Package } from 'lucide-react';
 import PurchaseOrderForm from '../components/PurchaseOrderForm';
+import PurchaseRequisitionDoc from '../components/PurchaseRequisitionDoc';
 import CustomSelect from '../components/CustomSelect';
 import PaginationControl from '../components/PaginationControl';
 import { FilterToggleButton, ProcurementPOFilterDrawer } from '../components/SalesDocFilter';
 import './PageCommon.css';
 
 export default function Procurement() {
-    const { hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate, canUpdate, canDelete } = useAuth();
+    const { currentUser, hasSubPermission, hasSectionPermission, getVisibleSubPages, canCreate, canUpdate, canDelete } = useAuth();
+    const { signatures, userSignatures } = useSignatures();
     const { showAlert, showConfirm } = useAlert();
     const visibleSubPages = getVisibleSubPages('procurement');
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || visibleSubPages[0]?.id || 'procurement_dashboard';
 
     // ── State: ค้นหาแยกตาม tab ──
     const [prSearch, setPrSearch] = useState('');
+    const [prStatusFilter, setPrStatusFilter] = useState('ทั้งหมด');
     const [poSearch, setPoSearch] = useState('');
-    const [recvSearch, setRecvSearch] = useState('');
     const [supplierSearch, setSupplierSearch] = useState('');
     const [supplierStatusFilter, setSupplierStatusFilter] = useState('ทั้งหมด');
 
@@ -67,6 +69,16 @@ export default function Procurement() {
     const [editingPOId, setEditingPOId] = useState(null);
     const [viewOnlyPO, setViewOnlyPO] = useState(false);
     const [previewPOId, setPreviewPOId] = useState(null);
+    const [creatingPOFromPR, setCreatingPOFromPR] = useState(null);
+
+    const handleCreatePOFromPR = (pr) => {
+        setCreatingPOFromPR(pr);
+        setEditingPOId(null);
+        setViewOnlyPO(false);
+        setSearchParams({ tab: 'procurement_po' });
+        setShowPOForm(true);
+    };
+
     const [showPOHistoryModal, setShowPOHistoryModal] = useState(false);
     const [poHistoryList, setPoHistoryList] = useState([]);
     const [loadingPOHistory, setLoadingPOHistory] = useState(false);
@@ -91,6 +103,204 @@ export default function Procurement() {
             setPoHistoryList([]);
         } finally {
             setLoadingPOHistory(false);
+        }
+    };
+
+    // ── State: ใบขอซื้อ (PR) จริงจาก Database ──
+    const [prList, setPrList] = useState([]);
+    const [loadingPR, setLoadingPR] = useState(false);
+    const [viewingPR, setViewingPR] = useState(null);
+    const [showCreatePRModal, setShowCreatePRModal] = useState(false);
+    const [prForm, setPrForm] = useState({
+        department: 'ฝ่ายจัดซื้อ',
+        notes: '',
+        items: [{ itemName: '', itemCode: '', requestQty: 1, unit: 'กก.', estimatedPrice: 0 }]
+    });
+    const [savingPR, setSavingPR] = useState(false);
+
+    // ── ฟังก์ชันโหลดรายการ PR จาก API ──
+    const fetchPurchaseRequisitions = useCallback(async () => {
+        setLoadingPR(true);
+        try {
+            const token = localStorage.getItem('token');
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            const params = new URLSearchParams();
+            if (prSearch.trim()) params.append('search', prSearch.trim());
+
+            const res = await fetch(`${API_BASE}/purchase-requisitions?${params.toString()}`, { headers, credentials: 'omit' });
+            const data = await res.json();
+            if (data.success) {
+                setPrList(data.data || []);
+            }
+        } catch (err) {
+            console.error('Error fetching PRs:', err);
+        } finally {
+            setLoadingPR(false);
+        }
+    }, [prSearch]);
+
+    useEffect(() => {
+        if (activeTab === 'procurement_pr' || activeTab === 'procurement_dashboard') {
+            const timer = setTimeout(() => {
+                fetchPurchaseRequisitions();
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [activeTab, prSearch, fetchPurchaseRequisitions]);
+
+    const handleUpdatePRStatus = async (prId, newStatus) => {
+        try {
+            const token = localStorage.getItem('token');
+
+            let purchaserName = null;
+            let purchaserSigPath = null;
+            if (newStatus === 'อนุมัติแล้ว' || newStatus === 'สั่งซื้อแล้ว') {
+                // Find matching user signature
+                const mySig = (userSignatures && userSignatures.length > 0)
+                    ? userSignatures[0]
+                    : signatures?.find(s => (s.user_id && s.user_id == currentUser?.id) || (s.FullName && s.FullName === (currentUser?.name || currentUser?.displayName)));
+                purchaserName = mySig?.FullName || currentUser?.name || currentUser?.displayName || currentUser?.username || 'เจ้าหน้าที่ฝ่ายจัดซื้อ';
+                purchaserSigPath = mySig?.ImagePath || null;
+            }
+
+            const res = await fetch(`${API_BASE}/purchase-requisitions/${prId}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ 
+                    status: newStatus,
+                    purchaser: (newStatus === 'อนุมัติแล้ว' || newStatus === 'สั่งซื้อแล้ว') ? purchaserName : null,
+                    purchaserSignature: (newStatus === 'อนุมัติแล้ว' || newStatus === 'สั่งซื้อแล้ว') ? purchaserSigPath : null
+                }),
+                credentials: 'omit'
+            });
+            const result = await res.json();
+            if (result.success) {
+                showAlert('สำเร็จ', `อัปเดตสถานะ PR เป็น "${newStatus}" เรียบร้อยแล้ว`, 'success');
+                const finalPurchaser = (newStatus === 'รอจัดซื้อ') ? null : (result.purchaser || purchaserName);
+                const finalSig = (newStatus === 'รอจัดซื้อ') ? null : (result.purchaserSignature || purchaserSigPath);
+                const finalPurchasedAt = (newStatus === 'รอจัดซื้อ') ? null : (result.purchasedAt || new Date().toISOString());
+
+                setPrList(prev => prev.map(item => (item.id === prId || item.prNumber === prId) ? { 
+                    ...item, 
+                    status: newStatus,
+                    purchaser: finalPurchaser,
+                    purchaserSignature: finalSig,
+                    purchasedAt: finalPurchasedAt
+                } : item));
+
+                if (viewingPR && (viewingPR.id === prId || viewingPR.prNumber === prId)) {
+                    setViewingPR(prev => ({ 
+                        ...prev, 
+                        status: newStatus,
+                        purchaser: finalPurchaser,
+                        purchaserSignature: finalSig,
+                        purchasedAt: finalPurchasedAt
+                    }));
+                }
+            } else {
+                showAlert('ข้อผิดพลาด', result.message || 'ไม่สามารถเปลี่ยนสถานะได้', 'error');
+            }
+        } catch (err) {
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        }
+    };
+
+    const handleDeletePR = async (prId, prNumber) => {
+        const confirmed = await showConfirm(
+            'ยืนยันการยกเลิกใบขอซื้อ',
+            `คุณแน่ใจหรือไม่ว่าต้องการยกเลิกใบขอซื้อ "${prNumber}"?`,
+            'warning'
+        );
+        if (!confirmed) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/purchase-requisitions/${prId}`, {
+                method: 'DELETE',
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                credentials: 'omit'
+            });
+            const result = await res.json();
+            if (result.success) {
+                showAlert('สำเร็จ', `ยกเลิกใบขอซื้อ ${prNumber} เรียบร้อยแล้ว`, 'success');
+                fetchPurchaseRequisitions();
+                if (viewingPR && (viewingPR.id === prId || viewingPR.prNumber === prId)) {
+                    setViewingPR(null);
+                }
+            } else {
+                showAlert('ข้อผิดพลาด', result.message || 'ไม่สามารถยกเลิกได้', 'error');
+            }
+        } catch (err) {
+            showAlert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์', 'error');
+        }
+    };
+
+    const handleSaveManualPR = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        const validItems = prForm.items.filter(it => it.itemName && it.itemName.trim());
+        if (validItems.length === 0) {
+            showAlert('กรุณากรอกข้อมูล', 'กรุณาระบุรายการสินค้า/วัตถุดิบอย่างน้อย 1 รายการ', 'warning');
+            return;
+        }
+
+        setSavingPR(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE}/purchase-requisitions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({
+                    department: prForm.department || 'ฝ่ายจัดซื้อ',
+                    notes: prForm.notes,
+                    items: validItems.map(it => ({
+                        itemName: it.itemName.trim(),
+                        itemCode: it.itemCode || '',
+                        requestQty: Number(it.requestQty) || 1,
+                        unit: it.unit || 'กก.',
+                        estimatedPrice: Number(it.estimatedPrice) || 0
+                    })),
+                    estimatedTotal: validItems.reduce((sum, it) => sum + ((Number(it.requestQty) || 0) * (Number(it.estimatedPrice) || 0)), 0)
+                }),
+                credentials: 'omit'
+            });
+            const json = await res.json();
+            if (json.success) {
+                showAlert('สำเร็จ', json.message || 'สร้างใบขอซื้อ (PR) เรียบร้อยแล้ว', 'success');
+                setShowCreatePRModal(false);
+                setPrForm({
+                    department: 'ฝ่ายจัดซื้อ',
+                    notes: '',
+                    items: [{ itemName: '', itemCode: '', requestQty: 1, unit: 'กก.', estimatedPrice: 0 }]
+                });
+                await fetchPurchaseRequisitions();
+                if (json.prNumber) {
+                    try {
+                        const token = localStorage.getItem('token');
+                        const resDet = await fetch(`${API_BASE}/purchase-requisitions/${json.prNumber}`, {
+                            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                        });
+                        const detJson = await resDet.json();
+                        if (detJson.success && detJson.data) {
+                            setViewingPR(detJson.data);
+                        }
+                    } catch (e) {
+                        console.error('Error opening created PR:', e);
+                    }
+                }
+            } else {
+                throw new Error(json.message || 'สร้างไม่สำเร็จ');
+            }
+        } catch (err) {
+            console.error('Error creating PR:', err);
+            showAlert('เกิดข้อผิดพลาด', err.message || 'ไม่สามารถสร้างใบขอซื้อได้', 'error');
+        } finally {
+            setSavingPR(false);
         }
     };
 
@@ -409,9 +619,6 @@ export default function Procurement() {
     const PO_STATUS_OPTIONS = [
         { value: 'รออนุมัติ', label: 'รออนุมัติ' },
         { value: 'อนุมัติแล้ว', label: 'อนุมัติแล้ว' },
-        { value: 'สั่งซื้อแล้ว', label: 'สั่งซื้อแล้ว' },
-        { value: 'รอเตรียมจัดส่ง', label: 'รอเตรียมจัดส่ง' },
-        { value: 'กำลังจัดส่ง', label: 'กำลังจัดส่ง' },
         { value: 'รับสินค้าแล้ว', label: 'รับสินค้าแล้ว' },
         { value: 'ยกเลิก', label: 'ยกเลิก' },
     ];
@@ -420,12 +627,8 @@ export default function Procurement() {
         switch (status) {
             case 'อนุมัติแล้ว':
             case 'รับสินค้าแล้ว': return 'badge-success';
-            case 'สั่งซื้อแล้ว':
-            case 'กำลังจัดส่ง': return 'badge-info';
-            case 'รออนุมัติ':
-            case 'รอเตรียมจัดส่ง': return 'badge-warning';
-            case 'ยกเลิก':
-            case 'ไม่อนุมัติ': return 'badge-danger';
+            case 'รออนุมัติ': return 'badge-warning';
+            case 'ยกเลิก': return 'badge-danger';
             default: return 'badge-neutral';
         }
     };
@@ -435,14 +638,9 @@ export default function Procurement() {
             case 'อนุมัติแล้ว':
             case 'รับสินค้าแล้ว':
                 return { background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' };
-            case 'สั่งซื้อแล้ว':
-            case 'กำลังจัดส่ง':
-                return { background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' };
             case 'รออนุมัติ':
-            case 'รอเตรียมจัดส่ง':
                 return { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' };
             case 'ยกเลิก':
-            case 'ไม่อนุมัติ':
                 return { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' };
             default:
                 return { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' };
@@ -463,7 +661,11 @@ export default function Procurement() {
             });
             const result = await res.json();
             if (result.success) {
-                showAlert('สำเร็จ', `อัปเดตสถานะเป็น "${newStatus}" เรียบร้อยแล้ว`, 'success');
+                if (newStatus === 'รับสินค้าแล้ว') {
+                    showAlert('สำเร็จ', result.message || 'อัปเดตสถานะเป็น "รับสินค้าแล้ว" เรียบร้อยแล้ว ระบบได้ส่งรายการเข้าฝ่าย QC เพื่อ "ตรวจรับวัตถุดิบ (Incoming QC)" ก่อนส่งเข้าคลัง', 'success');
+                } else {
+                    showAlert('สำเร็จ', `อัปเดตสถานะเป็น "${newStatus}" เรียบร้อยแล้ว`, 'success');
+                }
                 setPoList(prev => prev.map(item => (item.PurchaseOrderID === poId || item.POID === poId) ? { ...item, Status: newStatus } : item));
             } else {
                 showAlert('ข้อผิดพลาด', result.message || 'ไม่สามารถเปลี่ยนสถานะได้', 'error');
@@ -504,42 +706,93 @@ export default function Procurement() {
     const totalOrderedAmount = poList.length > 0 
         ? poList.reduce((sum, po) => sum + (Number(po.TotalPayable) || Number(po.NetPayable) || Number(po.GrandTotal) || 0), 0)
         : 0;
-    const totalPRs = MOCK_PR.length;
+
+    const allPRs = prList;
+
+    const totalPRs = allPRs.length;
+    const pendingPRCards = useMemo(() => allPRs.filter(p => p.status === 'รอจัดซื้อ' || p.status === 'รออนุมัติ'), [allPRs]);
+    const pendingPRCount = pendingPRCards.length;
+    const approvedPRCount = useMemo(() => allPRs.filter(p => p.status === 'อนุมัติแล้ว').length, [allPRs]);
+    const orderedPRCount = useMemo(() => allPRs.filter(p => p.status === 'สั่งซื้อแล้ว').length, [allPRs]);
+
     const totalPOs = poList.length;
-    const completedReceives = MOCK_RECV.filter(r => r.status === 'ครบถ้วน').length;
+    const completedReceives = useMemo(() => poList.filter(p => p.Status === 'รับสินค้าแล้ว').length, [poList]);
 
     // ── กรองข้อมูลแต่ละ tab ──
-    const filteredPR = MOCK_PR.filter((pr) =>
-        pr.number.toLowerCase().includes(prSearch.toLowerCase()) ||
-        pr.item.toLowerCase().includes(prSearch.toLowerCase()) ||
-        pr.requestor.toLowerCase().includes(prSearch.toLowerCase())
-    );
+    const filteredPR = useMemo(() => {
+        return allPRs.filter((pr) => {
+            // กรองสถานะจากการ์ด
+            if (prStatusFilter !== 'ทั้งหมด') {
+                if (prStatusFilter === 'รอจัดซื้อ') {
+                    if (pr.status !== 'รอจัดซื้อ' && pr.status !== 'รออนุมัติ') return false;
+                } else if (pr.status !== prStatusFilter) {
+                    return false;
+                }
+            }
 
-    const filteredRecv = MOCK_RECV.filter((r) =>
-        r.number.toLowerCase().includes(recvSearch.toLowerCase()) ||
-        r.poNumber.toLowerCase().includes(recvSearch.toLowerCase()) ||
-        r.supplier.toLowerCase().includes(recvSearch.toLowerCase())
-    );
+            if (!prSearch.trim()) return true;
+            const term = prSearch.toLowerCase();
+            const prNum = (pr.prNumber || pr.number || '').toLowerCase();
+            const req = (pr.requestor || '').toLowerCase();
+            const dept = (pr.department || '').toLowerCase();
+            const task = (pr.taskId || '').toLowerCase();
+            const formula = (pr.formulaName || '').toLowerCase();
+            const notes = (pr.notes || '').toLowerCase();
+            const itemNames = (pr.items || []).map(i => (i.itemName || i.name || i.item || '').toLowerCase()).join(' ');
+            return prNum.includes(term) || req.includes(term) || dept.includes(term) || task.includes(term) || formula.includes(term) || notes.includes(term) || itemNames.includes(term);
+        });
+    }, [allPRs, prSearch, prStatusFilter]);
 
     // ── Badge class helpers ──
     const getPRStatusClass = (status) => {
         switch (status) {
             case 'อนุมัติแล้ว': return 'badge-success';
             case 'สั่งซื้อแล้ว': return 'badge-info';
+            case 'รอจัดซื้อ':
             case 'รออนุมัติ': return 'badge-warning';
+            case 'ยกเลิก':
             case 'ไม่อนุมัติ': return 'badge-danger';
             default: return 'badge-neutral';
         }
     };
 
-    const getRecvStatusClass = (status) => {
+    const getPRStatusStyle = (status) => {
         switch (status) {
-            case 'ครบถ้วน': return 'badge-success';
-            case 'ไม่ครบ': return 'badge-warning';
-            case 'ตีกลับ': return 'badge-danger';
-            default: return 'badge-neutral';
+            case 'อนุมัติแล้ว':
+                return { background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' };
+            case 'สั่งซื้อแล้ว':
+                return { background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' };
+            case 'รอจัดซื้อ':
+            case 'รออนุมัติ':
+                return { background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a' };
+            case 'ยกเลิก':
+            case 'ไม่อนุมัติ':
+                return { background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca' };
+            default:
+                return { background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0' };
         }
     };
+
+    const PR_STATUS_OPTIONS = [
+        { value: 'รอจัดซื้อ', label: 'รอจัดซื้อ' },
+        { value: 'รออนุมัติ', label: 'รออนุมัติ' },
+        { value: 'อนุมัติแล้ว', label: 'อนุมัติแล้ว' },
+        { value: 'สั่งซื้อแล้ว', label: 'สั่งซื้อแล้ว' },
+        { value: 'ยกเลิก', label: 'ยกเลิก' },
+    ];
+
+    // ── Pagination State for PR ──
+    const [prPage, setPrPage] = useState(1);
+    const [prPageSize, setPrPageSize] = useState(10);
+
+    useEffect(() => {
+        setPrPage(1);
+    }, [prSearch, prStatusFilter, prPageSize]);
+
+    const paginatedPRs = useMemo(() => {
+        const start = (prPage - 1) * prPageSize;
+        return filteredPR.slice(start, start + prPageSize);
+    }, [filteredPR, prPage, prPageSize]);
 
     // ── กำหนดชื่อหน้าตาม Tab ที่เลือก ──
     const getPageTitle = () => {
@@ -547,7 +800,6 @@ export default function Procurement() {
             case 'procurement_dashboard': return 'ภาพรวมจัดซื้อ';
             case 'procurement_pr': return 'ใบขอซื้อ (PR)';
             case 'procurement_po': return 'ใบสั่งซื้อ (PO)';
-            case 'procurement_recv': return 'รับสินค้าเข้าคลัง';
             case 'procurement_supplier': return 'ทะเบียนผู้ขาย (Suppliers)';
             default: return 'จัดซื้อ (Procurement)';
         }
@@ -555,12 +807,11 @@ export default function Procurement() {
 
     const getPageDesc = () => {
         switch (activeTab) {
-            case 'procurement_dashboard': return 'ภาพรวมยอดสั่งซื้อ จำนวน PR/PO และการรับสินค้า';
+            case 'procurement_dashboard': return 'ภาพรวมยอดสั่งซื้อ และจำนวน PR/PO';
             case 'procurement_pr': return 'จัดการคำขอซื้อสินค้าหรือวัตถุดิบ (Purchase Requisition)';
             case 'procurement_po': return 'จัดการใบสั่งซื้อสินค้าและบริการ (Purchase Order)';
-            case 'procurement_recv': return 'บันทึกรายการรับสินค้าเข้าคลังจากซัพพลายเออร์';
             case 'procurement_supplier': return 'จัดการข้อมูลรายชื่อผู้ขาย ซัพพลายเออร์ และเงื่อนไขการค้า';
-            default: return 'จัดการคำขอซื้อ สั่งซื้อ และรับสินค้า';
+            default: return 'จัดการคำขอซื้อ สั่งซื้อ และทะเบียนผู้ขาย';
         }
     };
 
@@ -599,7 +850,7 @@ export default function Procurement() {
                             <div className="summary-card card">
                                 <div className="summary-icon">📦</div>
                                 <div>
-                                    <span className="summary-label">รับสินค้า (ครบถ้วน)</span>
+                                    <span className="summary-label">รับสินค้าแล้ว (PO)</span>
                                     <span className="summary-value">{completedReceives} รายการ</span>
                                 </div>
                             </div>
@@ -611,60 +862,460 @@ export default function Procurement() {
             {/* ── Tab: PR (Purchase Requisition) ── */}
             {(activeTab === 'procurement_pr' && hasSubPermission('procurement_pr')) && (
                 <div className="subpage-content" key="procurement_pr">
+                    {/* ── ส่วนการ์ดใบงานคำขอซื้อที่รอจัดซื้อ (Pending Purchase Requisition Job Cards) ── */}
+                    <div style={{ marginBottom: 32 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <Package size={20} color="#f59e0b" /> รายการคำขอซื้อที่รอจัดซื้อ ({pendingPRCards.length})
+                            </h3>
+                            <span style={{ fontSize: 13, color: '#64748b' }}>
+                                รายการที่ส่งมาจากคลังสินค้า หรือแผนกต่าง ๆ เพื่อรอการจัดซื้อ
+                            </span>
+                        </div>
+
+                        {loadingPR ? (
+                            <div style={{ padding: 36, textAlign: 'center', color: '#64748b' }}>กำลังโหลดข้อมูลใบขอซื้อ...</div>
+                        ) : pendingPRCards.length === 0 ? (
+                            <div style={{ 
+                                padding: '36px 20px', 
+                                textAlign: 'center', 
+                                background: '#f8fafc', 
+                                borderRadius: 12, 
+                                border: '1px dashed #cbd5e1', 
+                                color: '#64748b' 
+                            }}>
+                                <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                                <div style={{ fontSize: 15, fontWeight: 600, color: '#334155', marginBottom: 4 }}>
+                                    ไม่มีรายการคำขอซื้อใหม่ที่รอจัดซื้อ
+                                </div>
+                                <div style={{ fontSize: 13, color: '#94a3b8' }}>
+                                    เมื่อฝ่ายคลังสินค้ากดปุ่ม "ส่งใบขอซื้อ (PR)" หรือมีแผนกส่งคำขอเข้ามา การ์ดใบงานจะปรากฏที่นี่
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+                                {pendingPRCards.map(pr => (
+                                    <div 
+                                        key={pr.id || pr.prNumber} 
+                                        style={{ 
+                                            background: '#fff', 
+                                            borderRadius: 12, 
+                                            border: '1px solid #e2e8f0', 
+                                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', 
+                                            overflow: 'hidden', 
+                                            display: 'flex', 
+                                            flexDirection: 'column' 
+                                        }}
+                                    >
+                                        {/* Card Header */}
+                                        <div style={{ 
+                                            padding: '12px 16px', 
+                                            borderBottom: '1px solid #f1f5f9', 
+                                            background: '#f8fafc', 
+                                            display: 'flex', 
+                                            justifyContent: 'space-between', 
+                                            alignItems: 'center' 
+                                        }}>
+                                            <div>
+                                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 15 }}>{pr.prNumber}</div>
+                                                <div style={{ fontSize: 12, color: '#64748b' }}>วันที่: {pr.date || (pr.requestDate ? new Date(pr.requestDate).toLocaleDateString('th-TH') : '-')}</div>
+                                            </div>
+                                            <span style={{ 
+                                                fontSize: 12, 
+                                                padding: '4px 10px', 
+                                                borderRadius: 12, 
+                                                background: '#fef3c7', 
+                                                color: '#b45309', 
+                                                fontWeight: 600,
+                                                border: '1px solid #fde68a'
+                                            }}>
+                                                {pr.status || 'รอจัดซื้อ'}
+                                            </span>
+                                        </div>
+
+                                        {/* Card Body */}
+                                        <div style={{ padding: 16, flex: 1 }}>
+                                            {pr.formulaName && (
+                                                <div style={{ fontSize: 14, color: '#475569', marginBottom: 4 }}>
+                                                    สูตร: <strong style={{ color: '#0f172a' }}>{pr.formulaName}</strong>
+                                                </div>
+                                            )}
+                                            {pr.taskId && (
+                                                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 8 }}>
+                                                    อ้างอิงงานผลิต: <strong style={{ color: '#4338ca' }}>{pr.taskId}</strong>
+                                                </div>
+                                            )}
+                                            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>
+                                                ผู้ขอ: <span style={{ color: '#334155', fontWeight: 500 }}>{pr.requestor || '-'}</span> 
+                                                <span style={{ color: '#cbd5e1', margin: '0 6px' }}>|</span> 
+                                                แผนก: <span style={{ color: '#334155', fontWeight: 500 }}>{pr.department || '-'}</span>
+                                            </div>
+
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                                                <span>รายการที่ขอซื้อ:</span>
+                                                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>{(pr.items || []).length} รายการ</span>
+                                            </div>
+
+                                            <div style={{ background: '#f8fafc', borderRadius: 8, border: '1px solid #f1f5f9', padding: 8, maxHeight: 150, overflowY: 'auto' }}>
+                                                {(pr.items && pr.items.length > 0) ? (
+                                                    <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                                                        <tbody>
+                                                            {pr.items.map((it, idx) => (
+                                                                <tr key={idx} style={{ borderBottom: idx < pr.items.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                                                                    <td style={{ padding: '6px 4px', color: '#334155', fontWeight: 500 }}>
+                                                                        {it.itemName || it.item || it.name}
+                                                                        {it.currentStock !== undefined && (
+                                                                            <span style={{ marginLeft: 6, fontSize: 11, color: '#dc2626', background: '#fef2f2', padding: '1px 5px', borderRadius: 4, fontWeight: 600 }}>
+                                                                                คงเหลือ: {it.currentStock}
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 600, color: '#0369a1', whiteSpace: 'nowrap' }}>
+                                                                        {(Number(it.requestQty) || Number(it.qty) || Number(it.deductQty) || 0).toLocaleString()} {it.unit || 'กก.'}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                ) : (
+                                                    <div style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', padding: '8px 0' }}>ไม่มีรายการสินค้า</div>
+                                                )}
+                                            </div>
+
+                                            {pr.notes && (
+                                                <div style={{ fontSize: 12, color: '#64748b', marginTop: 10, background: '#fffbeb', padding: '6px 10px', borderRadius: 6, border: '1px solid #fef3c7' }}>
+                                                    <span style={{ fontWeight: 600, color: '#92400e' }}>หมายเหตุ: </span>{pr.notes}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Card Footer Actions */}
+                                        <div style={{ padding: 12, borderTop: '1px solid #f1f5f9', background: '#fff', display: 'flex', gap: 8, flexDirection: 'column' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setViewingPR(pr)}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '8px 12px',
+                                                    background: '#ffffff',
+                                                    color: '#334155',
+                                                    border: '1px solid #cbd5e1',
+                                                    borderRadius: 8,
+                                                    fontSize: 13,
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: 6
+                                                }}
+                                            >
+                                                <Eye size={15} /> ดูรายละเอียดใบขอซื้อ
+                                            </button>
+
+                                            {canCreate('procurement_po') && pr.status !== 'ยกเลิก' && pr.status !== 'สั่งซื้อแล้ว' && !pr.poNumber && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCreatePOFromPR(pr)}
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '8px 12px',
+                                                        background: '#059669',
+                                                        color: '#ffffff',
+                                                        border: 'none',
+                                                        borderRadius: 8,
+                                                        fontSize: 12.5,
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: 6,
+                                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                                                    }}
+                                                >
+                                                    <ShoppingBag size={14} /> เปิดใบสั่งซื้อ (PO) จากใบนี้
+                                                </button>
+                                            )}
+
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                {canUpdate('procurement_pr') && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUpdatePRStatus(pr.id || pr.prNumber, 'อนุมัติแล้ว')}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '8px 10px',
+                                                            background: '#ecfdf5',
+                                                            color: '#065f46',
+                                                            border: '1px solid #a7f3d0',
+                                                            borderRadius: 8,
+                                                            fontSize: 12,
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: 4
+                                                        }}
+                                                    >
+                                                        <CheckCircle size={14} /> อนุมัติแล้ว
+                                                    </button>
+                                                )}
+
+                                                {canUpdate('procurement_pr') && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleUpdatePRStatus(pr.id || pr.prNumber, 'สั่งซื้อแล้ว')}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: '8px 10px',
+                                                            background: '#eff6ff',
+                                                            color: '#1d4ed8',
+                                                            border: '1px solid #bfdbfe',
+                                                            borderRadius: 8,
+                                                            fontSize: 12,
+                                                            fontWeight: 600,
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            gap: 4
+                                                        }}
+                                                    >
+                                                        <ShoppingBag size={14} /> สั่งซื้อแล้ว
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── ส่วนตารางด้านล่าง: ประวัติและรายการใบขอซื้อทั้งหมด ── */}
+                    <div style={{ borderTop: '2px dashed #e2e8f0', paddingTop: 24, marginTop: 16 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                            <h3 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <FileText size={18} color="#3b82f6" /> ประวัติและรายการใบขอซื้อทั้งหมด
+                            </h3>
+                        </div>
+
                     {hasSectionPermission('procurement_pr_search') && (
                         <div className="toolbar">
-                            <div className="search-group">
-                                <div className="search-input-wrap">
-                                    <Search size={16} />
-                                    <input
-                                        type="text"
-                                        placeholder="พิมพ์เลขที่ PR, รายการ หรือผู้ขอ..."
-                                        value={prSearch}
-                                        onChange={(e) => setPrSearch(e.target.value)}
-                                    />
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <div className="search-group">
+                                    <div className="search-input-wrap">
+                                        <Search size={16} />
+                                        <input
+                                            type="text"
+                                            placeholder="พิมพ์เลขที่ PR, รายการ, งานผลิต หรือผู้ขอ..."
+                                            value={prSearch}
+                                            onChange={(e) => setPrSearch(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') fetchPurchaseRequisitions();
+                                            }}
+                                        />
+                                    </div>
+                                    <button className="search-btn" onClick={fetchPurchaseRequisitions}>ค้นหา</button>
                                 </div>
-                                <button className="search-btn">ค้นหา</button>
+
+                                {prStatusFilter !== 'ทั้งหมด' && (
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        background: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        border: '1px solid #bfdbfe',
+                                        padding: '4px 10px',
+                                        borderRadius: 20,
+                                        fontSize: 12,
+                                        fontWeight: 500
+                                    }}>
+                                        <span>สถานะ: <strong>{prStatusFilter}</strong></span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setPrStatusFilter('ทั้งหมด')}
+                                            style={{
+                                                border: 'none',
+                                                background: 'transparent',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                padding: 0,
+                                                color: '#1d4ed8'
+                                            }}
+                                            title="ล้างตัวกรองสถานะ"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             {canCreate('procurement_pr') && (
-                                <button className="btn-primary">+ สร้างใบขอซื้อ (PR)</button>
+                                <button 
+                                    className="btn-primary" 
+                                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                                    onClick={() => setShowCreatePRModal(true)}
+                                >
+                                    <Plus size={16} /> สร้างใบขอซื้อ (PR)
+                                </button>
                             )}
                         </div>
                     )}
 
                     {hasSectionPermission('procurement_pr_table') && (
                         <div className="table-card card">
-                            <table className="data-table">
+                            <table className="data-table" style={{ minWidth: '880px' }}>
                                 <thead>
                                     <tr>
+                                        <th style={{ width: '50px', textAlign: 'center' }}>ลำดับ</th>
                                         <th>เลขที่ PR</th>
-                                        <th>ผู้ขอ / แผนก</th>
-                                        <th>รายการ</th>
-                                        <th>จำนวน</th>
-                                        <th>ราคาประเมิน</th>
                                         <th>วันที่ขอ</th>
+                                        <th>ผู้ขอ / แผนก</th>
+                                        <th>งานผลิต / อ้างอิง</th>
+                                        <th style={{ textAlign: 'right' }}>จำนวนรวม</th>
+                                        <th style={{ textAlign: 'right' }}>ยอดประเมิน (บาท)</th>
                                         <th>สถานะ</th>
+                                        <th style={{ textAlign: 'center', width: '100px' }}>จัดการ</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredPR.map((pr) => (
-                                        <tr key={pr.id}>
-                                            <td className="text-bold">{pr.number}</td>
-                                            <td>{pr.requestor} <br /><small className="text-muted">{pr.department}</small></td>
-                                            <td>{pr.item}</td>
-                                            <td>{pr.qty}</td>
-                                            <td>฿{pr.estimatedPrice.toLocaleString()}</td>
-                                            <td>{pr.date}</td>
-                                            <td>
-                                                <span className={`badge ${getPRStatusClass(pr.status)}`}>
-                                                    {pr.status}
-                                                </span>
+                                    {loadingPR ? (
+                                        <tr>
+                                            <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                                                กำลังโหลดข้อมูลใบขอซื้อ...
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) : filteredPR.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="9" style={{ textAlign: 'center', padding: '36px', color: '#64748b' }}>
+                                                ไม่มีข้อมูลใบขอซื้อ {prSearch ? '(ที่ตรงกับเงื่อนไขการค้นหา)' : ''}
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        paginatedPRs.map((pr, idx) => {
+                                            const prNum = pr.prNumber || pr.number;
+                                            const prId = pr.id || prNum;
+                                            const totalQty = (pr.items || []).reduce((s, i) => s + (Number(i.requestQty) || 0), 0);
+                                            const docDate = pr.date || (pr.createdAt ? new Date(pr.createdAt).toLocaleDateString('th-TH') : '-');
+                                            const estimatedTotal = Number(pr.estimatedPrice || pr.estimatedTotal || 0);
+
+                                            return (
+                                                <tr key={prId || idx}>
+                                                    <td style={{ textAlign: 'center' }}>{(prPage - 1) * prPageSize + idx + 1}</td>
+                                                    <td 
+                                                        className="text-bold" 
+                                                        style={{ color: '#2563eb', cursor: 'pointer' }}
+                                                        onClick={() => setViewingPR(pr)}
+                                                        title="คลิกเพื่อดูเอกสารใบขอซื้อ"
+                                                    >
+                                                        {prNum}
+                                                    </td>
+                                                    <td>{docDate}</td>
+                                                    <td>
+                                                        <span style={{ fontWeight: 600, color: '#1e293b' }}>{pr.requestor || '-'}</span>
+                                                        {pr.department && <small className="text-muted" style={{ display: 'block', fontSize: '11px' }}>{pr.department}</small>}
+                                                    </td>
+                                                    <td>
+                                                        {pr.taskId ? (
+                                                            <div>
+                                                                <span style={{ display: 'inline-block', padding: '1px 6px', borderRadius: '4px', background: '#e0e7ff', color: '#3730a3', fontSize: '11px', fontWeight: 600 }}>
+                                                                    {pr.taskId}
+                                                                </span>
+                                                                {pr.formulaName && <small className="text-muted" style={{ display: 'block', fontSize: '11px', marginTop: '1px' }}>{pr.formulaName}</small>}
+                                                            </div>
+                                                        ) : (
+                                                            <span style={{ fontSize: '13px', color: '#64748b' }}>{pr.notes || 'ขอซื้อทั่วไป'}</span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#0f172a' }}>
+                                                        {totalQty > 0 ? totalQty.toLocaleString() : (pr.qty || '-')}
+                                                        <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '4px' }}>
+                                                            {pr.items && pr.items[0]?.unit ? (pr.items[0].unit || pr.items[0].displayUnit) : ''}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#15803d' }}>
+                                                        {estimatedTotal > 0 ? `฿${estimatedTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                                    </td>
+                                                    <td>
+                                                        {canUpdate('procurement_pr') ? (
+                                                            <div onClick={(e) => e.stopPropagation()} style={{ minWidth: '125px', display: 'inline-block' }}>
+                                                                <CustomSelect
+                                                                    value={pr.status || 'รอจัดซื้อ'}
+                                                                    onChange={(e) => handleUpdatePRStatus(prId, e.target.value)}
+                                                                    usePortal={true}
+                                                                    style={{
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '20px',
+                                                                        fontSize: '12px',
+                                                                        fontWeight: 600,
+                                                                        minHeight: '28px',
+                                                                        ...(getPRStatusStyle(pr.status))
+                                                                    }}
+                                                                >
+                                                                    {PR_STATUS_OPTIONS.map(opt => (
+                                                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                                    ))}
+                                                                </CustomSelect>
+                                                            </div>
+                                                        ) : (
+                                                            <span className={`badge ${getPRStatusClass(pr.status)}`} style={getPRStatusStyle(pr.status)}>
+                                                                {pr.status || 'รอจัดซื้อ'}
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'nowrap' }}>
+                                                            {canCreate('procurement_po') && pr.status !== 'ยกเลิก' && pr.status !== 'สั่งซื้อแล้ว' && !pr.poNumber && (
+                                                                <button
+                                                                    className="doc-action-btn"
+                                                                    title="เปิดใบสั่งซื้อ (PO) จากใบขอซื้อนี้"
+                                                                    style={{ color: '#059669' }}
+                                                                    onClick={() => handleCreatePOFromPR(pr)}
+                                                                >
+                                                                    <ShoppingBag size={16} />
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                className="doc-action-btn"
+                                                                title="ดูรายละเอียดใบขอซื้อ"
+                                                                style={{ color: '#2563eb' }}
+                                                                onClick={() => setViewingPR(pr)}
+                                                            >
+                                                                <Eye size={16} />
+                                                            </button>
+                                                            {canDelete('procurement_pr') && pr.status !== 'ยกเลิก' && (
+                                                                <button
+                                                                    className="doc-action-btn doc-action-btn-danger"
+                                                                    title="ยกเลิก/ลบ"
+                                                                    style={{ color: '#dc2626' }}
+                                                                    onClick={() => handleDeletePR(prId, prNum)}
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
                                 </tbody>
                             </table>
+                            <PaginationControl
+                                currentPage={prPage}
+                                totalPages={Math.ceil(filteredPR.length / prPageSize) || 1}
+                                totalItems={filteredPR.length}
+                                pageSize={prPageSize}
+                                onPageChange={setPrPage}
+                                onPageSizeChange={setPrPageSize}
+                            />
                         </div>
                     )}
+                    </div>
                 </div>
             )}
 
@@ -673,18 +1324,22 @@ export default function Procurement() {
                 showPOForm ? (
                     <PurchaseOrderForm
                         editId={editingPOId}
+                        initialPR={creatingPOFromPR}
                         viewOnly={viewOnlyPO}
                         onBack={() => {
                             setShowPOForm(false);
                             setEditingPOId(null);
                             setViewOnlyPO(false);
+                            setCreatingPOFromPR(null);
                             fetchPurchaseOrders();
                         }}
                         onSave={() => {
                             setShowPOForm(false);
                             setEditingPOId(null);
                             setViewOnlyPO(false);
+                            setCreatingPOFromPR(null);
                             fetchPurchaseOrders();
+                            fetchPurchaseRequisitions();
                         }}
                     />
                 ) : (
@@ -722,6 +1377,7 @@ export default function Procurement() {
                                         onClick={() => {
                                             setEditingPOId(null);
                                             setViewOnlyPO(false);
+                                            setCreatingPOFromPR(null);
                                             setShowPOForm(true);
                                         }}
                                     >
@@ -892,65 +1548,6 @@ export default function Procurement() {
                 )
             )}
 
-            {/* ── Tab: Receiving ── */}
-            {(activeTab === 'procurement_recv' && hasSubPermission('procurement_recv')) && (
-                <div className="subpage-content" key="procurement_recv">
-                    {hasSectionPermission('procurement_recv_search') && (
-                        <div className="toolbar">
-                            <div className="search-group">
-                                <div className="search-input-wrap">
-                                    <Search size={16} />
-                                    <input
-                                        type="text"
-                                        placeholder="พิมพ์เลขที่รับ, อ้างอิง PO หรือซัพพลายเออร์..."
-                                        value={recvSearch}
-                                        onChange={(e) => setRecvSearch(e.target.value)}
-                                    />
-                                </div>
-                                <button className="search-btn">ค้นหา</button>
-                            </div>
-                            {canCreate('procurement_recv') && (
-                                <button className="btn-primary">+ บันทึกรับสินค้า</button>
-                            )}
-                        </div>
-                    )}
-
-                    {hasSectionPermission('procurement_recv_table') && (
-                        <div className="table-card card">
-                            <table className="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>เลขที่รับสินค้า</th>
-                                        <th>อ้างอิง PO</th>
-                                        <th>ซัพพลายเออร์</th>
-                                        <th>วันที่รับ</th>
-                                        <th>ผู้รับ</th>
-                                        <th>หมายเหตุ</th>
-                                        <th>สถานะ</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredRecv.map((r) => (
-                                        <tr key={r.id}>
-                                            <td className="text-bold">{r.number}</td>
-                                            <td>{r.poNumber}</td>
-                                            <td>{r.supplier}</td>
-                                            <td>{r.date}</td>
-                                            <td>{r.receivedBy}</td>
-                                            <td className="text-muted">{r.note}</td>
-                                            <td>
-                                                <span className={`badge ${getRecvStatusClass(r.status)}`}>
-                                                    {r.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {/* ── Tab: ทะเบียนผู้ขาย (Suppliers) ── */}
             {(activeTab === 'procurement_supplier' && hasSubPermission('procurement_supplier')) && (
@@ -1410,6 +2007,233 @@ export default function Procurement() {
                                 ))
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── PR Detail View & Print Modal ── */}
+            {viewingPR && (
+                <PurchaseRequisitionDoc
+                    pr={viewingPR}
+                    onClose={() => setViewingPR(null)}
+                    onStatusUpdate={handleUpdatePRStatus}
+                    canUpdate={canUpdate('procurement_pr')}
+                    onCreatePO={canCreate('procurement_po') ? (pr) => {
+                        setViewingPR(null);
+                        handleCreatePOFromPR(pr);
+                    } : null}
+                />
+            )}
+
+            {/* ── Create Manual PR Modal ── */}
+            {showCreatePRModal && (
+                <div 
+                    className="pdf-preview-overlay" 
+                    onClick={() => setShowCreatePRModal(false)}
+                    style={{ zIndex: 3000, position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                    <div 
+                        className="pdf-preview-modal" 
+                        onClick={(e) => e.stopPropagation()} 
+                        style={{ maxWidth: '700px', width: '92%', maxHeight: '88vh', overflowY: 'auto', background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
+                            <h3 style={{ margin: 0, fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px', color: '#1e293b' }}>
+                                <Plus size={20} color="#2563eb" /> สร้างใบขอซื้อใหม่ (Purchase Requisition)
+                            </h3>
+                            <button onClick={() => setShowCreatePRModal(false)} className="doc-action-btn" style={{ width: '32px', height: '32px', background: '#f1f5f9', borderRadius: '6px', border: 'none', cursor: 'pointer' }}>
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveManualPR}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                                        แผนกที่ขอซื้อ
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        value={prForm.department}
+                                        onChange={(e) => setPrForm(p => ({ ...p, department: e.target.value }))}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                                        placeholder="เช่น ฝ่ายจัดซื้อ, ฝ่ายคลังสินค้า"
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                                        หมายเหตุ / วัตถุประสงค์
+                                    </label>
+                                    <input
+                                        type="text"
+                                        className="form-control"
+                                        value={prForm.notes}
+                                        onChange={(e) => setPrForm(p => ({ ...p, notes: e.target.value }))}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                                        placeholder="เช่น สั่งซื้อเติมสต็อกประจำสัปดาห์"
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                                        📦 รายการสินค้า/วัตถุดิบ
+                                    </label>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        style={{ padding: '3px 10px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                        onClick={() => setPrForm(p => ({
+                                            ...p,
+                                            items: [...p.items, { itemName: '', itemCode: '', requestQty: 1, unit: 'กก.', estimatedPrice: 0 }]
+                                        }))}
+                                    >
+                                        <Plus size={14} /> เพิ่มแถว
+                                    </button>
+                                </div>
+
+                                <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                                    <table className="data-table" style={{ margin: 0, width: '100%' }}>
+                                        <thead style={{ background: '#f8fafc' }}>
+                                            <tr>
+                                                <th>ชื่อสินค้า/วัตถุดิบ *</th>
+                                                <th style={{ width: '110px' }}>รหัส (ถ้ามี)</th>
+                                                <th style={{ width: '90px' }}>จำนวน</th>
+                                                <th style={{ width: '90px' }}>หน่วย</th>
+                                                <th style={{ width: '110px' }}>ราคาประเมิน</th>
+                                                <th style={{ width: '40px' }}></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {prForm.items.map((it, idx) => (
+                                                <tr key={idx}>
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            required
+                                                            placeholder="เช่น กระวาน, พริกไทยดำ"
+                                                            value={it.itemName}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setPrForm(p => {
+                                                                    const updated = [...p.items];
+                                                                    updated[idx].itemName = val;
+                                                                    return { ...p, items: updated };
+                                                                });
+                                                            }}
+                                                            style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="รหัส"
+                                                            value={it.itemCode}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setPrForm(p => {
+                                                                    const updated = [...p.items];
+                                                                    updated[idx].itemCode = val;
+                                                                    return { ...p, items: updated };
+                                                                });
+                                                            }}
+                                                            style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="number"
+                                                            min="0.1"
+                                                            step="any"
+                                                            value={it.requestQty}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setPrForm(p => {
+                                                                    const updated = [...p.items];
+                                                                    updated[idx].requestQty = val;
+                                                                    return { ...p, items: updated };
+                                                                });
+                                                            }}
+                                                            style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'right' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="เช่น กก."
+                                                            value={it.unit}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setPrForm(p => {
+                                                                    const updated = [...p.items];
+                                                                    updated[idx].unit = val;
+                                                                    return { ...p, items: updated };
+                                                                });
+                                                            }}
+                                                            style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                                                        />
+                                                    </td>
+                                                    <td>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            step="any"
+                                                            placeholder="฿"
+                                                            value={it.estimatedPrice}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setPrForm(p => {
+                                                                    const updated = [...p.items];
+                                                                    updated[idx].estimatedPrice = val;
+                                                                    return { ...p, items: updated };
+                                                                });
+                                                            }}
+                                                            style={{ width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid #cbd5e1', fontSize: '13px', textAlign: 'right' }}
+                                                        />
+                                                    </td>
+                                                    <td style={{ textAlign: 'center' }}>
+                                                        {prForm.items.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                                                onClick={() => setPrForm(p => ({
+                                                                    ...p,
+                                                                    items: p.items.filter((_, i) => i !== idx)
+                                                                }))}
+                                                            >
+                                                                <Trash2 size={15} />
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', borderTop: '1px solid #e2e8f0', paddingTop: '14px' }}>
+                                <button
+                                    type="button"
+                                    className="btn-secondary"
+                                    onClick={() => setShowCreatePRModal(false)}
+                                    disabled={savingPR}
+                                    style={{ padding: '8px 16px', fontSize: '13px' }}
+                                >
+                                    ยกเลิก
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    disabled={savingPR}
+                                    style={{ padding: '8px 20px', fontSize: '13px' }}
+                                >
+                                    {savingPR ? 'กำลังบันทึก...' : 'สร้างใบขอซื้อ (PR)'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

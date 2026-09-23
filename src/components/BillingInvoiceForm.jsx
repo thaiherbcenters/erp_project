@@ -873,17 +873,17 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
             const qData = initialFromQuotation;
             const parsedAddr = parseAddressToSplit(qData.address || '');
 
-            // คำนวณการหักเงินมัดจำจากใบเสนอราคา
+            // คำนวณการหักเงินมัดจำจากใบเสนอราคา / ใบเสร็จมัดจำ
             let depPct = qData.depositPercent !== undefined ? String(qData.depositPercent) : '0';
             const paidDep = Number(qData.paidDepositAmount || 0);
             const depAmt = Number(qData.depositAmount || 0);
             const actualDep = paidDep > 0 ? paidDep : depAmt;
 
-            // หากมีเงินมัดจำแต่ไม่ได้ระบุ % เป็น 30/40/50 ให้ตั้งเป็น custom
+            // หากมียอดมัดจำที่ชำระแล้ว หรือมีมัดจำ ให้ตั้งเป็น custom เสมอ
+            // เพื่อหักตามจำนวนเงินจริงที่ชำระไป (เช่น 500 บาท) แทนที่จะไปคำนวณซ้ำ 50% ของยอดรวมใหม่ (1,070 * 50% = 535)
+            // ทำให้ยอดคงเหลือเรียกเก็บเป็นยอดส่วนที่เหลือจริง (1,070 - 500 = 570 บาท)
             if (actualDep > 0) {
-                if (depPct !== '30' && depPct !== '40' && depPct !== '50') {
-                    depPct = 'custom';
-                }
+                depPct = 'custom';
             }
 
             setFormData(prev => ({
@@ -907,7 +907,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                 designFee: qData.designFee !== undefined ? qData.designFee : prev.designFee,
                 showDesignFeeInPrint: qData.showDesignFeeInPrint !== undefined ? !!qData.showDesignFeeInPrint : prev.showDesignFeeInPrint,
                 depositPercent: depPct,
-                customDepositAmount: depPct === 'custom' ? actualDep : (actualDep || 0),
+                customDepositAmount: actualDep,
                 showDepositInPrint: actualDep > 0 || depPct !== '0'
             }));
 

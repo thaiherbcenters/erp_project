@@ -298,13 +298,6 @@ export const ALL_PAGES = [
         ],
       },
       {
-        id: 'procurement_recv', name: 'Receiving',
-        sections: [
-          { id: 'procurement_recv_search', name: 'ค้นหารายการรับสินค้า' },
-          { id: 'procurement_recv_table', name: 'ตารางรับสินค้าเข้าคลัง' },
-        ],
-      },
-      {
         id: 'procurement_supplier', name: 'ทะเบียนผู้ขาย (Suppliers)',
         sections: [
           { id: 'procurement_supplier_search', name: 'ค้นหาผู้ขาย' },
@@ -439,6 +432,13 @@ export const ALL_PAGES = [
     id: 'operator', name: 'ฝ่ายผลิต', path: '/operator',
     subPages: [
       {
+        id: 'operator_history', name: 'ประวัติการผลิต',
+        sections: [
+          { id: 'operator_history_search', name: 'ค้นหาประวัติ' },
+          { id: 'operator_history_table', name: 'ตารางประวัติการผลิต' },
+        ],
+      },
+      {
         id: 'operator_dashboard', name: 'งานของฉัน',
         sections: [
           { id: 'operator_dashboard_tasks', name: 'งานที่ต้องรับผิดชอบ' },
@@ -464,13 +464,6 @@ export const ALL_PAGES = [
           { id: 'operator_labeling_stats', name: 'สถิติการติดฉลาก' },
           { id: 'operator_labeling_tasks', name: 'รายการงานติดฉลาก' },
           { id: 'operator_labeling_config', name: 'ตั้งค่าสติ๊กเกอร์' },
-        ],
-      },
-      {
-        id: 'operator_history', name: 'ประวัติการผลิต',
-        sections: [
-          { id: 'operator_history_search', name: 'ค้นหาประวัติ' },
-          { id: 'operator_history_table', name: 'ตารางประวัติการผลิต' },
         ],
       },
     ],
@@ -515,20 +508,10 @@ export const ALL_PAGES = [
   // --- ฝ่ายจัดส่งและกระจายสินค้า (Fulfillment & Shipping) ---
   {
     id: 'fulfillment', name: 'ฝ่ายจัดส่ง (Shipping)', path: '/fulfillment',
-    subPages: [
-      {
-        id: 'fulfillment_dashboard', name: 'Shipping Dashboard',
-        sections: [
-          { id: 'fulfillment_dashboard_stats', name: 'สถิติการจัดส่ง' },
-        ],
-      },
-      {
-        id: 'fulfillment_orders', name: 'รายการแพ็คจัดส่ง',
-        sections: [
-          { id: 'fulfillment_orders_table', name: 'ตารางรอแพ็คและจัดส่ง' },
-          { id: 'fulfillment_orders_action', name: 'จัดการแพ็คสินค้า / พิมพ์ปะหน้า' },
-        ],
-      },
+    sections: [
+      { id: 'fulfillment_cards', name: 'ใบงานรอจัดส่ง' },
+      { id: 'fulfillment_orders_table', name: 'ตารางรายการจัดส่ง' },
+      { id: 'fulfillment_orders_action', name: 'จัดการแพ็คสินค้า / พิมพ์ปะหน้า' },
     ],
   },
 
@@ -715,6 +698,7 @@ const collectAllIdsFromPage = (page) => {
     ids.push(sub.id);
     sub.sections?.forEach((sec) => ids.push(sec.id));
   });
+  page.sections?.forEach((sec) => ids.push(sec.id));
   return ids;
 };
 
@@ -872,12 +856,7 @@ export const MOCK_AP = [
 
 // ใบขอซื้อ (Purchase Requisition - PR)
 // status: 'รออนุมัติ', 'อนุมัติแล้ว', 'ไม่อนุมัติ', 'สั่งซื้อแล้ว'
-export const MOCK_PR = [
-  { id: 1, number: 'PR-2026-001', requestor: 'สมชาย ใจดี', department: 'ฝ่ายไอที', item: 'Server Rack', qty: 2, estimatedPrice: 150000, date: '2026-03-01', status: 'สั่งซื้อแล้ว' },
-  { id: 2, number: 'PR-2026-002', requestor: 'สมหญิง รักเรียน', department: 'ฝ่ายการตลาด', item: 'ชุดของพรีเมี่ยม', qty: 500, estimatedPrice: 45000, date: '2026-03-03', status: 'อนุมัติแล้ว' },
-  { id: 3, number: 'PR-2026-003', requestor: 'สมศักดิ์ มั่นคง', department: 'ฝ่ายบัญชี', item: 'เครื่องพิมพ์เอกสาร', qty: 1, estimatedPrice: 25000, date: '2026-03-05', status: 'รออนุมัติ' },
-  { id: 4, number: 'PR-2026-004', requestor: 'สมใจ สุขใจ', department: 'ฝ่ายบุคคล', item: 'เก้าอี้สำนักงาน', qty: 5, estimatedPrice: 15000, date: '2026-03-06', status: 'รออนุมัติ' },
-];
+export const MOCK_PR = [];
 
 // ใบสั่งซื้อ (Purchase Order - PO)
 // status: 'รอเตรียมจัดส่ง', 'กำลังจัดส่ง', 'รับสินค้าแล้ว', 'ยกเลิก'

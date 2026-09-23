@@ -1037,6 +1037,7 @@ export default function Sales() {
             case 'sales_customers': return 'จัดการข้อมูลลูกค้า';
             case 'sales_quotation': return 'ใบเสนอราคา';
             case 'sales_orders': return 'คำสั่งขาย';
+            case 'sales_receipt': return 'ใบเสร็จรับเงิน';
             case 'sales_poa': return 'ขึ้นทะเบียน';
             case 'sales_contracts': return 'จัดการสัญญา';
             case 'sales_corp_rep': return 'หนังสือแต่งตั้งผู้แทนนิติบุคคล';
@@ -1050,6 +1051,7 @@ export default function Sales() {
             case 'sales_customers': return 'จัดการข้อมูลและรายชื่อลูกค้าทั้งหมดในระบบ';
             case 'sales_quotation': return 'สร้างและจัดการข้อมูลเอกสารใบเสนอราคา (Quotation)';
             case 'sales_orders': return 'สร้างและจัดการข้อมูลคำสั่งขาย (Sales Order)';
+            case 'sales_receipt': return 'สร้างและจัดการข้อมูลเอกสารใบเสร็จรับเงิน (Receipt)';
             case 'sales_poa': return 'สร้างและจัดการเอกสารขึ้นทะเบียน';
             case 'sales_contracts': return 'เพิ่มและลบสัญญาระหว่างบริษัทกับลูกค้า';
             case 'sales_corp_rep': return 'สร้างและจัดการหนังสือแต่งตั้งผู้แทนนิติบุคคล';
@@ -2200,8 +2202,21 @@ export default function Sales() {
                                                             </span>
                                                         )}
                                                     </td>
-                                                    <td>{q.CustomerName}</td>
-                                                    <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
+                                                    <td>{q.CustomerName || q.customerName || '-'}</td>
+                                                    <td>
+                                                        <div style={{ fontWeight: 600 }}>
+                                                            {Number(
+                                                                (Number(q.DepositAmount) > 0 && q.RemainingAmount !== null && q.RemainingAmount !== undefined)
+                                                                    ? q.RemainingAmount
+                                                                    : (q.GrandTotal || 0)
+                                                            ).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                                        </div>
+                                                        {Number(q.DepositAmount) > 0 && (
+                                                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
+                                                                (หักมัดจำ {Number(q.DepositAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })})
+                                                            </div>
+                                                        )}
+                                                    </td>
                                                     <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
                                                     <td style={{ textAlign: 'center' }}>
                                                     <InlineStatusDropdown
@@ -2540,7 +2555,20 @@ export default function Sales() {
                                                 )}
                                             </td>
                                             <td>{b.CustomerName || '-'}</td>
-                                            <td>{((b.GrandTotal) || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+                                            <td>
+                                                <div style={{ fontWeight: 600 }}>
+                                                    {Number(
+                                                        (Number(b.DepositAmount) > 0 && b.RemainingAmount !== null && b.RemainingAmount !== undefined)
+                                                            ? b.RemainingAmount
+                                                            : (b.GrandTotal || 0)
+                                                    ).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                                                </div>
+                                                {Number(b.DepositAmount) > 0 && (
+                                                    <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
+                                                        (หักมัดจำ {Number(b.DepositAmount).toLocaleString('th-TH', { minimumFractionDigits: 2 })})
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td>{b.BillDate ? new Date(b.BillDate).toLocaleDateString('th-TH') : '-'}</td>
                                             <td>
                                                 <InlineStatusDropdown
