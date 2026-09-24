@@ -1067,46 +1067,50 @@ export default function Accounts() {
                         </button>
                         </div>
 
-                    {/* 2. Top Executive KPI Cards */}
+                    {/* 2. Top Executive KPI Cards (Single Row 5 Columns) */}
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
-                        gap: '16px'
+                        gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+                        gap: '12px'
                     }}>
                         {/* KPI 1: รายรับจริงสะสม (Authoritative Cash Inflow) */}
                         <div style={{
                             background: '#ffffff',
                             borderRadius: '12px',
                             border: '1px solid #e2e8f0',
-                            padding: '18px 20px',
+                            padding: '16px 14px',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                             borderTop: '4px solid #10b981',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            gap: '12px'
+                            gap: '10px',
+                            minWidth: 0
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>รายรับจริงสะสม (Cash Inflow)</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title="รายรับจริงสะสม (Cash Inflow)">
+                                    รายรับจริงสะสม (Cash Inflow)
+                                </span>
                                 <div style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    borderRadius: '10px',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
                                     background: '#ecfdf5',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#059669'
+                                    color: '#059669',
+                                    flexShrink: 0
                                 }}>
-                                    <Wallet size={19} />
+                                    <Wallet size={17} />
                                 </div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#0f766e', letterSpacing: '-0.5px' }}>
+                                <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f766e', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
                                     ฿{(dashboardStats?.kpi?.totalCashInflow ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    <CheckCircle2 size={12} color="#10b981" />
+                                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    <CheckCircle2 size={12} color="#10b981" style={{ flexShrink: 0 }} />
                                     <span>จากใบเสร็จ {dashboardStats?.kpi?.totalReceiptsCount || 0} ฉบับ</span>
                                 </div>
                             </div>
@@ -1117,44 +1121,49 @@ export default function Accounts() {
                             background: '#ffffff',
                             borderRadius: '12px',
                             border: '1px solid #e2e8f0',
-                            padding: '18px 20px',
+                            padding: '16px 14px',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                             borderTop: '4px solid #3b82f6',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            gap: '12px'
+                            gap: '10px',
+                            minWidth: 0
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>รายรับเดือนนี้ (This Month)</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title="รายรับเดือนนี้ (This Month)">
+                                    รายรับเดือนนี้ (This Month)
+                                </span>
                                 <div style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    borderRadius: '10px',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
                                     background: '#eff6ff',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#2563eb'
+                                    color: '#2563eb',
+                                    flexShrink: 0
                                 }}>
-                                    <Calendar size={19} />
+                                    <Calendar size={17} />
                                 </div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#1e40af', letterSpacing: '-0.5px' }}>
+                                <div style={{ fontSize: '20px', fontWeight: 800, color: '#1e40af', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
                                     ฿{(dashboardStats?.kpi?.thisMonthInflow ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     <span style={{
                                         display: 'inline-flex',
                                         alignItems: 'center',
                                         gap: '2px',
-                                        padding: '1px 6px',
+                                        padding: '1px 5px',
                                         borderRadius: '4px',
                                         fontSize: '11px',
                                         fontWeight: 600,
                                         background: (dashboardStats?.kpi?.momGrowth || 0) >= 0 ? '#dcfce7' : '#fee2e2',
-                                        color: (dashboardStats?.kpi?.momGrowth || 0) >= 0 ? '#15803d' : '#b91c1c'
+                                        color: (dashboardStats?.kpi?.momGrowth || 0) >= 0 ? '#15803d' : '#b91c1c',
+                                        flexShrink: 0
                                     }}>
                                         {(dashboardStats?.kpi?.momGrowth || 0) >= 0 ? '▲ +' : '▼ '}
                                         {dashboardStats?.kpi?.momGrowth || 0}% MoM
@@ -1169,34 +1178,38 @@ export default function Accounts() {
                             background: '#ffffff',
                             borderRadius: '12px',
                             border: '1px solid #e2e8f0',
-                            padding: '18px 20px',
+                            padding: '16px 14px',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                             borderTop: '4px solid #f59e0b',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            gap: '12px'
+                            gap: '10px',
+                            minWidth: 0
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>รายรับวันนี้ (Today Inflow)</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title="รายรับวันนี้ (Today Inflow)">
+                                    รายรับวันนี้ (Today Inflow)
+                                </span>
                                 <div style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    borderRadius: '10px',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
                                     background: '#fffbeb',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#d97706'
+                                    color: '#d97706',
+                                    flexShrink: 0
                                 }}>
-                                    <Coins size={19} />
+                                    <Coins size={17} />
                                 </div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#b45309', letterSpacing: '-0.5px' }}>
+                                <div style={{ fontSize: '20px', fontWeight: 800, color: '#b45309', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
                                     ฿{(dashboardStats?.kpi?.todayInflow ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     ยอดเงินสด/โอนรับเข้าวันปัจจุบัน
                                 </div>
                             </div>
@@ -1207,34 +1220,38 @@ export default function Accounts() {
                             background: '#ffffff',
                             borderRadius: '12px',
                             border: '1px solid #e2e8f0',
-                            padding: '18px 20px',
+                            padding: '16px 14px',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                             borderTop: '4px solid #ea580c',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            gap: '12px'
+                            gap: '10px',
+                            minWidth: 0
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>ลูกหนี้คงค้าง (Outstanding AR)</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title="ลูกหนี้คงค้าง (Outstanding AR)">
+                                    ลูกหนี้คงค้าง (Outstanding AR)
+                                </span>
                                 <div style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    borderRadius: '10px',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
                                     background: '#fff7ed',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#ea580c'
+                                    color: '#ea580c',
+                                    flexShrink: 0
                                 }}>
-                                    <Clock size={19} />
+                                    <Clock size={17} />
                                 </div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#c2410c', letterSpacing: '-0.5px' }}>
+                                <div style={{ fontSize: '20px', fontWeight: 800, color: '#c2410c', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
                                     ฿{(dashboardStats?.kpi?.totalOutstandingAR ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     ค้างชำระ/รอปิดยอด {dashboardStats?.kpi?.pendingARCount || 0} รายการ
                                 </div>
                             </div>
@@ -1245,34 +1262,38 @@ export default function Accounts() {
                             background: '#ffffff',
                             borderRadius: '12px',
                             border: '1px solid #e2e8f0',
-                            padding: '18px 20px',
+                            padding: '16px 14px',
                             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                             borderTop: '4px solid #e11d48',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'space-between',
-                            gap: '12px'
+                            gap: '10px',
+                            minWidth: 0
                         }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#64748b' }}>เจ้าหนี้การค้า (AP)</span>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <span style={{ fontSize: '12.5px', fontWeight: 600, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title="เจ้าหนี้การค้า (AP)">
+                                    เจ้าหนี้การค้า (AP)
+                                </span>
                                 <div style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    borderRadius: '10px',
+                                    width: '32px',
+                                    height: '32px',
+                                    borderRadius: '8px',
                                     background: '#fff1f2',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: '#e11d48'
+                                    color: '#e11d48',
+                                    flexShrink: 0
                                 }}>
-                                    <ArrowUpRight size={19} />
+                                    <ArrowUpRight size={17} />
                                 </div>
                             </div>
                             <div>
-                                <div style={{ fontSize: '24px', fontWeight: 800, color: '#be123c', letterSpacing: '-0.5px' }}>
+                                <div style={{ fontSize: '20px', fontWeight: 800, color: '#be123c', letterSpacing: '-0.5px', whiteSpace: 'nowrap' }}>
                                     ฿{(dashboardStats?.kpi?.totalAP ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                                <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     ภาระหนี้จากการจัดซื้อ (PO)
                                 </div>
                             </div>
@@ -1711,10 +1732,7 @@ export default function Accounts() {
                                                     <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                                         <button
                                                             type="button"
-                                                            onClick={() => {
-                                                                setReceiptEditId(r.receiptId);
-                                                                setShowReceiptForm(true);
-                                                            }}
+                                                            onClick={() => setPreviewReceiptId(r.receiptId)}
                                                             style={{
                                                                 background: 'none',
                                                                 border: '1px solid #e2e8f0',
@@ -1727,7 +1745,7 @@ export default function Accounts() {
                                                                 gap: '4px',
                                                                 fontSize: '11px'
                                                             }}
-                                                            title="ดูรายละเอียดใบเสร็จ"
+                                                            title="พรีวิวและพิมพ์ใบเสร็จรับเงิน"
                                                         >
                                                             <Eye size={12} /> ดู
                                                         </button>
