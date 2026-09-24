@@ -4,6 +4,7 @@ import { useAlert } from './CustomAlert';
 import API_BASE from '../config';
 import IdCardInput from './IdCardInput';
 import CustomDatePicker from './CustomDatePicker';
+import { toLocalDateInput, getTodayLocal } from '../utils/formatters';
 import './PowerOfAttorneyForm.css';
 
 /**
@@ -32,7 +33,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
     const [form, setForm] = useState({
         contractId: '',
         writtenAt: '',
-        documentDate: new Date().toISOString().split('T')[0],
+        documentDate: getTodayLocal(),
 
         licenseeName: 'นายธวัช จรุงพิรวงศ์',
         licenseNo: 'HB 12-1-67-1',
@@ -243,8 +244,7 @@ const PowerOfAttorneyForm = forwardRef(({ documentId, onBack, customerData, cont
                         const d = result.data;
                         // Format dates for input type="date"
                         const formatDt = (dateString) => {
-                            if (!dateString) return '';
-                            return dateString.split('T')[0];
+                            return toLocalDateInput(dateString);
                         };
                         
                         const newWrittenAt = d.WrittenAt || '';

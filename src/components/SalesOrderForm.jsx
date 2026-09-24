@@ -11,6 +11,7 @@ import QuotationSelectorModal from './QuotationSelectorModal';
 import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
+import { toLocalDateInput, getTodayLocal, formatThaiDocDate } from '../utils/formatters';
 import '../pages/PageCommon.css';
 const PRODUCT_CATALOG = {
     "ยาดมสมุนไพร": { price: 79, promo: { newQty: 40, newPrice: 25, oldQty: 50, oldPrice: 20 }, unit: 'ขวด' },
@@ -379,7 +380,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
         taxId: '',
         taxBranch: 'head_office',
         branchNo: '',
-        orderDate: new Date().toISOString().split('T')[0],
+        orderDate: getTodayLocal(),
         deliveryDate: '',
         discountPercent: 0,
         vatRate: 0,
@@ -552,8 +553,8 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                             address: d.Address || '',
                             phone: d.Phone || '',
                             taxId: d.TaxID || '',
-                            orderDate: d.OrderDate ? d.OrderDate.split('T')[0] : '',
-                            deliveryDate: d.DeliveryDate ? d.DeliveryDate.split('T')[0] : '',
+                            orderDate: toLocalDateInput(d.OrderDate),
+                            deliveryDate: toLocalDateInput(d.DeliveryDate),
                             discountPercent: d.DiscountPercent || 0,
                             vatRate: d.VatRate || 0,
                             shippingCost: d.ShippingCost || 0,
@@ -974,7 +975,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                                 <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
                                                     วันที่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Date</span>
                                                 </td>
-                                                <td style={{ padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>{formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '-'}</td>
+                                                <td style={{ padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>{formatThaiDocDate(formData.orderDate)}</td>
                                             </tr>
                                             <tr>
                                                 <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
@@ -1162,7 +1163,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                     </div>
                                     <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px', position: 'relative', zIndex: 2 }}></div>
                                     <div style={{ fontSize: '10pt' }}>ผู้จัดทำ / Prepared By</div>
-                                    <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                                    <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formatThaiDocDate(formData.orderDate) !== '-' ? formatThaiDocDate(formData.orderDate) : '......../......../........'}</div>
                                 </div>
                                 <div style={{ flex: 1, border: '1px solid #1a7a3a', borderRadius: '8px', padding: '10px', textAlign: 'center', position: 'relative' }}>
                                     <div style={{ height: '35px', position: 'relative' }}>
@@ -1180,7 +1181,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                     </div>
                                     <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px', position: 'relative', zIndex: 2 }}></div>
                                     <div style={{ fontSize: '10pt' }}>ผู้อนุมัติฝ่ายขาย / Sales Manager</div>
-                                    <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                                    <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formatThaiDocDate(formData.orderDate) !== '-' ? formatThaiDocDate(formData.orderDate) : '......../......../........'}</div>
                                 </div>
                                 <div style={{ flex: 1, border: '1px solid #1a7a3a', borderRadius: '8px', padding: '10px', textAlign: 'center', position: 'relative' }}>
                                     <div style={{ height: '35px', position: 'relative' }}>
@@ -1198,7 +1199,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                     </div>
                                     <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px', position: 'relative', zIndex: 2 }}></div>
                                     <div style={{ fontSize: '10pt' }}>ผู้รับทราบการผลิต / Production</div>
-                                    <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                                    <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formatThaiDocDate(formData.orderDate) !== '-' ? formatThaiDocDate(formData.orderDate) : '......../......../........'}</div>
                                 </div>
                             </div>
                         </div>
@@ -1903,7 +1904,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                             <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
                                                 วันที่ :<br /><span style={{ fontWeight: 'normal', fontSize: '8pt', color: '#555' }}>Date</span>
                                             </td>
-                                            <td style={{ padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>{formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '-'}</td>
+                                            <td style={{ padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>{formatThaiDocDate(formData.orderDate)}</td>
                                         </tr>
                                         <tr>
                                             <td style={{ fontWeight: 'bold', padding: '4px 8px', borderBottom: '1px solid #1a7a3a' }}>
@@ -2089,7 +2090,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                 </div>
                                 <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px', position: 'relative', zIndex: 2 }}></div>
                                 <div style={{ fontSize: '10pt' }}>ผู้จัดทำ / Prepared By</div>
-                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formatThaiDocDate(formData.orderDate) !== '-' ? formatThaiDocDate(formData.orderDate) : '......../......../........'}</div>
                             </div>
                             <div style={{ flex: 1, border: '1px solid #1a7a3a', borderRadius: '8px', padding: '10px', textAlign: 'center', position: 'relative' }}>
                                 <div style={{ height: '35px', position: 'relative' }}>
@@ -2107,7 +2108,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                 </div>
                                 <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px', position: 'relative', zIndex: 2 }}></div>
                                 <div style={{ fontSize: '10pt' }}>ผู้อนุมัติฝ่ายขาย / Sales Manager</div>
-                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formatThaiDocDate(formData.orderDate) !== '-' ? formatThaiDocDate(formData.orderDate) : '......../......../........'}</div>
                             </div>
                             <div style={{ flex: 1, border: '1px solid #1a7a3a', borderRadius: '8px', padding: '10px', textAlign: 'center', position: 'relative' }}>
                                 <div style={{ height: '35px', position: 'relative' }}>
@@ -2125,7 +2126,7 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                 </div>
                                 <div style={{ borderBottom: '1px dotted #000', width: '80%', margin: '0 auto 5px', position: 'relative', zIndex: 2 }}></div>
                                 <div style={{ fontSize: '10pt' }}>ผู้รับทราบการผลิต / Production</div>
-                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formData.orderDate ? new Date(formData.orderDate).toLocaleDateString('th-TH') : '......../......../........'}</div>
+                                <div style={{ fontSize: '9pt', color: '#555', marginTop: '2px' }}>วันที่ / Date {formatThaiDocDate(formData.orderDate) !== '-' ? formatThaiDocDate(formData.orderDate) : '......../......../........'}</div>
                             </div>
                         </div>
                     </div>

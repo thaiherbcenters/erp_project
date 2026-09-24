@@ -456,3 +456,60 @@ export function translateProductToEN(name) {
 
     return trimmed;
 }
+
+/**
+ * Converts any date representation (ISO UTC string from DB, Date object, or pure YYYY-MM-DD)
+ * to a local 'YYYY-MM-DD' string for HTML <input type="date"> and form state.
+ * Prevents UTC timezone shift (e.g. 2026-09-23T17:00:00.000Z becoming 2026-09-23 instead of 2026-09-24).
+ */
+export const toLocalDateInput = (val) => {
+    if (!val) return '';
+    if (typeof val === 'string') {
+        const trimmed = val.trim();
+        // If it is already a pure YYYY-MM-DD string without time, return as is
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+            return trimmed;
+        }
+    }
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
+
+/**
+ * Returns today's date formatted as 'YYYY-MM-DD' in local timezone.
+ * Avoids the UTC-offset bug of `new Date().toISOString().split('T')[0]`
+ * which produces yesterday's date between 00:00 - 06:59 AM in Thailand.
+ */
+export const getTodayLocal = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
+
+/**
+ * Formats any date representation into Thai Buddhist Era (dd/mm/yyyy พ.ศ.)
+ * or English (dd Mon yyyy) for document views, print headers, and table rows.
+ * Handles both pure YYYY-MM-DD strings and ISO strings without off-by-one errors.
+ */
+export const formatThaiDocDate = (val, isEn = false) => {
+    if (!val) return '-';
+    let d;
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val.trim())) {
+        const [y, m, dayNum] = val.trim().split('-').map(Number);
+        d = new Date(y, m - 1, dayNum);
+    } else {
+        d = new Date(val);
+    }
+    if (isNaN(d.getTime())) return '-';
+    if (isEn) {
+        return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    return d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+

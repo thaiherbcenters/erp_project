@@ -7,12 +7,13 @@ import API_BASE from '../config';
 import CustomDatePicker from './CustomDatePicker';
 import TaxIdInput from './TaxIdInput';
 import CustomSelect from './CustomSelect';
+import { getTodayLocal } from '../utils/formatters';
 
 const BillingForm = ({ onBack }) => {
     const [formData, setFormData] = useState({
         docType: 'billing_thc',
         billNo: '',
-        billDate: new Date().toISOString().split('T')[0],
+        billDate: getTodayLocal(),
         customerName: '',
         address: '',
         phone: '',

@@ -26,6 +26,7 @@ import '../pages/PageCommon.css';
 import './ChequeForm.css';
 import CustomSelect from './CustomSelect';
 import PaginationControl from './PaginationControl';
+import { toLocalDateInput, getTodayLocal, formatThaiDocDate } from '../utils/formatters';
 
 // ข้อมูลตั้งต้นของเช็คกสิกรไทย (อ้างอิงจากรูปถ่ายจริง)
 const DEFAULT_KBANK_CONFIG = {
@@ -157,10 +158,7 @@ export default function ChequeForm() {
 
     // ── Form State ──
     const [chequeNo, setChequeNo] = useState(DEFAULT_KBANK_CONFIG.chequeNo);
-    const [issueDate, setIssueDate] = useState(() => {
-        const today = new Date();
-        return today.toISOString().split('T')[0];
-    });
+    const [issueDate, setIssueDate] = useState(() => getTodayLocal());
     const [isBuddhistYear, setIsBuddhistYear] = useState(false); // พ.ศ. (บวก 543)
     const [payee, setPayee] = useState('');
     const [amount, setAmount] = useState('');
@@ -374,7 +372,7 @@ export default function ChequeForm() {
         setIsManualBaht(false);
         setRefDocNo('');
         setNotes('');
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayLocal();
         setIssueDate(today);
         setDueDate(today);
         setSearchParams({ tab: 'form' });
@@ -387,7 +385,7 @@ export default function ChequeForm() {
         setPayee(item.PayeeOrPayer || '');
         setAmount(item.Amount !== undefined ? String(item.Amount) : '');
         if (item.IssueDate) {
-            const formatted = new Date(item.IssueDate).toISOString().split('T')[0];
+            const formatted = toLocalDateInput(item.IssueDate);
             setIssueDate(formatted);
             setDueDate(formatted);
         }
@@ -402,7 +400,7 @@ export default function ChequeForm() {
         setPayee(item.PayeeOrPayer || '');
         setAmount(item.Amount !== undefined ? String(item.Amount) : '');
         if (item.IssueDate) {
-            const formatted = new Date(item.IssueDate).toISOString().split('T')[0];
+            const formatted = toLocalDateInput(item.IssueDate);
             setIssueDate(formatted);
             setDueDate(formatted);
         }
@@ -422,8 +420,7 @@ export default function ChequeForm() {
         setIsBuddhistYear(false);
         setRefDocNo('');
         setNotes('');
-        const today = new Date();
-        const formatted = today.toISOString().split('T')[0];
+        const formatted = getTodayLocal();
         setIssueDate(formatted);
         setDueDate(formatted);
         setEditingChequeId(null);
@@ -1130,7 +1127,7 @@ export default function ChequeForm() {
                                                 {Number(item.Amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
                                             <td style={{ padding: '12px 14px', textAlign: 'center', color: '#475569' }}>
-                                                {item.IssueDate ? new Date(item.IssueDate).toLocaleDateString('th-TH') : '-'}
+                                                {item.IssueDate ? formatThaiDocDate(item.IssueDate) : '-'}
                                             </td>
                                             <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                                                 <span style={{
@@ -1925,7 +1922,7 @@ export default function ChequeForm() {
                                 <div className="voucher-info-grid">
                                     <div className="voucher-info-item">
                                         <span className="lbl">วันที่ (Date):</span>
-                                        <span className="val">{new Date(issueDate).toLocaleDateString('th-TH')}</span>
+                                        <span className="val">{formatThaiDocDate(issueDate)}</span>
                                     </div>
                                     <div className="voucher-info-item">
                                         <span className="lbl">เลขที่เช็ค (Cheque No):</span>
@@ -1959,7 +1956,7 @@ export default function ChequeForm() {
                                     </div>
                                     <div className="voucher-info-item">
                                         <span className="lbl">วันที่ครบกำหนด:</span>
-                                        <span className="val">{new Date(dueDate || issueDate).toLocaleDateString('th-TH')}</span>
+                                        <span className="val">{formatThaiDocDate(dueDate || issueDate)}</span>
                                     </div>
                                     <div className="voucher-info-item" style={{ gridColumn: 'span 2' }}>
                                         <span className="lbl">คำอธิบายการสั่งจ่าย:</span>

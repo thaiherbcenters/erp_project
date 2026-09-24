@@ -10,7 +10,7 @@ import ContractSelectorModal from './ContractSelectorModal';
 import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
-import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN } from '../utils/formatters';
+import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN, toLocalDateInput, getTodayLocal, formatThaiDocDate } from '../utils/formatters';
 import FormattedAddress from './FormattedAddress';
 import ThaiAddressInputGroup from './ThaiAddressInputGroup';
 import '../pages/PageCommon.css';
@@ -753,7 +753,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
         docType: 'tax_invoice_thc', // tax_invoice_thc, tax_invoice_psf, tax_invoice_elt, delivery_order_thc
         billStatus: getPinnedBankAccount('tax_invoice_thc'),
         billNo: '',
-        billDate: new Date().toISOString().split('T')[0],
+        billDate: getTodayLocal(),
         printLanguage: 'TH', // TH or EN
         contractId: '',
         customerId: '',
@@ -970,7 +970,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                             docType: data.DocType || 'tax_invoice_thc',
                             billStatus: data.BankAccount || 'ktb',
                             billNo: data.TaxInvoiceNo || '',
-                            billDate: data.BillDate ? data.BillDate.split('T')[0] : '',
+                            billDate: toLocalDateInput(data.BillDate),
                             printLanguage: data.PrintLanguage || 'TH',
                             contractId: data.ContractID || '',
                             customerId: data.CustomerID || '',
@@ -1327,12 +1327,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
     }
 
     const formatDate = (dateStr) => {
-        if (!dateStr) return '-';
-        const d = new Date(dateStr);
-        if (isEn) {
-            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-        }
-        return d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return formatThaiDocDate(dateStr, isEn);
     };
 
     const formatMoney = (amount) => {
@@ -1370,7 +1365,7 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
             phone: formData.phone,
             taxId: formData.taxId,
             billDate: formData.billDate,
-            validUntil: new Date(new Date(formData.billDate).getTime() + 30*24*60*60*1000).toISOString().split('T')[0],
+            validUntil: toLocalDateInput(new Date(new Date(formData.billDate).getTime() + 30*24*60*60*1000)),
             subTotal: Number(subTotal) || 0,
             discountPercent: Number(formData.discountPercent) || 0,
             discountAmount: Number(discountAmount) || 0,

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { printTemplateHTML } from './billingPrintTemplates';
+import { formatThaiDocDate } from '../utils/formatters';
 
 const BillingPrintContainer = ({ formData }) => {
     const containerRef = useRef(null);
@@ -37,16 +38,7 @@ const BillingPrintContainer = ({ formData }) => {
 
         // Date formatting helper
         const formatDate = (dateStr) => {
-            if (!dateStr) return '-';
-            try {
-                const d = new Date(dateStr);
-                const day = String(d.getDate()).padStart(2, '0');
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const year = d.getFullYear() + 543;
-                return `${day}/${month}/${year}`;
-            } catch (e) {
-                return dateStr;
-            }
+            return formatThaiDocDate(dateStr);
         };
         const fDate = formatDate(formData.billDate);
 

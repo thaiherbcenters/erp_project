@@ -12,6 +12,7 @@ import ContractMfgForm from './ContractMfgForm';
 import PdpaConsentForm from './PdpaConsentForm';
 import CorpRepForm from './CorpRepForm';
 import SafetyCertForm from './SafetyCertForm';
+import { toLocalDateInput } from '../utils/formatters';
 
 /**
  * RegistrationDocCreator.jsx
@@ -413,7 +414,7 @@ const RegistrationDocCreator = ({ onBack, editingDocId = null, editingDocType = 
                     // Set shared form data
                     setSharedFormData({
                         writtenAt: doc.WrittenAt || doc.WrittenAtCompany || undefined,
-                        documentDate: doc.DocumentDate ? new Date(doc.DocumentDate).toISOString().split('T')[0] : undefined
+                        documentDate: toLocalDateInput(doc.DocumentDate) || undefined
                     });
 
                     const name = doc.GrantorName || doc.ApplicantName || (doc.Data && (doc.Data.licenseeName || doc.Data.applicantName)) || doc.EmployerName;

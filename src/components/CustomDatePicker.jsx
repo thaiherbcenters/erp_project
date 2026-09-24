@@ -27,9 +27,10 @@ const parseDateSafely = (val) => {
         val = val.target.value;
     }
     if (typeof val === 'string') {
-        const clean = val.trim().split('T')[0];
-        const parts = clean.split('-');
-        if (parts.length === 3) {
+        const trimmed = val.trim();
+        // If pure YYYY-MM-DD, parse components as local date to prevent any timezone shifts
+        if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+            const parts = trimmed.split('-');
             const y = parseInt(parts[0], 10);
             const m = parseInt(parts[1], 10) - 1;
             const d = parseInt(parts[2], 10);
@@ -38,7 +39,9 @@ const parseDateSafely = (val) => {
                 return isNaN(dt.getTime()) ? null : dt;
             }
         }
-        const dt = new Date(val);
+        // If contains time or other format (e.g. ISO UTC string 2026-09-23T17:00:00.000Z),
+        // new Date() correctly adjusts for the client's local timezone (e.g. Bangkok +7 -> 2026-09-24)
+        const dt = new Date(trimmed);
         return isNaN(dt.getTime()) ? null : dt;
     }
     return null;

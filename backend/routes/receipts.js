@@ -356,7 +356,16 @@ router.get('/:id', async (req, res) => {
         // Get Header
         const headerResult = await pool.request()
             .input('id', sql.Int, req.params.id)
-            .query(`SELECT * FROM Receipt WHERE ReceiptID = @id`);
+            .query(`
+                SELECT r.*, 
+                       COALESCE(q.QuotationNo, q_alt.QuotationNo) AS QuotationNo,
+                       COALESCE(r.QuotationID, q_alt.QuotationID) AS ResolvedQuotationID,
+                       COALESCE(r.QuotationGrandTotal, q.GrandTotal, q_alt.GrandTotal, 0) AS EffectiveQuotationGrandTotal
+                FROM Receipt r
+                LEFT JOIN Quotation q ON r.QuotationID = q.QuotationID
+                LEFT JOIN Quotation q_alt ON (r.QuotationID IS NULL AND r.CustomerOrder IS NOT NULL AND (q_alt.QuotationNo = r.CustomerOrder OR r.CustomerOrder LIKE '%' + q_alt.QuotationNo + '%'))
+                WHERE r.ReceiptID = @id
+            `);
             
         if (headerResult.recordset.length === 0) {
             return res.status(404).json({ success: false, message: 'Receipt not found' });
@@ -662,7 +671,7 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
         status, contractId, items,
         deliverTo, dueDate, paymentMethod, customerBank, customerBranch, chequeNo, chequeDate,
         isDeposit, depositStatus, paidDepositAmount,
-        quotationId, quotationGrandTotal
+        quotationNo, quotationId, quotationGrandTotal, receiptType
     } = req.body;
 
     let transaction;
@@ -748,11 +757,43 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
         request.input('chequeNo', sql.NVarChar, chequeNo || null);
         request.input('chequeDate', sql.Date, chequeDate || null);
 
-        request.input('isDeposit', sql.Bit, isDeposit !== undefined ? (isDeposit ? 1 : 0) : null);
-        request.input('depositStatus', sql.NVarChar, depositStatus || null);
-        request.input('paidDepositAmount', sql.Decimal(18, 2), (paidDepositAmount !== undefined && paidDepositAmount !== null) ? parseFloat(paidDepositAmount) : null);
-        request.input('quotationIdVal', sql.Int, quotationId || null);
-        request.input('quotationGrandTotal', sql.Decimal(18, 2), quotationGrandTotal || null);
+        // คำนวณสถานะมัดจำสำหรับ PUT:
+        const isDepReceipt = (receiptType === 'deposit') || Boolean(isDeposit);
+        const finalIsDeposit = (receiptType === 'final') ? 0 : (isDepReceipt ? 1 : 0);
+        const finalDepositStatus = depositStatus || (finalIsDeposit ? 'ชำระมัดจำแล้ว' : 'ชำระครบถ้วน');
+        const finalPaidDepositAmount = (paidDepositAmount !== undefined && paidDepositAmount !== null)
+            ? parseFloat(paidDepositAmount) 
+            : (finalIsDeposit ? (parseFloat(depositAmount) || parseFloat(grandTotal) || 0) : (parseFloat(grandTotal) || 0));
+
+        let resolvedQuotationId = quotationId ? parseInt(quotationId, 10) : null;
+        let resolvedQuotationGrandTotal = (quotationGrandTotal !== undefined && quotationGrandTotal !== null) ? parseFloat(quotationGrandTotal) : null;
+        
+        // Auto-resolve quotation from targetQno or existing receipt if missing
+        const targetQno = quotationNo || (customerOrder && customerOrder.match(/QT-?\d{8}-\d{3}/i)?.[0]) || (notes && notes.match(/QT-?\d{8}-\d{3}/i)?.[0]);
+        if (!resolvedQuotationId && targetQno) {
+            const qLookup = await pool.request()
+                .input('qno', sql.NVarChar, targetQno)
+                .query(`SELECT TOP 1 QuotationID, GrandTotal FROM Quotation WHERE QuotationNo = @qno`);
+            if (qLookup.recordset.length > 0) {
+                resolvedQuotationId = qLookup.recordset[0].QuotationID;
+                if (!resolvedQuotationGrandTotal) {
+                    resolvedQuotationGrandTotal = qLookup.recordset[0].GrandTotal;
+                }
+            }
+        } else if (resolvedQuotationId && !resolvedQuotationGrandTotal) {
+            const qLookup = await pool.request()
+                .input('qid', sql.Int, resolvedQuotationId)
+                .query(`SELECT TOP 1 GrandTotal FROM Quotation WHERE QuotationID = @qid`);
+            if (qLookup.recordset.length > 0) {
+                resolvedQuotationGrandTotal = qLookup.recordset[0].GrandTotal;
+            }
+        }
+
+        request.input('isDeposit', sql.Bit, finalIsDeposit);
+        request.input('depositStatus', sql.NVarChar, finalDepositStatus);
+        request.input('paidDepositAmount', sql.Decimal(18, 2), finalPaidDepositAmount);
+        request.input('quotationIdVal', sql.Int, resolvedQuotationId || null);
+        request.input('quotationGrandTotal', sql.Decimal(18, 2), resolvedQuotationGrandTotal || null);
 
         // 1. Backup Current Version to History Table before modifying
         const backupReq = new sql.Request(transaction);
@@ -809,9 +850,9 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
                 FdaServiceTrademark = @fdaServiceTrademark, FdaServiceTrademarkPrice = @fdaServiceTrademarkPrice, FdaServiceTrademarkQuantity = @fdaServiceTrademarkQuantity,
                 DeliverTo = @deliverTo, DueDate = @dueDate, PaymentMethod = @paymentMethod,
                 CustomerBank = @customerBank, CustomerBranch = @customerBranch, ChequeNo = @chequeNo, ChequeDate = @chequeDate,
-                IsDeposit = ISNULL(@isDeposit, IsDeposit),
-                DepositStatus = ISNULL(@depositStatus, DepositStatus),
-                PaidDepositAmount = ISNULL(@paidDepositAmount, PaidDepositAmount),
+                IsDeposit = @isDeposit,
+                DepositStatus = @depositStatus,
+                PaidDepositAmount = @paidDepositAmount,
                 QuotationID = @quotationIdVal,
                 QuotationGrandTotal = @quotationGrandTotal,
                 Revision = Revision + 1,
@@ -848,9 +889,67 @@ router.put('/:id', authorizeRoles('admin', 'sales'), validate(createReceiptSchem
 
         await transaction.commit();
 
-        // ✅ Audit Log: แก้ไขใบเสนอราคา
-        await logAction(req, 'UPDATE', 'billing-invoices', qid, 
-            `แก้ไขใบเสนอราคา ${receiptNo || qid} — ลูกค้า: ${customerName} — ยอดรวม: ${grandTotal}`);
+        // ✅ Auto-sync Quotation deposit status if referencing quotation
+        if (resolvedQuotationId || targetQno) {
+            try {
+                const isDepositFlag = (finalIsDeposit === 1);
+                const isFinal = (receiptType === 'final') || (showDepositInPrint && depositAmount > 0) || (notes && (notes.includes('ส่วนที่เหลือ') || notes.includes('ปิดยอด') || notes.includes('BI-') || notes.includes('BI202')));
+
+                const qTargetQuery = resolvedQuotationId ? `QuotationID = @targetQid` : `QuotationNo = @targetQno`;
+                const qReq = pool.request();
+                if (resolvedQuotationId) qReq.input('targetQid', sql.Int, resolvedQuotationId);
+                if (targetQno) qReq.input('targetQno', sql.NVarChar, targetQno);
+
+                if (isDepositFlag && !isFinal) {
+                    qReq.input('paid', sql.Decimal(18, 2), finalPaidDepositAmount);
+                    await qReq.query(`
+                        UPDATE Quotation 
+                        SET DepositStatus = N'ชำระมัดจำแล้ว', 
+                            PaidDepositAmount = @paid,
+                            UpdatedAt = GETDATE()
+                        WHERE ${qTargetQuery}
+                    `);
+                    console.log(`✅ PUT Auto-updated Quotation ${resolvedQuotationId || targetQno} DepositStatus to 'ชำระมัดจำแล้ว' (paid: ${finalPaidDepositAmount})`);
+                } else {
+                    // Final or Full payment
+                    await qReq.query(`
+                        UPDATE Quotation 
+                        SET DepositStatus = N'ชำระครบถ้วน', 
+                            PaidDepositAmount = GrandTotal,
+                            UpdatedAt = GETDATE()
+                        WHERE ${qTargetQuery}
+                    `);
+                    console.log(`✅ PUT Auto-updated Quotation ${resolvedQuotationId || targetQno} DepositStatus to 'ชำระครบถ้วน'`);
+
+                    // อัปเดตสถานะใบเสร็จมัดจำเดิมให้เป็น 'ชำระครบถ้วน'
+                    if (targetQno || resolvedQuotationId) {
+                        const recUpdateReq = pool.request();
+                        recUpdateReq.input('curId', sql.Int, qid);
+                        let recWhere = `ReceiptID <> @curId AND IsDeposit = 1`;
+                        if (resolvedQuotationId) {
+                            recUpdateReq.input('targetQid', sql.Int, resolvedQuotationId);
+                            recWhere += ` AND QuotationID = @targetQid`;
+                        } else {
+                            recUpdateReq.input('targetQno', sql.NVarChar, targetQno);
+                            recWhere += ` AND (CustomerOrder = @targetQno OR CustomerOrder LIKE '%' + @targetQno + '%')`;
+                        }
+                        await recUpdateReq.query(`
+                            UPDATE Receipt 
+                            SET DepositStatus = N'ชำระครบถ้วน',
+                                UpdatedAt = GETDATE()
+                            WHERE ${recWhere}
+                        `);
+                        console.log(`✅ PUT Auto-updated linked deposit receipt(s) to 'ชำระครบถ้วน'`);
+                    }
+                }
+            } catch (syncErr) {
+                console.error('⚠️ Warning syncing quotation deposit status in PUT:', syncErr.message);
+            }
+        }
+
+        // ✅ Audit Log: แก้ไขใบเสร็จรับเงิน
+        await logAction(req, 'UPDATE', 'receipts', qid, 
+            `แก้ไขใบเสร็จรับเงิน ${finalReceiptNo || qid} — ลูกค้า: ${customerName} — ยอดรวม: ${grandTotal}`);
 
         res.json({ success: true, message: 'Receipt updated successfully' });
 

@@ -58,6 +58,7 @@ const safeJSONParse = (str, fallback = {}) => {
 };
 
 import NameInputWithTitle from './NameInputWithTitle';
+import { toLocalDateInput, getTodayLocal } from '../utils/formatters';
 
 
 const ContractMfgForm = forwardRef(({ documentId, customerData, contractData, initialData = null, sharedFormData = {}, onSharedDataChange }, ref) => {
@@ -65,7 +66,7 @@ const ContractMfgForm = forwardRef(({ documentId, customerData, contractData, in
     const [formData, setFormData] = useState({
         ContractNo: '',
         WrittenAt: '',
-        DocumentDate: new Date().toISOString().split('T')[0],
+        DocumentDate: getTodayLocal(),
         EmployerName: '',
         EmployerID: '',
         EmployerRep: '',
@@ -100,7 +101,7 @@ const ContractMfgForm = forwardRef(({ documentId, customerData, contractData, in
                         ...prev,
                         ContractNo: d.ContractNo || prev.ContractNo,
                         WrittenAt: d.WrittenAt || prev.WrittenAt,
-                        DocumentDate: d.DocumentDate ? new Date(d.DocumentDate).toISOString().split('T')[0] : prev.DocumentDate,
+                        DocumentDate: d.DocumentDate ? toLocalDateInput(d.DocumentDate) : prev.DocumentDate,
                         EmployerName: d.EmployerName || prev.EmployerName,
                         EmployerID: d.EmployerID || prev.EmployerID,
                         EmployerRep: d.EmployerRep || prev.EmployerRep,
@@ -240,7 +241,7 @@ const ContractMfgForm = forwardRef(({ documentId, customerData, contractData, in
                         <label>วันที่ทำสัญญา</label>
                         <CustomDatePicker
                             name="DocumentDate"
-                            value={formData.DocumentDate ? formData.DocumentDate.split('T')[0] : ''}
+                            value={formData.DocumentDate ? toLocalDateInput(formData.DocumentDate) : ''}
                             onChange={(e) => handleChange('DocumentDate', e.target.value)}
                         />
                     </div>

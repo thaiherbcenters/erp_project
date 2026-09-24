@@ -10,7 +10,7 @@ import ContractSelectorModal from './ContractSelectorModal';
 import CustomerSelectorModal from './CustomerSelectorModal';
 import { useSignatures } from '../hooks/useSignatures';
 import { TipTapCell } from './TipTapCell';
-import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN } from '../utils/formatters';
+import { formatFullAddress, numberToEnglishWords, translateUnitToEN, translateProductToEN, toLocalDateInput, getTodayLocal, formatThaiDocDate } from '../utils/formatters';
 import FormattedAddress from './FormattedAddress';
 import ThaiAddressInputGroup from './ThaiAddressInputGroup';
 import PaginationControl from './PaginationControl';
@@ -850,7 +850,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         docType: 'delivery_order_thc', // delivery_order_thc, delivery_order_psf, delivery_order_elt, delivery_order_thc
         billStatus: getPinnedBankAccount('delivery_order_thc'),
         billNo: '',
-        billDate: new Date().toISOString().split('T')[0],
+        billDate: getTodayLocal(),
         printLanguage: 'TH', // TH or EN
         contractId: '',
         customerId: '',
@@ -900,10 +900,14 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
         fdaServiceRegisterQuantity: 1,
         fdaServiceTrademark: false,
         fdaServiceTrademarkPrice: 5000,
-        fdaServiceTrademarkQuantity: 1,
         quotationId: null,
         quotationNo: '',
-        quotationGrandTotal: 0
+        quotationGrandTotal: 0,
+        paymentMethod: '',
+        customerBank: '',
+        customerBranch: '',
+        chequeNo: '',
+        chequeDate: ''
     });
 
     const userModifiedFdaQty = useRef({ register: false, trademark: false });
@@ -986,7 +990,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                 customerOrder: prev.customerOrder || qData.quotationNo || '',
                 quotationNo: qData.quotationNo || '',
                 quotationId: qData.quotationId || null,
-                receiptType: qData.receiptType || ''
+                receiptType: qData.receiptType || '',
+                paymentMethod: qData.paymentMethod || prev.paymentMethod || ''
             }));
 
             if (qData.items && qData.items.length > 0) {
@@ -1253,7 +1258,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             docType: data.DocType || 'delivery_order_thc',
                             billStatus: data.BankAccount || 'ktb',
                             billNo: data.ReceiptNo || '',
-                            billDate: data.BillDate ? data.BillDate.split('T')[0] : '',
+                            billDate: toLocalDateInput(data.BillDate),
                             printLanguage: data.PrintLanguage || 'TH',
                             contractId: data.ContractID || '',
                             customerId: data.CustomerID || '',
@@ -1293,13 +1298,40 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             fdaServiceTrademarkPrice: data.FdaServiceTrademarkPrice !== undefined ? parseFloat(data.FdaServiceTrademarkPrice) : 5000,
                             fdaServiceTrademarkQuantity: data.FdaServiceTrademarkQuantity !== undefined && data.FdaServiceTrademarkQuantity !== null ? data.FdaServiceTrademarkQuantity : (data.items?.length || 1),
                             deliverTo: data.DeliverTo || '',
-                            dueDate: data.DueDate ? data.DueDate.split('T')[0] : '',
+                            dueDate: toLocalDateInput(data.DueDate),
                             paymentMethod: data.PaymentMethod || '',
                             customerBank: data.CustomerBank || '',
                             customerBranch: data.CustomerBranch || '',
                             chequeNo: data.ChequeNo || '',
-                            chequeDate: data.ChequeDate ? data.ChequeDate.split('T')[0] : ''
+                            chequeDate: toLocalDateInput(data.ChequeDate),
+                            quotationId: data.ResolvedQuotationID || data.QuotationID || null,
+                            quotationNo: data.QuotationNo || (data.CustomerOrder && data.CustomerOrder.match(/QT-?\d{8}-\d{3}/i)?.[0]) || '',
+                            quotationGrandTotal: Number(data.EffectiveQuotationGrandTotal || data.QuotationGrandTotal || 0),
+                            receiptType: data.ReceiptType || (Boolean(data.IsDeposit) ? 'deposit' : 'full')
                         });
+
+                        const linkedQid = data.ResolvedQuotationID || data.QuotationID;
+                        if (linkedQid && Boolean(data.IsDeposit)) {
+                            fetch(`${API_BASE}/quotations/${linkedQid}`)
+                                .then(r => r.json())
+                                .then(qRes => {
+                                    if (qRes.success && qRes.data && qRes.data.items && qRes.data.items.length > 0) {
+                                        setSavedQuotationItems(qRes.data.items.map(it => ({
+                                            id: it.ItemID || Date.now(),
+                                            name: it.ItemName,
+                                            qty: (it.Qty !== null && it.Qty !== undefined) ? it.Qty : '',
+                                            price: (it.Price !== null && it.Price !== undefined) ? it.Price : '',
+                                            amount: (it.Amount !== null && it.Amount !== undefined) ? it.Amount : 0,
+                                            isPromo: it.IsPromo,
+                                            promoMultiplier: it.PromoMultiplier || 1,
+                                            unit: it.Unit || 'ชิ้น',
+                                            image: it.ImageURL || null,
+                                            showDropdown: false
+                                        })));
+                                    }
+                                })
+                                .catch(err => console.warn('Could not pre-fetch quotation items for restore:', err));
+                        }
 
                         if (data.items && data.items.length > 0) {
                             setItems(data.items.map(item => ({
@@ -1698,12 +1730,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
     }
 
     const formatDate = (dateStr) => {
-        if (!dateStr) return '-';
-        const d = new Date(dateStr);
-        if (isEn) {
-            return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-        }
-        return d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        return formatThaiDocDate(dateStr, isEn);
     };
 
     const formatMoney = (amount) => {
@@ -1716,6 +1743,14 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
 
     const handleSave = async (e) => {
         e.preventDefault();
+
+        // ตรวจสอบช่องทางการชำระเงิน (Payment Method) — บังคับต้องเลือกก่อนบันทึก
+        if (!formData.paymentMethod || !formData.paymentMethod.trim()) {
+            showAlert('กรุณาเลือกช่องทางการชำระเงิน', 'กรุณาระบุช่องทางที่ลูกค้าชำระเงินเข้ามาก่อนทำการบันทึก (เงินสด, โอนเงิน หรือเช็ค)', 'warning');
+            const el = document.getElementById('payment-method-container') || document.querySelector('[name="paymentMethod"]');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
 
         const ok = await showConfirm('ยืนยันการบันทึก', 'คุณต้องการบันทึกใบเสร็จรับเงิน RECEIPT (ORIGINAL)นี้ใช่หรือไม่?', 'info');
         if (!ok) return;
@@ -1741,7 +1776,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
             phone: formData.phone,
             taxId: formData.taxId,
             billDate: formData.billDate,
-            validUntil: new Date(new Date(formData.billDate).getTime() + 30*24*60*60*1000).toISOString().split('T')[0],
+            validUntil: toLocalDateInput(new Date(new Date(formData.billDate).getTime() + 30*24*60*60*1000)),
             subTotal: Number(subTotal) || 0,
             discountPercent: Number(formData.discountPercent) || 0,
             discountAmount: Number(discountAmount) || 0,
@@ -2360,31 +2395,64 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                             </div>
                         </div>
 
-                        <div className="form-group" style={{ marginTop: '12px', padding: '0' }}>
-                            <label>ช่องทางที่ลูกค้าชำระเงินเข้ามา</label>
-                            <select name="paymentMethod" value={formData.paymentMethod || ''} onChange={handleFormChange} style={{ width: '100%', padding: '10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px', outline: 'none', backgroundColor: '#fff' }}>
-                                <option value="">- เลือกช่องทาง -</option>
-                                <option value="cash">เงินสด (Cash)</option>
-                                <option value="transfer">โอนเงินเข้าบัญชี (Transfer)</option>
-                                <option value="cheque">เช็ค (Cheque)</option>
-                            </select>
+                        {/* ช่องทางที่ลูกค้าชำระเงินเข้ามา (Payment Method) */}
+                        <div id="payment-method-container" className="form-group" style={{ marginTop: '12px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: '#334155' }}>
+                                ช่องทางที่ลูกค้าชำระเงินเข้ามา <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
+                                    <input 
+                                        type="radio" 
+                                        name="paymentMethod" 
+                                        value="transfer" 
+                                        checked={formData.paymentMethod === 'transfer'} 
+                                        onChange={(e) => setFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                                        style={{ width: '16px', height: '16px', accentColor: '#16a34a', cursor: 'pointer' }}
+                                    />
+                                    <span>โอนเงินเข้าบัญชี (Transfer)</span>
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
+                                    <input 
+                                        type="radio" 
+                                        name="paymentMethod" 
+                                        value="cash" 
+                                        checked={formData.paymentMethod === 'cash'} 
+                                        onChange={(e) => setFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                                        style={{ width: '16px', height: '16px', accentColor: '#16a34a', cursor: 'pointer' }}
+                                    />
+                                    <span>เงินสด (Cash)</span>
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 500, color: '#1e293b' }}>
+                                    <input 
+                                        type="radio" 
+                                        name="paymentMethod" 
+                                        value="cheque" 
+                                        checked={formData.paymentMethod === 'cheque'} 
+                                        onChange={(e) => setFormData(prev => ({ ...prev, paymentMethod: e.target.value }))}
+                                        style={{ width: '16px', height: '16px', accentColor: '#16a34a', cursor: 'pointer' }}
+                                    />
+                                    <span>เช็ค (Cheque)</span>
+                                </label>
+                            </div>
                         </div>
                         
+                        {/* Cheque / Bank Details */}
                         <div className="q-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px 20px', marginTop: '12px' }}>
                             <div className="form-group">
-                                <label>ธนาคารลูกค้า (Bank)</label>
+                                <label style={formData.paymentMethod === 'cheque' ? { color: '#b45309', fontWeight: 600 } : {}}>ธนาคารลูกค้า (Bank)</label>
                                 <input type="text" name="customerBank" placeholder="ระบุธนาคาร" value={formData.customerBank || ''} onChange={handleFormChange} />
                             </div>
                             <div className="form-group">
-                                <label>สาขา (Branch)</label>
+                                <label style={formData.paymentMethod === 'cheque' ? { color: '#b45309', fontWeight: 600 } : {}}>สาขา (Branch)</label>
                                 <input type="text" name="customerBranch" placeholder="สาขา" value={formData.customerBranch || ''} onChange={handleFormChange} />
                             </div>
                             <div className="form-group">
-                                <label>เลขที่เช็ค (Cheque No.)</label>
+                                <label style={formData.paymentMethod === 'cheque' ? { color: '#b45309', fontWeight: 600 } : {}}>เลขที่เช็ค (Cheque No.)</label>
                                 <input type="text" name="chequeNo" placeholder="เลขเช็ค (ถ้ามี)" value={formData.chequeNo || ''} onChange={handleFormChange} />
                             </div>
                             <div className="form-group">
-                                <label>วันที่สั่งจ่ายเช็ค</label>
+                                <label style={formData.paymentMethod === 'cheque' ? { color: '#b45309', fontWeight: 600 } : {}}>วันที่สั่งจ่ายเช็ค</label>
                                 <input type="date" name="chequeDate" value={formData.chequeDate || ''} onChange={handleFormChange} style={{ width: '100%', padding: '9px 10px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '15px' }} />
                             </div>
                         </div>
@@ -3006,7 +3074,12 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                         <button className="print-btn" type="button" onClick={handlePrint}>
                             <Printer size={18} /> พิมพ์บิล
                         </button>
-                        <button type="submit" className="submit-btn" disabled={status === 'saving'} style={status === 'error' ? {background: '#ef4444', boxShadow: 'none'} : {}}>
+                        <button 
+                            type="submit" 
+                            className="submit-btn" 
+                            disabled={status === 'saving'} 
+                            style={status === 'error' ? {background: '#ef4444', boxShadow: 'none'} : {}}
+                        >
                             {status === 'saving' ? 'กำลังบันทึก...' : status === 'error' ? 'บันทึกไม่สำเร็จ (ลองใหม่)' : <><Save size={18} /> บันทึกข้อมูล</>}
                         </button>
                     </div>

@@ -143,7 +143,7 @@ router.get('/deposits', async (req, res) => {
                 re_fin.Status AS FinalReceiptStatus,
                 re_fin.GrandTotal AS FinalReceiptGrandTotal
             FROM Receipt r
-            LEFT JOIN Quotation q ON r.QuotationID = q.QuotationID
+            LEFT JOIN Quotation q ON (r.QuotationID IS NOT NULL AND r.QuotationID = q.QuotationID) OR (r.QuotationID IS NULL AND r.CustomerOrder IS NOT NULL AND (q.QuotationNo = r.CustomerOrder OR r.CustomerOrder LIKE '%' + q.QuotationNo + '%'))
             LEFT JOIN Users u ON r.CreatedBy = u.user_id
             OUTER APPLY (
                 SELECT TOP 1 
@@ -901,7 +901,7 @@ router.get('/dashboard-stats', async (req, res) => {
                 q.GrandTotal AS QuotationBaseGrandTotal,
                 re_fin.ReceiptID AS FinalReceiptID
             FROM Receipt r
-            LEFT JOIN Quotation q ON r.QuotationID = q.QuotationID
+            LEFT JOIN Quotation q ON (r.QuotationID IS NOT NULL AND r.QuotationID = q.QuotationID) OR (r.QuotationID IS NULL AND r.CustomerOrder IS NOT NULL AND (q.QuotationNo = r.CustomerOrder OR r.CustomerOrder LIKE '%' + q.QuotationNo + '%'))
             OUTER APPLY (
                 SELECT TOP 1 rf.ReceiptID
                 FROM Receipt rf

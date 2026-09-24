@@ -12,6 +12,7 @@ import './PowerOfAttorneyForm.css';
 import NameInputWithTitle from './NameInputWithTitle';
 import IdCardInput from './IdCardInput';
 import CustomDatePicker from './CustomDatePicker';
+import { toLocalDateInput, getTodayLocal } from '../utils/formatters';
 
 // ─── Design Tokens ───
 const colors = {
@@ -69,7 +70,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
         ReceiverName: '',
 
         documentId: null,
-        DocumentDate: new Date().toISOString().split('T')[0],
+        DocumentDate: getTodayLocal(),
         // ๑. ประเภทคำขอ
         ReqMedicineFromHerb: false,
         ReqMedType: '',
@@ -180,9 +181,9 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                         ...d,
                         Section5FieldOrder: order,
                         ReceiptNo: d.ReceiptNo || prev.ReceiptNo,
-                        ReceiptDate: d.ReceiptDate ? new Date(d.ReceiptDate).toISOString().split('T')[0] : prev.ReceiptDate,
+                        ReceiptDate: d.ReceiptDate ? toLocalDateInput(d.ReceiptDate) : prev.ReceiptDate,
                         ReceiverName: d.ReceiverName || prev.ReceiverName,
-                        DocumentDate: d.DocumentDate ? new Date(d.DocumentDate).toISOString().split('T')[0] : prev.DocumentDate,
+                        DocumentDate: d.DocumentDate ? toLocalDateInput(d.DocumentDate) : prev.DocumentDate,
                         ReqMedicineFromHerb: d.ReqMedicineFromHerb !== undefined ? Boolean(d.ReqMedicineFromHerb) : prev.ReqMedicineFromHerb,
                         ReqMedType: d.ReqMedType || prev.ReqMedType,
                         ReqMedTypeOther: d.ReqMedTypeOther || prev.ReqMedTypeOther,
@@ -228,15 +229,15 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                         AppJuristicRepNationality: d.AppJuristicRepNationality || prev.AppJuristicRepNationality,
                         AppJuristicRepCitizenID: d.AppJuristicRepCitizenID || prev.AppJuristicRepCitizenID,
                         AppForeignPassportNo: d.AppForeignPassportNo || prev.AppForeignPassportNo,
-                        AppForeignPassportExpiry: d.AppForeignPassportExpiry ? new Date(d.AppForeignPassportExpiry).toISOString().split('T')[0] : prev.AppForeignPassportExpiry,
+                        AppForeignPassportExpiry: d.AppForeignPassportExpiry ? toLocalDateInput(d.AppForeignPassportExpiry) : prev.AppForeignPassportExpiry,
                         AppForeignResCertNo: d.AppForeignResCertNo || prev.AppForeignResCertNo,
-                        AppForeignResCertDate: d.AppForeignResCertDate ? new Date(d.AppForeignResCertDate).toISOString().split('T')[0] : prev.AppForeignResCertDate,
+                        AppForeignResCertDate: d.AppForeignResCertDate ? toLocalDateInput(d.AppForeignResCertDate) : prev.AppForeignResCertDate,
                         AppForeignWorkPermitNo: d.AppForeignWorkPermitNo || prev.AppForeignWorkPermitNo,
-                        AppForeignWorkPermitExpiry: d.AppForeignWorkPermitExpiry ? new Date(d.AppForeignWorkPermitExpiry).toISOString().split('T')[0] : prev.AppForeignWorkPermitExpiry,
+                        AppForeignWorkPermitExpiry: d.AppForeignWorkPermitExpiry ? toLocalDateInput(d.AppForeignWorkPermitExpiry) : prev.AppForeignWorkPermitExpiry,
                         AppForeignBizLicenseNo: d.AppForeignBizLicenseNo || prev.AppForeignBizLicenseNo,
-                        AppForeignBizLicenseDate: d.AppForeignBizLicenseDate ? new Date(d.AppForeignBizLicenseDate).toISOString().split('T')[0] : prev.AppForeignBizLicenseDate,
+                        AppForeignBizLicenseDate: d.AppForeignBizLicenseDate ? toLocalDateInput(d.AppForeignBizLicenseDate) : prev.AppForeignBizLicenseDate,
                         AppForeignBizCertNo: d.AppForeignBizCertNo || prev.AppForeignBizCertNo,
-                        AppForeignBizCertDate: d.AppForeignBizCertDate ? new Date(d.AppForeignBizCertDate).toISOString().split('T')[0] : prev.AppForeignBizCertDate,
+                        AppForeignBizCertDate: d.AppForeignBizCertDate ? toLocalDateInput(d.AppForeignBizCertDate) : prev.AppForeignBizCertDate,
                         ProductionType: d.ProductionType || prev.ProductionType,
                         ProdLicenseeName: d.ProdLicenseeName || prev.ProdLicenseeName,
                         ProdLicenseNo: d.ProdLicenseNo || prev.ProdLicenseNo,
@@ -1153,7 +1154,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                                         <p style={{ margin: '0 0 14px 0', fontSize: '13px', fontWeight: '700', color: colors.text }}>🛂 หนังสือเดินทาง (Passport)</p>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                             <InputField label="หนังสือเดินทางเลขที่" name="AppForeignPassportNo" value={form.AppForeignPassportNo} />
-                                            <InputField label="วันหมดอายุ" name="AppForeignPassportExpiry" value={form.AppForeignPassportExpiry ? form.AppForeignPassportExpiry.split('T')[0] : ''} type="date" />
+                                            <InputField label="วันหมดอายุ" name="AppForeignPassportExpiry" value={form.AppForeignPassportExpiry ? toLocalDateInput(form.AppForeignPassportExpiry) : ''} type="date" />
                                         </div>
                                     </div>
 
@@ -1162,7 +1163,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                                         <p style={{ margin: '0 0 14px 0', fontSize: '13px', fontWeight: '700', color: colors.text }}>🏠 ใบสำคัญถิ่นที่อยู่</p>
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                             <InputField label="ใบสำคัญถิ่นที่อยู่เลขที่" name="AppForeignResCertNo" value={form.AppForeignResCertNo} />
-                                            <InputField label="ออกให้ ณ วันที่" name="AppForeignResCertDate" value={form.AppForeignResCertDate ? form.AppForeignResCertDate.split('T')[0] : ''} type="date" />
+                                            <InputField label="ออกให้ ณ วันที่" name="AppForeignResCertDate" value={form.AppForeignResCertDate ? toLocalDateInput(form.AppForeignResCertDate) : ''} type="date" />
                                         </div>
                                     </div>
                                 </div>
@@ -1172,7 +1173,7 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                                     <p style={{ margin: '0 0 14px 0', fontSize: '13px', fontWeight: '700', color: colors.text }}>💼 ใบอนุญาตทำงาน (Work Permit)</p>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                                         <InputField label="ใบอนุญาตทำงานเลขที่" name="AppForeignWorkPermitNo" value={form.AppForeignWorkPermitNo} />
-                                        <InputField label="วันหมดอายุ" name="AppForeignWorkPermitExpiry" value={form.AppForeignWorkPermitExpiry ? form.AppForeignWorkPermitExpiry.split('T')[0] : ''} type="date" />
+                                        <InputField label="วันหมดอายุ" name="AppForeignWorkPermitExpiry" value={form.AppForeignWorkPermitExpiry ? toLocalDateInput(form.AppForeignWorkPermitExpiry) : ''} type="date" />
                                     </div>
                                 </div>
                             </>
@@ -1183,11 +1184,11 @@ const TorBor1Form = forwardRef(({ documentId, readOnly = false, initialData = nu
                             <p style={{ margin: '0 0 14px 0', fontSize: '13px', fontWeight: '700', color: colors.text }}>🏢 ใบอนุญาตประกอบธุรกิจ / หนังสือรับรอง (ตามกฎหมายการประกอบธุรกิจของคนต่างด้าว)</p>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
                                 <InputField label="ใบอนุญาตประกอบธุรกิจตามบัญชีสาม เลขที่" name="AppForeignBizLicenseNo" value={form.AppForeignBizLicenseNo} />
-                                <InputField label="ออกให้ ณ วันที่" name="AppForeignBizLicenseDate" value={form.AppForeignBizLicenseDate ? form.AppForeignBizLicenseDate.split('T')[0] : ''} type="date" />
+                                <InputField label="ออกให้ ณ วันที่" name="AppForeignBizLicenseDate" value={form.AppForeignBizLicenseDate ? toLocalDateInput(form.AppForeignBizLicenseDate) : ''} type="date" />
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                                 <InputField label="หรือหนังสือรับรองตามกฎหมาย เลขที่" name="AppForeignBizCertNo" value={form.AppForeignBizCertNo} />
-                                <InputField label="ออกให้ ณ วันที่" name="AppForeignBizCertDate" value={form.AppForeignBizCertDate ? form.AppForeignBizCertDate.split('T')[0] : ''} type="date" />
+                                <InputField label="ออกให้ ณ วันที่" name="AppForeignBizCertDate" value={form.AppForeignBizCertDate ? toLocalDateInput(form.AppForeignBizCertDate) : ''} type="date" />
                             </div>
                         </div>
                     </div>

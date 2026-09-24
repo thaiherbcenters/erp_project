@@ -4,6 +4,7 @@ import API_BASE from '../config';
 import './PowerOfAttorneyForm.css';
 import NameInputWithTitle from './NameInputWithTitle';
 import CustomDatePicker from './CustomDatePicker';
+import { toLocalDateInput, getTodayLocal } from '../utils/formatters';
 
 const SafetyCertForm = forwardRef(({ documentId, contractId, customerId, onSharedDataChange, embedded }, ref) => {
     const [loading, setLoading] = useState(false);
@@ -11,7 +12,7 @@ const SafetyCertForm = forwardRef(({ documentId, contractId, customerId, onShare
 
     const [form, setForm] = useState({
         writtenAt: '',
-        documentDate: new Date().toISOString().split('T')[0],
+        documentDate: getTodayLocal(),
         ownerPrefix: '',
         ownerName: '',
         reqTypeRegistration: false,
@@ -36,7 +37,7 @@ const SafetyCertForm = forwardRef(({ documentId, contractId, customerId, onShare
                 setForm(prev => ({
                     ...prev,
                     writtenAt: data.WrittenAt || '',
-                    documentDate: data.DocumentDate ? data.DocumentDate.split('T')[0] : '',
+                    documentDate: toLocalDateInput(data.DocumentDate),
                     ownerPrefix: data.OwnerPrefix || '',
                     ownerName: data.OwnerName || '',
                     reqTypeRegistration: data.ReqTypeRegistration || false,

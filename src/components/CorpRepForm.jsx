@@ -5,6 +5,7 @@ import IdCardInput from './IdCardInput';
 import NameInputWithTitle from './NameInputWithTitle';
 import CustomDatePicker from './CustomDatePicker';
 import CustomSelect from './CustomSelect';
+import { toLocalDateInput, getTodayLocal } from '../utils/formatters';
 
 /**
  * CorpRepForm.jsx
@@ -15,7 +16,7 @@ const CorpRepForm = forwardRef(({ customerData, contractData, initialData = null
     const [form, setForm] = useState({
         // ส่วนหัว
         writtenAt: '',
-        documentDate: new Date().toISOString().split('T')[0],
+        documentDate: getTodayLocal(),
         // ข้อ 1: ข้อมูลนิติบุคคล
         juristicName: '',
         juristicRegNo: '',
@@ -70,7 +71,7 @@ const CorpRepForm = forwardRef(({ customerData, contractData, initialData = null
         repZip: '',
         repPhone: '',
         repEmail: '',
-        effectiveDate: new Date().toISOString().split('T')[0],
+        effectiveDate: getTodayLocal(),
     });
 
     // Fetch saved data when editing
@@ -86,10 +87,10 @@ const CorpRepForm = forwardRef(({ customerData, contractData, initialData = null
                     setForm(prev => ({
                         ...prev,
                         writtenAt: d.WrittenAt || prev.writtenAt,
-                        documentDate: d.DocumentDate ? new Date(d.DocumentDate).toISOString().split('T')[0] : prev.documentDate,
+                        documentDate: d.DocumentDate ? toLocalDateInput(d.DocumentDate) : prev.documentDate,
                         juristicName: d.JuristicName || prev.juristicName,
                         juristicRegNo: d.JuristicRegNo || prev.juristicRegNo,
-                        juristicRegDate: d.JuristicRegDate ? new Date(d.JuristicRegDate).toISOString().split('T')[0] : prev.juristicRegDate,
+                        juristicRegDate: d.JuristicRegDate ? toLocalDateInput(d.JuristicRegDate) : prev.juristicRegDate,
                         officeAddrNo: d.OfficeAddrNo || prev.officeAddrNo,
                         officeBuilding: d.OfficeBuilding || prev.officeBuilding,
                         officeMoo: d.OfficeMoo || prev.officeMoo,
@@ -106,15 +107,15 @@ const CorpRepForm = forwardRef(({ customerData, contractData, initialData = null
                         signatory1Prefix: d.Signatory1Prefix || prev.signatory1Prefix,
                         signatory1Name: d.Signatory1Name || prev.signatory1Name,
                         signatory1IdCard: d.Signatory1IdCard || prev.signatory1IdCard,
-                        signatory1CardExpiry: d.Signatory1CardExpiry ? new Date(d.Signatory1CardExpiry).toISOString().split('T')[0] : prev.signatory1CardExpiry,
+                        signatory1CardExpiry: d.Signatory1CardExpiry ? toLocalDateInput(d.Signatory1CardExpiry) : prev.signatory1CardExpiry,
                         signatory2Prefix: d.Signatory2Prefix || prev.signatory2Prefix,
                         signatory2Name: d.Signatory2Name || prev.signatory2Name,
                         signatory2IdCard: d.Signatory2IdCard || prev.signatory2IdCard,
-                        signatory2CardExpiry: d.Signatory2CardExpiry ? new Date(d.Signatory2CardExpiry).toISOString().split('T')[0] : prev.signatory2CardExpiry,
+                        signatory2CardExpiry: d.Signatory2CardExpiry ? toLocalDateInput(d.Signatory2CardExpiry) : prev.signatory2CardExpiry,
                         signatory3Prefix: d.Signatory3Prefix || prev.signatory3Prefix,
                         signatory3Name: d.Signatory3Name || prev.signatory3Name,
                         signatory3IdCard: d.Signatory3IdCard || prev.signatory3IdCard,
-                        signatory3CardExpiry: d.Signatory3CardExpiry ? new Date(d.Signatory3CardExpiry).toISOString().split('T')[0] : prev.signatory3CardExpiry,
+                        signatory3CardExpiry: d.Signatory3CardExpiry ? toLocalDateInput(d.Signatory3CardExpiry) : prev.signatory3CardExpiry,
                         reqTypeTorBor1: d.ReqTypeTorBor1 !== undefined && d.ReqTypeTorBor1 !== null ? Boolean(d.ReqTypeTorBor1) : prev.reqTypeTorBor1,
                         reqTypeJorRor1: d.ReqTypeJorRor1 !== undefined && d.ReqTypeJorRor1 !== null ? Boolean(d.ReqTypeJorRor1) : prev.reqTypeJorRor1,
                         reqTypeJorJor1: d.ReqTypeJorJor1 !== undefined && d.ReqTypeJorJor1 !== null ? Boolean(d.ReqTypeJorJor1) : prev.reqTypeJorJor1,
@@ -124,7 +125,7 @@ const CorpRepForm = forwardRef(({ customerData, contractData, initialData = null
                         repPrefix: d.RepPrefix || prev.repPrefix,
                         repName: d.RepName || prev.repName,
                         repIdCard: d.RepIdCard || prev.repIdCard,
-                        repCardExpiry: d.RepCardExpiry ? new Date(d.RepCardExpiry).toISOString().split('T')[0] : prev.repCardExpiry,
+                        repCardExpiry: d.RepCardExpiry ? toLocalDateInput(d.RepCardExpiry) : prev.repCardExpiry,
                         repAddrNo: d.RepAddrNo || prev.repAddrNo,
                         repBuilding: d.RepBuilding || prev.repBuilding,
                         repMoo: d.RepMoo || prev.repMoo,
@@ -136,7 +137,7 @@ const CorpRepForm = forwardRef(({ customerData, contractData, initialData = null
                         repZip: d.RepZip || prev.repZip,
                         repPhone: d.RepPhone || prev.repPhone,
                         repEmail: d.RepEmail || prev.repEmail,
-                        effectiveDate: d.EffectiveDate ? new Date(d.EffectiveDate).toISOString().split('T')[0] : prev.effectiveDate,
+                        effectiveDate: d.EffectiveDate ? toLocalDateInput(d.EffectiveDate) : prev.effectiveDate,
                     }));
                 }
             } catch (err) {

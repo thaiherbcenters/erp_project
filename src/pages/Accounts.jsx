@@ -75,6 +75,7 @@ import BillingInvoiceForm from '../components/BillingInvoiceForm';
 import ReceiptForm from '../components/ReceiptForm';
 import QuotationForm from '../components/QuotationForm';
 import { FilterToggleButton, AccountsARFilterDrawer } from '../components/SalesDocFilter';
+import { formatThaiDocDate, toLocalDateInput } from '../utils/formatters';
 
 import './PageCommon.css';
 
@@ -218,15 +219,7 @@ export default function Accounts() {
 
     // ── Helper: ฟอร์แมตวันที่เป็นรูปแบบไทย dd/mm/yyyy (พ.ศ.) ──
     const formatReceiptDate = useCallback((dStr) => {
-        if (!dStr) return '-';
-        try {
-            const parts = dStr.split('T')[0].split('-');
-            if (parts.length === 3) {
-                const y = parseInt(parts[0], 10) + 543;
-                return `${parts[2]}/${parts[1]}/${y}`;
-            }
-        } catch (_) {}
-        return dStr;
+        return formatThaiDocDate(dStr);
     }, []);
 
     const fetchDashboardStats = useCallback(async () => {
@@ -516,11 +509,11 @@ export default function Accounts() {
             if (String(d.CreatedBy) !== String(depositFilter.createdBy)) return false;
         }
         if (depositFilter.dateFrom) {
-            const docDate = (d.BillDate || '').split('T')[0];
+            const docDate = toLocalDateInput(d.BillDate);
             if (docDate && docDate < depositFilter.dateFrom) return false;
         }
         if (depositFilter.dateTo) {
-            const docDate = (d.BillDate || '').split('T')[0];
+            const docDate = toLocalDateInput(d.BillDate);
             if (docDate && docDate > depositFilter.dateTo) return false;
         }
         return true;
@@ -2232,7 +2225,7 @@ export default function Accounts() {
                                                                     </div>
                                                                 )}
                                                             </td>
-                                                            <td>{row.BillDate ? row.BillDate.split('T')[0] : '—'}</td>
+                                                            <td>{formatThaiDocDate(row.BillDate)}</td>
                                                             <td>
                                                                 <div style={{ fontWeight: 600 }}>{row.CustomerName || '—'}</div>
                                                             </td>

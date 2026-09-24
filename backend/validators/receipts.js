@@ -16,6 +16,7 @@ const ReceiptItemSchema = z.object({
 const createReceiptSchema = z.object({
     customerId: z.union([z.string(), z.number()]).nullable().optional(),
     ReceiptNo: z.string().optional(),
+    receiptNo: z.string().optional(),
     docType: z.string().nullable().optional(),
     bankAccount: z.string().nullable().optional(),
     customerTypeId: z.union([z.string(), z.number()]).nullable().optional(),
@@ -56,14 +57,16 @@ const createReceiptSchema = z.object({
     fdaCreditTerms: z.string().nullable().optional(),
     fdaServiceRegister: z.boolean().optional().default(false),
     fdaServiceRegisterPrice: z.number().min(0).optional().default(0),
+    fdaServiceRegisterQuantity: z.union([z.number(), z.string(), z.null()]).optional().nullable(),
     fdaServiceTrademark: z.boolean().optional().default(false),
     fdaServiceTrademarkPrice: z.number().min(0).optional().default(0),
+    fdaServiceTrademarkQuantity: z.union([z.number(), z.string(), z.null()]).optional().nullable(),
     contractId: z.union([z.string(), z.number()]).nullable().optional(),
     status: z.string().optional().default('ร่าง'),
     
     deliverTo: z.string().nullable().optional(),
     dueDate: z.string().nullable().optional(),
-    paymentMethod: z.string().nullable().optional(),
+    paymentMethod: z.string({ message: 'กรุณาระบุช่องทางการชำระเงิน' }).min(1, 'กรุณาระบุช่องทางการชำระเงิน'),
     customerBank: z.string().nullable().optional(),
     customerBranch: z.string().nullable().optional(),
     chequeNo: z.string().nullable().optional(),
@@ -71,10 +74,11 @@ const createReceiptSchema = z.object({
 
     quotationNo: z.string().nullable().optional(),
     quotationId: z.union([z.string(), z.number()]).nullable().optional(),
+    quotationGrandTotal: z.union([z.number(), z.string(), z.null()]).optional().nullable().transform(val => (val === '' || val === null || val === undefined) ? null : Number(val)),
     receiptType: z.string().nullable().optional(),
-    isDeposit: z.boolean().optional().default(false),
+    isDeposit: z.union([z.boolean(), z.string(), z.number()]).optional().default(false).transform(val => val === true || val === 'true' || val === 1 || val === '1'),
     depositStatus: z.string().nullable().optional(),
-    paidDepositAmount: z.union([z.number(), z.string()]).optional().default(0).transform(val => Number(val) || 0),
+    paidDepositAmount: z.union([z.number(), z.string(), z.null()]).optional().default(0).transform(val => (val === '' || val === null || val === undefined) ? 0 : Number(val)),
 
     items: z.array(ReceiptItemSchema).optional().default([]),
 });

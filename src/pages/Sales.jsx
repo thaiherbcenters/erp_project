@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAlert } from '../components/CustomAlert';
 import { Eye, Edit, Trash2, Clock, History, X, Send, Plus, FileText, LayoutDashboard, Users, FileSpreadsheet, ShoppingCart, Receipt, Briefcase, UserCheck, Search, Copy, Upload, Download, UploadCloud, RotateCcw, Filter, Calendar, TrendingUp, ArrowRight, ChevronRight, Truck, FileCheck, Layers, DollarSign } from 'lucide-react';
 import { MOCK_CUSTOMERS } from '../data/mockData';
+import { formatThaiDocDate } from '../utils/formatters';
 import QuotationForm from '../components/QuotationForm';
 import SalesOrderForm from '../components/SalesOrderForm';
 import BillingInvoiceForm from '../components/BillingInvoiceForm';
@@ -1603,7 +1604,7 @@ export default function Sales() {
                                                 </td>
                                                 <td>{q.CustomerName || q.customer}</td>
                                                 <td>{(q.GrandTotal || q.total || 0).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
-                                                <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : q.date}</td>
+                                                <td>{formatThaiDocDate(q.BillDate || q.date)}</td>
                                                 <td>
 <InlineStatusDropdown
                                                         value={q.Status || q.status}
@@ -1807,7 +1808,7 @@ export default function Sales() {
                                                     </td>
                                                     <td>{q.CustomerName}</td>
                                                     <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                                    <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                                    <td>{formatThaiDocDate(q.BillDate)}</td>
                                                     <td style={{ textAlign: 'center' }}>
 <InlineStatusDropdown
                                                         value={q.Status || q.status}
@@ -2009,7 +2010,7 @@ export default function Sales() {
                                                     <td>{q.ContractID || '-'}</td>
                                                     <td>{q.CustomerName}</td>
                                                     <td>{Number(q.GrandTotal).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                                    <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                                    <td>{formatThaiDocDate(q.BillDate)}</td>
                                                     <td style={{ textAlign: 'center' }}>
 <InlineStatusDropdown
                                                         value={q.Status || q.status}
@@ -2217,7 +2218,7 @@ export default function Sales() {
                                                             </div>
                                                         )}
                                                     </td>
-                                                    <td>{q.BillDate ? new Date(q.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                                    <td>{formatThaiDocDate(q.BillDate)}</td>
                                                     <td style={{ textAlign: 'center' }}>
                                                     <InlineStatusDropdown
                                                         value={q.Status || q.status}
@@ -2373,7 +2374,7 @@ export default function Sales() {
                                                 <td>{o.CustomerName}</td>
                                                 <td>{o.CustomerPONumber || '—'}</td>
                                                 <td>{(o.GrandTotal || 0).toLocaleString('th-TH', { minimumFractionDigits: 2 })}</td>
-                                                <td>{o.OrderDate ? new Date(o.OrderDate).toLocaleDateString('th-TH') : ''}</td>
+                                                <td>{formatThaiDocDate(o.OrderDate)}</td>
                                                 <td><span className={`badge ${getOrderStatusClass(o.Status)}`}>{o.Status}</span></td>
                                                 <td>{o.CreatedByName || '-'}</td>
                                                 <td style={{ textAlign: 'center' }}>
@@ -2569,7 +2570,7 @@ export default function Sales() {
                                                     </div>
                                                 )}
                                             </td>
-                                            <td>{b.BillDate ? new Date(b.BillDate).toLocaleDateString('th-TH') : '-'}</td>
+                                            <td>{formatThaiDocDate(b.BillDate)}</td>
                                             <td>
                                                 <InlineStatusDropdown
                                                     value={b.Status || b.status}
@@ -2712,7 +2713,7 @@ export default function Sales() {
                                         <tr key={p.DocumentID}>
                                             <td>{p.DocumentNo || '-'}</td>
                                             <td>{p.Version > 1 ? `V${p.Version}` : '-'}</td>
-                                            <td>{p.DocumentDate ? new Date(p.DocumentDate).toLocaleDateString('th-TH') : '-'}</td>
+                                            <td>{formatThaiDocDate(p.DocumentDate)}</td>
                                             <td>{p.GrantorName || '-'}</td>
                                             <td>{p.GranteeName || '-'}</td>
                                             <td>
@@ -2880,8 +2881,8 @@ export default function Sales() {
                                                         </div>
                                                     </div>
                                                     <div style={{ fontSize: '12px', color: '#64748b', display: 'flex', gap: '16px' }}>
-                                                        <span>วันที่เอกสาร: {h.DocumentDate ? new Date(h.DocumentDate).toLocaleDateString('th-TH') : '-'}</span>
-                                                        <span>สร้างเมื่อ: {new Date(h.CreatedAt).toLocaleDateString('th-TH')}</span>
+                                                        <span>วันที่เอกสาร: {formatThaiDocDate(h.DocumentDate)}</span>
+                                                        <span>สร้างเมื่อ: {formatThaiDocDate(h.CreatedAt)}</span>
                                                     </div>
                                                 </div>
                                             ))

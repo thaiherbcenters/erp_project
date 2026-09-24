@@ -19,6 +19,7 @@ import { TipTapCell } from './TipTapCell';
 import API_BASE from '../config';
 import SupplierSelectorModal from './SupplierSelectorModal';
 import PRSelectorModal from './PRSelectorModal';
+import { toLocalDateInput, getTodayLocal, formatThaiDocDate } from '../utils/formatters';
 import './PurchaseOrderForm.css';
 
 // ── Formatting Helpers ──
@@ -27,15 +28,8 @@ const formatCurrency = (num) => {
 };
 
 const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    const actualStr = typeof dateStr === 'object' ? (dateStr.target?.value || dateStr.value || '') : dateStr;
-    if (!actualStr) return '-';
-    try {
-        const d = new Date(actualStr);
-        return isNaN(d.getTime()) ? String(actualStr) : d.toLocaleDateString('th-TH');
-    } catch {
-        return String(actualStr);
-    }
+    const actualStr = typeof dateStr === 'object' ? (dateStr?.target?.value || dateStr?.value || '') : dateStr;
+    return formatThaiDocDate(actualStr);
 };
 
 function ThaiBaht(Number) {
@@ -162,7 +156,7 @@ export default function PurchaseOrderForm({ editId, initialPR, onBack, onSave, o
     // ── Form State ──
     const [formData, setFormData] = useState({
         poNumber: '',
-        poDate: new Date().toISOString().split('T')[0],
+        poDate: getTodayLocal(),
         refNumber: '',
         prNumber: '',
         docType: 'po_thc',
@@ -303,7 +297,7 @@ export default function PurchaseOrderForm({ editId, initialPR, onBack, onSave, o
 
                         setFormData({
                             poNumber: po.PONumber || '',
-                            poDate: po.PODate ? po.PODate.split('T')[0] : '',
+                            poDate: toLocalDateInput(po.PODate),
                             refNumber: po.RefNumber || '',
                             prNumber: po.PRNumber || '',
                             docType: po.DocType || 'po_thc',

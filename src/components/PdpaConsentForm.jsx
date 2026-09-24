@@ -2,6 +2,7 @@ import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'rea
 import API_BASE from '../config';
 import './PowerOfAttorneyForm.css';
 import NameInputWithTitle from './NameInputWithTitle';
+import { toLocalDateInput, getTodayLocal } from '../utils/formatters';
 
 /**
  * PdpaConsentForm.jsx
@@ -13,7 +14,7 @@ const PdpaConsentForm = forwardRef(({ documentId, customerData, contractId, embe
 
     const [form, setForm] = useState({
         writtenAt: '',
-        documentDate: new Date().toISOString().split('T')[0],
+        documentDate: getTodayLocal(),
         personPrefix: '', // '', '', '', 'อื่นๆ'
         personPrefixOther: '',
         personName: '',
@@ -39,7 +40,7 @@ const PdpaConsentForm = forwardRef(({ documentId, customerData, contractId, embe
                     setForm(prev => ({
                         ...prev,
                         writtenAt: d.WrittenAt || prev.writtenAt,
-                        documentDate: d.DocumentDate ? new Date(d.DocumentDate).toISOString().split('T')[0] : prev.documentDate,
+                        documentDate: d.DocumentDate ? toLocalDateInput(d.DocumentDate) : prev.documentDate,
                         personPrefix: d.PersonPrefix || prev.personPrefix,
                         personPrefixOther: d.PersonPrefixOther || prev.personPrefixOther,
                         personName: d.PersonName || prev.personName,

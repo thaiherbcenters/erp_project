@@ -5,6 +5,7 @@ import API_BASE from '../config';
 import './PowerOfAttorneyForm.css';
 import NameInputWithTitle from './NameInputWithTitle';
 import CustomDatePicker from './CustomDatePicker';
+import { toLocalDateInput, getTodayLocal } from '../utils/formatters';
 
 /**
  * HerbalCertForm.jsx
@@ -19,7 +20,7 @@ const HerbalCertForm = forwardRef(({ documentId, customerData, contractId, embed
 
     const [form, setForm] = useState({
         writtenAt: '',
-        documentDate: new Date().toISOString().split('T')[0],
+        documentDate: getTodayLocal(),
         applicantPrefix: '',
         applicantName: '',
         productName: '',
@@ -27,7 +28,7 @@ const HerbalCertForm = forwardRef(({ documentId, customerData, contractId, embed
         refProductNameThai: '',
         refRegistrationNo: '',
         certificateHolder: '',
-        signDate: new Date().toISOString().split('T')[0],
+        signDate: getTodayLocal(),
     });
 
     // Fetch saved data when editing
@@ -43,7 +44,7 @@ const HerbalCertForm = forwardRef(({ documentId, customerData, contractId, embed
                     setForm(prev => ({
                         ...prev,
                         writtenAt: d.WrittenAt || prev.writtenAt,
-                        documentDate: d.DocumentDate ? new Date(d.DocumentDate).toISOString().split('T')[0] : prev.documentDate,
+                        documentDate: d.DocumentDate ? toLocalDateInput(d.DocumentDate) : prev.documentDate,
                         applicantPrefix: d.ApplicantPrefix || d.ApplicantType || prev.applicantPrefix,
                         applicantName: d.ApplicantName || prev.applicantName,
                         productName: d.ProductName || prev.productName,
@@ -51,7 +52,7 @@ const HerbalCertForm = forwardRef(({ documentId, customerData, contractId, embed
                         refProductNameThai: d.RefProductNameThai || prev.refProductNameThai,
                         refRegistrationNo: d.RefRegistrationNo || prev.refRegistrationNo,
                         certificateHolder: d.CertificateHolder || prev.certificateHolder,
-                        signDate: d.SignDate ? new Date(d.SignDate).toISOString().split('T')[0] : prev.signDate,
+                        signDate: d.SignDate ? toLocalDateInput(d.SignDate) : prev.signDate,
                         productNameAlt: d.ProductNameAlt || prev.productNameAlt || '',
                         regNo: d.RegNo || prev.regNo || '',
                         regDetailNo: d.RegDetailNo || prev.regDetailNo || '',
