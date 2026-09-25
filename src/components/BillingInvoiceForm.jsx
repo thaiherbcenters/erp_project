@@ -3,6 +3,7 @@ import { Save, Printer, ArrowLeft, Plus, Trash2, FileText, CheckCircle, Calendar
 import { useAlert } from '../components/CustomAlert';
 import API_BASE from '../config';
 import CustomDatePicker from '../components/CustomDatePicker';
+import CreditTermsInput from './CreditTermsInput';
 import TaxIdInput from '../components/TaxIdInput';
 import CustomSelect from './CustomSelect';
 import ContractSelectorModal from './ContractSelectorModal';
@@ -1703,7 +1704,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                         </div>
 
 
-                        <div className="form-row" style={{ marginTop: '14px' }}>
+                        <div className="form-row" style={{ marginTop: '14px', gridTemplateColumns: !isFda ? '1fr 1fr 1fr' : '1fr 1fr' }}>
                             <div className="form-group" style={{ marginBottom: 0 }}>
                                 <label>เลขที่ / No. <span className="required">*</span></label>
                                 <input type="text" name="billNo" value={formData.billNo} onChange={handleFormChange} required />
@@ -1717,6 +1718,12 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                     required
                                 />
                             </div>
+                            {!isFda && (
+                                <div className="form-group" style={{ marginBottom: 0 }}>
+                                    <label>เงื่อนไขการชำระเงิน (Credit Terms)</label>
+                                    <CreditTermsInput name="fdaCreditTerms" value={formData.fdaCreditTerms} onChange={handleFormChange} />
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1795,8 +1802,8 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                         <input type="text" name="fdaProjectName" placeholder="ขึ้นทะเบียนตำรับยา (G)" value={formData.fdaProjectName} onChange={handleFormChange} style={{ background: '#fff' }} />
                                     </div>
                                     <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ fontWeight: 'bold', color: '#334155' }}>กำหนดชำระเครดิต (Credit Terms)</label>
-                                        <input type="text" name="fdaCreditTerms" placeholder="ชำระเต็มจำนวน" value={formData.fdaCreditTerms} onChange={handleFormChange} style={{ background: '#fff' }} />
+                                        <label style={{ fontWeight: 'bold', color: '#334155' }}>เงื่อนไขการชำระเงิน (Credit Terms)</label>
+                                        <CreditTermsInput name="fdaCreditTerms" value={formData.fdaCreditTerms} onChange={handleFormChange} />
                                     </div>
                                 </div>
                                 
@@ -2479,7 +2486,7 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                                 </tr>
                                 <tr>
                                     <td style={{ border: '1px solid black', padding: '4px 8px', whiteSpace: 'nowrap' }}>
-                                        <span>กำหนดชำระเครดิต/ Credit:</span> <span style={{ fontSize: '9pt', color: 'red' }}>ชำระเต็มจำนวน</span>
+                                        <span>เงื่อนไขการชำระเงิน/ Credit:</span> <span style={{ fontSize: '9pt', color: 'red' }}>{formData.fdaCreditTerms || 'ชำระเต็มจำนวน'}</span>
                                     </td>
                                 </tr>
                             </tbody>
@@ -2806,7 +2813,9 @@ export default function BillingInvoiceForm({ editId, onBack, onSave, viewOnly, i
                             <td style={{ borderRight: '1px solid black', borderTop: 'none', padding: '2px 8px', verticalAlign: 'top' }}>
                                 <span style={{ fontWeight: 'normal' }}>{formData.phone || '-'}</span>
                             </td>
-                            <td style={{ borderTop: 'none', padding: '2px 8px', verticalAlign: 'top' }}></td>
+                            <td style={{ borderTop: 'none', padding: '2px 8px', verticalAlign: 'top' }}>
+                                <span style={{ fontWeight: 'bold' }}>{isEn ? 'Credit :' : 'เงื่อนไขการชำระเงิน/ Credit:'}</span> <span style={{ marginLeft: '5px', fontWeight: 'normal', color: 'red', fontSize: '9pt' }}>{formData.fdaCreditTerms || 'ชำระเต็มจำนวน'}</span>
+                            </td>
                         </tr>
                         <tr>
                             <td style={{ borderRight: '1px solid black', borderTop: 'none', padding: '2px 8px', verticalAlign: 'top' }}>

@@ -913,7 +913,7 @@
                         <input type="text" id="fdaProjectName" value="ขึ้นทะเบียนตำรับยา (G)" placeholder="ชื่อโครงการ">
                     </div>
                     <div class="form-group">
-                        <label>กำหนดชำระเครดิต (Credit Terms)</label>
+                        <label>เงื่อนไขการชำระเงิน (Credit Terms)</label>
                         <input type="text" id="fdaCreditTerms" value="ชำระเต็มจำนวน" placeholder="เช่น ชำระเต็มจำนวน">
                     </div>
                 </div>
@@ -1369,7 +1369,7 @@
                     <span id="printPhone" style="font-weight: normal;"></span>
                 </td>
                 <td style="border-top: none; padding: 5px 8px; vertical-align: top;">
-                    <!-- Blank area under date -->
+                    <span style="font-weight:bold;">เงื่อนไขการชำระเงิน/ Credit:</span> <span id="printCreditTerms" style="margin-left: 5px; font-weight: normal; color: red; font-size: 9pt;">ชำระเต็มจำนวน</span>
                 </td>
             </tr>
             <tr>
@@ -2135,7 +2135,7 @@
                     <td style="border: 1px solid black; padding: 4px 8px; white-space: nowrap;">วันที่: <span id="fdaPrintDate"></span></td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid black; padding: 4px 8px; white-space: nowrap;">กำหนดชำระเครดิต/ Credit: <span style="font-size: 9pt; color: red;" id="fdaPrintCreditTerm">ชำระเต็มจำนวน</span></td>
+                    <td style="border: 1px solid black; padding: 4px 8px; white-space: nowrap;">เงื่อนไขการชำระเงิน/ Credit: <span style="font-size: 9pt; color: red;" id="fdaPrintCreditTerm">ชำระเต็มจำนวน</span></td>
                 </tr>
             </table>
 
@@ -3164,6 +3164,7 @@
             document.getElementById('fdaPrintCustomerCode').textContent = document.getElementById('fdaCustomerCode').value || '';
             document.getElementById('fdaPrintProjectName').textContent = document.getElementById('fdaProjectName').value || 'ขึ้นทะเบียนตำรับยา (G)';
             document.getElementById('fdaPrintCreditTerm').textContent = document.getElementById('fdaCreditTerms').value || 'ชำระเต็มจำนวน';
+            if (document.getElementById('printCreditTerms')) document.getElementById('printCreditTerms').textContent = (document.getElementById('fdaCreditTerms') ? document.getElementById('fdaCreditTerms').value : '') || 'ชำระเต็มจำนวน';
 
             // เงื่อนไข + หมายเหตุ (อ่านจากช่องหมายเหตุในฟอร์ม)
             const fdaRemarksContainer = document.getElementById('fdaPrintRemarksContainer');

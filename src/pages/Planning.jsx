@@ -18,12 +18,13 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     Search, Plus, Filter, CalendarDays, PieChart, Activity,
-    CheckCircle, Wrench, Package, ClipboardList, AlertTriangle,
-    ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock, Play, ShoppingCart, FileText, UserCheck
+    CheckCircle, CheckCircle2, Wrench, Package, ClipboardList, AlertTriangle,
+    ArrowRight, Eye, XCircle, Beaker, TrendingUp, Clock, Play, ShoppingCart, FileText, UserCheck,
+    Printer, Sparkles, Layers, SlidersHorizontal, RefreshCw, X
 } from 'lucide-react';
 import API_BASE from '../config';
 import { usePlanner } from '../context/PlannerContext';
-import { formatDynamicBatchSize, getDynamicBatchSizeValue, convertToBase } from '../utils/formatters';
+import { formatDynamicBatchSize, getDynamicBatchSizeValue, convertToBase, toLocalDateInput, getTodayLocal, formatThaiDocDate } from '../utils/formatters';
 import { useRnD } from '../context/RnDContext';
 import { useProduction } from '../context/ProductionContext';
 import { useAlert } from '../components/CustomAlert';
@@ -78,8 +79,31 @@ export default function Planning() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('ทั้งหมด');
     const [soFilter, setSOFilter] = useState('');
+    const [lineFilter, setLineFilter] = useState('');
+    const [formulaSearch, setFormulaSearch] = useState('');
+    const [soSearch, setSoSearch] = useState('');
     const [jobPage, setJobPage] = useState(1);
     const [jobPageSize, setJobPageSize] = useState(10);
+
+    // ── In-page Navigation View: 'jobs' | 'pending_so' | 'formulas' ──
+    const [activeView, setActiveView] = useState(() => {
+        const tab = new URLSearchParams(location.search).get('tab');
+        if (tab === 'pending_so') return 'pending_so';
+        if (tab === 'formulas') return 'formulas';
+        return 'jobs';
+    });
+
+    useEffect(() => {
+        const tab = new URLSearchParams(location.search).get('tab');
+        if (tab === 'pending_so') setActiveView('pending_so');
+        else if (tab === 'formulas') setActiveView('formulas');
+        else if (tab === 'planning_list') setActiveView('jobs');
+    }, [location.search]);
+
+    const handleOpenCreateWithFormula = (formula) => {
+        handleFormulaSelect(formula.id);
+        setShowCreateModal(true);
+    };
 
     useEffect(() => {
         setJobPage(1);
@@ -98,7 +122,7 @@ export default function Planning() {
         totalQty: 0,
         unit: '',
         priority: 'ปกติ',
-        planDate: new Date().toISOString().split('T')[0],
+        planDate: getTodayLocal(),
         dueDate: '',
         assignedLine: 'Line A',
         notes: '',
@@ -137,11 +161,8 @@ export default function Planning() {
     }, []);
 
     useEffect(() => {
-        if (currentTab === 'planning_overview' || showCreateModal) {
-            // Only show loading indicator if it's currently empty (first load)
-            fetchPendingSalesOrders(pendingSalesOrders.length === 0);
-        }
-    }, [currentTab, jobs, showCreateModal]);
+        fetchPendingSalesOrders(pendingSalesOrders.length === 0);
+    }, [jobs, showCreateModal]);
 
     const fetchPendingSalesOrders = async (showLoading = true) => {
         if (showLoading) setLoadingSOs(true);
@@ -749,9 +770,29 @@ export default function Planning() {
     };
 
     // ══════════════════════════════════════════════════════════════════
-    // 1. Planning Overview (Dashboard)
+    // Unified Planning Hub Components
     // ══════════════════════════════════════════════════════════════════
-    const renderOverview = () => {
+
+    const handleReleaseJob = async (jobId) => {
+        const ok = await showConfirm('ยืนยันการส่งงาน', `ยืนยันการส่งใบสั่งผลิต ${jobId} ให้ฝ่ายผลิต?\nระบบจะทำการตั้งคิวงานใหม่ทันที`, 'info');
+        if (!ok) return;
+        const res = await releaseJobOrder(jobId);
+        if (res.success) {
+            showAlert('สำเร็จ', 'ส่งงานให้ฝ่ายผลิตเรียบร้อยแล้ว! สามารถดูคิวงานได้ที่หน้าฝ่ายผลิต', 'success');
+        } else {
+            showAlert('เกิดข้อผิดพลาด', res.message, 'error');
+        }
+    };
+
+    // Extract SO references from job notes
+    const extractSO = (notes) => {
+        if (!notes) return null;
+        const match = notes.match(/SO:\s*(SO-?[\d-]+)/);
+        return match ? match[1] : null;
+    };
+
+    // QC Rejected Alert Banner
+    const renderQCAlert = () => {
         const jobsWithRejectedQc = jobs.filter(j => {
             const jobQcs = (qcRequests || []).filter(q => q.jobOrderId === j.id);
             const latestQcs = {};
@@ -764,291 +805,328 @@ export default function Planning() {
             return Object.values(latestQcs).some(q => q.status === 'ไม่ผ่าน');
         });
 
-        return (
-        <div className="planning-overview">
+        if (jobsWithRejectedQc.length === 0) return null;
 
-            {jobsWithRejectedQc.length > 0 && (
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 16, marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <AlertTriangle size={24} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
+        return (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '14px 18px', marginBottom: 18, display: 'flex', gap: 14, alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', boxShadow: '0 2px 4px rgba(220, 38, 38, 0.05)' }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <AlertTriangle size={20} color="#dc2626" />
+                    </div>
                     <div>
-                        <h4 style={{ color: '#991b1b', margin: '0 0 6px', fontSize: 15, fontWeight: 700 }}>แจ้งเตือน: พบรายการผลิตที่ไม่ผ่าน QC</h4>
-                        <p style={{ color: '#b91c1c', margin: 0, fontSize: 13, lineHeight: 1.5 }}>
-                            มีใบสั่งผลิตจำนวน <strong>{jobsWithRejectedQc.length}</strong> รายการที่ฝ่ายผลิตถูกส่งกลับแก้ไข (Rework) หรือคัดทิ้ง (Reject) เนื่องจากไม่ผ่านการตรวจสอบคุณภาพ 
-                            กรุณาตรวจสอบตารางด้านล่างและประสานงานกับฝ่ายผลิต
+                        <h4 style={{ color: '#991b1b', margin: '0 0 3px', fontSize: 14, fontWeight: 700 }}>
+                            แจ้งเตือน: พบใบสั่งผลิตที่ไม่ผ่าน QC ({jobsWithRejectedQc.length} รายการ)
+                        </h4>
+                        <p style={{ color: '#b91c1c', margin: 0, fontSize: 12.5 }}>
+                            มีรายการผลิตที่ผลตรวจคุณภาพไม่ผ่าน (ถูกส่งกลับแก้ไขหรือคัดทิ้ง) กรุณาตรวจสอบและประสานงานฝ่ายผลิต
                         </p>
                     </div>
                 </div>
-            )}
-
-            {hasSectionPermission('planning_overview_stats') && (
-                <div className="summary-row">
-                    <div className="card summary-card">
-                        <div className="summary-icon" style={{ background: '#f0ebff', color: '#7b7bf5' }}><ClipboardList size={20} /></div>
-                        <div><span className="summary-label">ใบสั่งผลิตทั้งหมด</span><span className="summary-value">{totalJobs}</span></div>
-                    </div>
-                    <div className="card summary-card">
-                        <div className="summary-icon" style={{ background: '#fff8e1', color: '#f9a825' }}><Activity size={20} /></div>
-                        <div><span className="summary-label">กำลังผลิต</span><span className="summary-value">{inProgressJobs}</span></div>
-                    </div>
-                    <div className="card summary-card">
-                        <div className="summary-icon" style={{ background: '#e3f2fd', color: '#1e88e5' }}><Clock size={20} /></div>
-                        <div><span className="summary-label">รอผลิต</span><span className="summary-value">{waitingJobs}</span></div>
-                    </div>
-                    <div className="card summary-card">
-                        <div className="summary-icon" style={{ background: '#ecfdf5', color: '#059669' }}><CheckCircle size={20} /></div>
-                        <div><span className="summary-label">เสร็จสิ้น</span><span className="summary-value">{completedJobs}</span></div>
-                    </div>
-                </div>
-            )}
-
-            {/* คำสั่งขายที่รอวางแผน (Sales Orders) */}
-            <div className="card" style={{ marginBottom: 16 }}>
-                <h3 className="plan-card-title" style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0284c7', margin: '0 0 4px' }}>
-                    <ShoppingCart size={16} /> คำสั่งขายที่รอวางแผน (Pending Sales Orders)
-                </h3>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>ออเดอร์จากฝ่ายขายที่รอการจัดทำแผนผลิต (ใบสั่งผลิต)</p>
-                {loadingSOs ? (
-                    <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลคำสั่งขาย...</div>
-                ) : pendingSalesOrders.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่มีคำสั่งขายที่รอวางแผนในขณะนี้ 🎉</div>
-                ) : (
-                    <div className="custom-scrollbar" style={{ display: 'flex', overflowX: 'auto', gap: '16px', paddingBottom: '12px' }}>
-                        {pendingSalesOrders.map(so => (
-                            <div key={so.SalesOrderID} style={{
-                                flex: '0 0 auto',
-                                width: '320px',
-                                background: '#fff',
-                                borderRadius: '12px',
-                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
-                                border: '1px solid #e2e8f0',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                display: 'flex',
-                                flexDirection: 'column'
-                            }}>
-                                {/* Left color bar */}
-                                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: '#8b5cf6' }}></div>
-                                
-                                <div style={{ padding: '16px 16px 12px 20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                                        <span style={{ 
-                                            background: '#8b5cf6', color: '#fff', padding: '4px 10px', 
-                                            borderRadius: '6px', fontSize: '13px', fontWeight: 600, letterSpacing: '0.3px' 
-                                        }}>
-                                            {so.SalesOrderNo}
-                                        </span>
-                                    </div>
-                                    
-                                    <h4 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: 700, color: '#1e293b' }}>
-                                        {so.CustomerName}
-                                    </h4>
-                                    
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        {so.CustomerPONumber && (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748b' }}>
-                                                <FileText size={14} style={{ color: '#94a3b8' }} />
-                                                <span>PO: <strong style={{ color: '#475569' }}>{so.CustomerPONumber}</strong></span>
-                                            </div>
-                                        )}
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748b' }}>
-                                            <CalendarDays size={14} style={{ color: '#94a3b8' }} />
-                                            <span>กำหนดส่ง: <strong style={{ color: '#475569' }}>{so.DeliveryDate ? new Date(so.DeliveryDate).toLocaleDateString('th-TH') : 'ไม่ระบุ'}</strong></span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div style={{ 
-                                    marginTop: 'auto', 
-                                    background: '#f8fafc', 
-                                    borderTop: '1px dashed #cbd5e1', 
-                                    padding: '12px 16px 12px 20px',
-                                    display: 'flex',
-                                    gap: '10px'
-                                }}>
-                                    <button 
-                                        onClick={() => handleViewSODetail(so.SalesOrderID)}
-                                        style={{ 
-                                            flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', 
-                                            background: '#fff', border: '1px solid #cbd5e1', color: '#475569', 
-                                            padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600
-                                        }}
-                                    >
-                                        <Eye size={14} /> รายละเอียด
-                                    </button>
-                                    <button 
-                                        onClick={() => handleCreateFromSO(so)}
-                                        style={{ 
-                                            flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', 
-                                            background: '#ede9fe', color: '#6d28d9', border: '1px solid #ddd6fe', 
-                                            padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600
-                                        }}
-                                    >
-                                        <ClipboardList size={14} /> จัดทำแผนผลิต
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                <button 
+                    onClick={() => { setActiveView('jobs'); setStatusFilter('ติดปัญหา (QC)'); }}
+                    style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+                >
+                    <Filter size={14} /> กรองดูรายการที่ติดปัญหา
+                </button>
             </div>
-
-            {/* สูตรที่พร้อมใช้งาน (จาก R&D) */}
-            <div className="card" style={{ marginBottom: 16 }}>
-                <h3 className="plan-card-title"><Beaker size={16} style={{ color: '#7b7bf5' }} /> สูตรที่พร้อมใช้งาน (จาก R&D)</h3>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>สูตรที่ผ่านการอนุมัติแล้ว สามารถนำมาเปิดใบสั่งผลิตได้</p>
-                <div className="plan-formula-grid">
-                    {MOCK_FORMULAS.filter(f => f.status === 'อนุมัติ').map(f => (
-                        <div key={f.id} className="plan-formula-card">
-                            <div className="plan-formula-top">
-                                <span className="plan-formula-code">{f.id}</span>
-                                <span className="badge badge-success">พร้อมผลิต</span>
-                            </div>
-                            <div className="plan-formula-name">{f.name}</div>
-                            <div className="plan-formula-meta">
-                                <span>{f.ingredients?.length ? formatDynamicBatchSize(f.ingredients) : `${f.batchSize.toLocaleString()} ${f.unit}`}/batch</span>
-                                <span>{f.ingredients.length} วัตถุดิบ</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Job Orders ล่าสุด */}
-            <div className="card">
-                <h3 className="plan-card-title"><ClipboardList size={16} style={{ color: '#1e88e5' }} /> ใบสั่งผลิตล่าสุด</h3>
-                <div className="table-card">
-                    <table className="data-table">
-                        <thead>
-                            <tr>
-                                <th>เลขที่</th>
-                                <th>ผลิตภัณฑ์</th>
-                                <th>จำนวน</th>
-                                <th>สถานะ</th>
-                                <th>Progress</th>
-                                <th>กำหนดเสร็จ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {loading ? (
-                                <tr><td colSpan="6" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>กำลังโหลดข้อมูล...</td></tr>
-                            ) : jobs.slice(0, 3).map(job => (
-                                <tr key={job.id}>
-                                    <td className="text-bold" style={{ whiteSpace: 'nowrap' }}>{job.id}</td>
-                                    <td>
-        <div style={{ fontSize: 13, fontWeight: 500 }}>{job.productName && job.productName !== job.formulaName ? job.productName : job.formulaName}</div>
-        {job.productName && job.productName !== job.formulaName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{job.formulaName}</div>}
-    </td>
-                                    <td style={{ whiteSpace: 'nowrap' }}>{job.totalQty.toLocaleString()} {job.unit}</td>
-                                    <td><span className={`status-badge ${getStatusBadge(job.status)}`}>{job.status}</span></td>
-                                    <td>
-                                        <div className="progress-container">
-                                            <div className="progress-bar" style={{ width: `${job.progress}%`, backgroundColor: job.status === 'เสร็จสิ้น' ? 'var(--success)' : 'var(--primary)' }}></div>
-                                            <span className="progress-text">{job.progress}%</span>
-                                        </div>
-                                    </td>
-                                    <td style={{ whiteSpace: 'nowrap' }}>{job.dueDate}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
         );
     };
 
-    // ══════════════════════════════════════════════════════════════════
-    // 2. ใบสั่งผลิต (Job Order List)
-    // ══════════════════════════════════════════════════════════════════
-    const handleReleaseJob = async (jobId) => {
-        const ok = await showConfirm('ยืนยันการส่งงาน', `ยืนยันการส่งใบสั่งผลิต ${jobId} ให้ฝ่ายผลิต?\nระบบจะทำการตั้งคิวงานใหม่ทันที`, 'info');
-        if (!ok) return;
-        const res = await releaseJobOrder(jobId);
-        if (res.success) {
-            showAlert('สำเร็จ', 'ส่งงานให้ฝ่ายผลิตเรียบร้อยแล้ว! สามารถดูคิวงานได้ที่หน้าฝ่ายผลิต', 'success');
-        } else {
-            showAlert('เกิดข้อผิดพลาด', res.message, 'error');
-        }
+    // ── KPI Summary Cards ──
+    const renderKPIStats = () => {
+        const totalJobs = jobs.length;
+        const inProgressJobs = jobs.filter(j => j.status === 'กำลังผลิต').length;
+        const waitingJobs = jobs.filter(j => j.status === 'รอผลิต' || j.status === 'รอเริ่มงาน').length;
+        const completedJobs = jobs.filter(j => j.status === 'เสร็จสิ้น').length;
+        const pendingSOCount = pendingSalesOrders.length;
+        const approvedFormulasCount = (MOCK_FORMULAS || []).filter(f => f.status === 'อนุมัติ').length;
+
+        return (
+            <div className="planning-kpi-grid">
+                {/* 1. ออเดอร์รอวางแผน (Sales Orders) */}
+                <div 
+                    className={`planning-kpi-card ${activeView === 'pending_so' ? 'active-filter' : ''}`}
+                    onClick={() => setActiveView('pending_so')}
+                    title="คลิกเพื่อดูและจัดทำแผนผลิตจากคำสั่งขาย"
+                    style={{ borderLeft: '4px solid #8b5cf6' }}
+                >
+                    <div className="planning-kpi-icon" style={{ background: '#f5f3ff', color: '#8b5cf6' }}>
+                        <ShoppingCart size={22} />
+                    </div>
+                    <div className="planning-kpi-info">
+                        <span className="planning-kpi-label">ออเดอร์รอวางแผน</span>
+                        <span className="planning-kpi-value" style={{ color: pendingSOCount > 0 ? '#7c3aed' : '#0f172a' }}>
+                            {pendingSOCount}
+                        </span>
+                        <span className="planning-kpi-sub">
+                            {pendingSOCount > 0 ? '⚠️ มีคำสั่งขายรอเปิด JO' : 'จัดการครบถ้วนแล้ว'}
+                        </span>
+                    </div>
+                </div>
+
+                {/* 2. ใบสั่งผลิตทั้งหมด */}
+                <div 
+                    className={`planning-kpi-card ${activeView === 'jobs' && statusFilter === 'ทั้งหมด' ? 'active-filter' : ''}`}
+                    onClick={() => { setActiveView('jobs'); setStatusFilter('ทั้งหมด'); }}
+                    title="คลิกเพื่อดูใบสั่งผลิตทั้งหมด"
+                    style={{ borderLeft: '4px solid #3b82f6' }}
+                >
+                    <div className="planning-kpi-icon" style={{ background: '#eff6ff', color: '#3b82f6' }}>
+                        <ClipboardList size={22} />
+                    </div>
+                    <div className="planning-kpi-info">
+                        <span className="planning-kpi-label">ใบสั่งผลิตทั้งหมด</span>
+                        <span className="planning-kpi-value">{totalJobs}</span>
+                        <span className="planning-kpi-sub">รายการ Job Order</span>
+                    </div>
+                </div>
+
+                {/* 3. รอผลิต / รอเริ่มงาน */}
+                <div 
+                    className={`planning-kpi-card ${activeView === 'jobs' && statusFilter === 'รอผลิต' ? 'active-filter' : ''}`}
+                    onClick={() => { setActiveView('jobs'); setStatusFilter('รอผลิต'); }}
+                    title="คลิกเพื่อกรองเฉพาะงานที่รอผลิต"
+                    style={{ borderLeft: '4px solid #0284c7' }}
+                >
+                    <div className="planning-kpi-icon" style={{ background: '#e0f2fe', color: '#0284c7' }}>
+                        <Clock size={22} />
+                    </div>
+                    <div className="planning-kpi-info">
+                        <span className="planning-kpi-label">รอเริ่มผลิต</span>
+                        <span className="planning-kpi-value">{waitingJobs}</span>
+                        <span className="planning-kpi-sub">พร้อมปล่อยเข้าไลน์</span>
+                    </div>
+                </div>
+
+                {/* 4. กำลังผลิต */}
+                <div 
+                    className={`planning-kpi-card ${activeView === 'jobs' && statusFilter === 'กำลังผลิต' ? 'active-filter' : ''}`}
+                    onClick={() => { setActiveView('jobs'); setStatusFilter('กำลังผลิต'); }}
+                    title="คลิกเพื่อกรองเฉพาะงานที่กำลังผลิต"
+                    style={{ borderLeft: '4px solid #f59e0b' }}
+                >
+                    <div className="planning-kpi-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
+                        <Activity size={22} />
+                    </div>
+                    <div className="planning-kpi-info">
+                        <span className="planning-kpi-label">กำลังผลิต</span>
+                        <span className="planning-kpi-value">{inProgressJobs}</span>
+                        <span className="planning-kpi-sub">ในสายการผลิต</span>
+                    </div>
+                </div>
+
+                {/* 5. เสร็จสิ้น */}
+                <div 
+                    className={`planning-kpi-card ${activeView === 'jobs' && statusFilter === 'เสร็จสิ้น' ? 'active-filter' : ''}`}
+                    onClick={() => { setActiveView('jobs'); setStatusFilter('เสร็จสิ้น'); }}
+                    title="คลิกเพื่อกรองเฉพาะงานที่เสร็จแล้ว"
+                    style={{ borderLeft: '4px solid #10b981' }}
+                >
+                    <div className="planning-kpi-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
+                        <CheckCircle size={22} />
+                    </div>
+                    <div className="planning-kpi-info">
+                        <span className="planning-kpi-label">ผลิตเสร็จสิ้น</span>
+                        <span className="planning-kpi-value">{completedJobs}</span>
+                        <span className="planning-kpi-sub">ส่งต่อคลังสินค้าแล้ว</span>
+                    </div>
+                </div>
+
+                {/* 6. สูตร R&D พร้อมใช้ */}
+                <div 
+                    className={`planning-kpi-card ${activeView === 'formulas' ? 'active-filter' : ''}`}
+                    onClick={() => setActiveView('formulas')}
+                    title="คลิกเพื่อดูสูตรที่พร้อมผลิตจาก R&D"
+                    style={{ borderLeft: '4px solid #06b6d4' }}
+                >
+                    <div className="planning-kpi-icon" style={{ background: '#ecfeff', color: '#0891b2' }}>
+                        <Beaker size={22} />
+                    </div>
+                    <div className="planning-kpi-info">
+                        <span className="planning-kpi-label">สูตร R&D พร้อมใช้</span>
+                        <span className="planning-kpi-value">{approvedFormulasCount}</span>
+                        <span className="planning-kpi-sub">อนุมัติพร้อมเปิดบิล</span>
+                    </div>
+                </div>
+            </div>
+        );
     };
-    const renderPlanList = () => {
-        const statuses = ['ทั้งหมด', 'รอผลิต', 'รอเริ่มงาน', 'กำลังผลิต', 'เสร็จสิ้น'];
 
-        // Extract SO references from job notes
-        const extractSO = (notes) => {
-            if (!notes) return null;
-            const match = notes.match(/SO:\s*(SO-?[\d-]+)/);
-            return match ? match[1] : null;
-        };
+    // ── In-Page Segmented Tab Navigation ──
+    const renderTabBar = () => {
+        const approvedFormulasCount = (MOCK_FORMULAS || []).filter(f => f.status === 'อนุมัติ').length;
 
-        // Build unique SO list for filter
+        return (
+            <div className="planning-hub-nav">
+                <div className="planning-hub-tabs">
+                    <button 
+                        type="button" 
+                        className={`planning-hub-tab-btn ${activeView === 'jobs' ? 'active' : ''}`}
+                        onClick={() => setActiveView('jobs')}
+                    >
+                        <ClipboardList size={16} />
+                        <span>ใบสั่งผลิตทั้งหมด (Job Orders)</span>
+                        <span className="planning-hub-badge">{jobs.length}</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        className={`planning-hub-tab-btn ${activeView === 'pending_so' ? 'active' : ''}`}
+                        onClick={() => setActiveView('pending_so')}
+                    >
+                        <ShoppingCart size={16} />
+                        <span>ออเดอร์รอวางแผน (Sales Orders)</span>
+                        <span className={`planning-hub-badge ${pendingSalesOrders.length > 0 ? 'highlight' : ''}`}>
+                            {pendingSalesOrders.length}
+                        </span>
+                    </button>
+                    <button 
+                        type="button" 
+                        className={`planning-hub-tab-btn ${activeView === 'formulas' ? 'active' : ''}`}
+                        onClick={() => setActiveView('formulas')}
+                    >
+                        <Beaker size={16} />
+                        <span>สูตรพร้อมใช้ R&D (Formulas)</span>
+                        <span className="planning-hub-badge">{approvedFormulasCount}</span>
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    // ── TAB 1: รายการใบสั่งผลิตทั้งหมด ──
+    const renderJobsTab = () => {
+        const statuses = ['ทั้งหมด', 'รอผลิต', 'รอเริ่มงาน', 'กำลังผลิต', 'เสร็จสิ้น', 'ติดปัญหา (QC)'];
         const soList = [...new Set(jobs.map(j => extractSO(j.notes)).filter(Boolean))].sort();
 
         const filtered = jobs.filter(j => {
-            const matchSearch = j.formulaName.includes(searchTerm) || j.id.includes(searchTerm) || (j.notes && j.notes.includes(searchTerm));
-            const matchStatus = statusFilter === 'ทั้งหมด' || j.status === statusFilter;
+            const matchSearch = (j.formulaName || '').includes(searchTerm) ||
+                (j.id || '').includes(searchTerm) ||
+                (j.productName || '').includes(searchTerm) ||
+                (j.notes && j.notes.includes(searchTerm));
+
+            // ตรวจสอบ QC Rejected
+            const jobQcs = (qcRequests || []).filter(q => q.jobOrderId === j.id);
+            const latestQcs = {};
+            jobQcs.forEach(q => {
+                const key = `${q.taskId}_${q.type}`;
+                if (!latestQcs[key] || new Date(q.requestedAt) > new Date(latestQcs[key].requestedAt)) {
+                    latestQcs[key] = q;
+                }
+            });
+            const hasRejected = Object.values(latestQcs).some(q => q.status === 'ไม่ผ่าน');
+
+            let matchStatus = true;
+            if (statusFilter === 'ติดปัญหา (QC)') {
+                matchStatus = hasRejected && j.status !== 'เสร็จสิ้น';
+            } else if (statusFilter !== 'ทั้งหมด') {
+                matchStatus = j.status === statusFilter;
+            }
+
             const matchSO = !soFilter || extractSO(j.notes) === soFilter;
-            return matchSearch && matchStatus && matchSO;
+            const matchLine = !lineFilter || j.assignedLine === lineFilter;
+
+            return matchSearch && matchStatus && matchSO && matchLine;
         });
 
         const paginatedJobs = filtered.slice((jobPage - 1) * jobPageSize, (jobPage - 1) * jobPageSize + jobPageSize);
 
         return (
             <div className="planning-list">
-
                 {/* ── Toolbar ── */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                    {/* Row 1: ค้นหา + ปุ่มสร้าง */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+                    {/* Row 1: ค้นหา + กรองสถานะ */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                         {hasSectionPermission('planning_list_search') && (
-                            <div className="search-group" style={{ maxWidth: 400 }}>
+                            <div className="search-group" style={{ maxWidth: 380, flex: 1, minWidth: 260 }}>
                                 <div className="search-input-wrap">
                                     <Search size={16} />
-                                    <input type="text" placeholder="ค้นหาใบสั่งผลิต... (เลขที่ JO, ชื่อสินค้า, SO)" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="ค้นหาใบสั่งผลิต... (เลขที่ JO, สินค้า, SO)" 
+                                        value={searchTerm} 
+                                        onChange={(e) => setSearchTerm(e.target.value)} 
+                                    />
+                                    {searchTerm && (
+                                        <button onClick={() => setSearchTerm('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#94a3b8' }}>
+                                            <X size={14} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
-                        {hasSectionPermission('planning_list_action') && canCreate('planning_list') && (
-                            <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ whiteSpace: 'nowrap', flexShrink: 0 }}><Plus size={16} /> สร้างใบสั่งผลิต</button>
-                        )}
-                    </div>
-                    {/* Row 2: กรองสถานะ + กรอง SO */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+
+                        {/* กรองสถานะ */}
                         <div className="plan-filter-group">
                             {statuses.map(s => (
-                                <button key={s} className={`plan-filter-btn ${statusFilter === s ? 'active' : ''}`} onClick={() => setStatusFilter(s)}>
+                                <button 
+                                    key={s} 
+                                    className={`plan-filter-btn ${statusFilter === s ? 'active' : ''}`} 
+                                    onClick={() => setStatusFilter(s)}
+                                    style={s === 'ติดปัญหา (QC)' ? { borderColor: '#fca5a5', color: statusFilter === s ? '#fff' : '#dc2626', background: statusFilter === s ? '#dc2626' : '#fef2f2' } : {}}
+                                >
                                     {s}
                                 </button>
                             ))}
                         </div>
-                        {soList.length > 0 && (
+                    </div>
+
+                    {/* Row 2: ตัวกรองย่อย SO + สายการผลิต + ตัวนับ */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                            {soList.length > 0 && (
+                                <CustomSelect 
+                                    value={soFilter} 
+                                    onChange={(e) => setSOFilter(e.target.value)}
+                                    style={{ width: 170, padding: '6px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 12.5, color: soFilter ? '#0369a1' : 'var(--text-muted)', background: soFilter ? '#e0f2fe' : '#fff' }}
+                                >
+                                    <option value="">ทุกคำสั่งขาย (SO)</option>
+                                    {soList.map(so => (
+                                        <option key={so} value={so}>{so}</option>
+                                    ))}
+                                </CustomSelect>
+                            )}
+
                             <CustomSelect 
-                                value={soFilter} 
-                                onChange={(e) => setSOFilter(e.target.value)}
-                                style={{ width: 160, padding: '5px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontSize: 12, color: soFilter ? '#0369a1' : 'var(--text-muted)', background: soFilter ? '#e0f2fe' : 'var(--card-bg)' }}
+                                value={lineFilter} 
+                                onChange={(e) => setLineFilter(e.target.value)}
+                                style={{ width: 160, padding: '6px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontSize: 12.5, color: lineFilter ? '#0369a1' : 'var(--text-muted)', background: lineFilter ? '#e0f2fe' : '#fff' }}
                             >
-                                <option value="">ทุก SO</option>
-                                {soList.map(so => (
-                                    <option key={so} value={so}>{so}</option>
-                                ))}
+                                <option value="">ทุกสายการผลิต</option>
+                                <option value="Line A">Line A (สายหลัก)</option>
+                                <option value="Line B">Line B (สายรอง)</option>
+                                <option value="Line C">Line C (สารเคมี)</option>
                             </CustomSelect>
-                        )}
+
+                            {(searchTerm || statusFilter !== 'ทั้งหมด' || soFilter || lineFilter) && (
+                                <button 
+                                    onClick={() => { setSearchTerm(''); setStatusFilter('ทั้งหมด'); setSOFilter(''); setLineFilter(''); }}
+                                    style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: 8, fontSize: 12, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                                >
+                                    <RefreshCw size={12} /> ล้างตัวกรอง
+                                </button>
+                            )}
+                        </div>
+
+                        <div style={{ fontSize: 13, color: '#64748b' }}>
+                            พบ <strong>{filtered.length}</strong> รายการ
+                        </div>
                     </div>
                 </div>
 
                 {hasSectionPermission('planning_list_table') && (
                     <div className="card table-card" style={{ overflow: 'auto' }}>
-                        <table className="data-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: 1000 }}>
+                        <table className="data-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: 1040 }}>
                             <colgroup>
                                 <col style={{ width: 155 }} />
                                 <col style={{ width: 135 }} />
                                 <col style={{ width: 'auto' }} />
-                                <col style={{ width: 80 }} />
-                                <col style={{ width: 70 }} />
-                                <col style={{ width: 70 }} />
-                                <col style={{ width: 100 }} />
-                                <col style={{ width: 100 }} />
-                                <col style={{ width: 90 }} />
-                                <col style={{ width: 100 }} />
+                                <col style={{ width: 85 }} />
+                                <col style={{ width: 75 }} />
+                                <col style={{ width: 75 }} />
+                                <col style={{ width: 105 }} />
+                                <col style={{ width: 110 }} />
+                                <col style={{ width: 95 }} />
+                                <col style={{ width: 110 }} />
                             </colgroup>
                             <thead>
                                 <tr>
@@ -1068,7 +1146,6 @@ export default function Planning() {
                                 {paginatedJobs.map(job => {
                                     const soRef = extractSO(job.notes);
                                     
-                                    // หา QC ล่าสุดของแต่ละ Task ใน Job นี้
                                     const jobQcs = (qcRequests || []).filter(q => q.jobOrderId === job.id);
                                     const latestQcs = {};
                                     jobQcs.forEach(q => {
@@ -1090,18 +1167,21 @@ export default function Planning() {
 
                                     return (
                                         <tr key={job.id} style={hasRejected ? { background: '#fef2f2' } : {}}>
-                                            {/* ── เลขที่ JO ── */}
+                                            {/* เลขที่ JO */}
                                             <td style={{ whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                                                     {hasRejected && <AlertTriangle size={13} color="#dc2626" style={{ flexShrink: 0 }} />}
-                                                    <span style={{ fontWeight: 600, fontSize: 12, color: hasRejected ? '#dc2626' : 'var(--primary)', letterSpacing: '0.3px' }}>{job.id}</span>
+                                                    <span style={{ fontWeight: 600, fontSize: 12.5, color: hasRejected ? '#dc2626' : 'var(--primary)', letterSpacing: '0.3px' }}>
+                                                        {job.id}
+                                                    </span>
                                                 </div>
                                             </td>
-                                            {/* ── อ้างอิง SO ── */}
+
+                                            {/* อ้างอิง SO */}
                                             <td style={{ verticalAlign: 'middle' }}>
                                                 {soRef ? (
                                                     <span 
-                                                        style={{ fontSize: 11, background: '#e0f2fe', color: '#0369a1', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap', display: 'inline-block' }}
+                                                        style={{ fontSize: 11, background: '#ede9fe', color: '#6d28d9', padding: '3px 8px', borderRadius: 4, cursor: 'pointer', fontWeight: 600, whiteSpace: 'nowrap', display: 'inline-block' }}
                                                         onClick={() => setSOFilter(soRef)}
                                                         title={`กรอง SO: ${soRef}`}
                                                     >
@@ -1111,56 +1191,80 @@ export default function Planning() {
                                                     <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
                                                 )}
                                             </td>
-                                            {/* ── ผลิตภัณฑ์ / สูตร (รวมกัน) ── */}
+
+                                            {/* ผลิตภัณฑ์ / สูตร */}
                                             <td style={{ verticalAlign: 'middle', overflow: 'hidden' }}>
-                                                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={job.productName || job.formulaName}>
-        {job.productName && job.productName !== job.formulaName ? job.productName : job.formulaName}
-    </div>
-    {job.productName && job.productName !== job.formulaName && (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {job.formulaName}
-        </div>
-    )}
-                                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={job.productName || job.formulaName}>
+                                                    {job.productName && job.productName !== job.formulaName ? job.productName : job.formulaName}
+                                                </div>
+                                                {job.productName && job.productName !== job.formulaName && (
+                                                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {job.formulaName}
+                                                    </div>
+                                                )}
+                                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                                                     <span className="plan-formula-ref" style={{ fontSize: 10 }}>{job.formulaId}</span>
                                                 </div>
                                             </td>
-                                            {/* ── จำนวน ── */}
+
+                                            {/* จำนวน */}
                                             <td style={{ textAlign: 'center', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                                                 {job.totalQty.toLocaleString()}
-                                                <div style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>{job.unit}</div>
+                                                <div style={{ fontSize: 10.5, fontWeight: 400, color: 'var(--text-muted)' }}>{job.unit}</div>
                                             </td>
-                                            {/* ── ความสำคัญ ── */}
+
+                                            {/* ความสำคัญ */}
                                             <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                                                 <span className={`badge ${getPriorityBadge(job.priority)}`} style={{ fontSize: 11 }}>{job.priority}</span>
                                             </td>
-                                            {/* ── ไลน์ผลิต ── */}
+
+                                            {/* ไลน์ผลิต */}
                                             <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                                                 <span className={`badge ${getLineBadge(job.assignedLine)}`} style={{ fontSize: 11 }}>{job.assignedLine}</span>
                                             </td>
-                                            {/* ── กำหนดเสร็จ ── */}
-                                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap', fontSize: 12, verticalAlign: 'middle' }}>{job.dueDate}</td>
-                                            {/* ── สถานะ ── */}
+
+                                            {/* กำหนดเสร็จ */}
+                                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap', fontSize: 12, verticalAlign: 'middle' }}>
+                                                {job.dueDate ? formatThaiDocDate(job.dueDate) : '-'}
+                                            </td>
+
+                                            {/* สถานะ */}
                                             <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                                                 <span className={`status-badge ${badgeClass}`} style={{ fontSize: 11 }}>{displayStatus}</span>
                                             </td>
-                                            {/* ── Progress ── */}
+
+                                            {/* Progress */}
                                             <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                                                 <div className="progress-container" style={{ minWidth: 60 }}>
                                                     <div className="progress-bar" style={{ width: `${job.progress}%`, backgroundColor: progressColor }}></div>
                                                     <span className="progress-text">{job.progress}%</span>
                                                 </div>
                                             </td>
-                                            {/* ── จัดการ ── */}
+
+                                            {/* จัดการ */}
                                             <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                                                <div style={{ display: 'inline-flex', gap: 3, alignItems: 'center', background: 'var(--bg)', borderRadius: 6, padding: '2px 3px' }}>
-                                                    <button className="btn-sm" onClick={() => setSelectedJob(job)} title="ดูรายละเอียด" style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}><Eye size={14} /></button>
-                                                    <button className="btn-sm" style={{ background: '#d1fae5', color: '#065f46', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} onClick={() => setPreviewJob(job)} title="พรีวิวเอกสาร"><FileText size={14} /></button>
-                                                    {job.status === 'รอผลิต' && canUpdate('planning_list') && (
+                                                <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center', background: '#f8fafc', borderRadius: 8, padding: '3px 4px', border: '1px solid #e2e8f0' }}>
+                                                    <button 
+                                                        className="btn-sm" 
+                                                        onClick={() => setSelectedJob(job)} 
+                                                        title="ดูรายละเอียด BOM & ขั้นตอน" 
+                                                        style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                                                    >
+                                                        <Eye size={14} />
+                                                    </button>
+                                                    <button 
+                                                        className="btn-sm" 
+                                                        style={{ background: '#d1fae5', color: '#065f46', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} 
+                                                        onClick={() => setPreviewJob(job)} 
+                                                        title="พิมพ์ใบสั่งผลิต"
+                                                    >
+                                                        <Printer size={14} />
+                                                    </button>
+                                                    {(job.status === 'รอผลิต' || job.status === 'รอเริ่มงาน') && canUpdate('planning_list') && (
                                                         <button 
                                                             className="btn-sm" 
                                                             style={{ background: '#e0e7ff', color: '#4338ca', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }} 
-                                                            title="ปล่อยให้ฝ่ายผลิต" 
+                                                            title="ปล่อยงานเข้าสู่ฝ่ายผลิต" 
                                                             onClick={() => handleReleaseJob(job.id)}
                                                         >
                                                             <Play size={14} />
@@ -1172,7 +1276,22 @@ export default function Planning() {
                                     );
                                 })}
                                 {filtered.length === 0 && (
-                                    <tr><td colSpan="10" style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>ไม่พบข้อมูล</td></tr>
+                                    <tr>
+                                        <td colSpan="10" style={{ textAlign: 'center', padding: 36, color: 'var(--text-muted)' }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                                                <Search size={28} style={{ opacity: 0.3 }} />
+                                                <p style={{ margin: 0, fontWeight: 500 }}>ไม่พบข้อมูลใบสั่งผลิตที่ตรงกับเงื่อนไข</p>
+                                                {(searchTerm || statusFilter !== 'ทั้งหมด' || soFilter || lineFilter) && (
+                                                    <button 
+                                                        onClick={() => { setSearchTerm(''); setStatusFilter('ทั้งหมด'); setSOFilter(''); setLineFilter(''); }}
+                                                        style={{ background: '#3b82f6', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, cursor: 'pointer', marginTop: 4 }}
+                                                    >
+                                                        ล้างตัวกรองทั้งหมด
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
                                 )}
                             </tbody>
                         </table>
@@ -1189,6 +1308,248 @@ export default function Planning() {
             </div>
         );
     };
+
+    // ── TAB 2: คำสั่งขายที่รอวางแผน (Pending Sales Orders) ──
+    const renderPendingSOTab = () => {
+        const filteredSOs = pendingSalesOrders.filter(so => {
+            if (!soSearch) return true;
+            const term = soSearch.toLowerCase();
+            return (so.SalesOrderNo || '').toLowerCase().includes(term) ||
+                (so.CustomerName || '').toLowerCase().includes(term) ||
+                (so.CustomerPONumber || '').toLowerCase().includes(term);
+        });
+
+        return (
+            <div className="planning-so-view">
+                {/* Header & Search */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                        <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <ShoppingCart size={18} color="#7c3aed" /> คำสั่งขายที่รอจัดทำแผนผลิต (Pending Sales Orders)
+                        </h3>
+                        <p style={{ margin: 0, fontSize: 12.5, color: '#64748b' }}>
+                            ออเดอร์ที่ได้รับการยืนยันจากฝ่ายขายแล้ว และรอจัดทำใบสั่งผลิต (Job Order) พร้อมสเกลวัตถุดิบอัตโนมัติ
+                        </p>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div className="search-input-wrap" style={{ width: 280 }}>
+                            <Search size={15} />
+                            <input 
+                                type="text" 
+                                placeholder="ค้นหาออเดอร์ (SO, ลูกค้า, PO)..." 
+                                value={soSearch} 
+                                onChange={(e) => setSoSearch(e.target.value)} 
+                            />
+                            {soSearch && (
+                                <button onClick={() => setSoSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#94a3b8' }}>
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                        <button 
+                            onClick={() => fetchPendingSalesOrders(true)} 
+                            style={{ background: '#fff', border: '1px solid #cbd5e1', padding: '8px 12px', borderRadius: 8, fontSize: 12.5, color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                            title="รีเฟรชคำสั่งขาย"
+                        >
+                            <RefreshCw size={14} className={loadingSOs ? 'spin' : ''} /> รีเฟรช
+                        </button>
+                    </div>
+                </div>
+
+                {loadingSOs ? (
+                    <div className="card text-center" style={{ padding: 48, color: 'var(--text-muted)' }}>
+                        <RefreshCw size={24} className="spin" style={{ margin: '0 auto 10px', color: '#8b5cf6' }} />
+                        <div>กำลังโหลดคำสั่งขาย...</div>
+                    </div>
+                ) : filteredSOs.length === 0 ? (
+                    <div className="card text-center" style={{ padding: '52px 24px', background: '#fff', borderRadius: 12, border: '1px dashed #cbd5e1' }}>
+                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                            <CheckCircle2 size={34} />
+                        </div>
+                        <h3 style={{ margin: '0 0 8px', color: '#1e293b', fontSize: 18, fontWeight: 700 }}>
+                            {soSearch ? 'ไม่พบคำสั่งขายที่ตรงกับคำค้นหา' : 'ไม่มีคำสั่งขายที่รอวางแผนในขณะนี้ 🎉'}
+                        </h3>
+                        <p style={{ margin: '0 0 20px', color: '#64748b', fontSize: 13, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
+                            {soSearch ? 'ลองตรวจสอบคำค้นหา หรือกดล้างคำค้นหา' : 'ยอดเยี่ยมมาก! ทุกคำสั่งขายจากฝ่ายขายได้รับการจัดทำแผนการผลิตเรียบร้อยแล้ว หรือยังไม่มีคำสั่งขายใหม่ส่งเข้ามา'}
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
+                            {soSearch ? (
+                                <button className="btn-secondary" onClick={() => setSoSearch('')}>ล้างคำค้นหา</button>
+                            ) : (
+                                <button className="btn-primary" onClick={() => setActiveView('jobs')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <ClipboardList size={16} /> ดูรายการใบสั่งผลิตทั้งหมด
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="planning-so-grid">
+                        {filteredSOs.map(so => (
+                            <div key={so.SalesOrderID} className="planning-so-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
+                                {/* Header */}
+                                <div className="planning-so-header">
+                                    <div>
+                                        <span className="planning-so-badge">
+                                            <ShoppingCart size={13} /> {so.SalesOrderNo}
+                                        </span>
+                                        <h4 style={{ margin: '10px 0 0', fontSize: 16, fontWeight: 700, color: '#1e293b' }}>
+                                            {so.CustomerName}
+                                        </h4>
+                                    </div>
+                                    <span style={{ fontSize: 11, background: '#f1f5f9', color: '#475569', padding: '3px 8px', borderRadius: 4, fontWeight: 600 }}>
+                                        {so.Status}
+                                    </span>
+                                </div>
+
+                                {/* Body */}
+                                <div className="planning-so-body">
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        {so.CustomerPONumber && (
+                                            <div className="planning-so-meta-row">
+                                                <FileText size={14} style={{ color: '#94a3b8' }} />
+                                                <span>PO ลูกค้า: <strong style={{ color: '#334155' }}>{so.CustomerPONumber}</strong></span>
+                                            </div>
+                                        )}
+                                        <div className="planning-so-meta-row">
+                                            <CalendarDays size={14} style={{ color: '#94a3b8' }} />
+                                            <span>กำหนดส่งมอบ: <strong style={{ color: '#dc2626' }}>{so.DeliveryDate ? formatThaiDocDate(so.DeliveryDate) : 'ไม่ระบุ'}</strong></span>
+                                        </div>
+                                    </div>
+
+                                    {/* Items List Preview */}
+                                    <div className="planning-so-items-box">
+                                        <div style={{ fontWeight: 600, color: '#475569', marginBottom: 6, fontSize: 11.5, display: 'flex', justifyContent: 'space-between' }}>
+                                            <span>รายการสินค้าในออเดอร์</span>
+                                            <span>จำนวน</span>
+                                        </div>
+                                        {(so.items || []).length > 0 ? (
+                                            (so.items || []).map((it, idx) => (
+                                                <div key={idx} className="planning-so-item-row">
+                                                    <span style={{ color: '#1e293b', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                                                        {it.ItemName}
+                                                    </span>
+                                                    <span style={{ fontWeight: 600, color: '#0369a1' }}>
+                                                        {Number(it.Qty).toLocaleString()} {it.Unit || 'ชิ้น'}
+                                                    </span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div style={{ color: '#94a3b8', fontStyle: 'italic', padding: '4px 0' }}>คลิกดูรายละเอียดเพื่อดูรายการสินค้า</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Footer Actions */}
+                                <div className="planning-so-footer">
+                                    <button 
+                                        onClick={() => handleViewSODetail(so.SalesOrderID)}
+                                        style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #cbd5e1', color: '#475569', padding: '9px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+                                    >
+                                        <Eye size={14} /> รายละเอียด
+                                    </button>
+                                    <button 
+                                        onClick={() => handleCreateFromSO(so)}
+                                        style={{ flex: 1.3, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, background: '#7c3aed', color: '#fff', border: 'none', padding: '9px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600, boxShadow: '0 2px 4px rgba(124, 58, 237, 0.25)' }}
+                                    >
+                                        <ClipboardList size={15} /> จัดทำแผนผลิต
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // ── TAB 3: สูตรการผลิตพร้อมใช้จาก R&D ──
+    const renderFormulasTab = () => {
+        const approvedFormulas = (MOCK_FORMULAS || []).filter(f => f.status === 'อนุมัติ');
+        const filteredFormulas = approvedFormulas.filter(f => {
+            if (!formulaSearch) return true;
+            const term = formulaSearch.toLowerCase();
+            return (f.id || '').toLowerCase().includes(term) ||
+                (f.name || '').toLowerCase().includes(term);
+        });
+
+        return (
+            <div className="planning-formulas-view">
+                {/* Header & Search */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+                    <div>
+                        <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Beaker size={18} color="#0891b2" /> สูตรการผลิตที่พร้อมใช้งานจากฝ่ายวิจัยและพัฒนา (R&D)
+                        </h3>
+                        <p style={{ margin: 0, fontSize: 12.5, color: '#64748b' }}>
+                            สูตรที่ผ่านการคิดค้น ตรวจสอบ และอนุมัติแล้ว สามารถคลิก "+ เปิดใบสั่งผลิตจากสูตรนี้" เพื่อวางแผนผลิตได้ทันที
+                        </p>
+                    </div>
+
+                    <div className="search-input-wrap" style={{ width: 280 }}>
+                        <Search size={15} />
+                        <input 
+                            type="text" 
+                            placeholder="ค้นหาสูตร (รหัสสูตร, ชื่อสูตร)..." 
+                            value={formulaSearch} 
+                            onChange={(e) => setFormulaSearch(e.target.value)} 
+                        />
+                        {formulaSearch && (
+                            <button onClick={() => setFormulaSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#94a3b8' }}>
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {filteredFormulas.length === 0 ? (
+                    <div className="card text-center" style={{ padding: 48, color: 'var(--text-muted)' }}>
+                        <Beaker size={32} style={{ opacity: 0.3, margin: '0 auto 10px' }} />
+                        <p style={{ margin: 0, fontWeight: 500 }}>ไม่พบสูตรที่ตรงกับคำค้นหา "{formulaSearch}"</p>
+                    </div>
+                ) : (
+                    <div className="planning-formula-grid-v2">
+                        {filteredFormulas.map(f => (
+                            <div key={f.id} className="planning-formula-card-v2">
+                                <div>
+                                    <div className="planning-formula-top-v2">
+                                        <span className="planning-formula-badge-code">{f.id}</span>
+                                        <span className="badge badge-success" style={{ fontSize: 11 }}>พร้อมผลิต</span>
+                                    </div>
+                                    <h4 className="planning-formula-title">{f.name}</h4>
+                                    
+                                    <div className="planning-formula-details-box">
+                                        <div>
+                                            <div className="planning-formula-detail-label">ขนาด Batch มาตรฐาน</div>
+                                            <div className="planning-formula-detail-val">
+                                                {f.ingredients?.length ? formatDynamicBatchSize(f.ingredients) : `${f.batchSize?.toLocaleString()} ${f.unit}`}/batch
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div className="planning-formula-detail-label">จำนวนวัตถุดิบ</div>
+                                            <div className="planning-formula-detail-val">{f.ingredients?.length || 0} รายการ</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button 
+                                    className="btn-primary" 
+                                    onClick={() => handleOpenCreateWithFormula(f)}
+                                    style={{ width: '100%', padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#2563eb' }}
+                                >
+                                    <Plus size={15} /> เปิดใบสั่งผลิตจากสูตรนี้
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    // Legacy fallbacks for compatibility
+    const renderOverview = () => renderJobsTab();
+    const renderPlanList = () => renderJobsTab();
 
 
 
@@ -1835,12 +2196,43 @@ export default function Planning() {
 
     return (
         <div className="page-container planning-page page-enter">
-            <div className="page-title" style={{ padding: '0 0 20px 0' }}>
-                <h1>{getPageTitle()}</h1>
-                <p>{getPageDesc()}</p>
+            {/* Header */}
+            <div className="page-title" style={{ padding: '0 0 16px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+                <div>
+                    <h1 style={{ display: 'flex', alignItems: 'center', gap: 10, margin: 0, fontSize: 24, fontWeight: 700 }}>
+                        <CalendarDays size={26} color="var(--primary)" />
+                        ศูนย์วางแผนการผลิต (Production Planning Hub)
+                    </h1>
+                    <p style={{ margin: '6px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                        ศูนย์ควบคุมแผนการผลิต จัดการใบสั่งผลิต ออเดอร์จากฝ่ายขาย และสูตรการผลิต R&D ครบวงจร
+                    </p>
+                </div>
+                {hasSectionPermission('planning_list_action') && canCreate('planning_list') && (
+                    <button 
+                        className="btn-primary" 
+                        onClick={() => setShowCreateModal(true)} 
+                        style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 8, fontSize: 13.5, fontWeight: 600, boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)' }}
+                    >
+                        <Plus size={16} /> สร้างใบสั่งผลิตใหม่
+                    </button>
+                )}
             </div>
-            {currentTab === 'planning_overview' && renderOverview()}
-            {currentTab === 'planning_list' && renderPlanList()}
+
+            {/* QC Rejected Alert Banner */}
+            {renderQCAlert()}
+
+            {/* Top Interactive KPI Cards (ศูนย์ควบคุมสถิติ) */}
+            {hasSectionPermission('planning_overview_stats') && renderKPIStats()}
+
+            {/* In-Page Navigation Tabs (สลับหน้าได้ทันที ไม่ต้องออกไปเมนูซ้าย) */}
+            {renderTabBar()}
+
+            {/* Tab Contents */}
+            {activeView === 'jobs' && renderJobsTab()}
+            {activeView === 'pending_so' && renderPendingSOTab()}
+            {activeView === 'formulas' && renderFormulasTab()}
+
+            {/* Modals */}
             {renderJobModal()}
             {renderCreateModal()}
             {renderSODetailModal()}

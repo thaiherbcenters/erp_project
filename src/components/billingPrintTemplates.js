@@ -82,7 +82,7 @@ export const printTemplateHTML = `<div id="printContainer">
                     <span id="printPhone" style="font-weight: normal;"></span>
                 </td>
                 <td style="border-top: none; padding: 5px 8px; vertical-align: top;">
-                    <!-- Blank area under date -->
+                    <span style="font-weight:bold;">เงื่อนไขการชำระเงิน/ Credit:</span> <span id="printCreditTerms" style="margin-left: 5px; font-weight: normal; color: red; font-size: 9pt;">ชำระเต็มจำนวน</span>
                 </td>
             </tr>
             <tr>
@@ -848,7 +848,7 @@ export const printTemplateHTML = `<div id="printContainer">
                     <td style="border: 1px solid black; padding: 4px 8px; white-space: nowrap;">วันที่: <span id="fdaPrintDate"></span></td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid black; padding: 4px 8px; white-space: nowrap;">กำหนดชำระเครดิต/ Credit: <span style="font-size: 9pt; color: red;" id="fdaPrintCreditTerm">ชำระเต็มจำนวน</span></td>
+                    <td style="border: 1px solid black; padding: 4px 8px; white-space: nowrap;">เงื่อนไขการชำระเงิน/ Credit: <span style="font-size: 9pt; color: red;" id="fdaPrintCreditTerm">ชำระเต็มจำนวน</span></td>
                 </tr>
             </table>
 

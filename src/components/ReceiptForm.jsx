@@ -2277,7 +2277,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                         <input type="text" name="fdaProjectName" placeholder="ขึ้นทะเบียนตำรับยา (G)" value={formData.fdaProjectName} onChange={handleFormChange} style={{ background: '#fff' }} />
                                     </div>
                                     <div className="form-group" style={{ marginBottom: 0 }}>
-                                        <label style={{ fontWeight: 'bold', color: '#334155' }}>กำหนดชำระเครดิต (Credit Terms)</label>
+                                        <label style={{ fontWeight: 'bold', color: '#334155' }}>เงื่อนไขการชำระเงิน (Credit Terms)</label>
                                         <input type="text" name="fdaCreditTerms" placeholder="ชำระเต็มจำนวน" value={formData.fdaCreditTerms} onChange={handleFormChange} style={{ background: '#fff' }} />
                                     </div>
                                 </div>
@@ -3129,7 +3129,7 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
                                 </tr>
                                 <tr>
                                     <td style={{ border: '1px solid black', padding: '4px 8px', whiteSpace: 'nowrap' }}>
-                                        <span>กำหนดชำระเครดิต/ Credit:</span> <span style={{ fontSize: '9pt', color: 'red' }}>ชำระเต็มจำนวน</span>
+                                        <span>เงื่อนไขการชำระเงิน/ Credit:</span> <span style={{ fontSize: '9pt', color: 'red' }}>{formData.fdaCreditTerms || 'ชำระเต็มจำนวน'}</span>
                                     </td>
                                 </tr>
                             </tbody>
