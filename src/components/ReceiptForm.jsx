@@ -1709,8 +1709,8 @@ export default function ReceiptForm({ editId, onBack, onSave, viewOnly, isHistor
     if (isElt) {
         compNameTH = isEn ? 'Elite Trading 2020 Co., Ltd. (HEAD OFFICE)' : 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด (สำนักงานใหญ่)';
         compNameEN = '';
-        compAddr1 = isEn ? '6/8 Moo 2, Sai Ma Subdistrict, Mueang Nonthaburi District' : 'เลขที่ 6/8 หมู่ที่ 2 แขวง/ตำบล ไทรม้า เขต/อำเภอเมืองนนทบุรี';
-        compAddr2 = isEn ? 'Nonthaburi Province 11000 Tel:063-898-9895' : 'จ.นนทบุรี รหัสไปรษณีย์ 11000 โทร:063-898-9895';
+        compAddr1 = isEn ? '186 Moo 6, Ban Mai Subdistrict, Pak Kret District' : 'เลขที่ 186 หมู่ที่ 6 แขวง/ตำบล บ้านใหม่ เขต/อำเภอ ปากเกร็ด';
+        compAddr2 = isEn ? 'Nonthaburi Province 11120 Tel:063-898-9895' : 'จ.นนทบุรี รหัสไปรษณีย์ 11120 โทร:063-898-9895';
         compTax = isEn ? 'Tax ID: 0125563029289' : 'เลขผู้เสียภาษี: 0125563029289';
         compLogo = '/images/logos/logo-elt.png';
     } else if (isPsf) {

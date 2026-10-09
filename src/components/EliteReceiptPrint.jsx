@@ -96,7 +96,7 @@ const EliteReceiptPrint = forwardRef(({ data }, ref) => {
                         ELITE TRADING 2020 CO., LTD.
                     </div>
                     <div style={{ fontSize: '9.5pt', lineHeight: 1.4, color: '#0f172a', whiteSpace: 'nowrap' }}>
-                        เลขที่ 6/8 หมู่ที่ 2 ต.ไทรม้า อ.เมืองนนทบุรี จ.นนทบุรี 11000<br />
+                        เลขที่ 186 หมู่ที่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120<br />
                         โทรศัพท์ 063-898-9895<br />
                         เลขประจำตัวผู้เสียภาษี 0125563029289
                     </div>

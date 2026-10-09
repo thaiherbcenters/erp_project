@@ -144,7 +144,7 @@ const EliteBookingOrderPrint = forwardRef(({ data }, ref) => {
                                 ELITE TRADING 2020 CO., LTD.
                             </div>
                             <div style={{ fontSize: '9pt', marginTop: '1px' }}>
-                                เลขที่ 6/8 หมู่ที่ 2 ต.ไทรม้า อ.เมืองนนทบุรี จ.นนทบุรี 11000
+                                เลขที่ 186 หมู่ที่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120
                             </div>
                             <div style={{ fontSize: '9pt', marginTop: '1px' }}>
                                 โทรศัพท์ 063-898-9895 - เลขประจำตัวผู้เสียภาษี 0125563029289

@@ -70,7 +70,7 @@ const EliteTaxInvoicePrint = forwardRef(({ data }, ref) => {
                             <div style={{ color: '#1a7a3a', fontSize: '16pt', fontWeight: 'bold', marginBottom: '4px', whiteSpace: 'nowrap' }}>บริษัท อิลิท เทรดดิ้ง 2020 จำกัด (สำนักงานใหญ่)</div>
                             <div style={{ fontSize: '12pt', fontWeight: 'bold', marginBottom: '4px' }}>ELITE TRADING 2020 CO., LTD.</div>
                             <div style={{ fontSize: '11pt', lineHeight: 1.5, marginBottom: '5px' }}>
-                                เลขที่ 6/8 หมู่ที่ 2 ต.ไทรม้า อ.เมืองนนทบุรี จ.นนทบุรี 11000<br />
+                                เลขที่ 186 หมู่ที่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120<br />
                                 โทรศัพท์ 063-898-9895 - เลขประจำตัวผู้เสียภาษี 0125563029289
                             </div>
                         </td>
