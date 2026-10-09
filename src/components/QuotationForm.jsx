@@ -1329,10 +1329,10 @@ export default function QuotationForm({ editId, onBack, onSave, viewOnly, isHist
         compTax = isEn ? 'Tax ID: 0125566026612' : 'เลขประจำตัวผู้เสียภาษี 0125566026612';
         compLogo = '/images/logos/logo-psf.png';
     } else {
-        compNameTH = isEn ? 'Thai Herb Centers(THC)Community Enterprise (HEAD OFFICE)' : 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์ (สำนักงานใหญ่)';
-        compNameEN = isEn ? '' : 'Thai Herb Centers(THC)Community Enterprise (HEAD OFFICE)';
+        compNameTH = isEn ? 'Thai Herb Centers Community Enterprise (HEAD OFFICE)' : 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์ (สำนักงานใหญ่)';
+        compNameEN = isEn ? '' : 'Thai Herb Centers Community Enterprise (HEAD OFFICE)';
         compAddr1 = isEn ? '6/10 Moo 2 Sai Ma subdistrict, Mueang Nonthaburi District, Nonthaburi 11000' : '6/10 หมู่ที่ 2 ต.ไทรม้า อ.เมืองนนทบุรี จ.นนทบุรี 11000';
-        compAddr2 = isEn ? '' : '6/10 Moo 2 Sai Ma subdistrict,Mueang Nonthaburi District,Nonthabui Province,Thailand 11000';
+        compAddr2 = '';
         compTax = isEn ? 'Tel: 083-9799389 / Tax ID: 099-200438186-0' : 'โทร:083-9799389 / เลขประจำตัวผู้เสียภาษี 099-200438186-0';
         compLogo = '/images/logos/logo-thc.png';
     }

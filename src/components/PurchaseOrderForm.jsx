@@ -82,7 +82,7 @@ const BUYER_COMPANIES = {
     po_thc: {
         name: 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์',
         headerName: 'วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์ (สำนักงานใหญ่)',
-        nameEn: 'Thai Herb Centers (THC) Community Enterprise (HEAD OFFICE)',
+        nameEn: 'Thai Herb Centers Community Enterprise (HEAD OFFICE)',
         address: '6/10 หมู่ที่ 2 ต.ไทรม้า อ.เมืองนนทบุรี จ.นนทบุรี 11000',
         phone: '083-9799389',
         email: 'thaiherbcenters@gmail.com',

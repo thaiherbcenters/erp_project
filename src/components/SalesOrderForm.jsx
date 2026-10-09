@@ -909,13 +909,10 @@ export default function SalesOrderForm({ editId, onBack, onSave, viewOnly }) {
                                                 วิสาหกิจชุมชนไทยเฮิร์บเซ็นเตอร์ (สำนักงานใหญ่)
                                             </div>
                                             <div style={{ fontSize: '9pt', marginTop: '1px', whiteSpace: 'nowrap' }}>
-                                                Thai Herb Centers(THC)Community Enterprise (HEAD OFFICE)
+                                                Thai Herb Centers Community Enterprise (HEAD OFFICE)
                                             </div>
                                             <div style={{ fontSize: '9pt', marginTop: '1px' }}>
                                                 6/10 หมู่ที่ 2 ต.ไทรม้า อ.เมืองนนทบุรี จ.นนทบุรี 11000
-                                            </div>
-                                            <div style={{ fontSize: '8pt' }}>
-                                                6/10 Moo 2 Sai Ma subdistrict,Mueang Nonthaburi District,Nonthabui Province,Thailand 11000
                                             </div>
                                             <div style={{ fontSize: '9pt', marginTop: '1px' }}>
                                                 โทร:083-9799389 / เลขประจำตัวผู้เสียภาษี 099-200438186-0
