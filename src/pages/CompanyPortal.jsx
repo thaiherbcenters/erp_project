@@ -36,10 +36,10 @@ const COMPANY_CONFIGS = {
     elite: {
         id: 2,
         short: 'ELITE',
-        nameTH: 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด',
-        nameEN: 'Elite Trading 2020 Co., Ltd.',
+        nameTH: 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด (สำนักงานใหญ่)',
+        nameEN: 'Elite Trading 2020 Co., Ltd. (HEAD OFFICE)',
         taxId: '0125563029289',
-        address: '186 หมู่ที่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120',
+        address: 'เลขที่ 186 หมู่ที่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120',
         color: '#2563eb',
         logo: '/images/logos/logo-elite.png',
         docPrefix: 'ELT',

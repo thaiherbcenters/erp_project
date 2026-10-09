@@ -1899,10 +1899,10 @@ export default function ChequeForm() {
                                 <div className="voucher-header">
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                         <div>
-                                            <h2 className="voucher-company-name">บริษัท อิลิท เทรดดิ้ง 2020 จำกัด</h2>
+                                            <h2 className="voucher-company-name">บริษัท อิลิท เทรดดิ้ง 2020 จำกัด (สำนักงานใหญ่)</h2>
                                             <p className="voucher-company-sub">ELITE TRADING 2020 CO., LTD.</p>
                                             <p className="voucher-company-sub" style={{ fontSize: '0.78rem', marginTop: '2px' }}>
-                                                เลขประจำตัวผู้เสียภาษี: 0125563029289 | 186 หมู่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120
+                                                เลขที่ 186 หมู่ที่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120 | เลขประจำตัวผู้เสียภาษี 0125563029289
                                             </p>
                                         </div>
                                         <img 

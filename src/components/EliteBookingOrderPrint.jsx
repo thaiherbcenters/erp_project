@@ -138,7 +138,7 @@ const EliteBookingOrderPrint = forwardRef(({ data }, ref) => {
                         </td>
                         <td style={{ width: '54%', padding: '2px 10px', verticalAlign: 'middle', border: 'none' }}>
                             <div style={{ color: '#1a7a3a', fontWeight: 'bold', fontSize: '13.5pt', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
-                                บริษัท อิลิท เทรดดิ้ง 2020 จำกัด
+                                บริษัท อิลิท เทรดดิ้ง 2020 จำกัด (สำนักงานใหญ่)
                             </div>
                             <div style={{ fontSize: '9pt', marginTop: '1px', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
                                 ELITE TRADING 2020 CO., LTD.
@@ -147,7 +147,10 @@ const EliteBookingOrderPrint = forwardRef(({ data }, ref) => {
                                 เลขที่ 186 หมู่ที่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120
                             </div>
                             <div style={{ fontSize: '9pt', marginTop: '1px' }}>
-                                โทรศัพท์ 063-898-9895 - เลขประจำตัวผู้เสียภาษี 0125563029289
+                                โทรศัพท์ 063-898-9895
+                            </div>
+                            <div style={{ fontSize: '9pt', marginTop: '1px' }}>
+                                เลขประจำตัวผู้เสียภาษี 0125563029289
                             </div>
                         </td>
                         <td style={{ width: '30%', textAlign: 'center', verticalAlign: 'middle', border: 'none', padding: '4px' }}>

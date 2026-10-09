@@ -1305,10 +1305,10 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
 
     if (isElt) {
         compNameTH = isEn ? 'Elite Trading 2020 Co., Ltd. (HEAD OFFICE)' : 'บริษัท อิลิท เทรดดิ้ง 2020 จำกัด (สำนักงานใหญ่)';
-        compNameEN = '';
-        compAddr1 = isEn ? '186 Moo 6, Ban Mai Subdistrict, Pak Kret District' : 'เลขที่ 186 หมู่ที่ 6 แขวง/ตำบล บ้านใหม่ เขต/อำเภอ ปากเกร็ด';
-        compAddr2 = isEn ? 'Nonthaburi Province 11120 Tel:063-898-9895' : 'จ.นนทบุรี รหัสไปรษณีย์ 11120 โทร:063-898-9895';
-        compTax = isEn ? 'Tax ID: 0125563029289' : 'เลขผู้เสียภาษี: 0125563029289';
+        compNameEN = isEn ? '' : 'ELITE TRADING 2020 CO., LTD.';
+        compAddr1 = isEn ? '186 Moo 6, Ban Mai, Pak Kret, Nonthaburi 11120' : 'เลขที่ 186 หมู่ที่ 6 ต.บ้านใหม่ อ.ปากเกร็ด จ.นนทบุรี 11120';
+        compAddr2 = isEn ? 'Tel: 063-898-9895' : 'โทรศัพท์ 063-898-9895';
+        compTax = isEn ? 'Tax ID: 0125563029289' : 'เลขประจำตัวผู้เสียภาษี 0125563029289';
         compLogo = '/images/logos/logo-elt.png';
     } else if (isPsf) {
         compNameTH = isEn ? 'Premier Smart Farm Co., Ltd. (HEAD OFFICE)' : 'บริษัท พรีเมียร์ สมาร์ท ฟาร์ม จำกัด (สำนักงานใหญ่)';
@@ -2731,13 +2731,15 @@ export default function TaxInvoiceForm({ editId, onBack, onSave, viewOnly, isHis
                                 <div style={{ color: '#1a7a3a', fontWeight: 'bold', fontSize: '13.5pt', lineHeight: 1.2, whiteSpace: 'nowrap' }}>
                                     {compNameTH}
                                 </div>
-                                <div style={{ fontSize: '9pt', marginTop: '1px', whiteSpace: 'nowrap' }}>
-                                    {compNameEN}
-                                </div>
+                                {compNameEN && (
+                                    <div style={{ fontSize: '9pt', fontWeight: 'bold', marginTop: '1px', whiteSpace: 'nowrap' }}>
+                                        {compNameEN}
+                                    </div>
+                                )}
                                 <div style={{ fontSize: '9pt', marginTop: '1px' }}>
                                     {compAddr1}
                                 </div>
-                                {compAddr2 && <div style={{ fontSize: '8pt' }}>{compAddr2}</div>}
+                                {compAddr2 && <div style={{ fontSize: compAddr2.length > 50 ? '8pt' : '9pt', marginTop: '1px' }}>{compAddr2}</div>}
                                 <div style={{ fontSize: '9pt', marginTop: '1px' }}>
                                     {compTax}
                                 </div>
